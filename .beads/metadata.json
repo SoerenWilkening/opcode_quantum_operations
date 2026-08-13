@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "opcode_quantum_operations",
+  "project_id": "35126d0b-046e-4ef5-b108-f7a614a9bd04"
+}
