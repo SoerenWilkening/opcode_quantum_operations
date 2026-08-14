@@ -1,5 +1,23 @@
 # Agent Instructions
 
+> ## ⚠️ READ [`CLAUDE.md`](CLAUDE.md) FIRST — it holds the project's hard rules
+>
+> [`CLAUDE.md`](CLAUDE.md) is the **authoritative operating manual** for this
+> repository: the Prime Directive, Rules 0–17, invariants I1–I6, the open blockers,
+> the key prohibitions, and the conventions. It is deliberately **not** duplicated
+> here — one copy, so the two cannot drift.
+>
+> The three things most often got wrong, so they are also stated here:
+>
+> 1. **Nothing is built yet.** No `src/`, no `CMakeLists.txt`, no Bennett.jl
+>    checkout. Every path in the planning docs is a plan, not a fact.
+> 2. **A leaked dirty ancilla is a silent miscompile, not a leak.** A correct value
+>    is not a correct circuit.
+> 3. **Bennett.jl is the sole source of circuit constructions** — port, never
+>    re-derive, and never quote it from memory.
+>
+> This file covers only shell hygiene and the beads integration.
+
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
 > **Architecture in one line:** Issues live in a local Dolt database
