@@ -36,11 +36,14 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 3 | **M02** | `src/shadow.[ch]` | 114 / 130 |
 > | 4 | **M03** | `src/qubits.[ch]`, plus `tests/support/death.[ch]` | 130 / 150 |
 > | 5 | **M04** | `src/sink.[ch]` + `cq_sink` in the public header, plus `tests/support/mock_sink.[ch]` | 108 / 90 · 139 / 120 |
+> | 6 | **M05** | `src/emit.[ch]` — the §3 fold table — plus `src/ctx.[ch]`, the shared context | 122 / 190 |
 >
-> **Next is Step 6 — M05 `emit`, the fold table. It is the critical path (Rule 11) and
-> the most important suite in the project.** Layer 1 and everything below it in plan §3
-> is still a plan: no emitter, no register table, no sandwich, no kernel, and **no
-> `cq_ctx`** — the four Layer 0 modules are wired together only by their tests.
+> **The fold table has landed and is green at 159/159** (155 exhaustive + 4 distinctness
+> deaths), so the critical path is behind us. `cq_ctx` now exists: pool + shadow + a
+> borrowed sink, and in Debug the I6 scratch extent.
+>
+> **Next is Step 7 — M07 `reg`.** Still a plan: no register or handle table, no scratch,
+> no sandwich, no kernel, and no controlled axis (M06 is Step 20, not Step 7).
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -461,6 +464,12 @@ The `tests/support/` harness is hand-rolled (no dependencies beyond libc).
 plan §2.2's list of five, added at Step 4 because Steps 4 and 6 need ten aborts between
 them. The other three land across Phase B: `refmodel`, `bitkinds`, `poolcheck`.
 
+Some deaths are **Debug-only by design** — plan §2.1 gates the I2 owner map, the I6
+scratch-extent check and the §3 distinctness asserts on `CQOPS_DEBUG_INVARIANTS`. Those
+cases call `CQ_DEATH_SKIP_WITHOUT_INVARIANTS(...)` and report a **skip** in Release
+rather than a pass, so a Release run never claims to have verified something the
+configuration compiled out. Say which configuration a death was verified in (Rule 17).
+
 `mock_sink` is the workhorse: it records the `(op, operands)` stream, compares against
 an expected sequence and dumps the actual one on failure, and feeds `CHECK_GATES` its
 three per-kind counts. **Angles compare bitwise, not with `==`** — `0.0` and `-0.0` are
@@ -480,12 +489,24 @@ issue; `make test` is the local stand-in (lint, then both configurations).
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
-- **Layer 0 is complete; Layer 1 and below does not exist.** `src/bit.h`,
-  `src/shadow.[ch]`, `src/qubits.[ch]` and `src/sink.[ch]` are real as of Step 5 — but
-  there is still no emitter, no register table, no sandwich and no kernel, so **`cq_ctx`
-  does not exist** and the four modules are wired together only by their tests. Check
-  before you cite — and read `third_party/bennett/COMMIT` rather than running `git log`
-  inside it, which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **Layer 0 and the emitter exist; nothing above them does.** `src/bit.h`,
+  `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]` and
+  `src/emit.[ch]` are real as of Step 6 — but there is no register or handle table, no
+  scratch, no sandwich, no kernel, and **no controlled axis** (M06 is Step 20, despite
+  its low module number). Check before you cite — and read
+  `third_party/bennett/COMMIT` rather than running `git log` inside it, which reports
+  the *parent* repo's HEAD because the snapshot has no `.git`.
+- **`cq_bit_coincident` has NO pointer-identity clause, and adding one breaks the fold
+  table.** PRD §3 says the distinctness check "can only ever fire on `CQ_BIT_Q`
+  operands, and cannot fire on two constants" — a pointer clause fires on one constant
+  bit passed in both control slots, which is a legal fold (`CCX(o,o,t)` → `X(t)`). It is
+  redundant besides: two `Q` bits at one address necessarily share an index. The PRD's
+  own parenthetical said otherwise and was corrected at Step 6.
+- **`cq_materialise` emits its `X` straight to the sink, not through `cq_emit_x`.**
+  Deliberate and load-bearing for Step 20: once M06 makes `cq_emit_x` consult
+  `ctrl_depth`, routing through it would promote the materialising `X` to a `CX` and
+  leave the fresh qubit entangled with the control instead of in a definite state.
+  Whether that is right is M06's call, and the current code declines to answer it.
 - **The §8 vtable is frozen at six entries and there is no `h`.** Settled at Step 5 on
   Step 0.7's resolution: `cqrt_h` was an over-declaration in CQ_lang, so §12's Grover
   builds H out of rotations. Adding a seventh entry forks us from a frozen ABI.
@@ -676,7 +697,7 @@ check, do not assume, and update this table when a step lands):
 | Layer | Modules |
 |---|---|
 | 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · **M04 `sink`** |
-| 1 — emission | M05 `emit` (the fold table — Rule 11) · M06 `controlled` |
+| 1 — emission | **M05 `emit`** (the fold table — Rule 11) · M06 `controlled` |
 | 2 — registers, sandwich | M07 `reg` · M08 `scratch` · M09 `sandwich` |
 | 3 — kernels | M10 `bitwise` · M11 `shift_const` · M12 `shift_var` · M13 `cast` · M14 `add` · M15 `addacc` · M16 `cmp` · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |
 | 4 — analog, sinks | M21 `angle` · M22 `rotate` · M23 `sink_printf` · M24 `sink_count` · M25 `sink_qec` |

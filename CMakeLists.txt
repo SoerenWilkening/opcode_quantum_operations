@@ -88,6 +88,8 @@ add_library(cqops STATIC
                         # header-only and carries no translation unit)
     src/qubits.c        # M03, Step 4 — pool, LIFO free list, ceiling, peak
     src/sink.c          # M04, Step 5 — the §8 vtable, dispatch, CQOPS_SINK
+    src/ctx.c           #      Step 6 — the shared context aggregate
+    src/emit.c          # M05, Step 6 — the §3 fold table (critical path)
 )
 
 target_include_directories(cqops

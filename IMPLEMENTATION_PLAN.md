@@ -307,6 +307,53 @@ later verification claim rests on: `tests/test_harness_negative.c`, a binary reg
 `WILL_FAIL` that asserts a failing `CHECK` really does report and exit non-zero. A
 `CHECK` that could not fail would make every suite green while verifying nothing.
 
+### Step 6 status (2026-08-14) — **the fold table is in, 159/159**
+
+M05 `src/emit.[ch]` (122/190) plus `src/ctx.[ch]`, the shared context aggregate. 24
+ctest tests green under **both** configurations and under ASan + UBSan; `make lint`
+green. **19 mutations of `emit.c`, 19 killed.**
+
+The suite is 155 exhaustive cases — 5 X + 25 CX + 125 CCX over the five operand kinds
+— each pinning gate stream, qubits allocated, resulting bit-kind and resulting shadow,
+plus the 4 distinctness deaths in `test_emit_death.c`. Three layers of defence against
+the oracle and the emitter sharing a misreading of §3: the oracle follows the PRD's own
+rows and reductions; the 25 CX rows are **also** pinned as a literal hand-written table
+that never runs the oracle; and `check_universal` asserts five things that hold whatever
+the fold table says (I1 on the target, controls never modified, ≤ 2 gates, at most one
+qubit and only for a materialised target, and no qubit taken when no gate was emitted).
+
+**Deviation 6 — `src/ctx.[ch]` is not in §3's module map.** PRD §3's emitter signature
+takes a `cq_ctx *` and M06–M09 all need the same aggregate, so it has to exist by
+Step 6. Kept to a struct and three functions with no policy of its own. It is **not**
+in the public header yet, despite PRD §14 listing "context" there: the first consumer
+of a public context is the shim at M26 (Step 23), and freezing an ABI four steps early
+would be guessing.
+
+**Deviation 7 — `cq_materialise` emits its `X` straight to the sink**, not through
+`cq_emit_x`. Once M06 makes `cq_emit_x` consult `ctrl_depth` (Step 20), routing through
+it would promote the materialising `X` to a `CX` and leave the fresh qubit entangled
+with the control rather than in a definite state. Whether that is correct is M06's
+call; the code declines to answer it by accident. Filed.
+
+**Two corrections to the design of record, both found by this suite:**
+
+1. **`cq_bit_coincident` had a pointer-identity clause and now does not.** It was
+   redundant — two `Q` bits at one address necessarily hold the same index — and
+   unsound, because it fired on one constant bit passed in both control slots, which
+   PRD §3 says explicitly must never happen. `CCX(o, o, t)` is a legal fold to `X(t)`
+   and the clause aborted on it.
+2. **PRD §3's "on qubit index (and pointer identity)" contradicted its own next
+   clause** and has been corrected to "on qubit index alone", with the finding recorded
+   inline.
+
+One test-quality note worth carrying to Step 7. Deleting M05's distinctness check
+**still aborted**, because M02's `cq_shadow_cx` carries its own `c != t` assert one
+layer down — defence in depth made the mutation survive. What M05 must do is reject
+*before* anything reaches the sink, so the death cases now use a sink that **disarms
+the abort window on any emission**: a gate that escapes turns the later abort into
+exit 4 and fails the case. Expect the same shape wherever two layers guard one
+condition.
+
 ### Steps 2–5 status (2026-08-14) — **Phase A Layer 0 complete, with five deviations**
 
 M01 `src/bit.h` (64/70, header-only — no translation unit), M02 `src/shadow.[ch]`

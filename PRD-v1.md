@@ -327,9 +327,17 @@ pair, because `c1 != c2 != t` is prose shorthand and not valid C semantics:
 `c1 == t` is exactly as much a miscompile signature as `c1 == c2`, so all three `CCX` pairs
 are checked. Note what the assert can actually compare: distinctness is a property of
 **bits**, not of kinds. Two different bits may both be `Q unknown` while holding different
-qubit indices — a legal, ordinary pair. So the check is on qubit index (and pointer
-identity), which means it can only ever fire on `CQ_BIT_Q` operands, and cannot fire on two
-constants. That is correct: two constant bits are genuinely independent channels.
+qubit indices — a legal, ordinary pair. So the check is **on qubit index alone**, which
+means it can only ever fire on `CQ_BIT_Q` operands, and cannot fire on two constants. That
+is correct: two constant bits are genuinely independent channels.
+
+> **This sentence used to read "on qubit index (and pointer identity)", and the
+> parenthetical contradicted the rest of it.** A pointer-identity clause fires on two
+> constants that happen to be the same object, which the same sentence forbids — and it is
+> redundant besides, since two `Q` bits at one address necessarily hold the same index.
+> Found at Step 6: `CCX(o, o, t)`, one constant `ONE` bit passed as both controls, is a
+> legal fold to `X(t)` and the spurious clause aborted on it. Register-level aliasing is a
+> separate question and belongs to **D7** and M07.
 
 ### Shadow update rules
 

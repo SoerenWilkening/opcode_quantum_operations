@@ -31,12 +31,25 @@ add_cqops_test(test_shadow)       # M02, Step 3 — the §3 shadow update table
 add_cqops_test(test_qubits)       # M03, Step 4 — pool, D2, D4, I3, peak
 add_cqops_test(test_sink)         # M04, Step 5 — §8 vtable + mock_sink
 
+## Layer 1 — emission.
+add_cqops_test(test_emit_fold)    # M05, Step 6 — L0, 155 exhaustive cases
+
 ## Fail-loud paths. NOT WILL_FAIL — that inverts a non-zero exit code and does
 ## not invert a crash, so it cannot express "this abort()s" at all; see
 ## tests/support/death.h.
 add_cqops_death_test(test_shadow_death CASES
     reads_past_the_end
     writes_past_the_end
+)
+
+## The remaining 4 of Step 6's 159: the §3 distinctness asserts. Debug-gated
+## by plan §2.1, so these SKIP in Release rather than reporting a false pass.
+add_cqops_death_test(test_emit_death CASES
+    cx_control_equals_target
+    ccx_controls_are_the_same_qubit
+    ccx_first_control_equals_target
+    ccx_second_control_equals_target
+    i6_target_outside_the_scratch_region
 )
 
 add_cqops_death_test(test_sink_death CASES

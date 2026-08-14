@@ -223,8 +223,17 @@ CQ_TEST(coincidence_is_a_property_of_bits_not_of_kinds)
     CHECK(!cq_bit_coincident(&q3, &q4));   /* distinct rails                 */
 
     CHECK(cq_bit_coincident(&q3, &q3b));   /* same qubit, two cq_bit objects */
-    CHECK(cq_bit_coincident(&q3, &q3));    /* literally the same bit         */
-    CHECK(cq_bit_coincident(&z1, &z1));    /* pointer identity beats kind    */
+    CHECK(cq_bit_coincident(&q3, &q3));    /* literally the same qubit bit   */
+
+    /* The same CONSTANT object passed twice is NOT coincident, even though it
+     * is the same object. PRD §3: the check "can only ever fire on CQ_BIT_Q
+     * operands, and cannot fire on two constants". This is not pedantry —
+     * CCX(o, o, t) with one constant ONE bit in both control slots is a legal
+     * fold to X(t), and Step 6's fold suite aborts on it if a pointer-identity
+     * clause creeps back in. That clause is redundant anyway: two Q bits at one
+     * address necessarily share an index. */
+    CHECK(!cq_bit_coincident(&z1, &z1));
+    CHECK(!cq_bit_coincident(&o1, &o1));
 }
 
 CQ_TEST_MAIN(

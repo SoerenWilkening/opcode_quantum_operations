@@ -123,11 +123,22 @@ static inline void cq_bit_flip_const(cq_bit *b)
  * *bits*, not of kinds — two different bits may both be Q on different
  * indices, which is an ordinary legal pair. So this can only ever fire on
  * CQ_BIT_Q operands, and never on two constants, which are genuinely
- * independent channels. Takes pointers because pointer identity is half the
- * question; every other query here is by value. */
+ * independent channels.
+ *
+ * THERE IS DELIBERATELY NO POINTER-IDENTITY CLAUSE, and an earlier draft of
+ * this file had one. It was wrong twice over. It is REDUNDANT — two Q bits at
+ * the same address necessarily hold the same index, so the index test already
+ * catches them — and it is UNSOUND, because it makes the predicate fire on two
+ * constants that happen to be the same object, which PRD §3 says explicitly it
+ * must never do. Caught at Step 6 by the fold suite: `CCX(o, o, t)` with one
+ * constant ONE bit passed as both controls is a legal fold to X(t), and the
+ * spurious clause aborted on it. Register-level aliasing is a different
+ * question and belongs to D7 and M07, not here.
+ *
+ * Takes pointers only because both operands are read; every other query in
+ * this header is by value. */
 static inline int cq_bit_coincident(const cq_bit *a, const cq_bit *b)
 {
-    if (a == b) return 1;
     return a->kind == CQ_BIT_Q && b->kind == CQ_BIT_Q && a->q == b->q;
 }
 

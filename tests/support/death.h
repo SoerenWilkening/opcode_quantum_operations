@@ -42,6 +42,9 @@ void cq_death_disarm(void);
 /* Reports that the statement returned instead of aborting, and exits 1. */
 void cq_death_survived(const char *file, int line, const char *stmt);
 
+/* Reports that the case cannot run in this configuration, and exits 0. */
+void cq_death_skip(const char *why);
+
 /* Dispatches argv[1] to a case; returns a process exit status. */
 int cq_death_main(int argc, char **argv, const cq_death_case *cases, size_t n);
 
@@ -52,6 +55,18 @@ int cq_death_main(int argc, char **argv, const cq_death_case *cases, size_t n);
         cq_death_disarm();                                                    \
         cq_death_survived(__FILE__, __LINE__, #stmt);                         \
     } while (0)
+
+/* Some hard errors are Debug-gated by design — plan §2.1 assigns the I2 owner
+ * map, the I6 scratch-extent check and the §3 operand-distinctness asserts to
+ * CQOPS_DEBUG_INVARIANTS. Their death cases cannot fire in Release, so they
+ * SKIP there rather than fail, and say so loudly: a Release run must never
+ * report having verified something the configuration compiled out (Rule 17).
+ * Place this after the case's setup and before its CQ_EXPECT_ABORT. */
+#if defined(CQOPS_DEBUG_INVARIANTS) && CQOPS_DEBUG_INVARIANTS
+#  define CQ_DEATH_SKIP_WITHOUT_INVARIANTS(why) ((void)0)
+#else
+#  define CQ_DEATH_SKIP_WITHOUT_INVARIANTS(why) cq_death_skip(why)
+#endif
 
 #define CQ_DEATH_CASE(fn) { #fn, fn }
 

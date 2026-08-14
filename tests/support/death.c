@@ -28,6 +28,14 @@ void cq_death_disarm(void)
     armed = 0;
 }
 
+void cq_death_skip(const char *why)
+{
+    fprintf(stderr, "# SKIP (configuration cannot reach this abort): %s\n",
+            why ? why : "-");
+    fflush(NULL);
+    _Exit(0);
+}
+
 void cq_death_survived(const char *file, int line, const char *stmt)
 {
     fprintf(stderr, "%s:%d: expected an abort from: %s\n", file, line, stmt);
