@@ -5,8 +5,13 @@ add_library(cqops_test_support STATIC
     support/harness.c
 )
 
+## src/ is PRIVATE on the cqops target, because none of it is public API. The
+## suites need it anyway: plan §2.1 is one test binary per *module*, and the
+## modules are internal — test_bit.c includes "bit.h" directly. Carrying the
+## path here rather than widening cqops keeps the exception on the test side.
 target_include_directories(cqops_test_support PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(cqops_test_support
@@ -17,6 +22,9 @@ target_link_libraries(cqops_test_support
 ## Suites. Layer order mirrors plan §3; each lands with its step.
 
 add_cqops_test(test_skeleton)
+
+## Layer 0 — primitives.
+add_cqops_test(test_bit)          # M01, Step 2 — I1
 
 ## The harness's own negative self-test: expected to exit non-zero. It is what
 ## makes every other suite's green meaningful.
