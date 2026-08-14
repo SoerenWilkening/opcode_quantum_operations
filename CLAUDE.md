@@ -26,8 +26,8 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
 > | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **Steps 1–4 have landed (2026-08-14): the build is real, and so is Layer 0 minus the
-> sink.** On disk and passing under both configurations, 13 ctest tests:
+> **Steps 1–5 have landed (2026-08-14): Layer 0 is complete.** On disk and passing
+> under both configurations, 18 ctest tests:
 >
 > | Step | Module | Files | LOC / budget |
 > |---|---|---|---|
@@ -35,9 +35,12 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 2 | **M01** | `src/bit.h` — header-only, all `static inline`, **no translation unit** | 64 / 70 |
 > | 3 | **M02** | `src/shadow.[ch]` | 114 / 130 |
 > | 4 | **M03** | `src/qubits.[ch]`, plus `tests/support/death.[ch]` | 130 / 150 |
+> | 5 | **M04** | `src/sink.[ch]` + `cq_sink` in the public header, plus `tests/support/mock_sink.[ch]` | 108 / 90 · 139 / 120 |
 >
-> **The next module is M04 `sink` at Step 5; M05 `emit` — the fold table, the critical
-> path — is Step 6.** Everything from M05 down in plan §3 is still a plan.
+> **Next is Step 6 — M05 `emit`, the fold table. It is the critical path (Rule 11) and
+> the most important suite in the project.** Layer 1 and everything below it in plan §3
+> is still a plan: no emitter, no register table, no sandwich, no kernel, and **no
+> `cq_ctx`** — the four Layer 0 modules are wired together only by their tests.
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -448,11 +451,20 @@ ctest --test-dir build-debug -R death            # every fail-loud path
 ./build-debug/tests/test_qubits_death             # lists its cases
 ```
 
+`CQOPS_SINK` picks the default sink by name (PRD §8), so CQ_lang's fixtures select one
+without a code change; `cqops_set_sink()` overrides it, and `NULL` returns to the
+environment's choice. Unset or empty means absent, and the documented fallback is
+`printf`. A name that resolves to nothing is a hard error, never a quiet substitution.
+
 The `tests/support/` harness is hand-rolled (no dependencies beyond libc).
-**`harness.[ch]` and `death.[ch]` exist** — `death.[ch]` is beyond plan §2.2's list of
-five, added at Step 4 because Steps 4 and 6 need ten aborts between them. The other
-three land with what they need: `mock_sink` at Step 5 (it needs M04's vtable),
-`refmodel` / `bitkinds` / `poolcheck` across Phase B.
+**`harness.[ch]`, `death.[ch]` and `mock_sink.[ch]` exist** — `death.[ch]` is beyond
+plan §2.2's list of five, added at Step 4 because Steps 4 and 6 need ten aborts between
+them. The other three land across Phase B: `refmodel`, `bitkinds`, `poolcheck`.
+
+`mock_sink` is the workhorse: it records the `(op, operands)` stream, compares against
+an expected sequence and dumps the actual one on failure, and feeds `CHECK_GATES` its
+three per-kind counts. **Angles compare bitwise, not with `==`** — `0.0` and `-0.0` are
+equal in C but are different gates to emit.
 
 **Tests reach internal headers directly** — `tests/CMakeLists.txt` puts `src/` on
 `cqops_test_support`'s PUBLIC include path, so `test_bit.c` writes `#include "bit.h"`.
@@ -468,12 +480,18 @@ issue; `make test` is the local stand-in (lint, then both configurations).
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
-- **Layer 0 exists up to M03; M04 and everything below it does not.** `src/bit.h`,
-  `src/shadow.[ch]` and `src/qubits.[ch]` are real as of Step 4 — but there is still no
-  emitter, no register table, no sandwich and no kernel, so a `cq_ctx` does not exist
-  either and the three modules are wired together only by their tests. Check before you
-  cite — and read `third_party/bennett/COMMIT` rather than running `git log` inside it,
-  which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **Layer 0 is complete; Layer 1 and below does not exist.** `src/bit.h`,
+  `src/shadow.[ch]`, `src/qubits.[ch]` and `src/sink.[ch]` are real as of Step 5 — but
+  there is still no emitter, no register table, no sandwich and no kernel, so **`cq_ctx`
+  does not exist** and the four modules are wired together only by their tests. Check
+  before you cite — and read `third_party/bennett/COMMIT` rather than running `git log`
+  inside it, which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **The §8 vtable is frozen at six entries and there is no `h`.** Settled at Step 5 on
+  Step 0.7's resolution: `cqrt_h` was an over-declaration in CQ_lang, so §12's Grover
+  builds H out of rotations. Adding a seventh entry forks us from a frozen ABI.
+  Relatedly, `cq_sink_active()` **never returns NULL** — an unresolvable `CQOPS_SINK`
+  is a hard error, because quietly substituting a different sink hands the caller a
+  circuit they did not ask for.
 - **`cq_qubits_release` does NOT read a shadow.** Plan §4's Step 4 row says "releasing
   a qubit whose shadow is not known-0 is a hard error", which reads as though M03 looks
   it up. It does not, and must not: the signature is
@@ -657,7 +675,7 @@ check, do not assume, and update this table when a step lands):
 
 | Layer | Modules |
 |---|---|
-| 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · M04 `sink` |
+| 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · **M04 `sink`** |
 | 1 — emission | M05 `emit` (the fold table — Rule 11) · M06 `controlled` |
 | 2 — registers, sandwich | M07 `reg` · M08 `scratch` · M09 `sandwich` |
 | 3 — kernels | M10 `bitwise` · M11 `shift_const` · M12 `shift_var` · M13 `cast` · M14 `add` · M15 `addacc` · M16 `cmp` · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |

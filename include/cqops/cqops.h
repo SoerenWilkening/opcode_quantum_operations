@@ -11,6 +11,8 @@
 #ifndef CQOPS_CQOPS_H
 #define CQOPS_CQOPS_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -36,6 +38,40 @@ extern "C" {
  * Comparing the two is how a caller catches a stale libcqops.a on the link
  * line against a newer header. */
 const char *cqops_version_string(void);
+
+/* --- Sinks (PRD §8, M04) -------------------------------------------------
+ *
+ * The one place a gate leaves the library. Emission is a stream, not a
+ * structure (NORTH_STAR §4): libcqops holds no circuit object, no gate list
+ * and no statevector, and a gate pushed through one of these pointers is gone
+ * from our side. What the sink does with it — print it, count it, hand it to
+ * the QEC layer, record it for a test — is the sink's business, and that is
+ * what lets one small library serve all four with no duplication.
+ *
+ * THIS SHAPE IS FROZEN (Step 0.7). Six entries, and there is no `h`: cqrt_h
+ * proved to be an over-declaration in CQ_lang — declared and defined there,
+ * emitted by nothing and called by nothing — so it is struck from PRD §1, and
+ * §12's Grover builds H out of rotations rather than as a primitive. Adding a
+ * seventh entry on a guess would fork us from CQ_lang's frozen ABI.
+ *
+ * `ry`/`rz` carry a raw `double` all the way down. Converting an angle to
+ * whatever representation a backend wants is the SINK's problem — angle
+ * representation is explicitly not ours (Key Prohibitions). `mz` is terminal:
+ * CQ_lang emits no adjoint and no cqrt_free for a measured handle. */
+typedef struct {
+    void (*x)  (void *u, uint32_t q);
+    void (*cx) (void *u, uint32_t c, uint32_t t);
+    void (*ccx)(void *u, uint32_t a, uint32_t b, uint32_t t);
+    void (*ry) (void *u, uint32_t q, double theta);
+    void (*rz) (void *u, uint32_t q, double phi);
+    void (*mz) (void *u, uint32_t q);
+    void *user;
+} cq_sink;
+
+/* Selects the active sink explicitly, overriding the CQOPS_SINK default.
+ * NULL clears the override and returns to the environment's choice. The sink
+ * is borrowed, not copied: it must outlive its use. */
+void cqops_set_sink(const cq_sink *s);
 
 #ifdef __cplusplus
 }

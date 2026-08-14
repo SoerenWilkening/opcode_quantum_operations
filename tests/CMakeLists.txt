@@ -4,6 +4,7 @@
 add_library(cqops_test_support STATIC
     support/harness.c
     support/death.c
+    support/mock_sink.c
 )
 
 ## src/ is PRIVATE on the cqops target, because none of it is public API. The
@@ -28,6 +29,7 @@ add_cqops_test(test_skeleton)
 add_cqops_test(test_bit)          # M01, Step 2 — I1
 add_cqops_test(test_shadow)       # M02, Step 3 — the §3 shadow update table
 add_cqops_test(test_qubits)       # M03, Step 4 — pool, D2, D4, I3, peak
+add_cqops_test(test_sink)         # M04, Step 5 — §8 vtable + mock_sink
 
 ## Fail-loud paths. NOT WILL_FAIL — that inverts a non-zero exit code and does
 ## not invert a crash, so it cannot express "this abort()s" at all; see
@@ -35,6 +37,13 @@ add_cqops_test(test_qubits)       # M03, Step 4 — pool, D2, D4, I3, peak
 add_cqops_death_test(test_shadow_death CASES
     reads_past_the_end
     writes_past_the_end
+)
+
+add_cqops_death_test(test_sink_death CASES
+    missing_entry_is_not_called
+    env_names_an_unknown_sink
+    no_sink_registered_at_all
+    registry_overflow
 )
 
 add_cqops_death_test(test_qubits_death CASES

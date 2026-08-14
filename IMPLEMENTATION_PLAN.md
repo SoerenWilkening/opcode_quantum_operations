@@ -307,13 +307,21 @@ later verification claim rests on: `tests/test_harness_negative.c`, a binary reg
 `WILL_FAIL` that asserts a failing `CHECK` really does report and exit non-zero. A
 `CHECK` that could not fail would make every suite green while verifying nothing.
 
-### Steps 2–4 status (2026-08-14) — **done, with four deviations**
+### Steps 2–5 status (2026-08-14) — **Phase A Layer 0 complete, with five deviations**
 
 M01 `src/bit.h` (64/70, header-only — no translation unit), M02 `src/shadow.[ch]`
-(114/130), M03 `src/qubits.[ch]` (130/150). Every gate met under **both**
+(114/130), M03 `src/qubits.[ch]` (130/150), M04 `src/sink.[ch]` **(108/90)** plus
+`tests/support/mock_sink.[ch]` **(139/120)**. Every gate met under **both**
 configurations and additionally under a full ASan + UBSan build with Homebrew clang;
-13 ctest tests; `make lint` green. Each suite was **mutation-tested** rather than
-assumed to bite — 8, 10 and 15 mutations respectively, all killed.
+18 ctest tests; `make lint` green. Each suite was **mutation-tested** rather than
+assumed to bite — 8, 10, 15 and 12 mutations respectively, all killed.
+
+**Two §3 budgets overshot, both far under the 300 hard limit and neither worth a
+split.** M04 carries a name registry so `cq_sink_register` / `cq_sink_by_name` resolve
+`CQOPS_SINK` inside M04; the alternative — M04 returning only the requested *name* and
+Step 9 doing the mapping — would be smaller but would reduce Step 5's "env-var default
+selection works" gate to "we can read an environment variable". `mock_sink`'s overshoot
+is `cq_mock_dump`, which is the "dump on failure" half of §2.2's own spec for it.
 
 **Deviation 1 — `cq_qubits_release` takes the evidence as a parameter.** §4's Step 4 row
 says "releasing a qubit whose shadow is not known-0 is a hard error", which reads as
@@ -342,6 +350,22 @@ one. Steps 4 and 6 need ten deaths between them. See CLAUDE.md *Build & Test*.
 **Deviation 4 — tests include internal headers directly.** `tests/CMakeLists.txt` adds
 `src/` to `cqops_test_support`'s PUBLIC include path, since §2.1 is one binary per
 *module* and the modules are internal. `src/` stays PRIVATE on the `cqops` target.
+
+**Deviation 5 — M04 is split across the public and internal headers.** PRD §14 puts
+"context, sink, config" in `include/cqops/cqops.h`, and §8 spells `cqops_set_sink()` as
+public — so the `cq_sink` vtable and that setter live in the public header (verbatim
+from §8), while `src/sink.h` carries the internal half: the six dispatch helpers and
+the registry. Selection is **process-wide**, not per-context, because §8 gives
+`cqops_set_sink()` no context argument and because the environment default has to work
+with no call into the library at all. It is resolved on every `cq_sink_active()` rather
+than cached, so there is no stale-selection state; when `cq_ctx` lands at Step 7 it
+should borrow the active sink **once at construction**, not re-resolve per gate.
+
+Dispatch goes through `cq_sink_x(...)` and friends rather than `s->x(s->user, q)` at the
+call site for exactly one reason: a NULL vtable entry is caught and named instead of
+jumping through a null pointer. §8's qec sink "stubs" `ry`/`rz`, and a stub is a no-op
+function, not a hole — silently dropping gates is the failure that leaves every suite
+downstream green while verifying nothing.
 
 One finding worth carrying forward, from mutation testing at Step 4: a growable array's
 freshly-`realloc`'d tail is only *usually* zero, so an omitted initialiser can pass a
