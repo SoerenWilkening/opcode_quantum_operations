@@ -55,23 +55,77 @@ does not in general: if a target bit is `BIT_ONE`, the forward pass materialises
 an `X` (2 gates) while the reverse pass sees it already on a qubit (1 gate), and the `X`
 is never undone.
 
-The saving condition:
+The saving condition, in two parts. **Part (a) alone is what an earlier draft said, and it
+is not sufficient** — see the control-side hazard below.
 
-> **I6** — inside a `cq_sandwich` compute half, every gate *target* is a bit of the
-> scratch region. Scratch is born `BIT_ZERO`, so materialisation there emits no `X`, and
-> step `s` therefore emits an identical gate sequence forwards and backwards.
+> **I6(a) — target side.** Inside a `cq_sandwich` compute half, every gate *target* is a
+> bit of the scratch region. Sources appear only as controls, and controls are never
+> materialised.
+>
+> **I6(b) — control side.** Every bit of the scratch region is `CQ_BIT_Q` for the whole
+> duration of the compute half. `cq_sandwich` guarantees this by **pre-materialising the
+> entire scratch region at step 0**, before the first compute step runs.
 
-Sources appear only as controls, and controls are never materialised. This holds for
-every kernel in PRD §6 — e.g. ripple-carry `add` targets only the carry chain during
-compute, and touches `dst` only in `copyout`, which is outside the reversed region.
+Together these make step `s` emit an identical gate sequence forwards and backwards, so
+replay-in-reverse cancels exactly.
 
-Two enforcement mechanisms, both cheap:
+**Why (a) is not enough — the hazard, and why it is nasty.** The old justification was
+"scratch is born `BIT_ZERO`, so materialisation there emits no `X`." True, and it covers
+targets. But the fold table dispatches on *kind*, and a scratch bit can be read as a
+**control** while it is still `BIT_ZERO`:
+
+```
+step 1:  CCX(c_0, a_1, c_1)     c_0 is still BIT_ZERO  ->  "either control ZERO" -> 0 gates
+step 2:  CX (a_0, c_0)          materialises c_0       ->  c_0 is now CQ_BIT_Q
+         ... reverse ...
+step 2:  CX (a_0, c_0)          c_0 already Q          ->  1 CX      (matches forward)
+step 1:  CCX(c_0, a_1, c_1)     c_0 is now Q           ->  1 CCX     (forward emitted NOTHING)
+```
+
+The reverse half is no longer the mirror of the forward half. The sandwich does not cancel,
+scratch is left dirty, and **L1 stays green the whole way** — the value is right and the
+trace looks plausible. Only L2/L3 can see it, and only for bit-kind masks that trigger the
+late materialisation (`{ZERO,Q}`-only masks first fail at `W=5`). This is risk **R8**, and it
+was found independently by two of the Step 0.2 extractions.
+
+**Decision (2026-08-14): pre-materialise.** `cq_sandwich` materialises the whole scratch
+region up front. Rationale: it restores the property this whole design exists for —
+reversal is *structural* and cannot be got wrong per-kernel (§0.1). The alternative
+(document an ordering obligation, "never read a scratch bit as a control before it is
+materialised") is cheaper in gates but puts reverse-half correctness back into twelve
+separate kernels, and it is unenforceable by the `const`-qualification mechanism, which
+only guards targets.
+
+Two consequences, both load-bearing:
+
+1. **L4 goldens stop depending on the *scratch* side — but NOT on the operand side.**
+   No fold on a scratch bit can fire, so the scratch half of the count is a function of `W`
+   alone. **Operand folds still fire**, and must: `a + 0`, `x − 1`, an all-`ZERO` operand
+   and the `x+1` constant-increment case all legitimately emit fewer gates, and that is
+   what L5 exists to prove. So a kernel's count is a function of `(W, operand mask)`, and
+   **every L4 golden must name the mask it was taken at.**
+   *Pin at the all-quantum mask.* It is the right choice for a specific reason, not by
+   convention: because we never demote (D6), an operand mask can only drift **towards** `Q`
+   between a forward call and its `_unc` — so the all-quantum mask is the **fixed point** of
+   that drift, and it is the one mask at which forward and `_unc` emit the same count. That
+   is what makes a single stable golden per `(kernel, W)` possible at all, and it is
+   consistent with Rule 14: forward and `_unc` counts are pinned separately *because* they
+   differ at every other mask.
+2. **A kernel must short-circuit *before* entering the sandwich when every operand bit is
+   classical.** Otherwise pre-materialisation would allocate scratch qubits for a fully
+   classical operation and break **L5**'s "zero gates and zero qubits". The all-classical
+   path never enters `cq_sandwich` at all — it folds to a constant result directly.
+
+Three enforcement mechanisms, all cheap:
 
 - **Compile time.** `cq_emit_*` takes controls as `const cq_bit *` and targets as
   `cq_bit *`. Materialisation mutates, so a source can never be materialised by
-  construction.
+  construction. *(PRD §3's prototypes contradicted this and have been corrected.)*
 - **Run time (debug).** The context carries the active scratch extent during a compute
   half; `cq_emit_*` asserts the target lies inside it. Costs nothing in release builds.
+- **Run time (debug), I6(b).** On entry to a compute half, assert every scratch bit is
+  already `CQ_BIT_Q`. This is a one-line loop and it makes a regression in the
+  pre-materialisation step fail loudly instead of silently.
 
 I6 is the reason a kernel budget of 100–200 lines is realistic.
 
@@ -105,13 +159,67 @@ against a specification that is not present.
 | 0.4 | Locate Bennett's published gate-count baselines (referenced by PRD §11 L4 with no path) and record where they live. | `docs/constructions/BASELINES.md` |
 | 0.5 | Resolve the three PRD blockers from review: **1455 vs 1474** symbol count (recount from the real yaml); **`_unc` vs `cqrt_free` qubit ownership** (who returns qubits to the pool — this decides M09's API); **L4 golden tuple arity** (`58/6/40/12` is four numbers against a three-tuple). | PRD-v1 edits |
 | 0.6 | Write the inverted list — *what is **not** from Bennett*: fold table, shadow, handle table, qubit pool, rotations (§7), sinks (§8), `cswap`/Fredkin, nested-control AND. | PRD §0 "Provenance" |
+| 0.7 | Resolve **`cqrt_h`**: listed in PRD §1's core family, absent from §8's sink vtable, forbidden by constraint 1, and built from rotations in §12. Decide before M04 freezes the vtable in Step 5. | PRD-v1 edits |
+| 0.8 | Resolve the **fold-table case count**: §4 Step 6 enumerates 155 and then gates at "175/175". Settle it *in this plan* before `test_emit_fold.c` is written. | this plan, §4 Step 6 |
+
+*(0.7 and 0.8 were found after this plan was first written and existed only in `bd`; folded
+in here 2026-08-14.)*
 
 **Gate:** every K1–K12 has a written construction spec with a gate-count formula in `W`.
 Those formulas become the L4 goldens; without them L4 has nothing to assert against.
 
-> 0.5's `_unc`/`free` question is genuinely blocking: PRD §10 says `_unc` returns qubits
-> to the pool *and* leaves bits as "known-zero qubits", which double-frees on a following
-> `cqrt_free`. Pick one before M09.
+> **0.5's `_unc`/`free` question — SETTLED 2026-08-14: `cqrt_free` is the sole
+> deallocator.** `_unc` zeroes values in place and reclaims nothing. Forced empirically,
+> not chosen: CQ_lang decides reclamation *per rail* and its only lever is emitting or
+> withholding the free, so the same `_unc` symbol appears both freed and deliberately
+> never freed (on a rail it has proven entangled). Reclaiming at `_unc` would return an
+> entangled qubit to the free list. Three independent judges, 3–0, over 239 pinned
+> goldens: 25,147 `_unc` calls, 0 double-frees. Full statement in PRD §10.
+>
+> **This plan mis-stated the consequence, twice** (the 0.5 row above, and this note):
+> it does **not** decide M09's API. M09 is `sandwich.[ch]`, whose driver runs
+> compute/copy-out/compute-reversed over **scratch** and never touches a result rail's
+> ownership; its signature is unchanged under either rule and **Step 8 was never
+> blocked**. The `_unc` axis is Step 21 and lives in M26. The real deltas are: M26's
+> `_unc` epilogue calls nothing in the pool; M03 keeps exactly **one** release site,
+> reachable only from `cqrt_free`; and M07 must carry whatever evidence `cqrt_free`'s
+> assert reads — which is its own open question, below.
+
+### Step 0 status (2026-08-14)
+
+| # | State | Where the answer lives |
+|---|---|---|
+| 0.1 | **done** | `third_party/bennett/` @ `980805de` + `COMMIT`; URL in PRD §0 |
+| 0.2 | **done** | `docs/constructions/K01..K12.md` — *but see GAP 1 below* |
+| 0.3 | **done** | `docs/cqrt_census.txt`; `third_party/cq_lang/` @ `a6a92fe` |
+| 0.4 | **done** | `docs/constructions/BASELINES.md` |
+| 0.5 | items 1 and 3 **done** (PRD §1, PRD §11); item 2 **open** | — |
+| 0.6 | **done** | PRD §0 "Provenance" |
+| 0.7 | **done** — over-declaration; struck from PRD §1. Vtable unaffected, M04 unblocked | PRD §1 |
+| 0.8 | **done** — **159** (155 + 4). Uncovered a 15-case hole in PRD §3's `CCX` table, now fixed | §4 Step 6; PRD §3 |
+
+> **GAP 1 — DECIDED 2026-08-14: pre-materialise.** The Step 0.2 catalogue was internally
+> split: K06/K07/K09/K12 pinned goldens assuming scratch bits stay classical until
+> materialised, while K11 pinned the golden that pre-materialisation implies. Both were
+> self-consistent and mutually incompatible, so M14 and M18 would have been written against
+> two different emitter designs. The underlying hazard is real and is now **I6(b)** plus
+> risk **R8** — see §0.2. `cq_sandwich` pre-materialises the whole scratch region at step 0;
+> K11 was already consistent, and §3 of K06, K07, K09 and K12 is re-issued against it —
+> every re-derived figure independently confirmed by an adversarial verifier.
+>
+> Goldens at W=8, all at the **all-quantum mask**: K06 `11W−4` = **84** (was 80),
+> K07 `15W−2` = **118** (was 116), K09 `ult` `12W+4` = **100** (was 98) and `slt`
+> `16W+8` = **136**, K12 `udiv` `34W²+13W` = **2280** (was 2166), K11 `13W²−8W` = **768**.
+> Qubits: K06 `2W`, K07 `3W`, K09 `ult` `3W+1`, K11 `W²+2W`,
+> K12 `8W²+6W−1` (**559** at W=8; **not** `8W²+5W` — killing K12's third fold costs a
+> further `W−1` qubits, and the gate/qubit pair must move together).
+>
+> **The decision fixed a latent bug in K12, it did not merely re-price it.** K12's own
+> re-issue initially claimed its halves already mirrored correctly under the old rules.
+> They did not: replaying its forward list in reverse diverges at `W ≥ 3` for any classical
+> `b` — `lower_sub!` reads `result[i]` as a *control* and then targets it again, so a write
+> whose sources all fold leaves the target classical and the reverse half sees `Q`. Smallest
+> witness: `W=3`, `a` all `Q`, `b` all `ZERO`.
 
 ---
 
@@ -159,6 +267,45 @@ Counts non-blank, non-comment lines. Runs in CI and as `make lint`.
 
 **Gate:** `ctest` runs one trivially passing test in both configurations; `make lint`
 passes; sanitizers are active in `Debug`.
+
+### Step 1 status (2026-08-14) — **done, with one deviation**
+
+On disk: `CMakeLists.txt`, `cmake/CqopsTest.cmake`, `cmake/CqopsSanitizers.cmake`,
+`include/cqops/cqops.h`, `src/version.c`, `tests/CMakeLists.txt`,
+`tests/support/harness.[ch]`, `tests/test_skeleton.c`,
+`tests/test_harness_negative.c`, `tools/check_loc.sh`, root `Makefile`.
+
+Gate met: both configurations configure and build **warning-free** under
+`-Wall -Wextra -Werror -Wconversion`, `ctest` is 2/2 in each, `make lint` passes.
+
+Three things worth knowing:
+
+1. **Only `harness.[ch]` of §2.2 exists.** It is the one support file with no
+   dependency on an unbuilt module. `mock_sink` needs M04's vtable (Step 5);
+   `refmodel` / `bitkinds` / `poolcheck` land across Phase B. `CHECK_GATES` is
+   nonetheless in `harness.h` now, taking six plain counts, so Step 5's `mock_sink`
+   only has to feed it a tuple.
+2. **`src/version.c` is scaffolding, not a module.** It exists so the Step 1 gate
+   proves a real link — include path, archive, link line — rather than proving only
+   that the harness runs. It is not in the §3 module map and carries no design weight.
+3. **DEVIATION — `Debug` is UBSan-only on the default toolchain.** Apple clang 17 on
+   Darwin 25 / x86_64 has a broken AddressSanitizer runtime: a trivial `main` built
+   with `-fsanitize=address` dies with `SIGILL` inside `libsystem_pthread` before
+   reaching `main`. Hard-coding the plan's `-fsanitize=address,undefined` would make
+   every Debug binary in the project unrunnable on this box. So each sanitizer is
+   **probed** — compiled *and run* — via `check_c_source_runs`, and only what works is
+   enabled; what is missing gets a CMake warning, and `test_skeleton` cross-checks the
+   build's belief against the compiler's `__has_feature` so the gap can never go
+   quiet. `CQOPS_SANITIZERS=ON` turns a missing sanitizer into a hard configure error;
+   `-DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang` (Homebrew LLVM) restores both,
+   verified. UBSan on Apple clang does genuinely abort, verified via
+   `-fno-sanitize-recover=all`. **Until ASan is available by default, a Debug run
+   verifies less than the plan assumes — Rule 17 applies when reporting it.**
+
+Also added beyond the letter of §2.2, because the harness is the foundation every
+later verification claim rests on: `tests/test_harness_negative.c`, a binary registered
+`WILL_FAIL` that asserts a failing `CHECK` really does report and exit non-zero. A
+`CHECK` that could not fail would make every suite green while verifying nothing.
 
 ---
 
@@ -223,7 +370,7 @@ it grows.
 |---|---|---|---|
 | M26 | `shim/cq_runtime_impl.c` | 220 | The `cqrt_*` surface incl. the PRD §2.1 easy-to-miss families |
 | M27 | `shim/gen_shim.py` | 280 | Reads `opcode_table.yaml`; emits one `.gen.c` per opcode family + fp aborts |
-| M28 | generated `*.gen.c` | exempt | ~1455 integer wrappers + 878 fp abort bodies |
+| M28 | generated `*.gen.c` | exempt | **1595** integer wrappers + **884** fp abort bodies (PRD §1; 1455 if i80 is ruled out of scope) |
 
 Hand-written total ≈ **3,400 LOC** across 27 modules.
 
@@ -242,7 +389,7 @@ proceed). PRD increment mapping in the right column.
 | 3 | `test_shadow.c` — the §3 shadow update table, all operand combinations; poison is sticky; "unknown when determinate" is allowed, the reverse never is | M02 | Table green | 1 |
 | 4 | `test_qubits.c` — LIFO order (D4); ceiling exceeded fails loud (D2); releasing a qubit whose shadow is not known-0 is a **hard error** (I3); peak tracking | M03 | All green | 1 |
 | 5 | `test_sink.c` + `mock_sink` — every vtable entry dispatches; env-var default selection | M04 + `mock_sink` | Recording sink usable by later tests | 1 |
-| 6 | **`test_emit_fold.c` — L0, exhaustive.** Target/control ∈ {const-0, const-1, Q known-0, Q known-1, Q unknown}: 5 X cases, 25 CX, 125 CCX. Each pins **gates emitted, qubits allocated, resulting bit-kind, and shadow**. Plus: distinctness assert fires on `c == t` and `c1 == c2` | M05 | **175/175.** This is the most important suite in the project — everything above it is Bennett transcribed against these three functions | 1 |
+| 6 | **`test_emit_fold.c` — L0, exhaustive.** Target/control ∈ {const-0, const-1, Q known-0, Q known-1, Q unknown}: `5 X + 25 CX + 125 CCX` = **155** cases, the full Cartesian product. Each pins **gates emitted, qubits allocated, resulting bit-kind, and shadow** — four *assertions* per case, not four cases. Plus **4** distinctness death-tests: `c == t` (CX) and `c1 == c2`, `c1 == t`, `c2 == t` (CCX). Each death-test needs **Q** operands, since the assert compares qubit indices and cannot fire on constants | M05 | **159/159** (155 + 4). This is the most important suite in the project — everything above it is Bennett transcribed against these three functions | 1 |
 | 7 | `test_reg.c` — handles monotonic, never reused (D5); tombstones; I4 (all-constant register owns zero qubits); free of a dirty rail is a hard error; I2 owner map catches a double-owned qubit; **D7 aliasing asserts fire** | M07 | All green | 1 |
 | 8 | `test_scratch.c`, `test_sandwich.c` — driver runs compute forwards, copyout, compute backwards; a synthetic step function's recorded stream is a **palindrome around the copyout**; I6 violation (target outside scratch) is caught in Debug | M08, M09 | All green | 1 |
 | 9 | `test_sink_printf.c`, `test_sink_count.c` — trace format matches CQ_lang's goldens; counter totals match the mock sink's stream | M23, M24 | **PRD Increment 1 complete** | 1 |
@@ -256,7 +403,7 @@ kernel driver rather than written per kernel:
 |---|---|---|
 | **L1** | `shadow(dst) == refmodel(a, b)` for all `(a,b)` at `W ∈ {1,2,4,8}`, × bit-kind masks; random sampling at `W ∈ {16,32,64}` | `bitkinds` + `refmodel` |
 | **L2** | After the call, the live-qubit set equals **exactly** `dst`'s qubits | `poolcheck`, automatic on every L1 case |
-| **L3** | forward → `_unc` → `dst` all-zero **and** pool restored. Asserted on **values and pool state only, never bit-kinds** (PRD §10) | `poolcheck`, automatic |
+| **L3** | forward → `_unc` → `dst`'s **values** all-zero; then an explicit `cqrt_free` → pool restored. Asserted on **values and pool state only, never bit-kinds** (PRD §10). Note `_unc` alone does **not** restore the pool — it reclaims nothing, so the free is a required third step, not a tidy-up | `poolcheck`, automatic |
 | **L4** | `(NOT, CNOT, Toffoli)` at each `W` matches the golden, cross-checked against the Step 0.2 formula | `sink_count` + `tests/goldens/`, `--update-goldens` to regenerate |
 
 Bit-kind masks are not purely random. The fixed set always includes: all-classical
@@ -298,7 +445,7 @@ parameter in the kernel test driver, not twelve new suites.
 | Step | Red | Green | Gate | PRD |
 |---|---|---|---|---|
 | 22 | `test_gen_shim.py` — generator round-trips the real `opcode_table.yaml`; **emitted symbol count reconciles with Step 0.5**; every fp symbol gets a named abort body | M27 | Generator green | 8 |
-| 23 | `test_runtime.c` — the PRD §2.1 families: `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled[_inv]`, `cqrt_cswap` (constant ctrl = **0 gates**; quantum ctrl = Fredkin per bit) | M26, M28 | Full grid links; `nm` shows no undefined `cq_template_*` | 8 |
+| 23 | `test_runtime.c` — the PRD §2.1 families: `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled[_inv]`, `cqrt_cswap` (constant ctrl = **0 gates**; quantum ctrl = Fredkin per bit) | M26, M28 | Full grid links; `nm` shows no undefined `cq_template_*` **from the opcode grid**. The 401 intrinsic/libm symbols come from CQ_lang's own archives and are deliberately *not* ours (PRD §1) — an unqualified "no undefined `cq_template_*`" cannot pass | 8 |
 | 24 | **L6** — link against CQ_lang's existing fixtures, diff emitted traces | — | Traces match | 8 |
 | 25 | **L7** — Grover per PRD §12. (a) compiles through `cqc`, links, emits a gate stream; (b) **classical mode**: `M_PI/2 → M_PI` runs deterministically and `cq_measure` returns what plain C computes; (c) counter sink reports Toffoli count, T-count, peak qubits, stable across runs and pinned | — | **v1 done** | 8 |
 
@@ -346,6 +493,8 @@ Steps 10–13 are genuinely independent and can run concurrently. Steps 14–17 
 | # | Risk | Signal | Mitigation |
 |---|---|---|---|
 | R1 | I6 violated by a kernel — a compute-half target outside scratch makes the reverse half silently non-cancelling | L2 fails, or worse, L2 passes and L3 fails only at some widths | Debug-build extent assert (§0.2) plus `const`-qualified control parameters. Both land in Step 8, before any kernel |
+| **R8** | **I6's *control* side — the hazard R1 does not describe.** A scratch bit read as a **control** while still `BIT_ZERO` folds to 0 gates forward; if a later step materialises it, the reverse replay emits a gate the forward never did. The sandwich stops cancelling and scratch is left dirty | **L1 stays GREEN — and in at least one regime L4 stays green too.** Replaying K12's forward list in reverse with `a` all `Q`, `b` all `ZERO` yields a *different gate multiset with the identical total count* (116/204/318/458/816 at W=3/4/5/6/8), so the count golden matches while the circuit is wrong. **Only L2/L3 can see that case at all.** Other regimes are luckier: `a` all `ONE` with `b` quantum breaks only gate *order* (a benign commuting reorder). `{ZERO,Q}`-only masks first fail at W=5 | **Closed by I6(b)** (§0.2): `cq_sandwich` pre-materialises the whole scratch region at step 0, so no fold on a scratch bit can fire and the two halves are identical by construction. Debug-asserted on entry to every compute half. Lands in **Step 8**, before Step 12. Still put the witnesses (`W=3`, `a=b={Q,ZERO,ZERO}`; `{ZERO,Q}`-only at `W=5`) in the fixed L1 mask set — a regression must not depend on random masks to be caught |
+| R9 | Pre-materialisation defeats **L5** — a fully-classical operation allocates scratch qubits it never needed | L5 fails: non-zero gates or qubits for the all-constant case | The all-classical path **short-circuits before `cq_sandwich` is entered** and folds to a constant directly (§0.2, consequence 2). This is a kernel-entry check, so it lands with the first sandwich kernel in Step 12 and is covered by L5's existing all-classical mask |
 | R2 | **D7 aliasing** — CQ's pass emits `add(h,h)` or `_unc(out,out,b)`. Every kernel assumes distinct registers | Only surfaces at Step 24 (L6), by which point twelve kernels exist | Assert loud from Step 7. If it fires, the fix is a defensive `cqrt_copy` of the aliased operand — one place, not twelve |
 | R3 | Bennett.jl drift invalidates L4 goldens silently | Goldens diff after an unrelated pull | Pinned commit (Step 0.1); goldens carry the Bennett commit in a header comment |
 | R4 | K12 divrem exceeds 300 lines | `make lint` fails | Pre-planned split (M19/M20) already in the module map |

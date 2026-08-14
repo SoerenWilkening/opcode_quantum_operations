@@ -24,14 +24,30 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`NORTH_STAR.md`](NORTH_STAR.md) | *Why* — the five commitments, the five finish-line conditions, what this repo is **not** |
 > | [`PRD-v1.md`](PRD-v1.md) | *What* — scope, data model, the §3 fold table, the K1–K12 kernel catalogue, invariants I1–I5, open decisions D1–D7 |
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
-> | `bd` | The tracker. All 28 steps (0–27) are filed, plus **eight** Step 0 sub-tasks: the plan's 0.1–0.6, and 0.7/0.8 for two contradictions found after the plan was written. `bd ready` |
+> | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **NOTHING IS BUILT YET (as of 2026-08-14).** The repository contains those three
-> markdown documents, this file, `AGENTS.md`, and the beads DB. There is **no**
-> `src/`, no `include/`, no `tests/`, no `CMakeLists.txt`, no `third_party/`, and **no
-> Bennett.jl checkout anywhere on disk**. Every path named in this file or in the PRD
-> is a **plan, not a fact**. Do not claim a file exists because a document names it —
-> check (Rule 16).
+> **Step 1 has landed (2026-08-14): the build exists and the commands under *Build &
+> Test* below are real.** `CMakeLists.txt`, `cmake/`, `include/cqops/cqops.h`,
+> `src/version.c`, `tests/support/harness.[ch]`, `tools/check_loc.sh` and a root
+> `Makefile` are on disk; both configurations configure, build warning-free and pass
+> `ctest`. **No backend C exists yet** — `src/` holds only the version symbol, whose
+> job is to give the Step 1 gate a real link to prove. M01 `bit.h` arrives at Step 2,
+> and every module path in plan §3 is still a plan.
+>
+> **Step 0 is substantially done, so the references DO now exist on disk:**
+>
+> | Path | What |
+> |---|---|
+> | `third_party/bennett/` | Bennett.jl @ `980805de85314b3da7ac25cf6454b56566f8e609` — a stripped snapshot (no `.git`, no `.beads`) plus `COMMIT` and `.provenance/MANIFEST.txt`. Note `git log` inside it reports the **parent** repo's HEAD; read `COMMIT` to check the pin |
+> | `third_party/cq_lang/` | `opcode_table.yaml` verbatim @ CQ_lang `a6a92fe`, plus `COMMIT`. **Never edit it** |
+> | `docs/constructions/K01..K12.md` | The ported construction specs, each with a gate-count formula in `W` |
+> | `docs/constructions/BASELINES.md` | Upstream baselines, and which one Step 12 pins against |
+> | `docs/cqrt_census.txt` | The real `cqrt_*` census (**173** symbols) and the resolved template counts |
+>
+> Everything **else** named in this file or in the PRD is still a plan. Do not claim a
+> file exists because a document names it — check (Rule 16). And note the K-docs are
+> **not yet mutually consistent**: four of the twelve goldens are contingent on an
+> unmade decision — see Step 0.9 under Open blockers.
 
 ---
 
@@ -159,7 +175,7 @@ The levels, and what each one is actually for:
 
 | | Asserts | Notes |
 |---|---|---|
-| **L0** | The §3 fold table, exhaustively | Target/control over the 5 operand kinds: 5 X + 25 CX + 125 CCX = **155**, plus the 2 distinctness asserts. Each case pins gates emitted, qubits allocated, resulting bit-kind, **and** shadow. **Count unsettled** — plan §4 gates Step 6 at "175/175"; see Open blockers |
+| **L0** | The §3 fold table, exhaustively | **159** = 5 X + 25 CX + 125 CCX = **155** exhaustive over the 5 operand kinds, plus **4** distinctness death-tests (`c==t`; `c1==c2`, `c1==t`, `c2==t`). Each case pins gates emitted, qubits allocated, resulting bit-kind, **and** shadow — four *assertions* per case, not four cases. The table branches on **kind only, never shadow** (that is D6 no-demotion): only `3+9+27 = 39` gate-behaviour classes exist, and the 155 split is there to pin the shadow |
 | **L1** | `shadow(dst) == refmodel(a,b)` | Exhaustive at `W ∈ {1,2,4,8}` × bit-kind masks; sampled at `W ∈ {16,32,64}` |
 | **L2** | Live-qubit set == exactly `dst`'s qubits | Automatic on every L1 case |
 | **L3** | forward → `_unc` → all-zero **and** pool restored | Values and pool state only — see Rule 14 |
@@ -170,6 +186,21 @@ The levels, and what each one is actually for:
 
 L1 and L5 are the two that actually catch bugs. L4 is what stops a "harmless"
 refactor from silently doubling the T-count.
+
+**Two things about L4 that are counter-intuitive and cost real work to establish:**
+
+1. **Every golden must name the operand mask it was taken at, and that mask is
+   all-quantum.** Pre-materialising scratch (I6(b)) removes the *scratch* side's
+   dependence on bit-kinds, but **operand folds still fire** — `a + 0`, `x − 1`, an
+   all-`ZERO` operand all legitimately emit fewer gates, which is what L5 proves. Counts
+   are a function of `(W, operand mask)`. All-quantum is the correct pin because, with no
+   demotion (D6), a mask can only drift *towards* `Q`, making it the **fixed point** — the
+   one mask where forward and `_unc` agree.
+2. **A matching gate count is NOT evidence the sandwich cancelled.** Measured: replaying
+   K12's forward list in reverse under the old rules with `a` all `Q`, `b` all `ZERO` gives
+   a **different gate multiset with the identical total** (816 at W=8). L1 green *and* L4
+   green, circuit wrong, scratch dirty — **only L2/L3 could see it.** The Prime Directive's
+   "L1 *and* L2/L3 *and* L4 together" is right, but L4 is weaker than it looks.
 
 **Rule 11 — Step 6 (the fold table) is the critical path; over-invest there.** The
 fold table is the **only** place classical/quantum is decided. A bug there is a bug
@@ -260,49 +291,102 @@ say determinate when the truth is unknown. Poison is sticky.
 
 ## Open blockers — do NOT silently pick a side
 
-Five contradictions are unresolved. If your work depends on one, resolve it **in the
-source document** first; never settle it implicitly in code.
+If your work depends on one of these, resolve it **in the source document** first;
+never settle it implicitly in code. `bd show <id>` for the full statement of each.
 
-**Tracked as Step 0.5** — three PRD-internal contradictions:
+### Open
 
-1. **Symbol count: 1455 vs 1474.** PRD §1 says 1455 purely-integer (1455 + 878 fp =
-   2333); §13 and §14 both say 1474. Recount from the real `opcode_table.yaml`.
-2. **`_unc` vs `cqrt_free` qubit ownership — blocks M09's API.** PRD §10 says `_unc`
-   returns qubits to the pool *and* leaves bits as "known-zero qubits", which
-   double-frees on a following `cqrt_free`. Pick one **before** M09.
-3. **L4 golden tuple arity.** `x+1` at Int8 is given as `58/6/40/12` — four numbers
-   against a three-tuple `(NOT, CNOT, Toffoli)`.
+**`ckd.17` — what evidence does `cqrt_free`'s "provably clean" assert actually read?
+Bites M08 at Step 8, before any kernel exists.** It **cannot** be the two-bit shadow:
+§3's `CX` rule is `t.unknown |= c.unknown` and poison is sticky, so after any sandwich
+kernel on a tainted operand every bit of the rail is `Q unknown` — a literal shadow
+check hard-errors on every legitimate program, and M08's "assert clean on release"
+fails the same way on scratch. The proof must be **structural** (the §4 kernel contract
+plus I6 palindromic reversal), which requires **one sanctioned un-poisoning write** —
+the sole exception to "conservative in the safe direction only". That exception is
+itself a miscompile vector: applied to a rail whose XOR did *not* cancel, it launders a
+dirty rail into a provably-clean one and removes the project's only defence. Decide
+where the certificate lives, who may stamp it, and how a grep finds every caller.
 
-**Tracked as Step 0.7** — `cqrt_h`. PRD §1 lists `cqrt_h` in the core runtime family,
-but the §8 sink vtable has **no `h` entry**, and §12's Grover builds `H` out of
-rotations (`φ += π; θ += π/2`) rather than as a primitive. Either `cqrt_h` is realised
-via rotations, or it is an over-declaration, or the vtable is short an entry.
-Establish which **before M04 freezes the vtable shape in Step 5**; do not add an `h`
-sink entry on a guess.
+**`ckd.18` — the rotation-root free breaks the assert *and* I3 on a fixture CQ_lang
+ships as correct. Will abort Step 24.** `slice_uncompute_dead_dag.expected.log`:
+`alloc_i32(5) → ry(θ) → ry(−θ) → cqrt_free`, with **no `_unc` anywhere**, so no
+uncompute certificate can exist. In our model `alloc(5)` is all-constant with zero
+qubits (I4); `ry` at arbitrary θ materialises all 32 bits with shadow *unknown*; poison
+is sticky so `ry(−θ)` does not clear it. At the free the rail is physically `|5⟩` — two
+qubits at `|1⟩` — with an unknown shadow. The hard error fires on valid input; and
+suppressing it is worse, pushing two `|1⟩` qubits onto the free list, breaking I3 and
+handing a non-`|0⟩` qubit to the next `cq_materialise`. Emitting the corrective `X`s
+needs the value, i.e. D6, which is out of v1. Decide **before Step 19** (M22 rotate).
 
-**Tracked as Step 0.8** — the fold-table case count, which gates the critical path.
-Plan §4 Step 6 enumerates `5 X + 25 CX + 125 CCX` over the five operand kinds — that
-is **155** — and then gates the step at **"175/175"**. PRD §11 gives no count. 155
-exhaustive + the 2 distinctness asserts on the same row is 157, and 175 is a digit
-transposition of 157, so the plan's figure is most likely a typo. Settle it **in the
-plan** before writing `test_emit_fold.c`; do not pin the suite size in code on a guess.
+**Smaller, filed** — `ckd.13` K12's quadratic ancilla scheme (32,960 qubits at W=64);
+`ckd.14` M09 step granularity + the scratch shadow-poison rule; `ckd.15` K10's three
+sources vs Rule 7's two; `ckd.16` M11/M12 shift-out-of-range disagreement.
 
-> Steps 0.7 and 0.8 were found after `IMPLEMENTATION_PLAN.md` was written, so they
-> exist in the tracker but **not** in the plan's §1 Step 0 table, which still lists
-> only 0.1–0.6. Fold them into the plan when Step 0 is next touched.
+### Resolved 2026-08-14 — recorded so they are not re-litigated
+
+- **`_unc` vs `cqrt_free` ownership — `cqrt_free` is the SOLE deallocator.** `_unc`
+  zeroes values in place and reclaims **nothing**: no pool operation, no bit-kind
+  rewrite, no handle-table change. Forced empirically rather than chosen: CQ_lang
+  decides reclamation **per rail** and its only lever is emitting or withholding the
+  free, so the *same* `_unc` symbol appears both freed and deliberately never freed —
+  the latter on a rail it has proven entangled. Reclaiming at `_unc` would return an
+  entangled qubit to the free list. 3 judges, 3–0; 239 goldens, 25,147 `_unc` calls,
+  **0** double-frees, and 26,558 freed handles that never saw an `_unc` at all. **A
+  rail `_unc`'d and never freed stays allocated for good — that is the intended Rule-6
+  safe leak, not a bug.** PRD §10.
+  > **The plan mis-stated this as "decides M09's API". It does not.** M09 is
+  > `sandwich.[ch]`; its driver runs over **scratch** and never touches a result rail's
+  > ownership. Step 8 was never blocked. The `_unc` axis is Step 21, in M26.
+- **Sandwich scratch is PRE-MATERIALISED** (`cq_sandwich` step 0), now invariant
+  **I6(b)** in plan §0.2, closing risk **R8**. I6 as written constrained only gate
+  *targets*; the hazard is on the **control** side — a scratch bit read as a control
+  while still `BIT_ZERO` folds to 0 gates forward, and if a later step materialises it
+  the reverse replay emits a gate the forward never did, so the sandwich stops
+  cancelling **while L1 stays green**. Pre-materialising costs **qubits, never gates**
+  (scratch is born 0) and makes kernel gate counts a function of `W` alone — which is
+  what makes one L4 golden per `(kernel, W)` sound. New risk **R9**: the all-classical
+  path must short-circuit *before* the sandwich or L5 breaks.
+- **i80 is IN scope** — integer grid **1595**. **The two sibling yamls are OUT** — M27
+  generates from `opcode_table.yaml` only; CQ_lang supplies the other 401, so Step 23's
+  gate is "no undefined `cq_template_*` **from the opcode grid**".
+- **K11 uses Cuccaro**, a deliberate delta from upstream (Bennett's `multiplier.jl:29`
+  calls ripple). Saves ~3× scratch qubits. Cuccaro's `_unc` bar does not apply: the
+  accumulator is internal and never exposed to CQ_lang's `_unc` contract.
+- **Symbol count.** All three published figures were wrong. Current: **2479** total,
+  **884** fp-touching, **1595** purely-integer (**1455** excluding i80). `1732` was a
+  stale comment; `1474` was a **phantom** — it matches no revision and no partition.
+  PRD §1.
+- **L4 golden tuple arity.** No contradiction: Bennett's `gate_count` returns a
+  **4-field** NamedTuple `(total, NOT, CNOT, Toffoli)`, so `58/6/40/12` has a redundant
+  leading sum — `6+40+12 = 58`. Pin the three-tuple, carry `total` as a checksum, and
+  **always match the full tuple** (two unrelated upstream circuits both total 114).
+- **Which baseline Step 12 pins against.** `58/6/40/12`, **not** BENCHMARKS.md's
+  `100/4/68/28` — that file is stale (pre-U27/U28 defaults, and its generator no longer
+  runs). But `x+1` is a *constant increment*; **K6 is a general two-register add** and
+  sandwiches to `11W−4` = **84** at i8. Do not pin K6 against 58.
+- **`cqrt_h`.** An over-declaration: declared and defined in CQ_lang, **emitted by
+  nothing, called by nothing**. Struck from PRD §1. §8's 6-entry vtable is complete as
+  printed — **M04 is unblocked**. Grover-from-rotations is forced, not chosen.
+- **Fold-table count.** **159** = 155 exhaustive + **4** distinctness death-tests (not
+  2 — PRD §3 asks for all three `CCX` pairs). "175/175" was a typo.
+- **PRD §3 had a 15-case hole.** It carried a `c1 = ONE` row and no `c2 = ONE`
+  counterpart, leaving `(c1 = Q, c2 = ONE)` — 15 of the 125 `CCX` cases — matched by no
+  row. `CCX` is symmetric in its controls; fixed by a control swap before dispatch. If
+  you are reading a PRD without the `c2 = ONE` row, stop and re-check.
+- **PRD §3's emitter prototypes were non-`const`**, which would have silently disarmed
+  one of the two mechanisms enforcing I6. Controls are now `const cq_bit *`.
 
 ---
 
 ## Build & Test
 
-**There is no build system yet.** Step 1 creates it; until then, none of the commands
-below exist. Do not report them as run.
-
-The intended shape (plan §2.1–§2.3):
+**The build exists as of Step 1.** These commands are real; the `--update-goldens`
+one is not, and arrives with the first L4 golden at Step 12.
 
 ```bash
 # Configure both configurations. Debug defines CQOPS_DEBUG_INVARIANTS
-# (I2 owner map, I6 scratch extent, distinctness asserts) + ASan/UBSan.
+# (I2 owner map, I6 scratch extent, distinctness asserts) + sanitizers.
 cmake -S . -B build-debug   -DCMAKE_BUILD_TYPE=Debug
 cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 
@@ -311,27 +395,65 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 ctest --test-dir build-debug   --output-on-failure
 ctest --test-dir build-release --output-on-failure
 
-# The 300-line guard (Rule 12). Runs in CI and locally.
-make lint            # tools/check_loc.sh
+# The 300-line guard (Rule 12). Both spellings run tools/check_loc.sh.
+make lint
+cmake --build build-debug --target lint
 
-# Regenerate L4 gate-count goldens — deliberately, never by reflex.
+# Everything at once: lint, then both configurations.
+make test
+
+# NOT YET REAL — regenerate L4 goldens. Arrives at Step 12 with K6.
 ctest --test-dir build-release -R kernel -- --update-goldens
 ```
 
+**Sanitizers are probed, not assumed** (`cmake/CqopsSanitizers.cmake`). Apple clang 17
+on this dev box (macOS 26 / Darwin 25, x86_64) has a **broken ASan runtime** — a
+trivial `main` built with `-fsanitize=address` dies with `SIGILL` in `libsystem_pthread`
+before reaching `main`. If a Debug binary SIGILLs at startup, that is the toolchain,
+not libcqops. So the build compiles-and-*runs* a probe per sanitizer and enables only
+what works, printing a CMake warning for what is missing, and `test_skeleton`
+cross-checks the build's belief against the compiler's `__has_feature`. UBSan works on
+Apple clang and genuinely aborts (`-fno-sanitize-recover=all`). For full coverage:
+
+```bash
+cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DCQOPS_SANITIZERS=ON -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang
+```
+
+`CQOPS_SANITIZERS` is `AUTO` (default, use what runs), `ON` (require them — a hard
+configure error if a sanitizer does not run) or `OFF`. **Debug on the default
+toolchain is currently UBSan-only; say so when reporting what was verified.**
+
 C11, `-Wall -Wextra -Werror -Wconversion`. One test binary per module via
-`add_cqops_test(name)`. The `tests/support/` harness is hand-rolled (no dependencies
-beyond libc): `harness`, `mock_sink` (the workhorse recording fixture), `refmodel`,
-`bitkinds`, `poolcheck`.
+`add_cqops_test(name)` — plus an optional `WILL_FAIL`, used by
+`tests/test_harness_negative.c` to assert the harness's *failure* path. A `CHECK` that
+could not fail would make every suite in the project vacuously green, so that path is
+tested rather than assumed; if `test_harness_negative` ever starts passing its own
+binary, the harness is broken, not fixed.
+
+The `tests/support/` harness is hand-rolled (no dependencies beyond libc). Only
+**`harness.[ch]` exists** — it is the one support file with no dependency on an unbuilt
+module. The other four land with what they need: `mock_sink` at Step 5 (it needs M04's
+vtable), `refmodel` / `bitkinds` / `poolcheck` across Phase B.
 
 CI is **in scope** for this project (unlike CQ_lang): it runs `check_loc.sh` and
-regenerates-and-diffs the shim from `opcode_table.yaml`.
+regenerates-and-diffs the shim from `opcode_table.yaml`. **Not wired up yet** — this
+repo has no git remote, so there is nowhere for a workflow to run. Filed as its own
+issue; `make test` is the local stand-in (lint, then both configurations).
 
 ---
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
-- **Almost nothing named in these docs exists on disk.** No `src/`, no
-  `third_party/bennett/`, no `docs/constructions/`. Check before you cite.
+- **`third_party/`, `docs/`, and now the build tree all exist — but `src/` holds no
+  backend C.** Step 0 landed the references (see the table at the top); Step 1 landed
+  `CMakeLists.txt`, `cmake/`, `include/cqops/cqops.h`, `src/version.c`,
+  `tests/support/harness.[ch]`, `tools/check_loc.sh`. `src/version.c` is a version
+  string and nothing else: the first real module is M01 `bit.h` at Step 2. Check before
+  you cite — and read `third_party/bennett/COMMIT` rather than running `git log` inside
+  it, which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **A Debug binary that dies with `SIGILL` before `main` is the ASan runtime, not our
+  code.** Apple clang 17 on Darwin 25 / x86_64 is broken this way; the build works
+  around it by probing. `bd memories asan` has the details.
 - **CQ_lang is a separate repository** at `/Users/sorenwilkening/Desktop/CQ_lang`. Its
   ABI is **frozen and not ours to change**. We satisfy it; we do not negotiate with
   it. `opcode_table.yaml` is *copied in* at a pinned revision, never edited here.
@@ -340,9 +462,20 @@ regenerates-and-diffs the shim from `opcode_table.yaml`.
   ABI shreds `__int128` into `{i64,i64}` at a function boundary. An i128 register is
   born from a `zext`/`sext` and dies at a `trunc`. The only signature it reaches is
   the `_hl` shape.
-- **234 of the 878 fp symbols look integer-ish and are not** — the cross-domain casts
+- **240 of the 884 fp symbols look integer-ish and are not** — the cross-domain casts
   (`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`) carry *both* an integer and a
-  floating-point width. The partition that balances is 1455 + 878 = 2333.
+  floating-point width. The partition that balances is **1595 + 884 = 2479**. (The
+  older `234` and `1455 + 878 = 2333` were correct at the revision the PRD was drafted
+  against and are stale by the i80 increments — see PRD §1 and `docs/cqrt_census.txt`.)
+- **The prescribed `cqrt_*` census command does not work.**
+  `grep -rhoE '"cqrt_[a-z0-9_]*"' ir-pass/src` returns **18 results, and they are
+  PREFIXES** (`"cqrt_addc_"`, `"cqrt_alloc_"`, …) — the pass concatenates the width
+  suffix at emit time, so no expansion of that grep can yield a symbol count, and two
+  symbols (`cqrt_h`, `cqrt_h_controlled`) are unreachable by it entirely. The real
+  surface is **173**, established from the declaration layer and cross-checked against
+  CQ_lang's own `core_abi_link_check.py`. See `docs/cqrt_census.txt` — and note the
+  trap recorded there: `cq_runtime.h` is column-aligned, so the obvious regex silently
+  drops 49 declarations and returns a plausible-looking 124.
 - **`cqrt_cswap` with a CONSTANT control is 0 gates** — swap the two `cq_bit` arrays
   and emit nothing. Only a quantum control becomes a Fredkin per bit
   (`CX(b,a); CCX(ctrl,a,b); CX(b,a)`).

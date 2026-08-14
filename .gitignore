@@ -8,3 +8,8 @@
 
 # Editor / IDE
 .idea/
+
+# CMake build trees
+build*/
+cmake-build-*/
+compile_commands.json
