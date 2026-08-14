@@ -26,13 +26,18 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
 > | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **Step 1 has landed (2026-08-14): the build exists and the commands under *Build &
-> Test* below are real.** `CMakeLists.txt`, `cmake/`, `include/cqops/cqops.h`,
-> `src/version.c`, `tests/support/harness.[ch]`, `tools/check_loc.sh` and a root
-> `Makefile` are on disk; both configurations configure, build warning-free and pass
-> `ctest`. **No backend C exists yet** — `src/` holds only the version symbol, whose
-> job is to give the Step 1 gate a real link to prove. M01 `bit.h` arrives at Step 2,
-> and every module path in plan §3 is still a plan.
+> **Steps 1–4 have landed (2026-08-14): the build is real, and so is Layer 0 minus the
+> sink.** On disk and passing under both configurations, 13 ctest tests:
+>
+> | Step | Module | Files | LOC / budget |
+> |---|---|---|---|
+> | 1 | — | `CMakeLists.txt`, `cmake/`, `include/cqops/cqops.h`, `src/version.c`, `tests/support/harness.[ch]`, `tools/check_loc.sh`, `Makefile` | — |
+> | 2 | **M01** | `src/bit.h` — header-only, all `static inline`, **no translation unit** | 64 / 70 |
+> | 3 | **M02** | `src/shadow.[ch]` | 114 / 130 |
+> | 4 | **M03** | `src/qubits.[ch]`, plus `tests/support/death.[ch]` | 130 / 150 |
+>
+> **The next module is M04 `sink` at Step 5; M05 `emit` — the fold table, the critical
+> path — is Step 6.** Everything from M05 down in plan §3 is still a plan.
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -430,10 +435,29 @@ could not fail would make every suite in the project vacuously green, so that pa
 tested rather than assumed; if `test_harness_negative` ever starts passing its own
 binary, the harness is broken, not fixed.
 
-The `tests/support/` harness is hand-rolled (no dependencies beyond libc). Only
-**`harness.[ch]` exists** — it is the one support file with no dependency on an unbuilt
-module. The other four land with what they need: `mock_sink` at Step 5 (it needs M04's
-vtable), `refmodel` / `bitkinds` / `poolcheck` across Phase B.
+**Hard errors get `add_cqops_death_test(name CASES a b c)`, never `WILL_FAIL`.** That
+property inverts a non-zero *exit code* and does not invert a crash, so it cannot
+express `abort()` at all. A death binary catches `SIGABRT` itself and exits 0 only when
+the abort landed inside a `CQ_EXPECT_ABORT` window, which makes it an ordinary test,
+makes "nothing aborted" a failure, and stops a sanitizer report from passing for the
+death under test. `argv[1]` selects the case, so one file hosts many deaths and CMake
+registers one ctest per case (`test_qubits_death.dirty_release`).
+
+```bash
+ctest --test-dir build-debug -R death            # every fail-loud path
+./build-debug/tests/test_qubits_death             # lists its cases
+```
+
+The `tests/support/` harness is hand-rolled (no dependencies beyond libc).
+**`harness.[ch]` and `death.[ch]` exist** — `death.[ch]` is beyond plan §2.2's list of
+five, added at Step 4 because Steps 4 and 6 need ten aborts between them. The other
+three land with what they need: `mock_sink` at Step 5 (it needs M04's vtable),
+`refmodel` / `bitkinds` / `poolcheck` across Phase B.
+
+**Tests reach internal headers directly** — `tests/CMakeLists.txt` puts `src/` on
+`cqops_test_support`'s PUBLIC include path, so `test_bit.c` writes `#include "bit.h"`.
+`src/` stays PRIVATE on the `cqops` target itself; the exception lives on the test side
+rather than widening the library.
 
 CI is **in scope** for this project (unlike CQ_lang): it runs `check_loc.sh` and
 regenerates-and-diffs the shim from `opcode_table.yaml`. **Not wired up yet** — this
@@ -444,13 +468,25 @@ issue; `make test` is the local stand-in (lint, then both configurations).
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
-- **`third_party/`, `docs/`, and now the build tree all exist — but `src/` holds no
-  backend C.** Step 0 landed the references (see the table at the top); Step 1 landed
-  `CMakeLists.txt`, `cmake/`, `include/cqops/cqops.h`, `src/version.c`,
-  `tests/support/harness.[ch]`, `tools/check_loc.sh`. `src/version.c` is a version
-  string and nothing else: the first real module is M01 `bit.h` at Step 2. Check before
-  you cite — and read `third_party/bennett/COMMIT` rather than running `git log` inside
-  it, which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **Layer 0 exists up to M03; M04 and everything below it does not.** `src/bit.h`,
+  `src/shadow.[ch]` and `src/qubits.[ch]` are real as of Step 4 — but there is still no
+  emitter, no register table, no sandwich and no kernel, so a `cq_ctx` does not exist
+  either and the three modules are wired together only by their tests. Check before you
+  cite — and read `third_party/bennett/COMMIT` rather than running `git log` inside it,
+  which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **`cq_qubits_release` does NOT read a shadow.** Plan §4's Step 4 row says "releasing
+  a qubit whose shadow is not known-0 is a hard error", which reads as though M03 looks
+  it up. It does not, and must not: the signature is
+  `cq_qubits_release(pool, q, int proven_zero)` and the caller supplies the evidence, as
+  `cq_qubits_release(p, q, cq_shadow_known_zero(sh, q))`. Two reasons, one conclusion —
+  plan §3 puts M03 in Layer 0 with no internal dependencies, and `ckd.17` establishes
+  that the shadow **cannot** be the free-time oracle, so hard-wiring the lookup would
+  bake in the very thing that bead says fails. Do not "tidy" it into a shadow read.
+- **`WILL_FAIL` cannot express a death here.** CTest's `WILL_FAIL` inverts a non-zero
+  *exit code* and does **not** invert a crash, and every hard error in this codebase is
+  an `abort()`. Use `add_cqops_death_test(name CASES ...)` and `CQ_EXPECT_ABORT` from
+  `tests/support/death.h`. `tests/test_harness_negative.c` is not a counter-example —
+  it works because it exits non-zero *normally*.
 - **A Debug binary that dies with `SIGILL` before `main` is the ASan runtime, not our
   code.** Apple clang 17 on Darwin 25 / x86_64 is broken this way; the build works
   around it by probing. `bd memories asan` has the details.
@@ -616,11 +652,12 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Where Things Live
 
-**Planned** (plan §3 — none of this exists yet):
+Plan §3's module map. **Bold = on disk; everything else is still a plan** (Rule 16 —
+check, do not assume, and update this table when a step lands):
 
 | Layer | Modules |
 |---|---|
-| 0 — primitives | M01 `bit.h` · M02 `shadow` · M03 `qubits` · M04 `sink` |
+| 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · M04 `sink` |
 | 1 — emission | M05 `emit` (the fold table — Rule 11) · M06 `controlled` |
 | 2 — registers, sandwich | M07 `reg` · M08 `scratch` · M09 `sandwich` |
 | 3 — kernels | M10 `bitwise` · M11 `shift_const` · M12 `shift_var` · M13 `cast` · M14 `add` · M15 `addacc` · M16 `cmp` · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |

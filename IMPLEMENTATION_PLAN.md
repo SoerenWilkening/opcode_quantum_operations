@@ -307,6 +307,48 @@ later verification claim rests on: `tests/test_harness_negative.c`, a binary reg
 `WILL_FAIL` that asserts a failing `CHECK` really does report and exit non-zero. A
 `CHECK` that could not fail would make every suite green while verifying nothing.
 
+### Steps 2–4 status (2026-08-14) — **done, with four deviations**
+
+M01 `src/bit.h` (64/70, header-only — no translation unit), M02 `src/shadow.[ch]`
+(114/130), M03 `src/qubits.[ch]` (130/150). Every gate met under **both**
+configurations and additionally under a full ASan + UBSan build with Homebrew clang;
+13 ctest tests; `make lint` green. Each suite was **mutation-tested** rather than
+assumed to bite — 8, 10 and 15 mutations respectively, all killed.
+
+**Deviation 1 — `cq_qubits_release` takes the evidence as a parameter.** §4's Step 4 row
+says "releasing a qubit whose shadow is not known-0 is a hard error", which reads as
+though M03 performs the lookup. It does not: the signature is
+`cq_qubits_release(pool, q, int proven_zero)` and the caller passes
+`cq_shadow_known_zero(sh, q)`. This is the only shape satisfying both of this plan's own
+constraints at once — §3 puts M03 in Layer 0 with **no internal dependencies**, so it
+cannot include `shadow.h`; and `ckd.17` (filed after this plan was written) establishes
+that the two-bit shadow **cannot** be the free-time oracle, so hard-wiring the lookup
+would bake in exactly the mechanism that bead says fails. The parameter lets ckd.17's
+structural certificate be substituted without touching M03, and forces every caller to
+name its evidence where a grep finds it.
+
+**Deviation 2 — M02 ships no un-poison, deliberately.** Nothing in `shadow.h` can return
+an entry to determinate; entries are born known-0 by `cq_shadow_ensure` and that is the
+only route to clean. A convenience setter would have settled `ckd.17` by accident, in
+the one direction that launders a dirty rail into a provably-clean one. ckd.17 carries a
+note saying the sanctioned write goes in `shadow.h` when it is resolved.
+
+**Deviation 3 — a sixth test-support file, `tests/support/death.[ch]`**, beyond §2.2's
+list of five, plus `add_cqops_death_test()` in `cmake/CqopsTest.cmake`. Forced by a
+measured fact: CTest's `WILL_FAIL` inverts a non-zero *exit code* and does **not**
+invert a crash, so it cannot express `abort()` — and every hard error in this project is
+one. Steps 4 and 6 need ten deaths between them. See CLAUDE.md *Build & Test*.
+
+**Deviation 4 — tests include internal headers directly.** `tests/CMakeLists.txt` adds
+`src/` to `cqops_test_support`'s PUBLIC include path, since §2.1 is one binary per
+*module* and the modules are internal. `src/` stays PRIVATE on the `cqops` target.
+
+One finding worth carrying forward, from mutation testing at Step 4: a growable array's
+freshly-`realloc`'d tail is only *usually* zero, so an omitted initialiser can pass a
+whole suite on allocator luck. M03 now poisons the new tail with `0xAA` under
+`CQOPS_DEBUG_INVARIANTS` and validates on read. **M07's handle table and owner map
+(Step 7) and M08's scratch (Step 8) have the same shape and want the same treatment.**
+
 ---
 
 ## 3. Module map
