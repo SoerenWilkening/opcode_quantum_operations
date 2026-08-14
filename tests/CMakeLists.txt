@@ -3,6 +3,7 @@
 
 add_library(cqops_test_support STATIC
     support/harness.c
+    support/death.c
 )
 
 ## src/ is PRIVATE on the cqops target, because none of it is public API. The
@@ -26,12 +27,24 @@ add_cqops_test(test_skeleton)
 ## Layer 0 — primitives.
 add_cqops_test(test_bit)          # M01, Step 2 — I1
 add_cqops_test(test_shadow)       # M02, Step 3 — the §3 shadow update table
+add_cqops_test(test_qubits)       # M03, Step 4 — pool, D2, D4, I3, peak
 
-## M02's fail-loud path. NOT WILL_FAIL: that inverts a non-zero exit code and
-## does not invert a crash, and this death is an abort(). The binary catches
-## SIGABRT itself and exits 0 only if the abort arrived where expected, so it
-## registers as an ordinary test — see the file header.
-add_cqops_test(test_shadow_death)
+## Fail-loud paths. NOT WILL_FAIL — that inverts a non-zero exit code and does
+## not invert a crash, so it cannot express "this abort()s" at all; see
+## tests/support/death.h.
+add_cqops_death_test(test_shadow_death CASES
+    reads_past_the_end
+    writes_past_the_end
+)
+
+add_cqops_death_test(test_qubits_death CASES
+    ceiling_exceeded
+    ceiling_set_below_live
+    dirty_release
+    release_of_a_qubit_left_at_one
+    release_of_an_unminted_index
+    double_release
+)
 
 ## The harness's own negative self-test: expected to exit non-zero. It is what
 ## makes every other suite's green meaningful.

@@ -86,6 +86,7 @@ add_library(cqops STATIC
     src/version.c
     src/shadow.c        # M02, Step 3 — the §3 shadow table (M01 bit.h is
                         # header-only and carries no translation unit)
+    src/qubits.c        # M03, Step 4 — pool, LIFO free list, ceiling, peak
 )
 
 target_include_directories(cqops

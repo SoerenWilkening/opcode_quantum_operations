@@ -36,3 +36,33 @@ function(add_cqops_test name)
         set_tests_properties(${name} PROPERTIES WILL_FAIL TRUE)
     endif()
 endfunction()
+
+## add_cqops_death_test(<name> CASES <case> [<case> ...])
+##
+## One binary hosting several fail-loud assertions, registered as one CTest
+## test per case: the binary takes the case name on argv[1] and the process is
+## gone after the abort, so it is one death per RUN but not one per FILE.
+##
+## Deliberately NOT WILL_FAIL. That property inverts a non-zero exit code and
+## does not invert a crash, so it cannot express "this abort()s" at all — see
+## tests/support/death.h. These binaries catch SIGABRT themselves and exit 0
+## only when the abort landed in an armed window, which makes them ordinary
+## tests and makes "nothing aborted" a failure.
+
+function(add_cqops_death_test name)
+    cmake_parse_arguments(ARG "" "" "CASES" ${ARGN})
+
+    if(NOT ARG_CASES)
+        message(FATAL_ERROR "add_cqops_death_test(${name}): CASES is required")
+    endif()
+
+    add_executable(${name} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.c")
+    target_link_libraries(${name} PRIVATE cqops_test_support cqops_build_flags)
+
+    foreach(case IN LISTS ARG_CASES)
+        add_test(NAME ${name}.${case} COMMAND ${name} ${case})
+        set_tests_properties(${name}.${case} PROPERTIES
+            ENVIRONMENT "ASAN_OPTIONS=abort_on_error=1;UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1"
+        )
+    endforeach()
+endfunction()
