@@ -25,6 +25,13 @@ add_cqops_test(test_skeleton)
 
 ## Layer 0 — primitives.
 add_cqops_test(test_bit)          # M01, Step 2 — I1
+add_cqops_test(test_shadow)       # M02, Step 3 — the §3 shadow update table
+
+## M02's fail-loud path. NOT WILL_FAIL: that inverts a non-zero exit code and
+## does not invert a crash, and this death is an abort(). The binary catches
+## SIGABRT itself and exits 0 only if the abort arrived where expected, so it
+## registers as an ordinary test — see the file header.
+add_cqops_test(test_shadow_death)
 
 ## The harness's own negative self-test: expected to exit non-zero. It is what
 ## makes every other suite's green meaningful.

@@ -84,6 +84,8 @@ target_compile_definitions(cqops_build_flags INTERFACE
 
 add_library(cqops STATIC
     src/version.c
+    src/shadow.c        # M02, Step 3 — the §3 shadow table (M01 bit.h is
+                        # header-only and carries no translation unit)
 )
 
 target_include_directories(cqops
