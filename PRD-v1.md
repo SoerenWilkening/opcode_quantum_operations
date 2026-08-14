@@ -5,6 +5,72 @@ Companion: [`NORTH_STAR.md`](NORTH_STAR.md)
 
 ---
 
+## 0. Sources of record
+
+This document cited both of its upstreams by name and neither by URL. Both are now pinned
+on disk (Step 0.1, Step 0.3); the pins are what make the L4 goldens attributable (risk R3).
+
+| Upstream | URL | Pinned at | On disk |
+|---|---|---|---|
+| **Bennett.jl** — the sole source of circuit constructions (constraint 4) | <https://github.com/tobiasosborne/Bennett.jl> | `980805de85314b3da7ac25cf6454b56566f8e609` (`main`, 2026-08-14) | [`third_party/bennett/`](third_party/bennett/) + [`COMMIT`](third_party/bennett/COMMIT) |
+| **CQ_lang** — the frozen ABI we satisfy | local: `/Users/sorenwilkening/Desktop/CQ_lang` | `a6a92feb094c8dd71c36d47c24460f3f0df67b44` (2026-08-13) | [`third_party/cq_lang/`](third_party/cq_lang/) |
+
+Bennett.jl is vendored as a **snapshot**: upstream's `.git/` (322 MB) and `.beads/` (129 MB)
+are stripped, every other path is byte-identical to the pinned tree, and
+`third_party/bennett/.provenance/MANIFEST.txt` lists all 2317 upstream paths with their blob
+hashes so the snapshot is independently verifiable against a fresh clone. Re-vendoring is a
+deliberate act: it invalidates every L4 golden, which is why goldens carry this SHA in a
+header comment.
+
+`third_party/cq_lang/opcode_table.yaml` is a **verbatim mirror of a frozen ABI**. It is
+never edited here. To pick up an ABI change, re-copy it at a new pinned CQ_lang revision.
+
+The extracted construction specs — one per kernel K1–K12, each with a gate-count formula in
+`W` — live in [`docs/constructions/`](docs/constructions/). Those formulas *are* the L4
+goldens; a kernel with no spec has nothing to assert against.
+
+### Provenance — what is **not** from Bennett
+
+Constraint 4 says Bennett.jl is the sole source of circuit constructions, and Rule 1 says
+port rather than re-derive. Both are about **circuits**. A large part of this library is not
+a circuit and has no upstream at all. Without the inverted list a later reader cannot tell
+which behaviour is bound by upstream (and so must not drift) from which is ours to change
+freely — and, worse, may go looking in Bennett for something that was never there.
+
+**The dividing line is sharp, and it is checkable in one line.** Bennett's gate operands are
+`const WireIndex = Int` — `NOTGate{target}`, `CNOTGate{control,target}`,
+`ToffoliGate{control1,control2,target}` are *all* plain wire integers
+(`src/gates.jl:1-22`). **Bennett has no constant/classical operand kind whatsoever.** Every
+mechanism below exists because we introduced one.
+
+| Mechanism | Ours or ported | Note |
+|---|---|---|
+| **§3 fold table** | **ours, entirely** | Bennett cannot have one: no classical operand kind exists upstream. This is why Rule 1 does *not* apply to M05 — do not go looking for it in Bennett |
+| **Operand distinctness asserts** | **ours** | A grep for distinctness assertions across all of Bennett's `src/*.jl` returns **nothing** |
+| **Tri-valued `cq_bit`; I1, I2, I4, I5** | **ours** | The whole representation |
+| **The two-bit shadow** (`{value, unknown}`) and its update rules | **ours** | Bennett has a real simulator; we deliberately have none (constraint 3) |
+| **Handle table, tombstones, monotonic handles** (D5) | **ours** | Matches CQ_lang's `h<N>` trace convention, not anything upstream |
+| **Qubit pool, LIFO free list, ceiling, I3** | **ours** | Bennett's `WireAllocator` is lowest-index-first; D4 chose LIFO for quieter trace diffs |
+| **§7 rotations and the θ ≡ π asymmetry** | **ours** | Bennett is purely classical-reversible; `Ry`/`Rz` have no upstream |
+| **§8 sink vtable and all three sinks** | **ours** | Streaming emission (constraint 3) is our architecture; Bennett builds a circuit object |
+| **`cqrt_cswap` / Fredkin, incl. the 0-gate constant-control case** | **ours** | Named by CQ_lang's ABI, not by Bennett |
+| **Nested-control AND into one wire** | **ours** | The *promotion it feeds* is Bennett's; collapsing two controls to one is ours |
+| **Measurement (`mz`, terminal semantics)** | **ours** | CQ_lang's contract |
+| — | — | — |
+| **§9 controlled promotion** (`NOT→CNOT`, `CNOT→Toffoli`, `Toffoli→` 3-Toffoli + shared ancilla) | **ported, verbatim** | `src/controlled.jl:114-127` |
+| **K1–K12 gate sequences** | **ported** | Per-kernel citations in `docs/constructions/` |
+
+**The sandwich (§5) is a subtle case — the algebra is Bennett's, the granularity is ours.**
+Upstream applies forward → copy-out → reverse **once, globally**, at
+`src/bennett_transform.jl:343-358`, sized `2·|gates| + |output_wires|` — exactly the `2F + W`
+shape. We apply that identical algebra **locally, per kernel**, because we have no global
+wrap to inherit. So do not "correct" a kernel toward Bennett's structure: for a single-kernel
+expression the two coincide exactly, but across `n` kernels Bennett pays `2·Σ Fᵢ + W` while we
+pay `Σ (2Fᵢ + Wᵢ)` — strictly more, and deliberately so. The `cq_sandwich` **driver** and
+invariant **I6** are ours (`IMPLEMENTATION_PLAN.md` §0.1–§0.2).
+
+---
+
 ## 1. Scope
 
 ### In scope
@@ -13,7 +79,7 @@ The **integer** half of CQ_lang's frozen ABI, at widths `i1, i8, i16, i32, i64, 
 
 | Family | Symbols | Source construction |
 |---|---|---|
-| Core runtime | `cqrt_alloc/measure/free`, `cqrt_x/h/cnot/toffoli`, `cqrt_copy_<W>`, `cqrt_cswap`, `cqrt_addc/xorc_<W>`, `cqrt_ry/rz_<W>` | this repo |
+| Core runtime | `cqrt_alloc/measure/free`, `cqrt_x/cnot/toffoli`, `cqrt_copy_<W>`, `cqrt_cswap`, `cqrt_addc/xorc_<W>`, `cqrt_ry/rz_<W>` | this repo |
 | Core runtime, **controlled** | `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled`, `cqrt_rz_<W>_controlled_inv` | §2.1 |
 | Binary arith | `add sub mul sdiv udiv srem urem` | Bennett `adder.jl`, `multiplier.jl`, `divider.jl` |
 | Binary bitwise | `and or xor shl lshr ashr` | Bennett `lowering/arith.jl` |
@@ -22,14 +88,69 @@ The **integer** half of CQ_lang's frozen ABI, at widths `i1, i8, i16, i32, i64, 
 | Shapes | `qq`, `hl`, `lh` | free — a literal is an array of constant bits |
 | Axes | forward, `_unc`, `_inv`, `_controlled`, `_controlled_inv` | §9, §10 |
 
-That is **1455 of the 2333** declarations in `runtime/cq_templates.h` — the *entire*
-purely-integer surface, 215 of it i128 — realised by roughly a dozen kernels.
+> **`cqrt_h` is struck from this row (Step 0.7 — resolved).** Earlier drafts listed
+> `cqrt_x/h/cnot/toffoli`, which contradicted three other places: constraint 1 below forbids
+> `H` outright, §8's sink vtable has no `h` entry, and §12 builds `H` out of rotations. The
+> evidence settles it and none of the three suspected causes was right. `cqrt_h` **is**
+> declared (`cq_runtime.h:226`) and defined (`cq_runtime.c:454`) in CQ_lang — but it is
+> **emitted by nothing and called by nothing**: no site in `ir-pass/`, no `.ll` fixture, no
+> test, and CQ_lang's own link witness takes the address of `cq_template_*` symbols only.
+> `include/CQ.h` exposes exactly three primitive families — `cq_theta` (Ry), `cq_phi` (Rz),
+> `cq_measure` — so a CQ program has **no way to write a Hadamard except** §12's composite.
+> It is the over-declaration phenomenon §2.1 already names. Consequences: §1's constraint 1
+> stands, §8's 6-entry vtable is **complete and correct as printed** (M04 may freeze it in
+> Step 5 with no `h` entry), and §12's Grover-from-rotations is **forced, not a choice**.
+> Omitting `cqrt_h` is not a link failure, because an unreferenced declaration produces no
+> undefined reference. Recorded so it is not re-litigated: if CQ_lang ever turns on emission,
+> a *link* error is the failure mode we want — it fires at build time, names the symbol, and
+> cannot produce a wrong circuit. Do not paper over it with a shim stub.
 
-The remaining **878 are fp-touching and none of them are in v1.** Beware when counting:
-234 of those 878 are the cross-domain casts (`sitofp`, `uitofp`, `fptosi`, `fptoui`,
-`bitcast`), whose names carry *both* an integer and a floating-point width. They look
-integer-ish and are not. The partition that balances is
-1455 purely-integer + 878 fp-touching = 2333.
+That is the *entire* purely-integer surface, realised by roughly a dozen kernels.
+
+**The symbol counts, recounted (Step 0.3 — supersedes every figure in earlier drafts).**
+Three different totals appeared across this document and CQ_lang's own tooling: **1455**,
+**1474** and **1732**. All three are wrong for the pinned revision. Counted from
+[`third_party/cq_lang/opcode_table.yaml`](third_party/cq_lang/opcode_table.yaml) at CQ_lang
+`a6a92fe`, cross-checked three independent ways (direct count of the shipped declaration
+layer; by-construction recount replicating the generator's own enumeration; and CQ_lang's
+generated witnesses `cq_link_smoke.c` and `core_abi_link_check.py`):
+
+| Figure | Value | Status |
+|---|---|---|
+| Total `cq_template_*` from `opcode_table.yaml` | **2479** | current |
+| fp-touching (out of v1) | **884** | current |
+| purely-integer, **including** i80 | **1595** | current |
+| purely-integer, **excluding** i80 | **1455** | current — see the i80 scope note below |
+| ~~1732~~ | — | stale comment (`opcode_table.yaml:4`, `gen_templates.py:5`); was the correct *total* on 2026-06-20, never an integer count |
+| ~~1474~~ | — | **phantom.** Appears at no revision as either a total or an integer count, and matches no alternative partition. A transcription slip from 1455 while drafting §13/§14. Nothing to reconcile — deleted |
+| ~~1455 + 878 = 2333~~ | — | a *correct snapshot* of revision `ce3837bc` (2026-07-06), stale by the two i80 increments of 2026-07-15 |
+
+Beware when counting: **240** of the 884 fp-touching symbols are the cross-domain casts
+(`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`), whose names carry *both* an integer and
+a floating-point width. They look integer-ish and are not. (This figure was 234 at the
+revision §1 was originally written against.)
+
+> **i80 is IN scope — the grid is 1595 (decided 2026-08-14).** The gap between 1595 and 1455
+> is exactly the **140** i80 symbols, which is why the original 1455 still looks right: it
+> predates i80. `i80` is the `x86_fp80` *bit-pattern* width, an intermediate that exists
+> solely to serve `long double` libm — explicitly v2. But all 140 are `and/or/shl/lshr/icmp`,
+> `trunc`-from-i80 and `zext`-to-i80: **pure classical permutations already inside v1's kernel
+> set**, and I5's width-genericity makes an 80-bit register cost nothing structurally. 80 is
+> not a power of two, which is worth a moment's attention when reading a kernel — but every
+> kernel loops over `reg->width` and none switches on it, so nothing special is needed.
+> Including them avoids a whole class of link failure for free. **The shim grid is 1595.**
+
+> **The two sibling tables are OUT of v1 scope (decided 2026-08-14).** `opcode_table.yaml` is
+> only **one of three** tables `gen_templates.py` drives (`:390-398`). `intrinsic_table.yaml`
+> (**389** symbols) and `libm_table.yaml` (**12**) emit `cq_template_*` into the *same link
+> namespace*, making CQ_lang's true `cq_template_*` link surface **2880** — a figure CQ_lang
+> asserts itself at `cq_link_smoke.c:2932`. M27 generates from `opcode_table.yaml` **only**;
+> CQ_lang keeps linking its own archives for the other **401**. Consequence for Step 23,
+> which must be worded accordingly: its gate is *"no undefined `cq_template_*` symbol **from
+> the opcode grid**"*, **not** "`nm` shows no undefined `cq_template_*`" — the latter cannot
+> pass while 401 symbols come from elsewhere. If that ever becomes inconvenient, the
+> alternative is to vendor both siblings at pinned revisions and widen M27; it is a bigger
+> v1 than this document scopes.
 
 **i128 is in scope but is a narrow commitment.** It costs nothing beyond width-genericity
 (§2.2), and CQ constrains it hard: 215 symbols over 16 opcodes
@@ -144,10 +265,19 @@ The entire classical short-circuit lives in three functions. Everything else in 
 library is Bennett.jl transcribed against them.
 
 ```c
-void cq_emit_x  (cq_ctx*, cq_bit *t);
-void cq_emit_cx (cq_ctx*, cq_bit *c,  cq_bit *t);
-void cq_emit_ccx(cq_ctx*, cq_bit *c1, cq_bit *c2, cq_bit *t);
+void cq_emit_x  (cq_ctx*,                    cq_bit *t);
+void cq_emit_cx (cq_ctx*, const cq_bit *c,   cq_bit *t);
+void cq_emit_ccx(cq_ctx*, const cq_bit *c1,
+                          const cq_bit *c2,  cq_bit *t);
 ```
+
+**Controls are `const`; targets are not.** This is not stylistic — it is one of the two
+mechanisms that enforce **I6** (`IMPLEMENTATION_PLAN.md` §0.2). Materialisation mutates a
+bit, so a `const` control *cannot be materialised by construction*, and a compute half can
+therefore never turn a source into a qubit behind the sandwich's back. The fold table never
+materialises a control anyway — constants in control position are folded away — so the
+qualifier costs nothing and removes a whole class of R1 miscompile. An earlier draft of this
+section declared all three operands non-`const`, which would have silently disarmed it.
 
 **Fold table** — the normative specification:
 
@@ -161,16 +291,45 @@ void cq_emit_ccx(cq_ctx*, cq_bit *c1, cq_bit *c2, cq_bit *t);
 | `CX(c,t)` | `c = Q`, `t = Q` | `sink.cx` | 1 |
 | `CCX(c1,c2,t)` | either control `ZERO` | nothing | 0 |
 | `CCX(c1,c2,t)` | `c1 = ONE` | `emit_cx(c2,t)` | ≤ 2 |
+| `CCX(c1,c2,t)` | `c2 = ONE`, `c1 = Q` | `emit_cx(c1,t)` | ≤ 2 |
 | `CCX(c1,c2,t)` | both controls `Q`, `t` constant | **materialise** `t`, then `sink.ccx` | 1 or 2 |
 | `CCX(c1,c2,t)` | both controls `Q`, `t = Q` | `sink.ccx` | 1 |
+
+> **The `c2 = ONE` row was missing from an earlier draft of this table, and its absence left
+> 15 of the 125 `CCX` operand combinations matched by no row at all.** Walk the four original
+> rows over the control pair `{ZERO, ONE, Q}²`: `(Z,·)`, `(·,Z)`, `(O,O)`, `(O,Q)` and `(Q,Q)`
+> are covered, but `(Q,O)` is not — it is not `ZERO`, `c1` is not `ONE`, and `c2` is not `Q`.
+> `CCX` is **symmetric in its controls**, so the two `ONE` rows are one rule written twice;
+> implement it as a control swap before dispatch, not as two branches. The `(O,Z)` overlap
+> between rows 1 and 2 is benign — both yield 0 gates — so row order does not matter.
+
+**Kind, never shadow.** Every row above dispatches on the bit's *kind* (`ZERO`, `ONE`, `Q`)
+and never on a qubit's shadow value. A `Q` control whose shadow is known-0 is **not** folded
+away; that would be shadow-driven demotion, which D6 excludes from v1. The consequence is
+worth stating because it sizes the L0 suite: there are only `3 + 9 + 27 = 39` distinct
+gate-emission behaviours, and the five-kind split that yields 155 cases exists to pin the
+resulting **shadow**, not to distinguish gate counts.
 
 **Materialisation** (`cq_materialise(bit)`): take a qubit from the pool (guaranteed |0⟩
 by I3), emit `X` if the bit's constant was 1, set `kind = CQ_BIT_Q`. This is the *only*
 place a qubit is ever allocated for data, and it is exactly the rule "a CX from a tainted
 bit into an untainted bit allocates a qubit."
 
-Operand distinctness (`c != t`, `c1 != c2 != t`) is asserted, not assumed — a coincident
-operand is a meaningless channel and a real miscompile signature.
+Operand distinctness is asserted, not assumed — a coincident operand is a meaningless
+channel and a real miscompile signature. There are **four** constraints, one per operand
+pair, because `c1 != c2 != t` is prose shorthand and not valid C semantics:
+
+| Gate | Asserted |
+|---|---|
+| `CX(c,t)` | `c != t` |
+| `CCX(c1,c2,t)` | `c1 != c2`, `c1 != t`, `c2 != t` |
+
+`c1 == t` is exactly as much a miscompile signature as `c1 == c2`, so all three `CCX` pairs
+are checked. Note what the assert can actually compare: distinctness is a property of
+**bits**, not of kinds. Two different bits may both be `Q unknown` while holding different
+qubit indices — a legal, ordinary pair. So the check is on qubit index (and pointer
+identity), which means it can only ever fire on `CQ_BIT_Q` operands, and cannot fire on two
+constants. That is correct: two constant bits are genuinely independent channels.
 
 ### Shadow update rules
 
@@ -216,6 +375,9 @@ forward–copy–reverse wrap cleans up afterwards. We have no global wrap, so w
 same construction locally:
 
 ```
+short-circuit                    if every operand bit is classical: fold to a constant,
+                                 emit nothing, allocate nothing, and DO NOT enter here
+pre-materialise scratch          all scratch bits -> CQ_BIT_Q. 0 gates, W_scratch qubits
 compute  f into scratch          (Bennett's construction, verbatim)
 copy-out scratch → dst           (W CNOTs; this is the "^=")
 reverse  the compute             (same gates, reverse order — all three gates are self-inverse)
@@ -225,6 +387,27 @@ free     scratch
 Cost: 2× the compute half. Applies to `add`, `sub`, `eq`, `ult`, `slt`, `mux`,
 `mul`, `divrem`. Naturally clean already (no sandwich needed): `and`, `or`, `xor`,
 constant `shl/lshr/ashr`, `sext/zext/trunc`.
+
+**The pre-materialise step is not an optimisation — it is what makes the reverse half
+cancel** (`IMPLEMENTATION_PLAN.md` §0.2, invariant **I6(b)**, risk **R8**). Scratch is born
+`BIT_ZERO`, and the fold table dispatches on *kind*: a scratch bit read as a **control**
+while still `BIT_ZERO` folds to zero gates on the forward pass, and if a later step
+materialises it, the reverse replay sees `CQ_BIT_Q` and emits a gate the forward never did.
+The halves stop mirroring and scratch is left dirty — while **L1 stays green**, because the
+value is still right. Materialising the whole region up front makes every scratch bit `Q`
+for the entire compute half, so the two passes are identical by construction.
+
+Two consequences worth stating here because they show up in the goldens:
+
+- It costs **qubits, never gates** — `cq_materialise` emits an `X` only if the constant was
+  1, and scratch is always born 0.
+- Kernel gate counts become a function of **`W` alone**, independent of the operand bit-kind
+  mask. That is what makes one L4 golden per `(kernel, W)` sound, and it is a direct answer
+  to risk R5.
+
+The **short-circuit** line is equally load-bearing in the other direction: without it,
+pre-materialisation would allocate scratch for a fully-classical operation and break **L5**'s
+"zero gates and zero qubits". An all-classical kernel call never reaches the sandwich.
 
 Because `X`, `CX` and `CCX` are each self-inverse, "reverse the compute" is literally
 replaying the emitted operand triples backwards — which the kernel knows without storing
@@ -257,6 +440,18 @@ Two notes on the catalogue:
 - **K12 is not a circuit.** Bennett implements division as a *branchless Julia kernel*
   compiled by its own pipeline (`src/divider.jl`). We do the same: an unrolled restoring
   division built from K7/K9/K10. Nothing new to port.
+- **K11 uses Cuccaro, and this is a deliberate delta from upstream** (decided 2026-08-14).
+  Bennett's `multiplier.jl:29` calls `lower_add!` — *ripple*, not Cuccaro — so "shift-add
+  over K8" is our choice, not a port. It is the right one: scratch drops from `3W²+W` to
+  `W²+2W` (**1088 vs 3104 qubits at W=32**, which matters once D2's pool ceiling is wired to
+  `qec_n_logical`) and Toffolis from `5W²−3W` to `5W²−5W`. K8 exists in this catalogue
+  precisely as the multiplier's in-place accumulator. **The Rule 7 objection to Cuccaro does
+  not apply here:** Cuccaro is barred from K6/K7 because its uncompute is the reverse circuit
+  rather than a re-run, which does not match CQ_lang's `_unc` contract — but inside the
+  multiplier the accumulator is internal to the kernel and never exposed to `_unc`. Note the
+  cost of the choice: *ripple is the only variant cross-checkable against an upstream
+  published figure*, so K11's golden is self-pinned. `docs/constructions/K11.md` keeps the
+  ripple figures as a labelled appendix for exactly that reason.
 
 ---
 
@@ -354,8 +549,35 @@ promotion never needs more than one control wire.
 ## 10. The uncompute axis
 
 - **`_unc(out, srcs…)`** — re-run the kernel with `dst = out` (§4). Precondition: every
-  source is still live. Postcondition: every bit of `out` is `BIT_ZERO` or a known-zero
-  qubit; its qubits go back to the pool.
+  source is still live. Postcondition, **on values only**: `out` holds
+  `f(srcs) ^ f(srcs) = 0`. **`_unc` owns no qubits and reclaims nothing** — no pool
+  operation, no bit-kind rewrite, no handle-table change. Every `CQ_BIT_Q` bit of `out`
+  still owns its qubit index when `_unc` returns, and `cqrt_free` is the **sole** place a
+  qubit ever goes back to the pool.
+
+  > **Why `_unc` must not reclaim — Step 0.5 item 2, settled 2026-08-14.** An earlier draft
+  > said `_unc` returns the qubits to the pool *and* leaves the bits as "known-zero qubits",
+  > which double-frees on a following `cqrt_free`. The resolution is not a coin-toss between
+  > the two halves: **CQ_lang decides reclamation per rail, and its only lever is emitting or
+  > withholding the `cqrt_free`.** The adjoint is emitted unconditionally
+  > (`ir-pass/src/Uncomputation.cpp:259`) and only the free is skipped (`:297-305`; `:268` —
+  > *"THE FREEZE SUPPRESSES THE FREE, NEVER THE ADJOINT"*). So the **same symbol** carries
+  > both dispositions: `cq_template_add_i32_hl_unc` is `_unc`'d **then freed** at
+  > `ir-pass/test/lowering_io_tape_derived_uncompute.ll:57-58`, and `_unc`'d and
+  > **deliberately never freed** at `tests/e2e/slice_io_chained_theta.expected.log:8`, where
+  > the rail was recorded onto a kept output tape and is *entangled at the free point*
+  > (`DagTraversal.cpp:343-355`). We see only the call stream and **cannot tell those two
+  > apart**, so reclaiming at `_unc` would return an entangled qubit to the free list —
+  > breaking I3 and reintroducing precisely the miscompile CQ_lang had already fixed, with
+  > CQ_lang having no mechanism to stop us.
+  >
+  > Measured over the 239 pinned goldens: **25,147** `cq_template_*_unc` calls, **9** whose
+  > rail is never freed, **0** double-frees — and **26,558** freed handles whose rail
+  > received *no* `_unc` at all. `cqrt_free` therefore keeps full reclamation logic under
+  > either rule, which is a second reason to put ownership there and nowhere else.
+  >
+  > **A rail that is `_unc`'d and never freed stays allocated forever. That is the intended
+  > Rule-6 safe leak, not a bug to fix.**
 
   > **Do not assert that `out`'s bit-kinds match what the forward produced — they often
   > will not.** Because we never demote (D6), an in-place `cqrt_ry`/`cqrt_rz` applied to
@@ -373,9 +595,21 @@ promotion never needs more than one control wire.
   `CompareLowering` emits it, for Phase-4 control flags. A compare's forward is
   `flag ^= pred(a,b)`, which is its own inverse, so `_inv` allocates a fresh rail and
   runs the forward. Low priority.
-- **`cqrt_free(h)`** — assert every bit is `BIT_ZERO` or a known-zero qubit, return the
-  qubits to the pool, mark the handle dead. A free of a dirty rail is a hard error, not
-  a warning: it is the exact signature of a silent state collapse.
+- **`cqrt_free(h)`** — **the one and only operation that returns qubits to the pool.**
+  Assert the rail is provably clean, return every qubit `h` still owns, and mark the handle
+  dead (a tombstone, D5). A free of a rail that is not provably clean is a hard error, not a
+  warning: it is the exact signature of a silent state collapse. Because `_unc` reclaims
+  nothing, a rail's qubits are returned **exactly once** — here — whether or not an `_unc`
+  preceded it.
+
+  > **What "provably clean" reads is NOT settled by this bullet, and it is not obvious.** It
+  > cannot be the two-bit shadow: §3's `CX` rule propagates `unknown`, so an uncomputed
+  > *tainted* rail is all-`Q unknown` and a literal shadow check would hard-error on every
+  > legitimate sandwich kernel. The evidence has to be **structural** — the §4 kernel
+  > contract plus I6 palindromic reversal — which means one sanctioned un-poisoning write,
+  > the sole exception to §3's "conservative in the safe direction only". This bites M08's
+  > "assert clean on release" at **Step 8, before any kernel exists**. Tracked separately;
+  > **do not** weaken this hard error to a warning to make a fixture pass.
 
 ---
 
@@ -388,14 +622,52 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 | L0 | Fold table | Unit tests over all operand-state combinations in §3 |
 | L1 | **Kernel differential** | For each kernel: all `(a,b)` at W ∈ {1,2,4,8} × sampled classical/quantum bit-kind masks, compare shadow result against the C operator. Random sampling at W ∈ {16,32,64} |
 | L2 | Ancilla-clean | After every kernel call, assert the live-qubit set equals exactly `dst`'s qubits |
-| L3 | Uncompute round-trip | forward → `_unc` → assert `dst` all-zero **and** the pool is back to its pre-call state |
-| L4 | Gate-count goldens | Pin per-kernel `(NOT, CNOT, Toffoli)` at each W. Cross-check against Bennett's published baselines where the construction matches (e.g. `x+1` at Int8 = 58/6/40/12; Cuccaro = 6W−5) and document every deliberate delta |
+| L3 | Uncompute round-trip | forward → `_unc` → assert `dst`'s **values** are all-zero. The pool is **not** restored yet — `_unc` reclaims nothing (§10). The harness then calls `cqrt_free` explicitly and asserts the pool is back to its pre-call state |
+| L4 | Gate-count goldens | Pin per-kernel `(NOT, CNOT, Toffoli)` at each W. Cross-check against Bennett's published baselines where the construction matches, and document every deliberate delta. See the arity and staleness notes below — both bit an earlier draft |
 | L5 | Classical short-circuit | Assert **zero** gates and **zero** qubits for the fully-classical case, and exactly 1 qubit / 1 CX for `int a = 0; a \|= b << 3` |
 | L6 | CQ_lang e2e | Link against CQ_lang's existing fixtures, diff emitted traces |
 | L7 | Grover | §12 |
 
 L1 and L5 are the two that actually catch bugs. L4 is what stops a "harmless" refactor
 from silently doubling the T-count.
+
+**L0's size is 159** — `5 X + 25 CX + 125 CCX = 155` exhaustive cases (the full Cartesian
+product over the five operand kinds) plus the **4** distinctness death-tests of §3. Each of
+the 155 pins a *4-tuple* — gates emitted, qubits allocated, resulting bit-kind, resulting
+shadow — which is four **assertions** per case, not four cases. See `IMPLEMENTATION_PLAN.md`
+§4 Step 6.
+
+**L4's golden tuple arity (Step 0.5 item 3 — resolved).** `x+1` at Int8 was quoted as
+`58/6/40/12`, four numbers against the three-tuple `(NOT, CNOT, Toffoli)`. There is no
+contradiction: Bennett's `gate_count` returns a **4-field NamedTuple**
+`(total, NOT, CNOT, Toffoli)` (`src/diagnostics.jl:25`, and printed that way at
+`README.md:114`), so the leading `58` is the redundant sum — `6 + 40 + 12 = 58`. Pin the
+three-tuple; carry `total` only as a checksum. **Always match the full tuple, never `total`
+alone:** two unrelated upstream circuits both total 114 (`x+1` at i16 is `114/6/80/28`, while
+a 4-entry QROM s-box is `114/10/96/8`).
+
+**Which upstream baseline to cross-check against (Step 0.4 — resolved).** Bennett publishes
+*two* figures for `x+1` at i8 and they disagree: `100/4/68/28` in `BENCHMARKS.md:9` and
+`58/6/40/12` in `README.md:114` / `CLAUDE.md:27`. **`BENCHMARKS.md` is stale** — it was
+generated under the pre-U27/U28 defaults (`add=:cuccaro`, `fold_constants=false`), its own
+regression test names those as the old defaults, and its generator cannot even run at the
+pinned commit (it calls a `_reset_names!` that has since been deleted). Pin against
+**`58/6/40/12`**. The comparison is legitimate rather than approximate because Bennett's
+*global* wrap is `2F + W` (`bennett_transform.jl:343-358`) — algebraically identical to our
+*local* sandwich — so for a single-kernel expression the two coincide exactly. It does **not**
+extend to multi-kernel expressions, where Bennett pays `2·Σ Fᵢ + W` and we pay `Σ (2Fᵢ + Wᵢ)`,
+strictly more. Full derivation and the confirmed closed forms
+(`total = 7W+2`, `NOT = 6`, `CNOT = 5W`, `Toffoli = 2W−4`) are in
+[`docs/constructions/BASELINES.md`](docs/constructions/BASELINES.md).
+
+> **`x+1` is a *constant increment with folding on*; K6 is a *general two-register add*.**
+> Do not pin K6 against 58. Read straight off `adder.jl`, the general adder's compute half is
+> `5W−2` and its sandwiched total `11W−4` — **84** at i8, not 58, and `4W−4` Toffolis rather
+> than `2W−4`. Pinning K6 against the constant-increment baseline would under-count by 26
+> gates and 16 Toffolis, more than half the T-count. K1–K5, K9, K10 and K12 have **no**
+> published upstream counts at all, so their goldens are necessarily self-pinned from our own
+> port — which is exactly why `x+1` @ i8 is the *one* place the port is validated against
+> upstream rather than against itself.
 
 ---
 
@@ -441,7 +713,7 @@ v1 is accepted when:
 | 5 | K10 (mux) + variable shifts; K8 (Cuccaro accumulator); K11 (mul) | L1–L4 green |
 | 6 | K12 (div/rem) | L1–L4 green |
 | 7 | `_unc` / `_inv` / `_controlled` axes; rotations + θ special cases; measurement | L3 green across all kernels; classical mode works |
-| 8 | Generated shim over the full 1474-symbol integer grid; CQ_lang link; Grover | L6, L7 green — **v1 done** |
+| 8 | Generated shim over the full integer grid (**1595**, or **1455** if i80 is ruled out of scope — §1); CQ_lang link; Grover | L6, L7 green — **v1 done** |
 | 9 | *(stretch)* QRAM — port Bennett's QROM (`src/qrom.jl`, self-cleaning AND tree, 2(L−1) Toffoli) and Shadow (`src/softmem.jl`) behind `cqrt_qram_*` | load/store round-trip |
 
 Increments 2–6 are independent after 1 and can be built in any order or in parallel.
@@ -457,7 +729,7 @@ src/sink_printf.c sink_count.c sink_qec.c
 src/kernels/{bitwise,shift,cast,add,cmp,mux,mul,divrem}.c
 shim/gen_shim.py             reads CQ_lang's tools/opcode_table.yaml
 shim/cq_runtime_impl.c       the cqrt_* surface
-shim/cq_templates_impl.c     generated dispatch (1474 thin wrappers)
+shim/cq_templates_impl.c     generated dispatch (1595 thin wrappers; see §1 on i80)
 tests/
 ```
 

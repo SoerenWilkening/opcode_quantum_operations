@@ -1,0 +1,26 @@
+Manifest.toml
+*.pdf
+docs/reference_code/
+docs/literature/*.pdf
+docs/literature/**/*.pdf
+.claude/
+v0.1/
+build/
+*:Zone.Identifier
+scripts/.browser-profile/
+scripts/sources/
+
+# Bennett-5p1c / U72 — third-party reference checkouts (e.g. JuliaGPU
+# GPUCompiler.jl); cloned ad-hoc during M1-M3 / T5 work for inspection
+# of LLVM frontends.  Not part of Bennett.jl's source.
+gpucompiler/
+
+# Third-party reference checkouts for Enzyme parity / coverage scans.
+# Cloned ad-hoc; not part of Bennett.jl's source.
+external/
+
+# Bennett-4nvl / U212 — large auto-generated benchmark artifact (1.2MB,
+# 17,815 LOC). Regenerated on demand by benchmark/codegen_sweep_impls.jl;
+# benchmark/sweep_cell.jl + benchmark/regression_check.jl auto-regen
+# when missing. Do NOT check in.
+benchmark/sweep_persistent_impls_gen.jl

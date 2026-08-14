@@ -1,0 +1,256 @@
+"""
+Pebbling strategies for reversible circuit optimization.
+
+Implements Knill's 1995 recursion (Theorem 2.1) for optimal time given
+a space bound, and provides a framework for applying pebbling strategies
+to the dependency DAG to generate optimized Bennett constructions.
+"""
+
+# Bennett-069e / U143: named sentinels for the Knill DP table.
+# `_PEBBLE_INF` initialises every cell to "no finite cost yet"; the
+# inner loop tests `cost < _PEBBLE_FINITE_BOUND` to gate off any
+# triple-sum involving a still-uncomputed cell.  Picked so:
+#
+#   3 · _PEBBLE_FINITE_BOUND < typemax(Int)   (no Int overflow on a+b+c)
+#   _PEBBLE_INF >= _PEBBLE_FINITE_BOUND       (the gate distinguishes
+#                                              the sentinel from any
+#                                              realistically-bounded
+#                                              real chain cost)
+#
+# Using `Union{Int, Nothing}` would be cleaner Julia but adds a tag-bit
+# per DP cell; the table can be hot in practical (n, s) regimes so the
+# named-Int sentinel wins on speed.
+const _PEBBLE_INF           = typemax(Int) ÷ 2
+const _PEBBLE_FINITE_BOUND  = typemax(Int) ÷ 4
+
+"""
+    knill_pebble_cost(n::Int, s::Int) -> Int
+
+Compute the minimum number of steps to pebble a chain of n nodes using
+at most s pebbles, using Knill's recursion (Theorem 2.1):
+
+  F(1, s) = 1                    for s >= 1
+  F(n, 1) = Inf                  for n >= 2
+  F(n, s) = min over m of F(m,s) + F(m,s-1) + F(n-m,s-1)  for n>=2, s>=2
+
+The three terms: forward first m nodes, unforward them (one fewer pebble),
+continue with remaining n-m nodes (one fewer pebble).
+"""
+function knill_pebble_cost(n::Int, s::Int)
+    # Dynamic programming table
+    F = fill(_PEBBLE_INF, n, s)
+
+    # Base cases
+    for ss in 1:s
+        F[1, ss] = 1
+    end
+
+    for nn in 2:n
+        for ss in 2:s
+            best = _PEBBLE_INF
+            for m in 1:(nn - 1)
+                a, b, c = F[m, ss], F[m, ss - 1], F[nn - m, ss - 1]
+                # Overflow-safe addition: each term well below typemax/3.
+                if a < _PEBBLE_FINITE_BOUND &&
+                   b < _PEBBLE_FINITE_BOUND &&
+                   c < _PEBBLE_FINITE_BOUND
+                    cost = a + b + c
+                    if cost < best
+                        best = cost
+                    end
+                end
+            end
+            F[nn, ss] = best
+        end
+    end
+
+    return F[n, s]
+end
+
+"""
+    min_pebbles(n::Int) -> Int
+
+Minimum number of pebbles needed to pebble a chain of n nodes.
+From Knill Theorem 2.3: F(n,s) < Inf iff n <= 2^{s-1}.
+So minimum s = 1 + ceil(log2(n)).
+"""
+function min_pebbles(n::Int)
+    n <= 1 && return 1
+    return 1 + ceil(Int, log2(n))
+end
+
+"""
+    knill_split_point(n::Int, s::Int) -> Int
+
+Find the optimal split point m for the Knill recursion at depth (n, s).
+Returns the m that minimizes F(m,s) + F(m,s-1) + F(n-m,s-1).
+"""
+function knill_split_point(n::Int, s::Int)
+    n <= 1 && return 0
+    s <= 1 && return 0
+
+    F = fill(_PEBBLE_INF, n, s)
+    for ss in 1:s; F[1, ss] = 1; end
+    for nn in 2:n, ss in 2:s
+        for m in 1:(nn-1)
+            a, b, c = F[m, ss], F[m, ss-1], F[nn-m, ss-1]
+            if a < _PEBBLE_FINITE_BOUND &&
+               b < _PEBBLE_FINITE_BOUND &&
+               c < _PEBBLE_FINITE_BOUND
+                cost = a + b + c
+                F[nn, ss] = min(F[nn, ss], cost)
+            end
+        end
+    end
+
+    # Find the best m for (n, s)
+    best_m = 1
+    best_cost = _PEBBLE_INF
+    for m in 1:(n-1)
+        a, b, c = F[m, s], F[m, s-1], F[n-m, s-1]
+        if a < _PEBBLE_FINITE_BOUND &&
+           b < _PEBBLE_FINITE_BOUND &&
+           c < _PEBBLE_FINITE_BOUND
+            cost = a + b + c
+            if cost < best_cost
+                best_cost = cost
+                best_m = m
+            end
+        end
+    end
+    return best_m
+end
+
+"""
+    _pebbled_bennett_impl(lr::LoweringResult; max_pebbles::Int=0) -> ReversibleCircuit
+
+Bennett construction with Knill's pebbling strategy for space optimization.
+Reached via `bennett(lr; strategy=PebbledStrategy(max_pebbles))`
+(Bennett-i2ca / U55) or the `pebbled_bennett(lr; max_pebbles)` legacy
+alias.
+
+Instead of forward ALL → copy → reverse ALL (full Bennett, max space),
+uses recursive checkpointing to reduce the number of simultaneously live
+intermediate wires.
+
+If max_pebbles <= 0, uses full Bennett (no optimization).
+"""
+function _pebbled_bennett_impl(lr::LoweringResult; max_pebbles::Int=0)
+    # Bennett-rjk7: honor the self_reversing fast-path universally — mirrors
+    # `_bennett_default` (src/bennett_transform.jl:286-294). Skipping the wrap
+    # halves gate count for QROM / Sun-Borissov primitives, and the U03 probe
+    # (`_validate_self_reversing!`, Bennett-egu6) catches forged tags loud per
+    # CLAUDE.md §1 regardless of strategy choice.
+    if lr.self_reversing
+        _validate_self_reversing!(lr)
+        return _build_circuit(lr.gates, lr.n_wires, lr.input_wires,
+                              lr.output_wires, lr)
+    end
+
+    # Bennett-s0tn: loop-guard copy-out lives only in `_bennett_default`.
+    isempty(lr.loop_guards) || return _bennett_default(lr)
+
+    copy_wires, total = _allocate_copy_wires(lr)
+    n_out = length(lr.output_wires)
+
+    n = length(lr.gates)
+
+    if max_pebbles <= 0 || max_pebbles >= n
+        # Full Bennett — same as bennett()
+        return bennett(lr)
+    end
+
+    # Bennett-prtp / U04: Knill gate-level recursion assumes per-gate fresh
+    # target wires. Branching CFGs (≥2 `__pred_*` groups) violate this
+    # assumption because predicate wires are allocated forward and consumed
+    # by later groups across the same wire range. Fall back to full Bennett
+    # on branching; keep pebbled_bennett's Knill savings for straight-line.
+    if _has_branching(lr)
+        return bennett(lr)
+    end
+
+    all_gates = ReversibleGate[]
+
+    # Build the copy gates (to be inserted at the right moment)
+    copy_gates = ReversibleGate[CNOTGate(lr.output_wires[i], copy_wires[i]) for i in 1:n_out]
+
+    # Generate pebbled schedule: forward + copy + reverse
+    _pebble_with_copy!(all_gates, lr.gates, copy_gates, 1, n, max_pebbles, true)
+
+    return _build_circuit(all_gates, total, lr.input_wires, copy_wires, lr)
+end
+
+"""
+Recursive pebbling with output copy insertion.
+
+When `is_outermost` is true and we reach the end of all gates, the copy_gates
+are inserted before uncomputing. For inner recursions, no copy is needed.
+
+Implements Knill's reversible pebbling game at the gate level:
+  Step 1: Forward gates lo:mid (compute, m steps)
+  Step 2: Recursively pebble mid+1:hi with s-1 pebbles
+  Step 3: Reverse gates lo:mid (uncompute, m steps)
+
+The benefit over full Bennett: the recursive splitting ensures that at any point
+during execution, at most s segments of gates have live wires simultaneously.
+Total gate count is always 2n-1+n_out (same as full Bennett for a chain), but
+the peak number of simultaneously-live wires is bounded by O(s * max_segment_wires).
+"""
+function _pebble_with_copy!(result::Vector{ReversibleGate},
+                            gates::Vector{ReversibleGate},
+                            copy_gates::Vector{ReversibleGate},
+                            lo::Int, hi::Int, s::Int,
+                            is_outermost::Bool)
+    n = hi - lo + 1
+    n <= 0 && return
+
+    # Base case: enough pebbles for full Bennett on this segment
+    if n <= s
+        for i in lo:hi
+            push!(result, gates[i])
+        end
+        if is_outermost && hi == length(gates)
+            append!(result, copy_gates)
+        end
+        for i in hi:-1:lo
+            push!(result, gates[i])
+        end
+        return
+    end
+
+    s <= 1 && throw(ArgumentError("pebbled_bennett: insufficient pebbles — need at least $(min_pebbles(n)) for $n gates, have $s"))
+
+    m = knill_split_point(n, s)
+    mid = lo + m - 1
+
+    # Step 1: Forward gates lo:mid (compute, m steps)
+    for i in lo:mid
+        push!(result, gates[i])
+    end
+
+    # Step 2: Recursively pebble mid+1:hi with s-1 pebbles
+    includes_end = (hi == length(gates)) && is_outermost
+    _pebble_with_copy!(result, gates, copy_gates, mid + 1, hi, s - 1, includes_end)
+
+    # Step 3: Reverse gates lo:mid (uncompute, m steps)
+    for i in mid:-1:lo
+        push!(result, gates[i])
+    end
+end
+
+"""
+    pebble_tradeoff(n::Int; max_space::Int=0) -> NamedTuple
+
+Compute the time-space tradeoff for pebbling n nodes.
+Returns (space, time, overhead) for the optimal strategy at the given space bound.
+If max_space is 0, uses full Bennett (space = n, time = 2n-1).
+"""
+function pebble_tradeoff(n::Int; max_space::Int=0)
+    if max_space <= 0
+        # Full Bennett
+        return (space=n, time=2n - 1, overhead=1.0)
+    end
+    s = max(max_space, min_pebbles(n))
+    t = knill_pebble_cost(n, s)
+    return (space=s, time=t, overhead=t / (2n - 1))
+end

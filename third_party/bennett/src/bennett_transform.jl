@@ -1,0 +1,406 @@
+"""
+Compute ancilla wire list: all wires not in input, output, or loop-check
+sets. Bennett-s0tn: `loop_check` wires are a fourth class — they hold a
+deliberate post-bennett convergence bit and must NOT be checked as
+ancillae (a healthy circuit ends with a loop-check wire at 1).
+"""
+function _compute_ancillae(total::Int, input_wires, output_wires,
+                           loop_check_wires=LoopGuard[])
+    in_set  = Set(input_wires)
+    out_set = Set(output_wires)
+    lc_set  = Set(lg.wire for lg in loop_check_wires)
+    return [w for w in 1:total
+            if !(w in in_set) && !(w in out_set) && !(w in lc_set)]
+end
+
+"""
+Build a ReversibleCircuit from gates, input/output wires, and metadata.
+Bennett-s0tn: `loop_check_wires` (post-bennett convergence copy-out wires)
+default empty; they are excluded from the ancilla set and form the fourth
+wire-partition class.
+"""
+function _build_circuit(all_gates::Vector{ReversibleGate}, total::Int,
+                        input_wires::Vector{Int}, output_wires::Vector{Int},
+                        lr::LoweringResult,
+                        loop_check_wires::Vector{LoopGuard}=LoopGuard[])
+    ancillae = _compute_ancillae(total, input_wires, output_wires,
+                                 loop_check_wires)
+    return ReversibleCircuit(total, all_gates, input_wires, output_wires,
+                             ancillae, lr.input_widths, lr.output_elem_widths,
+                             loop_check_wires)
+end
+
+"""
+    _allocate_copy_wires(lr::LoweringResult) -> (Vector{Int}, Int)
+
+Allocate `length(lr.output_wires)` fresh wire indices appended after
+`lr.n_wires`. Returns `(copy_wires, total)` where
+`total = lr.n_wires + length(lr.output_wires)`. Bennett-i2ca / U55:
+shared helper used by `_bennett_default`, `_eager_bennett_impl`,
+`_value_eager_bennett_impl`, and `_pebbled_bennett_impl` to remove the
+duplicated 4-line allocation pattern. The pebbled-group / checkpoint
+strategies allocate copy wires through a `WireAllocator` instead and do
+not call this helper.
+"""
+@inline function _allocate_copy_wires(lr::LoweringResult)
+    n_out = length(lr.output_wires)
+    copy_start = lr.n_wires + 1
+    copy_wires = collect(copy_start:copy_start + n_out - 1)
+    return copy_wires, lr.n_wires + n_out
+end
+
+"""
+    _emit_copy_gates!(result, output_wires, copy_wires) -> result
+
+Append `length(output_wires)` CNOT gates to `result`, copying each
+`output_wires[i]` into `copy_wires[i]`. Bennett-i2ca / U55: shared
+helper. NOTE: `src/pebble/pebbled_groups.jl` defines a different
+`_emit_copy_gates!` (5-arg, takes `live_map::Dict{Symbol,ActivePebble}`)
+for checkpoint-replay output mapping; both methods coexist via Julia
+arity dispatch.
+"""
+@inline function _emit_copy_gates!(result::Vector{ReversibleGate},
+                                    output_wires::Vector{Int},
+                                    copy_wires::Vector{Int})
+    for (j, w) in enumerate(output_wires)
+        push!(result, CNOTGate(w, copy_wires[j]))
+    end
+    return result
+end
+
+"""
+Build the canonical U03 probe battery for a self_reversing contract check:
+four fixed deterministic input bit-vectors (all-zero, all-one, walking-1 on
+the first input wire, walking-1 on the last input wire). Coverage rationale:
+all-zero detects unconditional ancilla flips; all-one activates every Toffoli
+control simultaneously; the walking-1 probes catch per-lane leakage that a
+fully quiescent or fully active input would miss. Deterministic — CLAUDE.md
+§4 and §6 both favour reproducible failures over randomised sweeps.
+"""
+function _u03_self_reversing_probes(total_in::Int)
+    probes = Tuple{String,Vector{Bool}}[]
+    push!(probes, ("all-zero",  falses(total_in)))
+    push!(probes, ("all-one",   trues(total_in)))
+    if total_in >= 1
+        p = falses(total_in); p[1] = true
+        push!(probes, ("walking-1-first-lane", p))
+    end
+    if total_in >= 2
+        p = falses(total_in); p[end] = true
+        push!(probes, ("walking-1-last-lane",  p))
+    end
+    return probes
+end
+
+"""
+Bennett-egu6 / U03: runtime check that an `lr` with `self_reversing=true`
+actually keeps Bennett's invariants. For each probe vector, forward-execute
+`lr.gates` on a fresh bit array seeded from the probe, then assert
+  (1) every ancilla wire is zero after the forward pass, and
+  (2) every input wire holds its original probe bit.
+Raises `ErrorException` with probe/wire/expected/actual context on violation.
+Reuses `apply!` (src/simulator.jl:1-3) and `_compute_ancillae` — CLAUDE.md
+§13 (no duplicated lowering).
+
+# Bennett-h0ai: `trusted_dirty_wires` exemption
+
+The `lower(parsed::ParsedIR)` pipeline injects an entry-block predicate
+NOTGate (`src/lowering/driver.jl:104` — `pw[1] = 1`) before any user
+instructions run. That wire ends the forward pass holding 1, NOT 0,
+which the strict probe rejects as a dirty ancilla even though the
+predicate is doing exactly what it's designed to do.
+
+When `_infer_self_reversing` runs auto-detection over a `lower()`-built
+LR, it passes the entry-block predicate wires via the `trusted_dirty_wires`
+kwarg; those wires are excluded from the ancilla-clean check. Forged
+producer-tag claims (the L3 catch from Bennett-h0ai's design) still
+fail loud because the trusted set is bounded — only the explicitly-named
+predicate wires are exempt, NOT every wire that happens to be dirty.
+
+Default empty set preserves the strict pre-h0ai contract.
+"""
+function _validate_self_reversing!(lr::LoweringResult;
+                                   trusted_dirty_wires::Set{Int}=Set{Int}())
+    total_in = sum(lr.input_widths)
+    ancilla_set = _compute_ancillae(lr.n_wires, lr.input_wires, lr.output_wires)
+    for (name, probe_bits) in _u03_self_reversing_probes(total_in)
+        bits = zeros(Bool, lr.n_wires)
+        offset = 0
+        for w in lr.input_widths
+            for i in 1:w
+                bits[lr.input_wires[offset + i]] = probe_bits[offset + i]
+            end
+            offset += w
+        end
+        snapshot = [bits[w] for w in lr.input_wires]
+
+        for g in lr.gates
+            apply!(bits, g)
+        end
+
+        for w in ancilla_set
+            (w in trusted_dirty_wires) && continue   # Bennett-h0ai exemption
+            bits[w] && throw(ArgumentError("bennett(): self_reversing=true contract violated — ancilla wire $w is 1 after forward pass under probe '$name' (n_wires=$(lr.n_wires), n_gates=$(length(lr.gates))). Fix the producer or drop the self_reversing flag."))
+        end
+        for (k, w) in pairs(lr.input_wires)
+            bits[w] == snapshot[k] ||
+                throw(ArgumentError("bennett(): self_reversing=true contract violated — input wire $w changed from $(snapshot[k]) to $(bits[w]) under probe '$name' (n_wires=$(lr.n_wires), n_gates=$(length(lr.gates))). Fix the producer or drop the self_reversing flag."))
+        end
+    end
+    return nothing
+end
+
+"""
+    _infer_self_reversing(lr::LoweringResult, trusted_predicate_wires::Vector{Int})
+        -> Bool
+
+Bennett-h0ai: the structural aggregator (Layer 2) for auto self_reversing
+detection. Returns `true` iff the `lr` is a structural one-primitive
+self-cleaning circuit AND the U03 runtime probe accepts it (with the
+entry-block predicate wires excused via `trusted_dirty_wires`).
+
+# Structural conditions (all must hold for `true`)
+
+1. NO branching (`!_has_branching(lr)`): only one `__pred_*` group exists
+   (the entry-block predicate). Branching adds path-predicate gates whose
+   wires end the forward pass holding values that don't fit the simple
+   exemption pattern.
+2. EXACTLY ONE tagged group. Zero tagged → no producer claims self-cleaning;
+   two-or-more tagged → chained primitives whose composition needs an outer
+   Bennett wrap to glue them. (Future work could extend to compose-with-clean
+   chains; out of scope for h0ai.)
+3. The tagged group's `result_wires == lr.output_wires` exactly. Any
+   permutation, slice, subset, or post-processing breaks the
+   "primitive output IS the function output" assumption that makes the
+   self-reversing fast-path safe.
+4. Every NON-tagged group is pure boilerplate: `__pred_<entry>`, `__ret_*`
+   (length-0 reverse passes), or `__branch_*` (excluded by condition 1).
+   The `__multi_ret_merge` group MUST be absent (covered by condition 1).
+
+# Runtime probe (Layer 3)
+
+After structural checks pass, the U03 probe is invoked with
+`trusted_dirty_wires=Set(trusted_predicate_wires)`. If the probe rejects
+(forged tag, real dirty ancilla outside the exemption, or input mutation),
+this returns `false` — auto-detection is conservative. NOTE: per
+CLAUDE.md §1, a forged producer-tag is technically a producer bug; the
+implementation chose conservative-fallback over loud-throw to preserve
+the principle that `auto_self_reversing=true` MUST never break a working
+compile. If you need fail-loud behavior, set `auto_self_reversing=false`
+explicitly and use the manual `bennett_direct(lr)` entry point.
+"""
+function _infer_self_reversing(lr::LoweringResult,
+                                trusted_predicate_wires::Vector{Int})
+    # Condition 1: no branching.
+    _has_branching(lr) && return false
+
+    # Conditions 2 + 3: exactly one tagged group, result_wires == output_wires.
+    n_tagged = 0
+    tagged::Union{GateGroup,Nothing} = nothing
+    for g in lr.gate_groups
+        if g.is_self_reversing
+            n_tagged += 1
+            tagged = g
+        end
+    end
+    n_tagged == 1 || return false
+    @assert tagged !== nothing
+    tagged.result_wires == lr.output_wires || return false
+
+    # Condition 4: every non-tagged group is boilerplate.
+    # Allowed boilerplate names: __pred_*, __ret_*, __branch_* (the last
+    # is gated by condition 1 anyway). Reject anything else loud-as-data.
+    for g in lr.gate_groups
+        g.is_self_reversing && continue
+        s = String(g.ssa_name)
+        is_boilerplate = startswith(s, "__pred_") ||
+                         startswith(s, "__ret_")  ||
+                         startswith(s, "__branch_")
+        is_boilerplate || return false
+    end
+
+    # Layer 3: runtime probe with trusted-dirty allowlist.
+    trusted_set = Set{Int}(trusted_predicate_wires)
+    try
+        _validate_self_reversing!(lr; trusted_dirty_wires=trusted_set)
+    catch e
+        e isa ArgumentError || rethrow(e)
+        return false
+    end
+    return true
+end
+
+"""
+    bennett(lr::LoweringResult; strategy::BennettStrategy=DefaultStrategy())
+    bennett(lr::LoweringResult, strategy::BennettStrategy)
+
+Bennett's 1973 construction: forward + copy-out + uncompute.
+
+Reference: Charles H. Bennett, "Logical Reversibility of Computation",
+IBM Journal of Research and Development, 17(6):525–532, 1973.
+DOI: 10.1147/rd.176.0525.  The paper proves that any computation can be
+made reversible at the cost of additional auxiliary memory by recording
+intermediate results, copying out the final answer, and then running
+the forward computation in reverse to clear the record.  The whole
+codebase is named after this paper.
+
+# Strategy dispatch (Bennett-i2ca / U55)
+
+The `strategy` argument selects an alternate construction; concrete
+subtypes of `BennettStrategy` are defined in `src/bennett_strategies.jl`:
+
+- `DefaultStrategy` — canonical forward + CNOT-copy + reverse (this body).
+- `EagerStrategy` — gate-level dead-end EAGER cleanup.
+- `ValueEagerStrategy` — group-level value EAGER + Kahn topological reverse.
+- `CheckpointStrategy` — per-group checkpoint-and-free.
+- `PebbledStrategy(max_pebbles)` — Knill 1995 gate-level recursive pebbling.
+- `PebbledGroupStrategy(max_pebbles)` — group-level pebbling with wire reuse.
+
+The legacy aliases (`eager_bennett`, `value_eager_bennett`,
+`pebbled_bennett`, `pebbled_group_bennett`, `checkpoint_bennett`) are
+retained as thin forwarders in `bennett_strategies.jl`.
+
+# Pre-reversed primitives (`self_reversing=true`)
+
+When `lr.self_reversing` is `true`, the lowering result is already a
+self-cleaning gate sequence — its ancillae end zero AND its result lives
+on the primary output wires WITHOUT any wrap. Examples:
+
+- `lower_tabulate(f, ...)` — QROM lookup `(x, 0^W) → (x, f(x))`, see
+  src/tabulate.jl:208-212 for the canonical caller.
+- `lower_mul_qcla_tree!` — Sun-Borissov polylogarithmic-depth
+  multiplier, src/mul_qcla_tree.jl.
+
+For these, the strategy short-circuits to forward-only emission — no
+copy-out, no reverse pass — typically halving the gate count and saving
+`n_out` ancillae. **All 6 strategies (DefaultStrategy, EagerStrategy,
+ValueEagerStrategy, CheckpointStrategy, PebbledStrategy,
+PebbledGroupStrategy) honor `lr.self_reversing=true` and take the same
+fast-path** — the U03 contract probe (`_validate_self_reversing!`,
+Bennett-egu6) is invoked uniformly per CLAUDE.md §1 (fail-fast-fail-
+loud), so a forged tag fails identically regardless of strategy choice.
+Universal honoring landed in Bennett-rjk7 (pre-rjk7: DefaultStrategy-
+only; the other strategies wrapped the LR and silently bypassed the
+U03 probe).
+
+Construction sites that produce a self-reversing `lr` MUST set the flag
+explicitly via the 8-arg `LoweringResult` constructor (the 6-arg + 7-arg
+convenience forms default `self_reversing=false`):
+
+```julia
+lr = LoweringResult(gates, n_wires, input_wires, output_wires,
+                    input_widths, output_elem_widths,
+                    GateGroup[], true)   # ← self_reversing=true
+```
+
+For downstream users (e.g. Sturm.jl) who construct a guaranteed-self-
+reversing primitive AND want to assert that contract loud, see
+[`bennett_direct`](@ref).
+"""
+function _bennett_default(lr::LoweringResult)
+    # P1: self-reversing primitives (e.g. Sun-Borissov multiplier, QROM
+    # tabulate) already end with ancillae clean and the result in
+    # lr.output_wires. Skip the copy-out + reverse pass — it would just
+    # double the gate count. Bennett-egu6 / U03: validate the primitive's
+    # contract before trusting it; silent acceptance of a broken
+    # self_reversing primitive would poison every downstream circuit.
+    if lr.self_reversing
+        # Bennett-s0tn: a self-reversing primitive is a closed self-cleaning
+        # gate sequence — it cannot contain an unrolled data-dependent loop
+        # (a loop LR always branches, and `_infer_self_reversing` rejects
+        # branching LRs). A non-empty loop_guards here is a contradiction.
+        isempty(lr.loop_guards) || error(
+            "bennett: lr.self_reversing=true but lr.loop_guards is non-empty " *
+            "($(length(lr.loop_guards)) guard(s)) — a self-reversing primitive " *
+            "cannot contain a data-dependent loop. The lowering is inconsistent " *
+            "(Bennett-s0tn).")
+        _validate_self_reversing!(lr)
+        # Bennett-nj5r / U200: pass lr.gates directly. ReversibleCircuit
+        # stores the array but does not mutate it; no caller mutates
+        # lr.gates after bennett() returns (verified across src/pebble/*).
+        # Skipping the defensive copy saves O(n_gates) allocation on every
+        # self_reversing circuit (lower_tabulate, mul_qcla_tree).
+        return _build_circuit(lr.gates, lr.n_wires, lr.input_wires,
+                              lr.output_wires, lr)
+    end
+
+    copy_wires, total = _allocate_copy_wires(lr)
+
+    # Bennett-s0tn: allocate one extra post-bennett wire per loop guard,
+    # appended after the output copy wires. The forward-pass convergence
+    # wire `lg.wire` is copied into `conv_copy` by a CNOT placed parallel
+    # to the output copy-out — it survives the reverse pass exactly as
+    # f(x) does.
+    n_loop = length(lr.loop_guards)
+    loop_copy_start = total + 1
+    loop_check_wires = LoopGuard[
+        LoopGuard(loop_copy_start + (i - 1), lr.loop_guards[i].header_label,
+                  lr.loop_guards[i].K)
+        for i in 1:n_loop]
+    total += n_loop
+
+    all_gates = ReversibleGate[]
+    sizehint!(all_gates,
+              2 * length(lr.gates) + length(lr.output_wires) + n_loop)
+
+    append!(all_gates, lr.gates)
+    _emit_copy_gates!(all_gates, lr.output_wires, copy_wires)
+    # Bennett-s0tn: copy-out the convergence bits parallel to the output
+    # copy-out. Placed BEFORE the reverse pass so the reverse uncomputes
+    # `lr.loop_guards[i].wire` back to 0 while `loop_check_wires[i].wire`
+    # stays frozen with the convergence value.
+    for i in 1:n_loop
+        push!(all_gates, CNOTGate(lr.loop_guards[i].wire,
+                                  loop_check_wires[i].wire))
+    end
+    for i in length(lr.gates):-1:1
+        push!(all_gates, lr.gates[i])
+    end
+
+    return _build_circuit(all_gates, total, lr.input_wires, copy_wires, lr,
+                          loop_check_wires)
+end
+
+"""
+    bennett_direct(lr::LoweringResult) -> ReversibleCircuit
+
+Forward-only path for already-reversible `lr`. Asserts
+`lr.self_reversing == true` (errors loud otherwise) and delegates to
+[`bennett`](@ref), which short-circuits the wrap. Convenience entry
+point for downstream library authors (Sturm.jl, future quantum
+backends) who construct a self-cleaning primitive and want to make the
+"no Bennett wrap" assumption load-bearing at the call site instead of
+buried in a constructor argument.
+
+The contract is identical to `bennett(lr)` with `self_reversing=true`:
+the U03 probe battery (`_validate_self_reversing!`) runs, and a forged
+claim — dirty ancillae or input mutation — raises a precise error
+naming the offending wire (Bennett-egu6 / U03).
+
+If `lr.self_reversing == false`, this raises `ArgumentError` rather
+than silently wrapping. Use `bennett(lr)` if you want the conditional
+behavior.
+
+# Example
+```julia
+# Self-cleaning primitive (e.g. QROM lookup):
+gates = ReversibleGate[]
+out_wires = emit_qrom!(gates, wa, table, idx_wires, W)
+lr = LoweringResult(gates, wire_count(wa), idx_wires, out_wires,
+                    [length(idx_wires)], [W],
+                    GateGroup[], true)   # self_reversing=true
+c = bennett_direct(lr)   # forward-only, ~½ the gates of bennett-with-wrap
+```
+
+(Bennett-cvnb / Sturm.jl-ao1 — surfaces the existing `self_reversing`
+fast path with a discoverable name.)
+"""
+function bennett_direct(lr::LoweringResult)
+    lr.self_reversing || throw(ArgumentError(
+        "bennett_direct: lr.self_reversing must be true. The 6-arg and " *
+        "7-arg LoweringResult convenience constructors default it to " *
+        "false; pass `true` as the 8th positional arg, or use `bennett(lr)` " *
+        "if you want the standard forward + copy-out + uncompute wrap " *
+        "(Bennett-cvnb / Sturm.jl-ao1)."))
+    return bennett(lr)
+end

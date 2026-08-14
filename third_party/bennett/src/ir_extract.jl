@@ -1,0 +1,25 @@
+# Bennett-x3jc / U116: ir_extract.jl was a 2,946-LOC monolith — split
+# along its existing `# ---- section ----` headers into the files below.
+# Loading order matches the original textual order so that all
+# parse-time references (struct definitions, const dispatch tables)
+# resolve in the same order they did pre-split.
+
+include("extract/entry.jl")         # extract_ir / extract_parsed_ir / from_ll / from_bc / _run_passes!
+include("extract/sig_llvm.jl")      # Bennett-40ys: by-signature LLVM IR emission (instance-less callees)
+include("extract/callees.jl")       # known callee registry + cache + _LLVMRef + _auto_name
+include("extract/callgraph.jl")     # CW-D1a: transitive_callees typed call-graph walker (SC9 Case B path)
+include("extract/julia_set.jl")     # CW-D1b: extract_parsed_ir_set_from_julia closed-world Julia multi-IR producer
+include("extract/errors.jl")        # _ir_error / _ir_error_msg + _LLVM_OPCODE_NAMES
+include("extract/sret.jl")          # sret detection + writes collection + synthesis (Bennett-dv1z)
+include("extract/module_walk.jl")   # _find_entry_function / _module_to_parsed_ir / _extract_const_globals / _expand_switches
+include("extract/instructions.jl")  # _handle_intrinsic + _convert_instruction (the IR → IRInst dispatcher)
+include("extract/heap.jl")          # Bennett-gps7 / M1: GC/heap-skeleton recogniser (_detect_gc_preamble!)
+include("extract/dict_vm.jl")       # SC9 Case B: mem=:vm Dict→IRMap* recogniser (ADR 0008 / 0013 §D-3)
+include("extract/vector_vm.jl")      # SC9 Case A: mem=:vm Vector recogniser — recognition (ADR 0016)
+include("extract/vector_vm_walk.jl") # SC9 Case A: skeleton + element-traffic capture (ADR 0016)
+include("extract/vector_vm_emit.jl") # SC9 Case A: multi-block ParsedIR assembly (ADR 0016)
+include("extract/vector_vm_cfg.jl")  # SC9 Case A: CFG helpers + body re-root (ADR 0016)
+include("extract/vector_vm_term.jl") # SC9 Case A: terminator rewrite + φ rebind (ADR 0016)
+include("extract/constexpr.jl")     # cc0.3 GlobalAlias + cc0.4 ConstantExpr operand folding
+include("extract/vectors.jl")       # cc0.7 vector SSA scalarisation + _convert_vector_instruction
+include("extract/helpers.jl")       # _get_deref_bytes / _operand / _iwidth / _type_width + _OPCODE_MAP / _PRED_MAP

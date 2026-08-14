@@ -137,7 +137,11 @@ buildable at all.
    exhaustively at W ≤ 8 and randomly at W ∈ {16, 32, 64}, across every mixture of
    classical and quantum operand bits.
 3. **Clean.** After every template call the qubit pool contains exactly the result
-   rail's qubits — asserted, not assumed. After `_unc`, it contains nothing.
+   rail's qubits — asserted, not assumed. After `_unc` the rail's **value** is zero but
+   its qubits are still held: `_unc` reclaims nothing, and `cqrt_free` is the sole
+   deallocator (PRD §10). The pool is empty after the **free**, not after the `_unc` —
+   and for a rail CQ_lang deliberately never frees, it stays held for good, which is the
+   intended safe leak rather than a failure of this condition.
 4. **Grover.** A Grover search written in ordinary C compiles through `cqc`, links, and
    emits a gate stream whose oracle arithmetic is verified exactly in classical mode.
 5. **Hardware.** Flipping one flag routes the same stream into `qec_x` / `qec_cx` /

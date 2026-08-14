@@ -1,0 +1,489 @@
+# tools/opcode_table.yaml — opcode surface (single source of truth).
+#
+# Drives `tools/gen_templates.py` (+ tools/abi_codegen.py), which emits:
+#   - runtime/cq_templates.h           (1732 declarations)
+#   - runtime/cq_templates.c           (printf-name stubs)
+#
+# Policy: backend stays stubbed (memory `feedback-no-backend-until-frontend-done`).
+# This file declares SYMBOLS and DISPATCH METADATA only; never template bodies.
+#
+# ----------------------------------------------------------------------------
+# SCHEMA (inline; validated by tools/gen_templates_test.py)
+# ----------------------------------------------------------------------------
+# Top-level keys:
+#   version          : string  — schema version, "1".
+#   phase            : string  — owning phase identifier, "phase3".
+#   widths           : map     — symbolic width -> {bits, c_type, domain}.
+#   predicates       : map     — predicate-family -> ordered LLVM mnemonics.
+#   binary_opcodes   : list    — every binary data opcode (18).
+#   unary_opcodes    : list    — every unary data opcode (1: fneg).
+#   compare_opcodes  : list    — comparator opcodes (2: icmp, fcmp).
+#   cast_opcodes     : list    — width / domain casts (9 kinds, 90 pairs).
+#
+# Required keys per `binary_opcodes` entry:
+#   opcode, family, widths, llvm_inst, c_operators, variants
+#   (signed_variant: bool optional — present when sign-aware).
+# Required keys per `unary_opcodes` entry:
+#   opcode, family, widths, llvm_inst, c_operators, variants.
+# Required keys per `compare_opcodes` entry:
+#   opcode, family, widths, llvm_inst, predicate_set, result_type, variants.
+#   (result_type MUST be "flag_handle"; PRD §"Comparison contract".)
+# Required keys per `cast_opcodes` entry:
+#   opcode, kind, llvm_inst, c_operators, pairs, variants.
+#   pairs is list of {from, to}; both names must appear in `widths`.
+#
+# Naming convention (modifier-then-variant; control axis before direction):
+#   forward Q+Q:     cq_template_<op>[_<pred>]_<W>[_<from_to>]
+#   forward Q+C(rhs): cq_template_<op>[_<pred>]_<W>[_<from_to>]_hl
+#   forward C+Q(lhs): cq_template_<op>[_<pred>]_<W>[_<from_to>]_lh
+#   inverse Q+Q:     cq_template_<op>[_<pred>]_<W>[_<from_to>]_inv
+#   inverse Q+C(rhs): cq_template_<op>[_<pred>]_<W>[_<from_to>]_hl_inv
+#   inverse C+Q(lhs): cq_template_<op>[_<pred>]_<W>[_<from_to>]_lh_inv
+# Controlled forms (Phase 4, §2.8): `_controlled` follows the shape suffix,
+# `_inv` stays last; the control flag is always argument 0:
+#   cq_template_<op>[_<pred>]_<W>[_<from_to>][_hl|_lh]_controlled[_inv]
+# Controlled axis is BINARY-ops-only — compares get no controlled grid
+# (nesting combines flags via cqrt_toffoli, PRD §2.7).
+# Uncompute forms (Phase 5, §2.3/DD-3): the VOID in-place `_unc` family. Only
+# the `_hl`/`_lh` shape tokens are spelled, then `_unc` last; QQ is the BARE
+# base symbol + `_unc` (exactly as the forward/inv/controlled QQ forms are bare —
+# the forward QQ template is `cq_template_<op>_<W>`, NOT `..._qq`, so the
+# uncompute twin must match it to link against the emitter's bare-QQ name). `out`
+# is prepended as argument 0 and the return is void:
+#   cq_template_<op>[_<pred>]_<W>[_<from_to>][_hl|_lh]_unc(out, src…)      (binary)
+#   cq_template_<op>_<from_to>_unc(out, src)                              (cast)
+#   cq_template_fneg_<W>_unc(out, src)                                    (unary)
+# Uncompute axis (WI-0, §6.0): binary + unary + cast + COMPARES. Compares carry
+# only unc_qq/unc_hl — a lhs-literal compare canonicalizes by predicate flip
+# (`5<x` ⇒ `x>5`, CompareLowering.cpp / TemplateName.cpp), so compares have NO
+# `_lh` on ANY axis, exactly like the commutative binary ops (add/mul/and/or/xor).
+#
+# Acceptance count check (total == 2315). Baselines: 1562 (pre-f16) -> 1732 (f16,
+# Increment D) -> 2091 (i128 Tier-1 +215, 8rvn fcmp +144). bd 3c6m.4 adds ONE
+# long-double fp width f80 to EVERY fp row + the fp-WIDTH cast grid (NOT then the
+# cross-domain int<->fp casts — fenced in castInScope; f128 deferred, not shipped):
+#   +1 fp width on fp_arith (fadd 10v + fmul 10v + fsub/fdiv/frem 15v each = 65)
+#      -> +65; fneg (3v) -> +3; fcmp (14 preds x 6v = 84) -> +84; fpext +3 pairs
+#      (f16/f32/f64 -> f80) & fptrunc +3 pairs (f80 -> f16/f32/f64) x 3 -> +18.
+#   +65 + 3 + 84 + 18 = +170 over 2091 -> 2261.
+# bd 3c6m.5 LIFTS the cross-domain int<->f80 fence (i128<->fp stays fenced):
+#   sitofp +4 ({i8,i16,i32,i64}->f80) + uitofp +5 (i1 too) + fptosi +4
+#   (f80->{i8,i16,i32,i64}) + fptoui +5 (i1 too) = 18 pairs x {fwd,inv,unc}
+#   = +54 over 2261 -> 2315.
+# bd p119.7 adds the fp<->int `bitcast` REINTERPRET family (EXTRACT/INSERT_WORDS):
+#   6 same-width pairs (f16<->i16, f32<->i32, f64<->i64) x {fwd,inv,unc} = +18
+#   over 2315 -> 2333.
+# bd 3c6m.51 Inc 1 adds the i80 x86_fp80 bit-pattern EXTRACTION (read) surface
+#   (INTERMEDIATE only, mirrors i128 but a NARROWER op set): `and` (int_bitwise 10v)
+#   +10, `lshr` (int_bitwise 15v) +15, `icmp` (10 preds x 6v) +60, `trunc`
+#   i80->{i1..i64} (5 pairs x 3v) +15, `bitcast` f80<->i80 (2 pairs x 3v) +6 = +106
+#   over 2333 -> 2439.
+# bd 3c6m.51 Inc 2 adds the i80 field-insert (WRITE) surface the promoteFp80Union
+#   RMW pack needs — still INTERMEDIATE-only, still narrower than i128: `or`
+#   (int_bitwise 10v) +10, `shl` (int_bitwise 15v) +15, `zext` i{1..64}->i80 (5
+#   pairs x 3v) +15 = +40 over 2439 -> 2479. i80 remains EXCLUDED from every OTHER
+#   binary/cast op (add/sub/mul/xor/ashr/div/rem, sext, cross-domain) + copyFn/
+#   addc/xorc/tape/qram (>64 fence) — the decline guards live in ArithLowering
+#   (i80 binary allow-set = and/lshr/or/shl) / CompareLowering / castInScope (i80 a
+#   zext DEST + trunc SOURCE only). i80 is NEVER a control-merged data value.
+#   binary_opcodes  == 18 (7 int_arith + 6 int_bitwise + 5 fp_arith). int rows
+#                          5 widths (+i128 on int_arith/bitwise; +i80 on the four
+#                          bitwise ops and/lshr/or/shl only), fp rows 4 widths
+#                          {f16,f32,f64,f80}.
+#   unary_opcodes   == 1  (fneg; 4 fp widths; fwd/inv/unc)
+#   compare_opcodes == 2  (icmp x 10 preds x 6 int widths {i1,i8,i16,i32,i64,i80};
+#                          fcmp x 14 preds x 4 fp widths; NO controlled axis;
+#                          unc_qq + unc_hl only)
+#   cast_opcodes    == 9  (sext, zext, trunc, fpext, fptrunc, sitofp, uitofp,
+#                          fptosi, fptoui; fpext/fptrunc a COMPLETE fp-width grid
+#                          over {f16,f32,f64,f80}; cross-domain int<->fp ships f80
+#                          (bd 3c6m.5) and excludes i128/i80; trunc adds the
+#                          i80->{i1..i64} narrow grid; zext adds the {i1..i64}->i80
+#                          widen grid (Inc 2); bitcast adds f80<->i80)
+# ============================================================================
+
+version: "1"
+phase: "phase3"
+
+# -- Widths --------------------------------------------------------------------
+# Symbolic names map to ABI metadata. Runtime ABI is signedness-agnostic
+# (PRD §"Width unification"). 11 widths total: 7 int {i1,i8,i16,i32,i64,i128,i80}
+# + 4 fp {f16,f32,f64,f80} (bd 3c6m.4 added f80; bd 3c6m.51 added the i80
+# x86_fp80 bit-pattern extraction width; f128 deferred).
+widths:
+  i1:  { bits: 1,  c_type: "bool",    domain: "int" }
+  i8:  { bits: 8,  c_type: "int8_t",  domain: "int" }
+  i16: { bits: 16, c_type: "int16_t", domain: "int" }
+  i32: { bits: 32, c_type: "int32_t", domain: "int" }
+  i64: { bits: 64, c_type: "int64_t", domain: "int" }
+  # i128 (Phase 7.1 follow-up n0ui, Tier-1 INTERMEDIATE only): a wide-int width
+  # for mid-computation i128 arithmetic (i64 theta -> zext i128 -> i128 arith ->
+  # trunc i64 -> i64 measure). NOT a theta/phi/measure source/sink suffix (the C
+  # ABI shreds a __int128 param/return to {i64,i64}; Tier-2 source/sink deferred
+  # post-freeze). Carries the int_arith/int_bitwise binary rows + zext/sext/trunc
+  # cast pairs ONLY; NO icmp (declines), NO fp casts, NO cqrt_* core symbol.
+  i128: { bits: 128, c_type: "__int128", domain: "int" }
+  # i80 (bd 3c6m.51, Tier-1 INTERMEDIATE only): the x86_fp80 bit-pattern width.
+  # The long-double libm cells extract sign/exponent/mantissa via a
+  # `union IEEEl2bits` type-pun — `store x86_fp80` then `load iN` at const byte
+  # offsets. LLVM (even at -O3) leaves the offset-8 word in memory because it
+  # straddles the undefined padding bytes [10,16); the promoteFp80Union peephole
+  # rewrites the union to `bitcast x86_fp80 -> i80` + `lshr`/`trunc`/`and`/`icmp`,
+  # modelling the padding as 0 (sound only where the body masks bits>=16 — the
+  # central §4 decline fence). i80 carries EXACTLY the extraction ops (and / icmp
+  # / lshr + the trunc-from-i80 grid + the f80<->i80 bitcast pair); every other
+  # i80 op DECLINES (rewriteBinary/CompareLowering/castInScope guards), and the
+  # >64 copy fence keeps it out of copyFn/addc/xorc/tape/qram (intermediate-only,
+  # never a control-merged data value). The immediate rides `__int128` (i80 is not
+  # a C type); every fdiml immediate (mask 0x7fff.. = 2^63-1, shift 64) fits in 64
+  # bits so the `(long long)` trace print is faithful. NOT a theta/measure suffix
+  # (like i128; the source/sink stay f80). f128 stays deferred.
+  i80: { bits: 80, c_type: "__int128", domain: "int" }
+  f16: { bits: 16, c_type: "_Float16", domain: "fp" }
+  f32: { bits: 32, c_type: "float",   domain: "fp"  }
+  f64: { bits: 64, c_type: "double",  domain: "fp"  }
+  # f80 (bd 3c6m.4): the long-double width on x86-64, where `long double` IS
+  # x86_fp80. c_type `long double` (printed with `%Lf`). The fp arith/compare rows
+  # and the fpext/fptrunc grid carry it; cross-domain int<->f80 casts now ship too
+  # (bd 3c6m.5) — casts are arity-1 (i32 handle in/out) so the c_type never
+  # materializes in a cast body; i128<->fp stays fenced. f128 (IEEE quad,
+  # == long double on AArch64) is NOT shipped: `long double` == fp80 here, so an
+  # fp128 c_type of `long double` would be an fp128-into-fp80 ABI miscompile; a
+  # tainted fp128 declines (abiWidthFromType returns "" for it). f128 is a
+  # deferred, must-be-built-on-AArch64 follow-up.
+  f80:  { bits: 80,  c_type: "long double", domain: "fp" }
+
+# -- Predicate sets ------------------------------------------------------------
+# `icmp`: 10 LLVM predicates Clang emits from C source.
+# `fcmp`: 14 of LLVM's 16 fp predicates — the full ordered/unordered comparison
+# family. The 6 Clang emits from plain C float `== != < > <= >=` at -O1 are the
+# five ordered (`oeq,olt,ogt,ole,oge`) + `une` (C `!=` lowers to unordered-not-
+# equal, NOT `one`). 8rvn (Phase 7.1 iw81.4) adds the remaining comparison
+# predicates: the unordered twins `ueq,ugt,uge,ult,ule` and the order-test trio
+# `one,ord,uno` (reached via `__builtin_isunordered`, `!`-negated ordered
+# compares, and fast-math). These are fp-DATA compares whose i1 result is a flag,
+# NEVER a rotation angle (the ArmClassify/RotationLowering angle fence is keyed on
+# arg-1 taint, independent of this set). The only two LLVM fcmp predicates left
+# OUT are the degenerate `true`/`false` (always-1/always-0; no comparison, never
+# emitted) — an out-of-set predicate has no generated template and MUST loud-
+# decline, never mint a phantom symbol (the ziov4 hazard). `compareInScope`
+# (OpcodeSupport.cpp) mirrors this list character-for-character.
+predicates:
+  icmp: [eq, ne, slt, sgt, sle, sge, ult, ugt, ule, uge]
+  fcmp: [oeq, une, olt, ogt, ole, oge, one, ord, uno, ueq, ugt, uge, ult, ule]
+
+# -- Binary opcodes (18 = 7 int_arith + 6 int_bitwise + 5 fp_arith) -----------
+# Int widths: i1, i8, i16, i32, i64.  FP widths: f32, f64.
+# Commutative ops carry the qq/hl grid across the fwd, inv, controlled[_inv],
+# and (Phase 5) void unc axes. Non-commutative ops additionally carry the lh
+# shape (classical-on-left, distinct from classical-on-right `_hl` because
+# operand order is observable) on every axis.
+# `c_operators` is informational (e2e generators).
+binary_opcodes:
+  # Integer arithmetic (7)
+  - { opcode: add,  family: int_arith,  widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::Add",  c_operators: ["+","+=","++"],                      variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
+  - { opcode: sub,  family: int_arith,  widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::Sub",  c_operators: ["-","-=","--","unary -"],            variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: mul,  family: int_arith,  widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::Mul",  c_operators: ["*","*="],                           variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
+  - { opcode: sdiv, family: int_arith,  widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::SDiv", c_operators: ["/","/="], signed_variant: true,     variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: udiv, family: int_arith,  widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::UDiv", c_operators: ["/","/="], signed_variant: true,     variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: srem, family: int_arith,  widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::SRem", c_operators: ["%","%="], signed_variant: true,     variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: urem, family: int_arith,  widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::URem", c_operators: ["%","%="], signed_variant: true,     variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  # Integer bitwise (6)
+  - { opcode: and,  family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128,i80], llvm_inst: "llvm::Instruction::And",  c_operators: ["&","&="],                          variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
+  - { opcode: or,   family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128,i80], llvm_inst: "llvm::Instruction::Or",   c_operators: ["|","|="],                          variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
+  - { opcode: xor,  family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::Xor",  c_operators: ["^","^=","unary ~"],                variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
+  - { opcode: shl,  family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128,i80], llvm_inst: "llvm::Instruction::Shl",  c_operators: ["<<","<<="],                        variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: lshr, family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128,i80], llvm_inst: "llvm::Instruction::LShr", c_operators: [">>",">>="], signed_variant: true,  variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: ashr, family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::AShr", c_operators: [">>",">>="], signed_variant: true,  variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  # Floating-point arithmetic (5; fneg is unary). f80/f128 added bd 3c6m.4 (the
+  # `…l` math.h arithmetic + fmodl→frem x86_fp80).
+  - { opcode: fadd, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FAdd", c_operators: ["+","+="], variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
+  - { opcode: fsub, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FSub", c_operators: ["-","-="], variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: fmul, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FMul", c_operators: ["*","*="], variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
+  - { opcode: fdiv, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FDiv", c_operators: ["/","/="], variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+  - { opcode: frem, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FRem", c_operators: ["%","%="], variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
+
+# -- Unary opcodes (1: fneg) ---------------------------------------------------
+# PRD §"Floating-point arithmetic": "the only genuinely new unary opcode".
+# Int unary -/~/!/++/-- lower to existing binary opcodes (sub/xor/add).
+unary_opcodes:
+  - { opcode: fneg, family: fp_arith, widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FNeg", c_operators: ["unary -"], variants: [fwd, inv, unc] }
+
+# -- Compare opcodes (2 families: icmp, fcmp) ----------------------------------
+# Result is a flag handle (i32 ABI, logical-1-bit). PRD §"Comparison contract".
+# _hl variants carry handle on LHS, classical scalar on RHS; operand-swap
+# canonicalization handles classical-on-lhs at lowering time (so NO _lh form).
+# WI-0 (§6.0) adds the void in-place unc_qq/unc_hl axis — the embedded compare
+# |a,b,c> -> |a,b, c XOR (a<b)> is a self-inverse permutation, uncomputed by
+# recompute-and-XOR from the live sources, exactly like add/mul. No _lh on the
+# uncompute axis either (compares never emit _lh), mirroring the commutative
+# binary ops.
+compare_opcodes:
+  - { opcode: icmp, family: int_compare, widths: [i1,i8,i16,i32,i64,i80], llvm_inst: "llvm::Instruction::ICmp", predicate_set: icmp, result_type: flag_handle, variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, unc_qq, unc_hl] }
+  - { opcode: fcmp, family: fp_compare,  widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FCmp", predicate_set: fcmp, result_type: flag_handle, variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, unc_qq, unc_hl] }
+
+# -- Cast opcodes (9 kinds, 90 cross-pairs) ------------------------------------
+# Casts are unary at the IR level — no Q+C variants. PRD §"Integer width
+# casts", §"Floating-point width casts", §"Cross-domain casts".
+# sitofp/fptosi exclude i1 (signed bool is meaningless; Clang uses
+# uitofp/fptoui for _Bool). uitofp/fptoui include i1.
+cast_opcodes:
+  # Integer width casts (3 kinds x 10 pairs each = 30 pairs)
+  - opcode: sext
+    kind: int_width
+    llvm_inst: "llvm::Instruction::SExt"
+    c_operators: ["(signed widen)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: i1,  to: i8  }
+      - { from: i1,  to: i16 }
+      - { from: i1,  to: i32 }
+      - { from: i1,  to: i64 }
+      - { from: i8,  to: i16 }
+      - { from: i8,  to: i32 }
+      - { from: i8,  to: i64 }
+      - { from: i16, to: i32 }
+      - { from: i16, to: i64 }
+      - { from: i32, to: i64 }
+      # i128 (n0ui Tier-1): COMPLETE the widen grid to i128 from every source
+      # intBits accepts (i1..i64), so castInScope's generic width compare never
+      # accepts a pair with no template (phantom mint) nor creates a decline cliff.
+      - { from: i1,  to: i128 }
+      - { from: i8,  to: i128 }
+      - { from: i16, to: i128 }
+      - { from: i32, to: i128 }
+      - { from: i64, to: i128 }
+  - opcode: zext
+    kind: int_width
+    llvm_inst: "llvm::Instruction::ZExt"
+    c_operators: ["(unsigned widen)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: i1,  to: i8  }
+      - { from: i1,  to: i16 }
+      - { from: i1,  to: i32 }
+      - { from: i1,  to: i64 }
+      - { from: i8,  to: i16 }
+      - { from: i8,  to: i32 }
+      - { from: i8,  to: i64 }
+      - { from: i16, to: i32 }
+      - { from: i16, to: i64 }
+      - { from: i32, to: i64 }
+      # i128 (n0ui Tier-1): COMPLETE the widen grid to i128 (i1..i64 -> i128) so
+      # castInScope's generic width compare matches the shipped templates exactly.
+      - { from: i1,  to: i128 }
+      - { from: i8,  to: i128 }
+      - { from: i16, to: i128 }
+      - { from: i32, to: i128 }
+      - { from: i64, to: i128 }
+      # i80 (bd 3c6m.51 Inc 2): the promoteFp80Union RMW field-insert zero-extends
+      # the store-back word `zext iN -> i80` before `shl` into position (bits
+      # [off*8,80)). COMPLETE the widen grid TO i80 (i1..i64 -> i80) so castInScope's
+      # generic `fi < ti` widen compare matches the shipped templates exactly. i80 is
+      # a zext DEST only, never a SOURCE (`zext i80 -> i128` has no template — mirror
+      # trunc, where i80 is a SOURCE only); sext to/from i80 stays EXCLUDED (no
+      # sign-extended fp80 word idiom).
+      - { from: i1,  to: i80 }
+      - { from: i8,  to: i80 }
+      - { from: i16, to: i80 }
+      - { from: i32, to: i80 }
+      - { from: i64, to: i80 }
+  - opcode: trunc
+    kind: int_width
+    llvm_inst: "llvm::Instruction::Trunc"
+    c_operators: ["(narrow)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: i8,  to: i1  }
+      - { from: i16, to: i1  }
+      - { from: i16, to: i8  }
+      - { from: i32, to: i1  }
+      - { from: i32, to: i8  }
+      - { from: i32, to: i16 }
+      - { from: i64, to: i1  }
+      - { from: i64, to: i8  }
+      - { from: i64, to: i16 }
+      - { from: i64, to: i32 }
+      # i128 (n0ui Tier-1): COMPLETE the narrow grid from i128 (i128 -> i1..i64) so
+      # castInScope's generic width compare matches the shipped templates exactly.
+      - { from: i128, to: i1  }
+      - { from: i128, to: i8  }
+      - { from: i128, to: i16 }
+      - { from: i128, to: i32 }
+      - { from: i128, to: i64 }
+      # i80 (bd 3c6m.51): the promoteFp80Union peephole extracts each fp80 union
+      # word by `trunc i80 -> iN` (offset-0 low word -> i64; the offset-8 meaningful
+      # 16 bits -> i16 then zext). COMPLETE the narrow grid from i80 (i80 -> i1..i64)
+      # so castInScope's generic `fi > ti` never mints a phantom; a trunc TO i80
+      # (i128 -> i80) is EXCLUDED in castInScope (`toW != "i80"`) — i80 is a trunc
+      # SOURCE only.
+      - { from: i80, to: i1  }
+      - { from: i80, to: i8  }
+      - { from: i80, to: i16 }
+      - { from: i80, to: i32 }
+      - { from: i80, to: i64 }
+  # FP width casts (2 kinds, 3 pairs each: f16<->{f32,f64} + f32<->f64)
+  - opcode: fpext
+    kind: fp_width
+    llvm_inst: "llvm::Instruction::FPExt"
+    c_operators: ["(float widen)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: f16, to: f32 }
+      - { from: f16, to: f64 }
+      - { from: f32, to: f64 }
+      # f80 (bd 3c6m.4): COMPLETE the strict-widen grid over {f16,f32,f64,f80}
+      # so castInScope's generic `ff < tf` compare never mints a phantom.
+      # `(long double)x` from a narrower fp widens to f80. (f128 deferred.)
+      - { from: f16, to: f80 }
+      - { from: f32, to: f80 }
+      - { from: f64, to: f80 }
+  - opcode: fptrunc
+    kind: fp_width
+    llvm_inst: "llvm::Instruction::FPTrunc"
+    c_operators: ["(float narrow)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: f64, to: f32 }
+      - { from: f32, to: f16 }
+      - { from: f64, to: f16 }
+      # f80 (bd 3c6m.4): COMPLETE the strict-narrow grid (mirror of fpext).
+      # `(double)ld` / `(float)ld` narrow from f80. (f128 deferred.)
+      - { from: f80,  to: f64 }
+      - { from: f80,  to: f32 }
+      - { from: f80,  to: f16 }
+  # Cross-domain casts (4 kinds, 12+15+12+15 = 54 pairs; +18 touching f16)
+  - opcode: sitofp
+    kind: int_to_fp
+    llvm_inst: "llvm::Instruction::SIToFP"
+    c_operators: ["(signed-int -> float)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: i8,  to: f16 }
+      - { from: i8,  to: f32 }
+      - { from: i8,  to: f64 }
+      - { from: i16, to: f16 }
+      - { from: i16, to: f32 }
+      - { from: i16, to: f64 }
+      - { from: i32, to: f16 }
+      - { from: i32, to: f32 }
+      - { from: i32, to: f64 }
+      - { from: i64, to: f16 }
+      - { from: i64, to: f32 }
+      - { from: i64, to: f64 }
+      # f80 (bd 3c6m.5): int → long-double cross-domain, mirroring int→{f16,f32,
+      # f64}. sitofp excludes i1 (Clang uses uitofp for _Bool). castInScope drops
+      # the isWideFp fence once these pairs exist. Casts are arity-1 (i32 handle
+      # in/out, Rule 15) so f80's `long double` c_type never materializes here.
+      - { from: i8,  to: f80 }
+      - { from: i16, to: f80 }
+      - { from: i32, to: f80 }
+      - { from: i64, to: f80 }
+  - opcode: uitofp
+    kind: int_to_fp
+    llvm_inst: "llvm::Instruction::UIToFP"
+    c_operators: ["(unsigned-int -> float)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: i1,  to: f16 }
+      - { from: i1,  to: f32 }
+      - { from: i1,  to: f64 }
+      - { from: i8,  to: f16 }
+      - { from: i8,  to: f32 }
+      - { from: i8,  to: f64 }
+      - { from: i16, to: f16 }
+      - { from: i16, to: f32 }
+      - { from: i16, to: f64 }
+      - { from: i32, to: f16 }
+      - { from: i32, to: f32 }
+      - { from: i32, to: f64 }
+      - { from: i64, to: f16 }
+      - { from: i64, to: f32 }
+      - { from: i64, to: f64 }
+      # f80 (bd 3c6m.5): unsigned int → long-double. uitofp INCLUDES i1.
+      - { from: i1,  to: f80 }
+      - { from: i8,  to: f80 }
+      - { from: i16, to: f80 }
+      - { from: i32, to: f80 }
+      - { from: i64, to: f80 }
+  - opcode: fptosi
+    kind: fp_to_int
+    llvm_inst: "llvm::Instruction::FPToSI"
+    c_operators: ["(float -> signed-int)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: f16, to: i8  }
+      - { from: f16, to: i16 }
+      - { from: f16, to: i32 }
+      - { from: f16, to: i64 }
+      - { from: f32, to: i8  }
+      - { from: f32, to: i16 }
+      - { from: f32, to: i32 }
+      - { from: f32, to: i64 }
+      - { from: f64, to: i8  }
+      - { from: f64, to: i16 }
+      - { from: f64, to: i32 }
+      - { from: f64, to: i64 }
+      # f80 (bd 3c6m.5): long-double → signed int, mirroring {f16,f32,f64}→int.
+      # fptosi excludes i1 (no signed bool). The f80 SOURCE is a tainted handle.
+      - { from: f80, to: i8  }
+      - { from: f80, to: i16 }
+      - { from: f80, to: i32 }
+      - { from: f80, to: i64 }
+  - opcode: fptoui
+    kind: fp_to_int
+    llvm_inst: "llvm::Instruction::FPToUI"
+    c_operators: ["(float -> unsigned-int)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: f16, to: i1  }
+      - { from: f16, to: i8  }
+      - { from: f16, to: i16 }
+      - { from: f16, to: i32 }
+      - { from: f16, to: i64 }
+      - { from: f32, to: i1  }
+      - { from: f32, to: i8  }
+      - { from: f32, to: i16 }
+      - { from: f32, to: i32 }
+      - { from: f32, to: i64 }
+      - { from: f64, to: i1  }
+      - { from: f64, to: i8  }
+      - { from: f64, to: i16 }
+      - { from: f64, to: i32 }
+      - { from: f64, to: i64 }
+      # f80 (bd 3c6m.5): long-double → unsigned int. fptoui INCLUDES i1 target.
+      - { from: f80, to: i1  }
+      - { from: f80, to: i8  }
+      - { from: f80, to: i16 }
+      - { from: f80, to: i32 }
+      - { from: f80, to: i64 }
+  # Reinterpret casts (bd p119.7): same-BIT-WIDTH fp<->int `bitcast` — the
+  # EXTRACT_WORDS / INSERT_WORDS / GET_*_WORD idiom that opens nearly every injected
+  # openlibm body (p119 Phase-1 audit). A tainted fp<->int bitcast is a reversible
+  # IDENTITY RELABEL (same basis states under a new type label; zero gate), so its
+  # fwd/inv/unc bodies are trace-only relabels like every other cast. BOTH
+  # directions ship (fp->int for EXTRACT, int->fp for INSERT). castInScope admits
+  # EXACTLY these 6 pairs; f80<->i80 is EXCLUDED (no i80 width -> declines) and
+  # same-width int<->int stays the pre-lowering identity FOLD (no template). The
+  # f64-as-angle hazard is owned by declineTaintedAngle, NOT by declining bitcast.
+  - opcode: bitcast
+    kind: reinterpret
+    llvm_inst: "llvm::Instruction::BitCast"
+    c_operators: ["(reinterpret)"]
+    variants: [fwd, inv, unc]
+    pairs:
+      - { from: f16, to: i16 }
+      - { from: f32, to: i32 }
+      - { from: f64, to: i64 }
+      - { from: i16, to: f16 }
+      - { from: i32, to: f32 }
+      - { from: i64, to: f64 }
+      # f80<->i80 (bd 3c6m.51): the x86_fp80 bit-pattern reinterpret. The
+      # promoteFp80Union peephole opens each fp80 union with `bitcast x86_fp80 %v
+      # to i80` (the identity relabel Bennett treats as zero-gate), then extracts
+      # words by lshr/trunc. i80<->f80 is the INSERT direction (Inc 2 pack). This is
+      # the ONLY same-bit-width pair castInScope admits for 80-bit (fpBits(f80)==80
+      # == intBits(i80)); f128<->i128 and any other 80-bit pun do not exist.
+      - { from: f80, to: i80 }
+      - { from: i80, to: f80 }
+# -- End of opcode table -------------------------------------------------------

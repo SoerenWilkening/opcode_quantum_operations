@@ -1,0 +1,28 @@
+Bennett.jl — vendored snapshot (libcqops Step 0.1)
+
+upstream:     https://github.com/tobiasosborne/Bennett.jl
+ref:          refs/heads/main
+commit:       980805de85314b3da7ac25cf6454b56566f8e609
+tree:         7bdeb74f865fa3ed1d878fb8daa4527a81f1b0d4
+authored:     2026-08-14T10:27:46+02:00
+subject:      bd: rebuild corrupted dolt git-remote-cache (stale init.lock, bd dolt push repaired)
+vendored on:  2026-08-14
+files at rev: 2317
+
+This is the SOLE source of circuit constructions for libcqops (CLAUDE.md Rule 1).
+Port from here; never re-derive. L4 gate-count goldens must carry this commit SHA
+in a header comment (risk R3) so a golden diff after a re-vendor is attributable.
+
+Snapshot contents differ from the upstream working tree in exactly two ways,
+both removals:
+  .git/    (322M of upstream history — re-clone and 'git checkout 980805de85314b3da7ac25cf6454b56566f8e609' to restore)
+  .beads/  (129M upstream dolt issue DB — not ours, not needed)
+Every other path is byte-identical to upstream at the commit above; the full
+list of upstream paths and blob hashes at that revision is in
+.provenance/MANIFEST.txt, so this snapshot is independently verifiable.
+
+To verify:
+  git clone https://github.com/tobiasosborne/Bennett.jl /tmp/bennett-verify
+  git -C /tmp/bennett-verify checkout 980805de85314b3da7ac25cf6454b56566f8e609
+  diff -r --exclude=.git --exclude=.beads /tmp/bennett-verify \
+    third_party/bennett  # expect: only COMMIT and .provenance/ as extras

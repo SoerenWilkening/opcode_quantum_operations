@@ -1,0 +1,331 @@
+# ---- Bennett-cc0.7: vector SSA scalarisation ----
+#
+# LLVM's SLP pass vectorises sequential same-type ops into `<N x iM>` SIMD.
+# Bennett has no native vector lowering. We scalarise at the extractor:
+# every vector SSA ref maps to N per-lane IROperands in `lanes`; vector ops
+# desugar into N independent scalar IRInsts. insertelement / shufflevector
+# are pure SSA plumbing (emit nothing, mutate `lanes`). extractelement renames
+# via `IRBinOp(:add, lane, 0, w)` — known ~W+2 gates per extract, acceptable
+# MVP cost (see `docs/design/cc07_consensus.md` §Choice 4).
+
+# ---- Bennett-cc0.3: LLVMGlobalAlias handling ----
+#
+# LLVM.jl has no Julia wrapper for LLVMGlobalAliasValueKind (enum 6) — its
+# `identify` function raises when `LLVM.Value(ref)` is called on such a ref.
+# Julia's runtime emits GlobalAliases liberally for JIT-loaded global slots
+# (@"jl_global#NNN.jit") that user code can't meaningfully read. We resolve
+# the aliasee via raw C API when possible; otherwise fall back to a sentinel
+# that flows through ParsedIR and is rejected fail-loud at lowering time.
+# See `docs/design/cc03_05_consensus.md`.
+
+# Bennett-v958 / U68: OPAQUE_PTR_SENTINEL is now defined in src/ir_types.jl
+# as the canonical singleton instance of `OpaquePtrSentinel <: IROperand`.
+# Re-imported into this module via `using .Bennett`-style transitive include.
+# Consumers that treat it as user arithmetic fail loud in `resolve!` via the
+# `OpaquePtrSentinel`-typed method (Bennett-ibz5 / U96).
+
+# Follow a GlobalAlias chain via raw C API (LLVM.jl has no `aliasee`
+# accessor). Returns the terminal non-alias ref, or nothing on cycles,
+# depth overflow, or NULL. Depth cap 16 is well beyond anything Julia emits.
+function _resolve_aliasee(ref::_LLVMRef)::Union{_LLVMRef, Nothing}
+    ref == C_NULL && return nothing
+    seen = Set{_LLVMRef}()
+    cur = ref
+    for _ in 1:16
+        cur in seen && return nothing         # cycle guard
+        push!(seen, cur)
+        kind = LLVM.API.LLVMGetValueKind(cur)
+        kind == LLVM.API.LLVMGlobalAliasValueKind || return cur
+        next = LLVM.API.LLVMAliasGetAliasee(cur)
+        next == C_NULL && return nothing
+        cur = next
+    end
+    return nothing                            # exceeded depth
+end
+
+# Iterate an instruction's operands via raw C API, returning a vector of
+# `Union{LLVM.Value, Nothing}`. `nothing` slots represent unresolvable
+# GlobalAlias operands or operand kinds LLVM.jl refuses to wrap. Use this
+# instead of `LLVM.operands(inst)` at sites where a pointer operand could
+# be a GlobalAlias — the regular iterator crashes on alias refs.
+function _safe_operands(inst::LLVM.Instruction)::Vector{Union{LLVM.Value, Nothing}}
+    n = Int(LLVM.API.LLVMGetNumOperands(inst.ref))
+    out = Vector{Union{LLVM.Value, Nothing}}(undef, n)
+    for i in 0:(n - 1)
+        ref = LLVM.API.LLVMGetOperand(inst.ref, i)
+        resolved = _resolve_aliasee(ref)
+        out[i + 1] = resolved === nothing ? nothing : try
+            LLVM.Value(resolved)
+        catch e
+            e isa InterruptException && rethrow()
+            nothing
+        end
+    end
+    return out
+end
+
+# `_operand` variant that accepts an optional `Nothing` (from `_safe_operands`)
+# and emits the opaque-pointer sentinel for unresolvable operands.
+function _operand_safe(val::Union{LLVM.Value, Nothing},
+                       names::Dict{_LLVMRef, Symbol})::IROperand
+    val === nothing && return OPAQUE_PTR_SENTINEL
+    return _operand(val, names)
+end
+
+# ---- Bennett-cc0.4 helpers: ConstantExpr operand folding ----
+#
+# `optimize=true` folds `isnothing()` checks on `Union{T,Nothing}` fields to
+# `select i1 icmp eq (ptr @TypeA, ptr @TypeB), ..., ...` — the condition is a
+# LLVM.ConstantExpr, which `_operand` otherwise doesn't recognise. MVP scope:
+# `icmp eq/ne` on pointer operands that resolve (via cc0.3's `_resolve_aliasee`
+# + trivial-cast peeling) to named globals or null. Fold to `iconst(0/1)`;
+# consumer width is inferred at lowering time just like `ConstantInt` literals.
+# Every other ConstantExpr shape fails loud with a cc0.4 breadcrumb.
+
+# Map ConstantExpr opcode → human-readable name for error messages.
+const _CONSTEXPR_OPCODE_NAMES = Dict(
+    LLVM.API.LLVMICmp          => "icmp",
+    LLVM.API.LLVMBitCast       => "bitcast",
+    LLVM.API.LLVMAddrSpaceCast => "addrspacecast",
+    LLVM.API.LLVMPtrToInt      => "ptrtoint",
+    LLVM.API.LLVMIntToPtr      => "inttoptr",
+    LLVM.API.LLVMGetElementPtr => "getelementptr",
+    LLVM.API.LLVMSelect        => "select",
+    LLVM.API.LLVMTrunc         => "trunc",
+    LLVM.API.LLVMZExt          => "zext",
+    LLVM.API.LLVMSExt          => "sext",
+    LLVM.API.LLVMAdd           => "add",
+    LLVM.API.LLVMSub           => "sub",
+    LLVM.API.LLVMMul           => "mul",
+    LLVM.API.LLVMAnd           => "and",
+    LLVM.API.LLVMOr            => "or",
+    LLVM.API.LLVMXor           => "xor",
+    LLVM.API.LLVMShl           => "shl",
+    LLVM.API.LLVMLShr          => "lshr",
+    LLVM.API.LLVMAShr          => "ashr",
+)
+
+_constexpr_opcode_name(opc) =
+    get(_CONSTEXPR_OPCODE_NAMES, opc, sprint(show, opc))
+
+# Canonical pointer identity. Julia-JIT emits GlobalAliases whose aliasees
+# are `inttoptr (i64 K to ptr)` — literal runtime addresses of type
+# descriptors. So a ref-based equality check isn't enough: we must follow
+# aliases, peel trivial address-preserving casts, and recognise
+# inttoptr-of-const as a numeric address.
+#
+# Returns a canonical identity tag:
+#   (:addr,  K::UInt64)    — absolute address from `inttoptr (i64 K to ptr)`
+#   (:named, r::_LLVMRef)  — named global (Function / GlobalVariable / IFunc)
+#   (:null,  UInt64(0))    — null pointer
+#   nothing                — undecidable (caller fails loud)
+#
+# ---- Bennett-iwo9 / CW-D3 Lever 1: Julia type-tag globals -----------------
+#
+# Julia's JIT emits a per-type "type-tag" global whose NAME encodes the type
+# (e.g. `@"+Main.Base.Dict#148"`) and whose initializer is `inttoptr (i64 K
+# to ptr)` for a NON-DETERMINISTIC runtime address K. The closed-world VM
+# (`ptr_cells=true`) needs a deterministic, reproducible identity for each
+# type — so we recognise these globals BY NAME and derive a canonical type
+# path from the name, NEVER reading the JIT address K. The naming convention
+# is `+<dotted.type.path>#<digits>`; the `#N` suffix is a per-compilation
+# discriminator that varies run-to-run and is stripped.
+#
+# `_is_type_tag_global_name` — the recogniser (consensus decision 1).
+_is_type_tag_global_name(s::AbstractString)::Bool =
+    startswith(s, "+") && occursin(r"#\d+$", s)
+
+# ---- bennettvm-416r.13 / CW-D3 Lever 2: jl_global#NNN singleton-data globals --
+#
+# Julia's JIT also interns EMPTY-`GenericMemory` singleton pointers (the shared
+# `Memory{K}()`/`Memory{V}()` empty instances a `Dict{K,V}()` stores into its
+# keys/slots/vals fields). Their LLVM shape is BYTE-IDENTICAL to a type-tag —
+# `@"jl_global#NNN" = private constant ptr @"jl_global#NNN.jit"`, the `.jit`
+# alias being `inttoptr (i64 <non-deterministic-JIT-addr> to ptr)` — but the
+# NAME lacks the `+` type-path prefix (census Q2b, `scratchpad/scout-jlglobal-
+# census.md`). Unlike a type-tag (an identity fed to an ignored `gc_alloc_obj`
+# tag arg), a singleton is a DATA pointer: it is stored into Dict fields and
+# read as data (a length@0 field the empty singleton reports as 0; a data-ptr@8
+# field consumed only by a compile-time len-0 memset). We recognise it BY NAME
+# (never the JIT address) and model it as a zeroed 16-cell Memory header shipped
+# in `ParsedIR.globals` — the VM mints the deterministic `GLOBAL_BASE` address.
+#
+# `^…$`-anchored so it matches ONLY a bare `jl_global#<digits>` module global,
+# NOT the `@"jl_global#NNN.jit"` alias (has a `.jit` suffix) nor the drifting
+# load-result SSA names (which are also `jl_global#<digits>` but are never
+# GlobalVariables — this recogniser is only ever applied to a `GlobalVariable`
+# name / a `LLVM.globals(mod)` entry, never to an SSA load-result ref).
+_is_singleton_data_global_name(s::AbstractString)::Bool =
+    occursin(r"^jl_global#\d+$", s)
+
+# `_canonical_type_path` — strip the leading `+` and the trailing `#<digits>`,
+# yielding the run-invariant canonical type path (e.g. "Main.Base.Dict").
+# FAIL LOUD (CLAUDE.md §1) if a `+`-prefixed name lacks the `#N` suffix:
+# that is unexpected JIT naming we must not silently mis-canonicalize.
+function _canonical_type_path(gname::AbstractString)::String
+    startswith(gname, "+") || error(
+        "ir_extract.jl: Bennett-iwo9 / CW-D3: _canonical_type_path called on " *
+        "non-type-tag global name `$(gname)` (expected leading `+`).")
+    occursin(r"#\d+$", gname) || error(
+        "ir_extract.jl: Bennett-iwo9 / CW-D3: `+`-prefixed global `$(gname)` " *
+        "lacks the trailing `#N` type-tag suffix — unexpected Julia JIT naming. " *
+        "Type-tag globals are `+<dotted.type.path>#<digits>`; a bare `+`-name " *
+        "cannot be canonicalized to a deterministic type id (CLAUDE.md §1).")
+    # Strip leading `+` and trailing `#<digits>`.
+    return replace(gname[2:end], r"#\d+$" => "")
+end
+
+# ---- Bennett-klgz / bennettvm-90l: determinism classifier for jlplt_*_got ----
+#
+# When Julia's JIT calls a runtime C entry point that has not been eagerly bound
+# (e.g. `ijl_object_id`, `memhash_seed`), it emits a PLT/GOT lazy-binding stub:
+# a global `@"jlplt_<callee>_<N>_got"` (a `constant ptr` holding the function
+# pointer), an atomic `load ptr` of that global, then an INDIRECT call through
+# the loaded SSA value. The callee name survives ONLY as the GOT global's
+# symbol — never as an `IRCall` `nameof` (verified live 2026-07-12:
+# `code_llvm(Base.ht_keyindex, Tuple{Dict{MK,Int8},MK})` →
+# `@jlplt_ijl_object_id_161_got`; `…{String,Int8}` → `@jlplt_memhash_seed_333_got`).
+#
+# Under `ptr_cells` such a load reaches the 416r.13 unrecognized-JIT-global wall
+# (instructions.jl) — which rejects it indiscriminately. The classifier below
+# lets that reject site DISTINGUISH the two hash families by demangled callee
+# name so the diagnostic names the construct (Rule 1). It ADMITS NOTHING new —
+# every family still rejects; only the message differs.
+#
+# IDENTITY hashers hash the *allocation address* of a heap object (a mutable
+# struct's default `hash` → `objectid`). That address is non-deterministic
+# across replays → the run is unreplayable → the genuine in-principle blocker of
+# ADR 0015 Decision 3 (the reversible determinism floor). CONTENT hashers
+# (`memhash_seed`, the `String` byte hash; NOT `Symbol`, which is
+# objectid-based in Base and lands in the IDENTITY bucket) are deterministic
+# and IN scope for the floor — they reject today only because runtime-callee GOT-stub
+# modeling is not yet built (a modeling gap, not a correctness floor).
+const _IDENTITY_HASH_GOT_CALLEES = Set{String}([
+    # objectid family (address-dependent) — verified stub name: `ijl_object_id`.
+    "ijl_object_id", "jl_object_id", "object_id", "objectid",
+    # pointer-identity primitives (inline to a ptrtoint today, so no GOT stub is
+    # observed — included defensively so a future JIT that emits them as stubs is
+    # still walled by name).
+    "pointer_from_objref", "jl_pointer_from_objref", "ijl_pointer_from_objref",
+])
+const _CONTENT_HASH_GOT_CALLEES = Set{String}([
+    # String content hash (fixed compile-time seed, hashing.jl) —
+    # deterministic, in-scope, not-yet-modeled. Symbol is NOT here: Base
+    # hash(::Symbol) = objectid (identity bucket; review-90l finding).
+    "memhash_seed", "memhash", "ijl_memhash_seed", "jl_memhash_seed",
+])
+
+# `_demangle_got_callee` — recover `<callee>` from a `jlplt_<callee>_<N>_got`
+# GOT-stub global name; `nothing` if `s` is not a runtime-callee GOT stub. The
+# `<N>` is a per-compilation discriminator (varies run-to-run) and is stripped,
+# exactly as the `#<digits>` suffix is stripped from a type-tag name.
+function _demangle_got_callee(s::AbstractString)::Union{String, Nothing}
+    m = match(r"^jlplt_(.+)_\d+_got$", s)
+    m === nothing && return nothing
+    return String(m.captures[1])
+end
+
+function _ptr_identity(ref::_LLVMRef)::Union{Tuple{Symbol, UInt64}, Tuple{Symbol, _LLVMRef}, Nothing}
+    ref == C_NULL && return nothing
+    cur = ref
+    for _ in 1:16
+        kind = LLVM.API.LLVMGetValueKind(cur)
+        if kind == LLVM.API.LLVMFunctionValueKind ||
+           kind == LLVM.API.LLVMGlobalIFuncValueKind ||
+           kind == LLVM.API.LLVMGlobalVariableValueKind
+            return (:named, cur)
+        elseif kind == LLVM.API.LLVMConstantPointerNullValueKind
+            return (:null, UInt64(0))
+        elseif kind == LLVM.API.LLVMGlobalAliasValueKind
+            next = LLVM.API.LLVMAliasGetAliasee(cur)
+            next == C_NULL && return nothing
+            cur = next
+            continue
+        elseif kind == LLVM.API.LLVMConstantExprValueKind
+            inner_opc = LLVM.API.LLVMGetConstOpcode(cur)
+            if inner_opc == LLVM.API.LLVMBitCast ||
+               inner_opc == LLVM.API.LLVMAddrSpaceCast
+                Int(LLVM.API.LLVMGetNumOperands(cur)) == 1 || return nothing
+                inner = LLVM.API.LLVMGetOperand(cur, 0)
+                inner == C_NULL && return nothing
+                cur = inner
+                continue
+            elseif inner_opc == LLVM.API.LLVMIntToPtr
+                # `inttoptr (i64 K to ptr)` — Julia JIT's typetag aliasee.
+                Int(LLVM.API.LLVMGetNumOperands(cur)) == 1 || return nothing
+                inner = LLVM.API.LLVMGetOperand(cur, 0)
+                inner == C_NULL && return nothing
+                inner_val = try
+                    LLVM.Value(inner)
+                catch e
+                    e isa InterruptException && rethrow()
+                    return nothing
+                end
+                inner_val isa LLVM.ConstantInt || return nothing
+                return (:addr, UInt64(_const_int_as_int(inner_val) % UInt64))
+            else
+                return nothing   # ptrtoint / gep / … not handled
+            end
+        else
+            return nothing       # unexpected kind (Argument, Instruction, …)
+        end
+    end
+    return nothing                # chase-depth exhausted
+end
+
+# Decide whether two pointer refs denote the same link-time address.
+# Returns `nothing` if either identity is undecidable (caller fails loud).
+function _ptr_addresses_equal(a::_LLVMRef, b::_LLVMRef)::Union{Bool, Nothing}
+    ia = _ptr_identity(a)
+    ib = _ptr_identity(b)
+    (ia === nothing || ib === nothing) && return nothing
+    return ia == ib
+end
+
+# Fold a ConstantExpr operand into an IROperand. MVP scope:
+#   icmp eq/ne on pointer operands → iconst(0/1)
+# Everything else fails loud with a cc0.4 breadcrumb.
+function _fold_constexpr_operand(ce::LLVM.ConstantExpr,
+                                 names::Dict{_LLVMRef, Symbol})::IROperand
+    opc = LLVM.API.LLVMGetConstOpcode(ce.ref)
+
+    if opc == LLVM.API.LLVMPtrToInt || opc == LLVM.API.LLVMIntToPtr
+        error("ir_extract.jl: Bennett-cc0.4/cc0.6: ConstantExpr<" *
+              "$(_constexpr_opcode_name(opc))> in operand position requires " *
+              "ptrtoint/inttoptr handling (cc0.6 scope). Operand: $(string(ce)).")
+    end
+
+    if opc != LLVM.API.LLVMICmp
+        error("ir_extract.jl: Bennett-cc0.4: unhandled ConstantExpr opcode " *
+              "`$(_constexpr_opcode_name(opc))` in operand position. " *
+              "Operand: $(string(ce)). File a new bead extending cc0.4 with " *
+              "a minimal repro.")
+    end
+
+    pred = LLVM.API.LLVMGetICmpPredicate(ce.ref)
+    pred in (LLVM.API.LLVMIntEQ, LLVM.API.LLVMIntNE) ||
+        error("ir_extract.jl: Bennett-cc0.4: ConstantExpr<icmp $pred> with " *
+              "ordering predicate is not foldable at extraction time (pointer " *
+              "address ordering is allocator-dependent). Operand: $(string(ce)). " *
+              "File a new bead extending cc0.4 if this arises in real code.")
+
+    n = Int(LLVM.API.LLVMGetNumOperands(ce.ref))
+    n == 2 ||
+        error("ir_extract.jl: Bennett-cc0.4: ConstantExpr<icmp> with $n operands " *
+              "(expected 2): $(string(ce))")
+
+    a_raw = LLVM.API.LLVMGetOperand(ce.ref, 0)
+    b_raw = LLVM.API.LLVMGetOperand(ce.ref, 1)
+
+    eq = _ptr_addresses_equal(a_raw, b_raw)
+    eq === nothing && error(
+        "ir_extract.jl: Bennett-cc0.4: ConstantExpr<icmp eq/ne> cannot be " *
+        "statically decided — one or both operands did not resolve to a " *
+        "canonical pointer identity (named global, null, or `inttoptr " *
+        "(i64 K to ptr)`). Operand: $(string(ce)). File a new bead extending " *
+        "cc0.4 with a minimal repro.")
+
+    result_true = (pred == LLVM.API.LLVMIntEQ) ? eq : !eq
+    return iconst(result_true ? 1 : 0)
+end
+

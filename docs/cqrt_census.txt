@@ -1,0 +1,779 @@
+================================================================================
+cqrt_census.txt — the cqrt_* / cq_template_* symbol census
+Step 0.3 deliverable. Ground truth for the Step 22 shim generator (M27).
+================================================================================
+
+Written           : 2026-08-14
+CQ_lang pin       : a6a92feb094c8dd71c36d47c24460f3f0df67b44 (Thu Aug 13 18:12:40 2026 +0200)
+CQ_lang path      : /Users/sorenwilkening/Desktop/CQ_lang   (READ-ONLY, frozen ABI)
+opcode_table.yaml : sha256 6245117dcffb4b1c34935ac9ba3f9d42d754c2dc5a881c9510ad594ba3e82426
+                    mirrored to third_party/cq_lang/opcode_table.yaml (see COMMIT)
+
+Rule 17 statement of what was and was not executed
+--------------------------------------------------
+RAN (all read-only; nothing in CQ_lang was modified):
+  * git rev-parse / git log / git show      — revision + historical yaml bodies
+  * grep / diff / shasum / wc               — symbol extraction and comparison
+  * python3 (PyYAML 6.0.2)                  — counting from the yaml by construction
+  * python3 tools/gen_templates.py --check  — CQ_lang's own drift gate; EXIT 0
+NOT RUN:
+  * The C build, ctest, cq_link_smoke, core_abi_link_check.py --archive. Nothing
+    here is a claim about a LINK actually succeeding. Counts below are counts of
+    DECLARATIONS and of generator-enumerated rows, cross-checked three ways.
+
+Headline numbers (all independently corroborated inside CQ_lang)
+----------------------------------------------------------------
+  cq_template_* from opcode_table.yaml ............... 2479
+  cq_template_* from intrinsic_table.yaml ............  389
+  cq_template_* from libm_table.yaml .................   12
+  cq_template_* TOTAL link surface ................... 2880
+  cqrt_* core ABI (runtime/cq_runtime.h) .............  173
+
+  Of the 2479: purely-integer 1595, fp-touching 884.
+
+  NONE of 1455, 1474 or 1732 is the current total or the current integer count.
+  Part F explains precisely where each came from.
+
+
+================================================================================
+PART A — THE PRESCRIBED CENSUS COMMAND, RUN VERBATIM (raw output)
+================================================================================
+
+PRD §2.1 / IMPLEMENTATION_PLAN prescribe:
+
+    grep -rhoE '"cqrt_[a-z0-9_]*"' ir-pass/src
+
+Run at the pinned revision, `sort | uniq -c | sort -rn`, it yields 18 distinct
+results. THESE ARE PREFIXES (string literals used for `starts_with` tests and as
+concatenation stems), NOT SYMBOLS. Raw output, occurrence counts on the left:
+
+      8 "cqrt_copy_"
+      7 "cqrt_qram_load_"
+      7 "cqrt_measure_"
+      6 "cqrt_tape_write_"
+      6 "cqrt_rz_"
+      6 "cqrt_"
+      5 "cqrt_qram_store_"
+      5 "cqrt_addc_"
+      4 "cqrt_xorc_"
+      4 "cqrt_x"
+      4 "cqrt_toffoli"
+      4 "cqrt_ry_"
+      4 "cqrt_qram_alloc_"
+      4 "cqrt_cnot"
+      3 "cqrt_cswap"
+      3 "cqrt_alloc_"
+      1 "cqrt_tape_alloc"
+      1 "cqrt_free"
+
+    18 distinct results.
+
+Note "cqrt_" itself is in the list: it is a bare prefix TEST, not a stem, and
+expands to zero symbols. Note also "cqrt_x" is simultaneously a complete symbol
+(`cqrt_x`) and a proper prefix of `cqrt_xorc_i32` — the result set is not even
+internally unambiguous.
+
+
+================================================================================
+PART B — WHY THE PRESCRIBED COMMAND CANNOT PRODUCE A SYMBOL COUNT
+================================================================================
+
+Four independent defects. Any one of them alone invalidates the count.
+
+B1. IT MATCHES STEMS, NOT NAMES. The pass never writes a full symbol name as a
+    literal. It builds names by CONCATENATING a stem with an ABI-width string
+    (and optionally an axis suffix) at emit time — see Part C for every site.
+    `"cqrt_rz_"` is one grep result but denotes 27 distinct symbols.
+
+B2. IT IS BLIND TO SYMBOLS THE PASS NEVER EMITS. `cqrt_h` and `cqrt_h_controlled`
+    are DECLARED and DEFINED in the frozen ABI but appear NOWHERE in ir-pass/ —
+    so the grep cannot see them at all, at any expansion. `cqrt_alloc_handle` is
+    likewise never emitted by the pass (it is a runtime-internal helper). The
+    grep censuses what the pass EMITS; the shim must satisfy what the ABI
+    DECLARES. Those are different sets.
+
+B3. IT SEARCHES THE WRONG LAYER. The authoritative `cqrt_*` surface is the
+    hand-written header runtime/cq_runtime.h, not ir-pass/src. CQ_lang says so
+    itself, in tools/core_abi_link_check.py:5-9 — that tool exists precisely
+    because enumerating `cqrt_*` from the emitter layer is the wrong move.
+
+B4. IT SAYS NOTHING ABOUT `cq_template_*`, which is ~94% of the link surface
+    (2880 of 3053 total symbols). The `cqrt_*` core is the small half.
+
+WHAT TO USE INSTEAD. Two commands, one per family. Both are ground truth because
+both read the DECLARATION layer:
+
+    # cqrt_* core ABI  -> 173.  Comment-stripped; tolerant of the return type
+    # and of column alignment (see the WARNING below).
+    python3 - <<'EOF'
+    import re
+    t=open('/Users/sorenwilkening/Desktop/CQ_lang/runtime/cq_runtime.h').read()
+    t=re.sub(r"/\*.*?\*/"," ",t,flags=re.S); t=re.sub(r"//[^\n]*"," ",t)
+    print(len(set(re.findall(r"\b(cqrt_[A-Za-z0-9_]+)\s*\([^;{]*\)\s*;",t))))
+    EOF
+
+    # cq_template_* -> 2479 / 389 / 12
+    cd /Users/sorenwilkening/Desktop/CQ_lang/runtime
+    for f in cq_templates.h cq_intrinsic_templates.h cq_libm_templates.h; do
+      printf '%s ' "$f"
+      grep -ohE '\bcq_template_[a-z0-9_]+\(' $f | sort -u | wc -l
+    done
+
+>>> WARNING — THE EXTRACTOR TRAP, HIT LIVE WHILE WRITING THIS FILE <<<
+    cq_runtime.h is hand-written and COLUMN-ALIGNED. Declarations look like:
+
+        void cqrt_x      (int32_t q);
+        void cqrt_h      (int32_t q);
+
+    The obvious regex `cqrt_[a-z0-9_]+\(` requires `(` to touch the name and so
+    SILENTLY MISSES every aligned declaration. During this census that regex
+    returned 124 and looked entirely plausible — it had dropped 49 symbols,
+    including `cqrt_h` itself, the very symbol Step 0.7 is about. The correct
+    count is 173. Always allow `\s*` before `(`, and always strip comments first.
+
+    CQ_lang independently documents the SAME failure mode from its own history
+    (tools/core_abi_link_check.py:32-38): its first draft pinned an alternation
+    of return types and silently missed `bool cqrt_measure_i1` and
+    `_Float16 cqrt_measure_f16` — "it UNDER-COVERED while reporting success".
+    That file's standing instruction is: never "fix" a mismatch by narrowing the
+    comparison. An under-covering extractor is the exact analogue, at the census
+    layer, of this repo's clean-trace dirty-ancilla hazard: a green-looking
+    result that is quietly wrong. Cross-check in BOTH directions.
+
+
+================================================================================
+PART C — THE CONCATENATION MACHINERY (where names are actually built)
+================================================================================
+
+C1. THE WIDTH VOCABULARY
+
+Every `cqrt_*` name is `stem + abiWidth [+ axis]`. `abiWidth` is produced by the
+canonical SUFFIX table:
+
+    ir-pass/src/WidthDispatch.cpp:39-44   constexpr SuffixRow kRows[] = { ... }
+      16 rows: i1, c, si8, ui8, si16, ui16, si32, ui32, sl, ul, sll, ull,
+               f16, f32, f64, f80
+    ir-pass/src/WidthDispatch.cpp:93-100  abiWidthFor(): row -> AbiWidth string
+      (sl/ul are target-dependent; resolved to i64 on LP64 at
+       WidthDispatch.cpp:70-78 from the DataLayout pointer size)
+
+Collapsing signedness, those 16 suffixes yield exactly NINE ABI widths:
+
+    i1  i8  i16  i32  i64      f16  f32  f64  f80
+
+>>> THERE ARE NO i128 AND NO i80 ROWS IN kRows. <<<
+This is the mechanical reason the `cqrt_*` surface has no i128 and no i80 symbol
+— confirmed empirically in Part D. WidthDispatch.cpp:51-65 `typeForAbiWidth()`
+DOES map "i80" and "i128" to LLVM types, but that function is reached from the
+cq_template_* / cast path, never from a suffix. The comment at
+WidthDispatch.cpp:36-38 states the intent directly: i128 "is deferred as a
+theta/measure suffix (its C ABI shreds __int128 to {i64,i64}), so no si128/ui128
+rows here (16 rows)".
+
+This CONFIRMS PRD §1 line 63-64: "no `cqrt_*` core symbol at i128 at all — no
+cqrt_alloc_i128, no cqrt_measure_i128, no cqrt_copy_i128". Verified, not recalled.
+
+C2. THE CONCATENATION SITES (exhaustive, file:line)
+
+  Stem-only, no width (fixed names):
+    ir-pass/src/ControlledSymbols.cpp:44    "cqrt_x"
+    ir-pass/src/ControlledSymbols.cpp:54    "cqrt_cswap"
+    ir-pass/src/ControlledSymbols.cpp:66    "cqrt_cnot"
+    ir-pass/src/ControlledSymbols.cpp:76    "cqrt_toffoli"
+    ir-pass/src/WidthDispatch.cpp:236       "cqrt_tape_alloc"
+    ir-pass/src/WidthDispatch.cpp:523       "cqrt_free"
+
+  stem + abiWidth:
+    ir-pass/src/WidthDispatch.cpp:129       ("cqrt_alloc_"       + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:154       ("cqrt_copy_"        + abiWidth)   copyFn
+    ir-pass/src/WidthDispatch.cpp:174       ("cqrt_copy_"        + abiWidth)   copyFnCell
+    ir-pass/src/WidthDispatch.cpp:193       ("cqrt_copy_"        + abiWidth)   copyFnClone
+    ir-pass/src/WidthDispatch.cpp:211       ("cqrt_addc_"        + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:225       ("cqrt_xorc_"        + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:254       ("cqrt_tape_write_"  + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:275       ("cqrt_qram_alloc_"  + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:287       ("cqrt_qram_load_"   + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:318       ("cqrt_qram_store_"  + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:379       ("cqrt_measure_"     + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:393       ("cqrt_ry_"          + abiWidth)
+    ir-pass/src/WidthDispatch.cpp:406       ("cqrt_rz_"          + abiWidth)
+
+  stem + abiWidth + axis suffix:
+    ir-pass/src/WidthDispatch.cpp:302       ("cqrt_qram_load_"  + abiWidth + "_unc")
+    ir-pass/src/WidthDispatch.cpp:335       ("cqrt_qram_store_" + abiWidth + "_unc")
+    ir-pass/src/WidthDispatch.cpp:351       ("cqrt_qram_store_" + abiWidth + "_controlled")
+    ir-pass/src/WidthDispatch.cpp:367       ("cqrt_qram_store_" + abiWidth + "_controlled_unc")
+    ir-pass/src/ControlledSymbols.cpp:32    ("cqrt_rz_"         + abiWidth + Suffix)
+                                              Suffix = "_controlled_inv" if inverse
+                                                       else "_controlled"   (line 30)
+    ir-pass/src/ControlledSymbols.cpp:106   ("cqrt_copy_"       + abiWidth + "_controlled")  int
+    ir-pass/src/ControlledSymbols.cpp:127   ("cqrt_copy_"       + abiWidth + "_controlled")  fp
+    ir-pass/src/ControlledSymbols.cpp:149   ("cqrt_tape_write_" + abiWidth + "_controlled")
+
+C3. THE PER-FAMILY WIDTH GUARDS (why families differ in width coverage)
+
+    ir-pass/src/WidthDispatch.cpp:151   copyFn:  !Ty->isIntegerTy() || bits > 64  -> decline
+    ir-pass/src/WidthDispatch.cpp:208   addcFn:  same guard
+    ir-pass/src/WidthDispatch.cpp:222   xorcFn:  same guard
+
+  That integer-and-<=64 guard is exactly why addc/xorc/tape_write are int-only
+  (5 widths) while alloc/measure/ry/rz span all 9. The uncontrolled `copyFn`
+  null-guards on isIntegerTy, but a SEPARATE controlled fp path exists
+  (ControlledSymbols.cpp:110-129, `copyControlledFpFn`) — which is why
+  `cqrt_copy_f<W>` and `cqrt_copy_f<W>_controlled` both appear at all 9 widths
+  in the header even though the uncontrolled fp copy has no ir-pass consumer.
+  (cq_runtime.h:12-18 documents this asymmetry and its provenance, issue kjd1.)
+
+
+================================================================================
+PART D — THE TRUE EXPANDED cqrt_* SURFACE: 173 SYMBOLS
+================================================================================
+
+Source of truth : /Users/sorenwilkening/Desktop/CQ_lang/runtime/cq_runtime.h
+Cross-checks    : (a) definitions in runtime/cq_runtime.c -> 173, set-identical
+                      (0 declared-not-defined, 0 defined-not-declared)
+                  (b) tools/core_abi_link_check.py:22 states, in CQ_lang's own
+                      words: "Measured at introduction: 173 declared / 173
+                      defined / 0 mismatch either way". Independent agreement.
+
+D1. FAMILY x AXIS x WIDTH GRID
+    Widths in column order:  i1 i8 i16 i32 i64 | f16 f32 f64 f80
+    X = present, . = absent
+
+  family              axis                 i1 i8 i16 i32 i64 f16 f32 f64 f80    n
+  ------------------------------------------------------------------------------
+  cqrt_alloc          (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_measure        (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_copy           (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_copy           _controlled          X  X  X   X   X   X   X   X   X      9
+  cqrt_addc           (fwd)                X  X  X   X   X   .   .   .   .      5
+  cqrt_xorc           (fwd)                X  X  X   X   X   .   .   .   .      5
+  cqrt_ry             (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_ry             _controlled_inv      X  X  X   X   X   .   X   X   .      7   <-- GAP
+  cqrt_rz             (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_rz             _controlled          X  X  X   X   X   X   X   X   X      9
+  cqrt_rz             _controlled_inv      X  X  X   X   X   X   X   X   X      9
+  cqrt_tape_write     (fwd)                X  X  X   X   X   .   .   .   .      5
+  cqrt_tape_write     _controlled          X  X  X   X   X   .   .   .   .      5
+  cqrt_qram_alloc     (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_qram_load      (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_qram_load      _unc                 X  X  X   X   X   X   X   X   X      9
+  cqrt_qram_store     (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_qram_store     _unc                 X  X  X   X   X   X   X   X   X      9
+  cqrt_qram_store     _controlled          X  X  X   X   X   X   X   X   X      9
+  cqrt_qram_store     _controlled_unc      X  X  X   X   X   X   X   X   X      9
+  ------------------------------------------------------------------------------
+                                                          width-carrying subtotal 162
+
+  Width-agnostic (11):
+    cqrt_x            cqrt_x_controlled
+    cqrt_h            cqrt_h_controlled          <-- declared+defined, NEVER emitted
+    cqrt_cnot         cqrt_cnot_controlled
+    cqrt_toffoli
+    cqrt_cswap
+    cqrt_free
+    cqrt_tape_alloc
+    cqrt_alloc_handle                            <-- runtime-INTERNAL helper
+  ------------------------------------------------------------------------------
+  TOTAL                                                                        173
+
+D2. THE ONE IRREGULARITY — cqrt_ry_*_controlled_inv IS 7 WIDTHS, NOT 9
+
+  Present : i1 i8 i16 i32 i64 f32 f64        Absent : f16 f80
+
+  This is deliberate, not an oversight. cq_runtime.h:191-193 states there is NO
+  plain `cqrt_ry_<W>_controlled` twin at all ("the prep itself is unconditional,
+  only its inverse is controlled") and pins the family at "7 widths".
+  cq_runtime.h:5 independently describes the controlled surface as
+  "cqrt_rz_<W>_controlled[_inv] (7 widths x 2)".
+
+  ACTION FOR M27: the shim generator must NOT emit a uniform 9-width cross
+  product for the ry controlled axis. Emitting `cqrt_ry_f16_controlled_inv` or
+  `cqrt_ry_f80_controlled_inv` mints symbols the frozen ABI does not declare.
+  Likewise it must never emit `cqrt_ry_<W>_controlled` (no `_inv`) for any width.
+
+D3. WIDTHS ABSENT FROM THE ENTIRE cqrt_* SURFACE: i128 and i80
+
+  Confirmed empirically across all 173 symbols, and explained mechanically by the
+  missing kRows entries (Part C1). Consequences for libcqops:
+    * PRD §1's i128 claim is CORRECT as written.
+    * The same is true of i80, which the PRD does not mention at all. i80 exists
+      ONLY on the cq_template_* side (Part F), never as a cqrt_* symbol.
+
+D4. SCOPE PARTITION AGAINST PRD §"Out of scope for v1"
+
+  PRD excludes cqrt_tape_* ("no consumer"), cqrt_qram_* ("stretch, Increment 8"),
+  and all fp widths ("v2, loud abort"). Applying that partition to the 173:
+
+    v1 IN SCOPE  (int widths + width-agnostic) ....  65
+    fp-width, v1 = loud abort .....................  34
+    cqrt_qram_*  (out of scope) ...................  63
+    cqrt_tape_*  (out of scope) ...................  11
+                                                    ---
+                                                    173
+
+  The 65 v1 symbols, verbatim:
+
+    cqrt_addc_i1   cqrt_addc_i8   cqrt_addc_i16   cqrt_addc_i32   cqrt_addc_i64
+    cqrt_alloc_i1  cqrt_alloc_i8  cqrt_alloc_i16  cqrt_alloc_i32  cqrt_alloc_i64
+    cqrt_copy_i1   cqrt_copy_i8   cqrt_copy_i16   cqrt_copy_i32   cqrt_copy_i64
+    cqrt_copy_i1_controlled       cqrt_copy_i8_controlled
+    cqrt_copy_i16_controlled      cqrt_copy_i32_controlled
+    cqrt_copy_i64_controlled
+    cqrt_measure_i1 cqrt_measure_i8 cqrt_measure_i16 cqrt_measure_i32 cqrt_measure_i64
+    cqrt_ry_i1     cqrt_ry_i8     cqrt_ry_i16     cqrt_ry_i32     cqrt_ry_i64
+    cqrt_ry_i1_controlled_inv     cqrt_ry_i8_controlled_inv
+    cqrt_ry_i16_controlled_inv    cqrt_ry_i32_controlled_inv
+    cqrt_ry_i64_controlled_inv
+    cqrt_rz_i1     cqrt_rz_i8     cqrt_rz_i16     cqrt_rz_i32     cqrt_rz_i64
+    cqrt_rz_i1_controlled         cqrt_rz_i8_controlled
+    cqrt_rz_i16_controlled        cqrt_rz_i32_controlled
+    cqrt_rz_i64_controlled
+    cqrt_rz_i1_controlled_inv     cqrt_rz_i8_controlled_inv
+    cqrt_rz_i16_controlled_inv    cqrt_rz_i32_controlled_inv
+    cqrt_rz_i64_controlled_inv
+    cqrt_xorc_i1   cqrt_xorc_i8   cqrt_xorc_i16   cqrt_xorc_i32   cqrt_xorc_i64
+    cqrt_x         cqrt_x_controlled
+    cqrt_h         cqrt_h_controlled
+    cqrt_cnot      cqrt_cnot_controlled
+    cqrt_toffoli   cqrt_cswap     cqrt_free       cqrt_alloc_handle
+
+  NOTE the 65 includes cqrt_h/cqrt_h_controlled and cqrt_alloc_handle. They are
+  in the LINK surface (must be defined) even though the pass never emits them.
+
+D5. PREFIX -> SYMBOL EXPANSION (reconciles Part A's 18 against Part D's 173)
+
+    prefix (from Part A)   symbols it actually denotes
+    ------------------------------------------------------------------
+    "cqrt_qram_store_"      36    9 widths x {fwd,_unc,_controlled,_controlled_unc}
+    "cqrt_rz_"              27    9 widths x {fwd,_controlled,_controlled_inv}
+    "cqrt_copy_"            18    9 widths x {fwd,_controlled}
+    "cqrt_qram_load_"       18    9 widths x {fwd,_unc}
+    "cqrt_ry_"              16    9 fwd + 7 _controlled_inv   (NOT 18 — see D2)
+    "cqrt_tape_write_"      10    5 widths x {fwd,_controlled}
+    "cqrt_alloc_"           10    9 widths + cqrt_alloc_handle
+    "cqrt_measure_"          9    9 widths
+    "cqrt_qram_alloc_"       9    9 widths
+    "cqrt_addc_"             5    5 int widths
+    "cqrt_xorc_"             5    5 int widths
+    "cqrt_x"                 2    cqrt_x, cqrt_x_controlled
+    "cqrt_cnot"              2    cqrt_cnot, cqrt_cnot_controlled
+    "cqrt_toffoli"           1
+    "cqrt_cswap"             1
+    "cqrt_free"              1
+    "cqrt_tape_alloc"        1
+    "cqrt_"                  0    bare prefix TEST, denotes nothing
+    ------------------------------------------------------------------
+    claimed by a prefix    171
+    UNREACHABLE by the grep  2    cqrt_h, cqrt_h_controlled
+    ------------------------------------------------------------------
+    TOTAL                  173
+
+  The two unreachable symbols are the formal proof of defect B2: no expansion of
+  the prescribed grep's output can ever reach them, because neither string occurs
+  anywhere in ir-pass/. Verified: `grep -rn 'cqrt_h' ir-pass/` returns nothing.
+
+
+================================================================================
+PART E — FINDINGS THAT SETTLE / BEAR ON OPEN BLOCKERS
+================================================================================
+
+E1. STEP 0.7 (`cqrt_h`) — RESOLVED. All three horns of the stated trilemma are
+    wrong; the truth is a fourth option.
+
+    EVIDENCE:
+      runtime/cq_runtime.h:226    void cqrt_h      (int32_t q);
+      runtime/cq_runtime.h:238    void cqrt_h_controlled   (int32_t ctrl, int32_t q);
+      runtime/cq_runtime.c:454    void cqrt_h(int32_t q) { printf("cqrt_h(h%d)\n", q); }
+      runtime/cq_runtime.c:482    void cqrt_h_controlled(...)
+      runtime/cq_runtime.h:217    "`cqrt_h` is still declared + defined but
+                                   unemitted (reserved for Phase 8 / 11)"
+      tools/free_pairing_check.py:646
+                                  "Self-adjoint; the pass does not emit it.
+                                   Classified for safety."
+      ir-pass/include/ControlledSymbols.h:53,62,72,77
+                                  declares xFn, cswapFn, cnotFn, toffoliFn —
+                                  there is NO hFn. The emitter has no way to
+                                  name cqrt_h.
+      grep -rn 'cqrt_h' ir-pass/  -> no matches at all.
+
+    RESOLUTION: `cqrt_h` is DECLARED + DEFINED in the frozen ABI but is NEVER
+    EMITTED by the IR pass. Therefore:
+      * PRD §1 listing cqrt_h in the core runtime family is CORRECT — it is a
+        real ABI symbol and libcqops must DEFINE it or a link against the ABI
+        header set is incomplete.
+      * PRD §8's sink vtable having NO `h` entry is ALSO CORRECT, and is not a
+        missing entry. A gate that is never emitted needs no sink dispatch.
+      * §12's Grover building H from rotations is consistent and is in fact
+        FORCED: since the pass never emits cqrt_h, H can only arrive via
+        cqrt_ry/cqrt_rz. This also keeps Rule 4 intact (no H on the classical
+        path).
+    So: do NOT add an `h` entry to the sink vtable, and do NOT treat cqrt_h as
+    an over-declaration to be dropped. Implement cqrt_h/cqrt_h_controlled as
+    defined-but-unreachable bodies (a loud abort naming the symbol is the
+    right shape — it is dead ABI, and if it ever fires, an assumption broke).
+    M04 can freeze the vtable shape in Step 5 without an `h` entry.
+
+E2. `cqrt_free` IS LIVE — and CQ_lang's own header comment about it is STALE.
+
+    runtime/cq_runtime.h:40-41 claims: "cqrt_free(handle): width-irrelevant
+    lifetime hook; declared but unused (reserved for later lifetime work)."
+
+    THAT COMMENT IS WRONG AT THIS REVISION. cqrt_free is emitted from at least
+    eight distinct call sites:
+      ir-pass/src/BennettWrap.cpp:106          ir-pass/src/IOSinkLowering.cpp:709
+      ir-pass/src/SwitchRouteEmit.cpp:184,194  ir-pass/src/ClassicalCallArmEmit.cpp:205
+      ir-pass/src/SwitchValueEmit.cpp:282,293  ir-pass/src/NestedRouteEmit.cpp:151
+      ir-pass/src/SelectMergeEmit.cpp:270,278  ir-pass/src/BreakReversePlay.cpp:473,488,600
+    and it appears in many committed lit fixtures (control_swap_select_*.ll,
+    lowering_uncompute_branch_botharms.ll, ...).
+
+    WHY THIS MATTERS HERE: libcqops Rule 6 ("free only a provably-zero rail";
+    a dirty free is a HARD ERROR) is built entirely on cqrt_free being a live,
+    frequently-emitted symbol. It is. Rule 6 is well-founded. Had the census
+    trusted the header prose instead of the emitter, Rule 6 would have looked
+    like defensive work against a dead symbol.
+    This also raises the stakes on Step 0.5 blocker 2 (`_unc` vs `cqrt_free`
+    qubit ownership, which gates M09's API): cqrt_free is emitted on real
+    control-flow paths, so the double-free question is a live hazard, not a
+    theoretical one. Still UNRESOLVED — this census does not settle it.
+
+E3. `cqrt_alloc_handle` IS RUNTIME-INTERNAL, NOT A LOWERING TARGET.
+    runtime/cq_runtime.h:43-45: "the internal helper cqrt_alloc_handle, which is
+    NOT one of the 33 PRD-pinned symbols but is retained so templates
+    (cq_templates) can keep handle numbering globally monotonic with
+    libcq_runtime." Declared at cq_runtime.h:615; called from cq_runtime.c:75,
+    82, 89, 96, 103, 110, 117, 124 (i.e. by every cqrt_alloc_* body). The pass
+    never emits it.
+    CONSEQUENCE FOR libcqops: this is the shared monotonic handle counter. It is
+    the ABI-level hook behind convention D5 ("handles are monotonic and never
+    reused"). libcqops must define it and must route BOTH its cqrt_alloc_* and
+    its cq_template_* handle minting through it, or handle numbering will
+    diverge from CQ_lang's trace convention and L6 trace diffs will churn.
+
+E4. STEP 0.5 BLOCKER 1 (1455 vs 1474) — RESOLVED. See Part F.
+
+E5. NOT ADDRESSED by this census, still open: Step 0.5 blocker 2 (`_unc` vs
+    cqrt_free ownership), Step 0.5 blocker 3 (L4 golden tuple arity), Step 0.8
+    (fold-table case count 155 vs 175). Nothing here bears on 3 or 0.8.
+
+
+================================================================================
+PART F — THE 1455 / 1474 / 1732 QUESTION, RESOLVED
+================================================================================
+
+F0. METHOD. Three independent counting routes, which agree.
+
+  ROUTE 1 — direct count of the shipped header (ground truth):
+      grep -ohE '\bcq_template_[a-z0-9_]+\(' runtime/cq_templates.h | sort -u | wc -l
+      -> 2479   (2497 lines - 18 non-declaration lines; all 2479 names distinct)
+
+  ROUTE 2 — count from the yaml by construction, replicating
+      tools/gen_templates.py:131-168 `enumerate_all()`:
+        binary  : sum over ops of len(widths) x len(variants)
+        unary   : len(widths) x len(variants)
+        compare : len(predicates) x len(widths) x len(variants)
+        cast    : len(pairs) x len(variants)
+      -> 2479. Full per-opcode breakdown at F1.
+
+  ROUTE 3 — CQ_lang's own generated witnesses:
+      runtime/cq_link_smoke.c:38     "tools/opcode_table.yaml — 2479 symbols"
+      runtime/cq_link_smoke.c:2518   "tools/intrinsic_table.yaml — 389 symbols"
+      runtime/cq_link_smoke.c:2908   "tools/libm_table.yaml — 12 symbols"
+      runtime/cq_link_smoke.c:2932   return cq_link_smoke_count == 2880UL ? 0 : 1;
+      tools/core_abi_link_check.py:5 "bd 0ktq covered the 2880 YAML-GENERATED
+                                      cq_template_* symbols"
+
+  SYNC PROOF. The yaml I counted is provably the one that produced the header:
+  runtime/cq_templates.h:1 embeds yaml-sha256 6245117d...a3e82426, which equals
+  the sha256 of the mirrored copy. And CQ_lang's drift gate agrees:
+      python3 tools/gen_templates.py --output-dir runtime --check   -> EXIT 0
+
+F1. THE COUNT BY CONSTRUCTION (opcode_table.yaml, 2479)
+
+  BINARY (18 opcodes)                                     widths x variants =  n
+    add   int_arith   [i1,i8,i16,i32,i64,i128]                 6 x 10 =    60
+    sub   int_arith   [i1,i8,i16,i32,i64,i128]                 6 x 15 =    90
+    mul   int_arith   [i1,i8,i16,i32,i64,i128]                 6 x 10 =    60
+    sdiv  int_arith   [i1,i8,i16,i32,i64,i128]                 6 x 15 =    90
+    udiv  int_arith   [i1,i8,i16,i32,i64,i128]                 6 x 15 =    90
+    srem  int_arith   [i1,i8,i16,i32,i64,i128]                 6 x 15 =    90
+    urem  int_arith   [i1,i8,i16,i32,i64,i128]                 6 x 15 =    90
+    and   int_bitwise [i1,i8,i16,i32,i64,i128,i80]             7 x 10 =    70
+    or    int_bitwise [i1,i8,i16,i32,i64,i128,i80]             7 x 10 =    70
+    xor   int_bitwise [i1,i8,i16,i32,i64,i128]                 6 x 10 =    60
+    shl   int_bitwise [i1,i8,i16,i32,i64,i128,i80]             7 x 15 =   105
+    lshr  int_bitwise [i1,i8,i16,i32,i64,i128,i80]             7 x 15 =   105
+    ashr  int_bitwise [i1,i8,i16,i32,i64,i128]                 6 x 15 =    90
+    fadd  fp_arith    [f16,f32,f64,f80]                        4 x 10 =    40
+    fsub  fp_arith    [f16,f32,f64,f80]                        4 x 15 =    60
+    fmul  fp_arith    [f16,f32,f64,f80]                        4 x 10 =    40
+    fdiv  fp_arith    [f16,f32,f64,f80]                        4 x 15 =    60
+    frem  fp_arith    [f16,f32,f64,f80]                        4 x 15 =    60
+                                                    binary subtotal =  1330
+
+  UNARY (1)
+    fneg  [f16,f32,f64,f80] x {fwd,inv,unc}                    4 x  3 =    12
+
+  COMPARE (2)
+    icmp  10 preds x [i1,i8,i16,i32,i64,i80] x 6 variants  10x6x6 =     360
+    fcmp  14 preds x [f16,f32,f64,f80]       x 6 variants  14x4x6 =     336
+                                                   compare subtotal =   696
+
+  CAST (9 opcodes, 147 pairs, x3 variants {fwd,inv,unc})
+    sext      15 pairs =  45     (int-only 15)
+    zext      20 pairs =  60     (int-only 20)
+    trunc     20 pairs =  60     (int-only 20)
+    fpext      6 pairs =  18     (fp 6)
+    fptrunc    6 pairs =  18     (fp 6)
+    sitofp    16 pairs =  48     (cross-domain 16)
+    uitofp    20 pairs =  60     (cross-domain 20)
+    fptosi    16 pairs =  48     (cross-domain 16)
+    fptoui    20 pairs =  60     (cross-domain 20)
+    bitcast    8 pairs =  24     (cross-domain 8)
+                                                      cast subtotal =   441
+
+    1330 + 12 + 696 + 441 = 2479                              TOTAL =  2479
+
+  Variant-count key (tools/gen_templates.py:72-105 VARIANT_INFO):
+    10v = commutative binary : fwd/inv/controlled/controlled_inv x {qq,hl} + unc x {qq,hl}
+    15v = non-commutative    : same, but x {qq,hl,lh}
+     6v = compare            : {fwd,inv,unc} x {qq,hl}  — NO controlled axis, NO _lh
+     3v = unary / cast       : {fwd,inv,unc}
+
+  DOMAIN SPLIT (a cast is "purely integer" iff BOTH endpoints are integer):
+    purely-integer  1595
+    fp-touching      884
+                    ----
+                    2479
+
+F2. WHERE 1732 CAME FROM — a stale comment, two of them.
+
+    tools/opcode_table.yaml:4      "runtime/cq_templates.h  (1732 declarations)"
+    tools/gen_templates.py:5       "cq_templates.h : extern "C" declarations (1732 symbols)"
+
+    Neither is computed; both are prose that was never updated. The SAME yaml
+    file refutes them 57 lines further down, at opcode_table.yaml:61-62, which
+    records the evolution explicitly:
+
+        "Baselines: 1562 (pre-f16) -> 1732 (f16, Increment D) -> 2091
+         (i128 Tier-1 +215, 8rvn fcmp +144)."
+
+    I confirmed this against git history by counting EVERY historical revision of
+    the yaml (git show <rev>:tools/opcode_table.yaml, counted by construction):
+
+        total   int    fp   date        revision subject (abbreviated)
+        -----------------------------------------------------------------
+          680   520   160   2026-05-26  phase3-M1 opcode-table schema
+          780   600   180   2026-05-30  WP1 opcode table
+         1172   940   232   2026-06-01  phase-4 controlled surface
+         1438  1140   298   2026-06-17  phase-5 WI-2 void _unc family
+         1562  1240   322   2026-06-18  phase-6 WI-0 compare _unc grid
+         1732  1240   492   2026-06-20  7.1-D f16 wide width          <-- 1732
+         1947  1455   492   2026-06-21  7.1-n0ui i128 Tier-1          <-- int hits 1455
+         2091  1455   636   2026-06-24  7.1 8rvn 14-predicate fcmp
+         2261  1455   806   2026-07-01  3c6m.4 long double f80
+         2315  1455   860   2026-07-03  3c6m.5 cross-domain int<->f80
+         2333  1455   878   2026-07-06  p119.7 fp<->int bitcast       <-- PRD's 2333
+         2439  1555   884   2026-07-15  3c6m.51 Inc 1 (i80 extract)
+         2479  1595   884   2026-07-15  3c6m.51 Inc 2 (i80 insert)    <-- CURRENT
+
+    1732 was the TOTAL on 2026-06-20, eight revisions and 747 symbols ago.
+    VERDICT: 1732 is real but long stale. It is a total, never an integer count.
+
+F3. WHERE 1455 AND 878 CAME FROM — a correct snapshot, now stale by two increments.
+
+    The table above shows total=2333, int=1455, fp=878 at exactly one revision:
+    ce3837bc (2026-07-06, "feat(p119.7): lower tainted fp<->int bitcast").
+
+    PRD §1 lines 51-58 therefore reproduce that revision EXACTLY and self-
+    consistently: "1455 of the 2333", "the remaining 878 are fp-touching",
+    "1455 purely-integer + 878 fp-touching = 2333".
+
+    Two further PRD §1 figures corroborate the same snapshot precisely:
+      * "234 of those 878 are the cross-domain casts (sitofp, uitofp, fptosi,
+        fptoui, bitcast)". Counted at ce3837bc: 48+60+48+60+18 = 234. EXACT.
+        (At HEAD it is 240 — bitcast gained the f80<->i80 pair, +6.)
+      * "215 of it i128". Counted at both revisions: 215. EXACT and unchanged.
+
+    So PRD §1 was ACCURATE WHEN WRITTEN and is now stale by exactly the two
+    3c6m.51 i80 increments of 2026-07-15. The deltas reconcile to the symbol,
+    using the yaml's own accounting at opcode_table.yaml:76-84:
+
+      Inc 1 (+106):  and +10, lshr +15, icmp +60, trunc(i80->iN) +15  = +100 int
+                     bitcast f80<->i80 (2 pairs x 3v)                 =   +6 fp
+      Inc 2  (+40):  or  +10, shl  +15, zext(iN->i80) +15             =  +40 int
+
+      int :  1455 + 100 + 40 = 1595   OK
+      fp  :   878 +   6 +  0 =  884   OK
+      tot :  2333 + 106 + 40 = 2479   OK
+
+    NOTE, and this is a genuine subtlety rather than a coincidence: the i80
+    increments added exactly 140 purely-integer symbols, so
+        (purely-integer at HEAD, EXCLUDING i80) = 1595 - 140 = 1455.
+    1455 is thus still a defensible number TODAY under the reading "integer
+    symbols at widths that are actually integers". i80 is an integer width only
+    in a bookkeeping sense — it is the x86_fp80 BIT-PATTERN width, exists solely
+    to serve long-double libm support, and is intermediate-only
+    (opcode_table.yaml:126-141). Whether libcqops v1 owns i80 is a SCOPE
+    DECISION, not a counting error. See F5.
+
+F4. WHERE 1474 CAME FROM — nowhere. It is a phantom.
+
+    PRD-v1.md:470  "Generated shim over the full 1474-symbol integer grid"
+    PRD-v1.md:486  "shim/cq_templates_impl.c  generated dispatch (1474 thin wrappers)"
+
+    1474 appears at NO revision of opcode_table.yaml, as neither a total nor an
+    integer count — see the full 13-revision table in F2, which contains no 1474.
+
+    I also tested 1474 against eleven alternative partitions at BOTH the current
+    and the 2333-era revision (integer including/excluding i80; excluding i128;
+    excluding both; excluding i1; dropping the compare rows; dropping the cast
+    rows; dropping each of the controlled / _unc / _inv axes; integer plus the
+    fp-touching casts). Results at HEAD: 1595, 1455, 1380, 1240, 1365, 1235,
+    1430, 1167, 1206, 992, 1871. At the 2333 revision: 1455, 1455, 1240, 1240,
+    1225, 1155, 1320, 1047, 1106, 902, 1725. NONE is 1474.
+
+    VERDICT: 1474 is unsupported by any evidence in CQ_lang at any point in its
+    history. PRD §13 and §14 should be corrected. Given §1 of the same document
+    says 1455, the most likely origin is a transcription slip from 1455 while
+    drafting §13/§14 (digit-level: 1455 -> 1474), not a different count. Do not
+    preserve it, and do not try to reconcile it — there is nothing to reconcile.
+
+F5. THE ANSWER, AND THE ONE SCOPE DECISION IT EXPOSES
+
+    TRUE TOTAL (opcode_table.yaml)  : 2479
+    TRUE purely-integer             : 1595   (1455 if i80 is excluded)
+    TRUE fp-touching                :  884   (878 if the f80<->i80 bitcast is excluded)
+    1455 : correct for 2026-07-06; today = purely-integer EXCLUDING i80
+    1474 : phantom, wrong at every revision — delete it
+    1732 : correct for 2026-06-20; a stale comment in two files
+
+    NEW DECISION THE PRD DOES NOT YET RECORD — does v1 own i80?
+    The PRD predates i80 entirely and never mentions it. Mechanically, all 140
+    i80 symbols are pure classical permutations well inside v1's kernel set —
+    `and`, `or`, `shl`, `lshr`, `icmp`, `trunc` from i80, `zext` to i80 — and
+    Rule 3 (no packed scalar; width-generic over reg->width) means an 80-bit
+    register costs nothing extra. So v1 CAN cover them. But i80 exists only to
+    serve x86_fp80 libm, which is explicitly v2. Recommendation: state the choice
+    in the PRD rather than let the shim's cross product decide it silently.
+    Whichever way it goes, the shim grid is 1595 or 1455 — never 1474.
+
+F6. SCOPE WARNING — opcode_table.yaml IS NOT THE WHOLE cq_template_* SURFACE
+
+    tools/gen_templates.py:390-398 (`ARTIFACTS`) drives THREE tables:
+
+      tools/opcode_table.yaml   -> runtime/cq_templates.h            2479
+      tools/intrinsic_table.yaml-> runtime/cq_intrinsic_templates.h   389
+      tools/libm_table.yaml     -> runtime/cq_libm_templates.h         12
+                                                                    ----
+                                                                    2880
+
+    All three emit the SAME `cq_template_*` prefix into the SAME link namespace
+    (gen_templates.py:247-272 and :191-244 confirm the sibling enumerators use
+    the identical `cq_template_<op>_<W>` naming). The PRD's "2333 declarations in
+    runtime/cq_templates.h" therefore describes ONE of three headers.
+
+    OPEN QUESTION FOR STEP 22 (M27), not settled here: if a CQ_lang program uses
+    a reversible intrinsic or a direct-libm call, the shim must define those 401
+    symbols too or the link fails. The libcqops PRD/plan never mention these two
+    tables. Either (a) they are out of v1 scope and the intrinsic/libm archives
+    are still linked from CQ_lang, or (b) M27 must generate over all three yamls
+    — in which case both siblings need vendoring into third_party/cq_lang at a
+    pinned revision alongside opcode_table.yaml. FILE THIS AS A NEW BLOCKER.
+
+F7. GRAND TOTAL OF THE LINK SURFACE
+
+    cq_template_*  2880   (2479 opcode + 389 intrinsic + 12 libm)
+    cqrt_*          173
+                   ----
+                   3053   symbols libcqops must ultimately resolve
+
+
+================================================================================
+PART G — EXACT REPRODUCTION COMMANDS
+================================================================================
+
+All commands are read-only. Run from /Users/sorenwilkening/Desktop/CQ_lang.
+
+  # 0. Confirm the pin
+  git rev-parse HEAD                       # a6a92feb094c8dd71c36d47c24460f3f0df67b44
+  git log -1 --format='%H %ad' -- tools/opcode_table.yaml   # 4d5ba4ec... 2026-07-15
+
+  # 1. Prove the yaml matches the shipped header, then prove no drift
+  shasum -a 256 tools/opcode_table.yaml    # 6245117d...a3e82426
+  head -1 runtime/cq_templates.h           # same sha in the banner
+  python3 tools/gen_templates.py --output-dir runtime --check   # exit 0
+
+  # 2. cq_template_* counts (ground truth, direct)
+  for f in cq_templates.h cq_intrinsic_templates.h cq_libm_templates.h; do
+    printf '%s ' "$f"
+    grep -ohE '\bcq_template_[a-z0-9_]+\(' runtime/$f | sort -u | wc -l
+  done                                     # 2479 / 389 / 12
+  grep -n '2880UL' runtime/cq_link_smoke.c # CQ_lang's own assertion
+
+  # 3. cqrt_* count (ground truth, comment-stripped, alignment-tolerant)
+  python3 - <<'EOF'
+  import re
+  t=open('runtime/cq_runtime.h').read()
+  t=re.sub(r"/\*.*?\*/"," ",t,flags=re.S); t=re.sub(r"//[^\n]*"," ",t)
+  print(len(set(re.findall(r"\b(cqrt_[A-Za-z0-9_]+)\s*\([^;{]*\)\s*;",t))))
+  EOF
+                                           # 173  -- NOT 124; see Part B WARNING
+
+  # 4. The prescribed (inadequate) command, for comparison
+  grep -rhoE '"cqrt_[a-z0-9_]*"' ir-pass/src | sort | uniq -c | sort -rn
+                                           # 18 PREFIXES
+
+  # 5. Historical counts, to re-derive 1732 / 1455 / 2333
+  #    Iterate `git log --format=%H -- tools/opcode_table.yaml`, and for each rev
+  #    `git show <rev>:tools/opcode_table.yaml` into the F0 ROUTE 2 construction.
+
+================================================================================
+END
+================================================================================
+
+================================================================================
+CORRECTION — appended 2026-08-14, after the Step 0.5 item 2 investigation
+================================================================================
+
+PART D's `cqrt_free` EMISSION-SITE LIST IS INCOMPLETE. This file listed 13 sites
+across 8 files. An independent census during the _unc/cqrt_free ownership
+investigation found 24 sites across 12 .cpp files and 15 distinct enclosing
+functions, all reached via `wd.freeFn()` (declared WidthDispatch.cpp:518-525):
+
+  Uncomputation.cpp:305          <-- MISSED, and it is the most important one:
+                                     the whole-DAG uncompute spine, the site that
+                                     owns the _unc/free pairing this file's
+                                     conclusion depends on
+  SwapRouteEmit.cpp:414,426,634,659          <-- 414/426/634/659 missed
+  BreakReversePlay.cpp:473,488,600,608,661,693,877,878  <-- 608/661/693/877/878 missed
+  SwitchDataMuxEmit.cpp:222      <-- missed
+  BennettWrap.cpp:106
+  SwitchValueEmit.cpp:282,293
+  SwitchRouteEmit.cpp:184,194
+  SelectMergeEmit.cpp:270,278
+  ClassicalCallArmEmit.cpp:205
+  NestedRouteEmit.cpp:151
+  IOSinkLowering.cpp:709
+
+THE CONCLUSION OF PART D STANDS AND IS STRENGTHENED: runtime/cq_runtime.h:40-41
+("declared but unused (reserved for later lifetime work)") is stale, and
+`cqrt_free` is emitted on ordinary control-flow paths reachable from plain C.
+Only the site list was short. Two families: (a) the Phase-5 uncompute spine frees
+DATA rails after their `_unc`; (b) Phase-4 control emitters free FLAG and WORK
+rails after their strip.
+
+Lesson, consistent with the extractor trap already recorded in this file: a census
+that greps for a *symbol name* misses sites that reach the symbol through a
+dispatch helper. Grep for the helper (`freeFn()`), not only for the name.
+
+MEASURED PAIRING (239 pinned goldens in CQ_lang/tests/e2e/*.expected.log):
+  25,147  cq_template_*_unc calls
+  23,818  followed on the VERY NEXT trace line by cqrt_free of the same handle
+   1,320  freed later in the trace
+       9  never freed at all (record-frozen / entangled rails — deliberate)
+       0  handles freed twice, anywhere in the corpus
+  26,558  freed handles whose rail received NO _unc at all
+This is what settled Step 0.5 item 2 in favour of "cqrt_free is the sole
+deallocator". See PRD-v1.md §10.

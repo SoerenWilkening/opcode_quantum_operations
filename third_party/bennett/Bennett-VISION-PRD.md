@@ -1,0 +1,580 @@
+# Bennett.jl — Vision PRD: The Enzyme of Reversible Computation
+
+## One-line summary
+
+Bennett.jl is an LLVM-level reversible compiler that transforms arbitrary
+programs into space-optimized reversible circuits, analogous to how Enzyme
+transforms arbitrary programs into optimized gradients.
+
+---
+
+> **The north-north star — the wider toolchain.** Bennett.jl and its sibling
+> BennettVM.jl are the **classical-oracle-synthesis core of a taint-driven
+> quantum compiler toolchain**. Upstream (owned by others, in active
+> development), minimal source-language extensions to C / Rust / … introduce
+> *quantum taints*; clang / LLVM propagate them and optimise the classical
+> remainder around them. **We own everything from the tainted LLVM opcodes on
+> down**: tainted opcodes are compiled to reversible form — by Bennett.jl for
+> the bounded, straight-line slice, by BennettVM.jl for the rest that is
+> possible at all (jumps, unbounded loops, runtime memory) — targeting a
+> *quantum* version of the Bennett VM, which is the common compilation target
+> for quantum languages and is itself lowered to hardware backends. The litmus
+> property: **the toolchain is the identity on untainted code** — if nothing is
+> tainted, the program stays classical (the half-joking "compile the Linux
+> kernel for the quantum VM" thought experiment). See §1.1. The reversible-VM
+> direction below is the next concrete step toward this.
+
+> **North star for the next major version — the reversible-VM backend.**
+> A fixed reversible *circuit* has no loop construct and no runtime-sized
+> memory, so it cannot represent a terminating computation of
+> statically-unknown length (an unbounded loop, a runtime-sized data
+> structure). The next-version direction is a **second lowering target** — a
+> reversible abstract machine, selected via the existing `target=` dispatch —
+> that emits a reversible *program* rather than a circuit, the same
+> architectural choice that lets Enzyme handle dynamic control flow and
+> dynamic memory. See **`Bennett-ReversibleVM-PRD.md`** (bead `Bennett-spqu`).
+
+## 1. Vision
+
+**Enzyme showed that automatic differentiation belongs at the LLVM level.**
+By operating below the source language — where every program is a sequence of
+primitive instructions — Enzyme differentiates C, C++, Fortran, Julia, Rust,
+and Swift with a single tool, inheriting LLVM's entire optimization pipeline.
+
+**Bennett.jl makes the same argument for reversible computation.** Every
+deterministic computation can be made reversible via Bennett's 1973
+construction. By operating at the LLVM IR level, Bennett.jl reversibilises
+any language that compiles to LLVM — without special types, without operator
+overloading, without rewriting foreign code.
+
+The result: given any pure function `f`, produce a reversible circuit
+`(x, 0) → (x, f(x))` using NOT, CNOT, and Toffoli gates, with all ancillae
+verified zero. The circuit is correct by construction and can be used for:
+
+- **Quantum control**: `when(qubit) do f(x) end` in Sturm.jl — any classical
+  computation becomes a quantum-controlled operation
+- **Reversible hardware synthesis**: direct compilation to Toffoli networks
+  for adiabatic/reversible CMOS
+- **Space-optimized quantum oracles**: Grover, phase estimation, QSVT all
+  need reversible implementations of classical functions
+
+### 1.1 The larger picture: classical-oracle core of a quantum compiler toolchain
+
+The reversible circuit is not the end product — it is the **classical-oracle
+layer** of a larger, taint-driven quantum compiler toolchain. The full
+pipeline:
+
+1. **Minimal source-language extensions** (C, Rust, … — *owned upstream, in
+   active development*) introduce **quantum taints**: markers that a value or
+   computation is quantum (in superposition / entangled).
+2. **clang / LLVM** propagate the taints and optimise the classical code
+   around them.
+3. LLVM opcodes are emitted; a **taint analysis** marks the affected ones.
+4. **Tainted opcodes are compiled to reversible form** — by Bennett.jl for the
+   bounded, straight-line slice, and by **BennettVM.jl** for everything else
+   that is possible at all (jumps, unbounded loops, runtime-sized memory).
+5. The target is a **quantum version of the Bennett VM** — "the quantum VM."
+6. The quantum VM is the **common compilation target for quantum languages**.
+7. The quantum VM is **realised on hardware backends**.
+
+**Our scope boundary: from the tainted LLVM opcodes on down.** The front-end
+taint-marking and the (control-dependence-aware) taint-propagation pass are
+owned upstream. Our input contract is a *tainted slice* of LLVM opcodes
+(classical inputs treated as known / constant wires); our job is rock-solid
+reversible compilation of that slice. This implies a *fragment-compile* entry
+mode alongside today's whole-function `reversible_compile` — a tainted sub-DAG,
+not always a complete `f`.
+
+**The defining property — identity on untainted code.** Because only the
+tainted slice is reversibilised, an empty taint set means no transformation:
+the program stays classical. This is what makes the half-joking ambition —
+*compile the Linux kernel for the quantum VM* — coherent: if nothing is
+tainted, it is just a classical binary.
+
+### 1.2 Operating order: reversible first, then recycle for quantum
+
+The plan is deliberately sequenced: **get classical reversible compilation
+excellent first, then reuse the learnings and recycle the results for the
+quantum layer.** Quantum is a later phase that builds on a trusted substrate,
+not a parallel track. Reversible-first is also the lower-risk path: bijectivity
+and ancilla-zero are decidable and exhaustively testable
+(`verify_reversibility`), whereas the quantum criteria are strictly harder to
+validate.
+
+Almost everything recycles directly:
+
+- **Results recycle as-is** — the Toffoli libraries, branchless soft-float, the
+  memory strategies, and BennettVM's history / pebbling layer *are* the
+  classical-oracle layer of the quantum VM.
+- **Learnings recycle as intuition** — the phi-resolution / false-path-
+  sensitization discipline is the same hazard the taint boundary hits; the
+  uncomputation discipline is one tightening away from quantum disentanglement.
+
+**Quantum-phase walls to remember (not problems for the reversible phase):**
+
+1. **Reversible ≠ unitary.** Bennett emits Toffoli networks = permutation
+   matrices, a strict subset of unitaries — no phase, no superposition-
+   creation. The genuinely-quantum gates (H, S, T, entanglers) come from the
+   *quantum source language*, not from reversibilising C. Bennett / VM
+   synthesise the classical-oracle slice; they are necessary, not sufficient,
+   for "quantum" (this is why §10's "not a general-purpose quantum compiler"
+   remains literally true).
+2. **Tainted control flow can't run on a classical program counter.** A loop
+   bound or branch that depends on a qubit cannot be decided by a classical PC
+   — that case falls back to bound-and-unroll (the circuit target) or
+   repeat-until-success. BennettVM's dynamic-PC model covers *untainted control
+   flow over tainted data*; *tainted* control flow is a genuine wall, distinct
+   from the non-termination wall.
+3. **Quantum uncomputation must disentangle, not merely zero.** Ancillae must
+   return to |0⟩ *and* leave no which-path entanglement — strictly stronger
+   than classical ancilla-zero. Keep cleanup expressed as a per-wire
+   postcondition (as `verify_reversibility` already does) so it can later be
+   tightened without redesign; avoid strategies that rely on leaving
+   correlated-but-zeroed scratch. Maps to the Unqomp / Reqomp / Qurts
+   uncomputation literature already collected in BennettVM.jl.
+
+---
+
+## 2. The Enzyme Analogy
+
+| Enzyme (AD) | Bennett.jl (Reversible) |
+|---|---|
+| Input: LLVM IR of f | Input: LLVM IR of f |
+| Output: gradient df/dx | Output: reversible circuit for f |
+| Forward pass | Forward gate computation |
+| Reverse pass (adjoint) | Bennett uncomputation |
+| Tape (cached forward values) | Ancilla wires |
+| Activity analysis | Constant-wire elimination |
+| Shadow memory | Reversible memory model |
+| Function augmentation | Gate-level call inlining (IRCall) |
+| Post-optimization AD | Post-optimization reversibilisation |
+| Works for any LLVM language | Works for any LLVM language |
+
+**Key difference**: Enzyme computes *derivatives* (a linear approximation).
+Bennett.jl computes *exact reversals* (the complete inverse). Enzyme's output
+is approximate; Bennett.jl's output is bit-exact. This is both harder (no
+approximation allowed) and simpler (no chain rule, no adjoints — just run the
+gates backwards).
+
+---
+
+## 3. Architecture
+
+```
+                    Bennett.jl Pipeline
+                    ═══════════════════
+
+  Julia function          LLVM IR              Parsed IR
+  ──────────────         ─────────            ──────────
+  f(x::Int8)     ──►  code_llvm()  ──►  extract_parsed_ir()
+  f(x::Float64)       (LLVM.jl C API)    (two-pass walker,
+                                           intrinsic expansion,
+                                           IRCall recognition)
+                              │
+                              ▼
+                    ┌─────────────────────┐
+                    │  Instruction Lowering │
+                    │  (lower.jl)           │
+                    │                       │
+                    │  • Integer arithmetic  │
+                    │  • Bitwise + shifts    │
+                    │  • Comparisons         │
+                    │  • Control flow (phi)  │
+                    │  • Type conversion     │
+                    │  • Memory (GEP/load)   │
+                    │  • Function calls      │
+                    │  • Division (soft)     │
+                    │  • Float (soft-float)  │
+                    │  • Path predicates     │
+                    └─────────┬─────────────┘
+                              │
+                              ▼
+                    ┌─────────────────────┐
+                    │  Pebbling Strategy   │
+                    │  (pebbling.jl)       │
+                    │                       │
+                    │  • Full Bennett       │
+                    │  • Knill recursion    │
+                    │  • [future] SAT       │
+                    │  • [future] EAGER     │
+                    └─────────┬─────────────┘
+                              │
+                              ▼
+                    ┌─────────────────────┐
+                    │  Bennett Construction │
+                    │  bennett_transform.jl │
+                    │                       │
+                    │  forward + copy + rev │
+                    │  ancilla verification │
+                    └─────────┬─────────────┘
+                              │
+                              ▼
+                    ReversibleCircuit
+                    ┌───────────────┐
+                    │ n_wires       │──► simulate()
+                    │ gates[]       │──► gate_count()
+                    │ input_wires   │──► verify_reversibility()
+                    │ output_wires  │──► controlled()
+                    │ ancillae      │──► extract_dep_dag()
+                    └───────────────┘
+```
+
+---
+
+## 4. LLVM IR Coverage Target
+
+Bennett.jl aims to handle every LLVM IR instruction that a pure, deterministic
+function can produce. "Pure" means: no I/O, no system calls, no concurrency.
+"Deterministic" means: same input always produces same output.
+
+### Tier 1: Complete (v0.1–v0.6)
+
+These are done and tested:
+
+| Category | Instructions | Gate primitives |
+|----------|-------------|-----------------|
+| Integer arithmetic | add, sub, mul, udiv, sdiv, urem, srem | Ripple-carry, shift-and-add, restoring division |
+| Bitwise | and, or, xor, shl, lshr, ashr | Toffoli per bit, barrel shifter |
+| Comparison | icmp (10 predicates) | Modified adder for ULT, sign-flip for SLT |
+| Control flow | br, phi, select, ret, unreachable | Path predicates, edge-predicate MUX chains |
+| Type conversion | sext, zext, trunc | CNOT copy / wire selection |
+| Aggregates | insertvalue, extractvalue | CNOT copy at element offset |
+| Memory (static) | getelementptr (const), load | Wire offset, CNOT copy |
+| Calls | call (registered callees) | Gate-level inlining via IRCall |
+| Float | fadd, fsub, fmul, fdiv, fneg, fcmp | Soft-float library (branchless) |
+
+### Tier 2: Engineering (v0.7–v0.8)
+
+Straightforward extensions of existing patterns:
+
+| Instruction | Approach | Blocker |
+|-------------|----------|---------|
+| switch | Cascaded icmp + select | None |
+| freeze | Identity (no-op) | None |
+| sitofp, fptosi | Soft conversion functions | None |
+| fpext, fptrunc | Precision conversion | None |
+| bitcast | Wire reinterpretation (zero gates) | None |
+| frem | Soft remainder via soft_fdiv | None |
+| vector.reduce.* | Unroll to scalar ops | None |
+
+### Tier 3: Research (v0.7–v0.9)
+
+Require new theory or significant architecture:
+
+| Instruction | Approach | Research question |
+|-------------|----------|-------------------|
+| store | Reversible memory write | How to preserve overwritten value? |
+| alloca (dynamic) | Reversible allocation | Reversible free list (AG13) |
+| GEP (variable index) | QRAM / controlled-SWAP | O(N) vs O(log N) access? |
+| memcpy, memmove | Reversible bulk copy | Leverage linearity? |
+| Indirect calls | Dynamic dispatch | Controlled-function-pointer? |
+
+### Tier 4: Hard but NOT Out of Scope
+
+**Coverage target: every LLVM IR opcode that a *pure deterministic* function
+can reach gets a reversible gate implementation, even if the approach
+requires novel theory.** The narrow exception — opcodes that are *intrinsically*
+non-deterministic or environment-coupled — is to fail loud at compile time
+with a clear error message (CLAUDE.md §1), not to silently miscompile. So
+this Tier 4 mixes two cases, both of which are tracked here rather than
+hidden in §9 Non-Goals:
+
+- **Targets — get a real gate lowering.** Most rows below: invoke /
+  landingpad / catch* / cleanup* (deterministic-call modelling),
+  atomicrmw / cmpxchg (single-thread sequential semantics), fence
+  (no-op), indirectbr / ptrtoint / inttoptr / addrspacecast
+  (identity / cascade), and the vector-op family (unrolling).
+
+- **Clear-error refusals — fail loud, not silent.** `va_arg` and `callbr`
+  are listed for completeness but don't get gates: the count and target
+  are runtime-determined from the calling environment.  The error path
+  is the *implementation* — same status as Enzyme's
+  `@enzyme_custom_rule` boundary.
+
+| Instructions | Approach | Status |
+|-------------|----------|--------|
+| invoke, landingpad, resume | Treat invoke as call + dead unwind path for deterministic callees; for non-deterministic callees, require explicit reversibility contract | Issues filed |
+| catchret, catchpad, catchswitch, cleanupret, cleanuppad | Deterministic catch bodies lower normally; non-deterministic paths become unreachable | Issues filed |
+| atomicrmw | Decompose to read + compute + reversible write (EXCH-based) | Issue Bennett-6nq |
+| cmpxchg | Expand to icmp + conditional reversible store | Issue Bennett-dop |
+| fence | No-op for single-threaded circuits (skip) | Issue Bennett-bmq |
+| va_arg | **Clear-error refusal** (count is runtime-dependent) | Issue Bennett-909 |
+| callbr | **Clear-error refusal** (inline asm) | Issue Bennett-e84 |
+| indirectbr | Expand to cascaded icmp + br | Issue Bennett-4eu |
+| ptrtoint, inttoptr | Identity (pointer IS wire index) | Issues filed |
+| addrspacecast | Identity (single address space) | Issue Bennett-ay7 |
+| ExtractElement, InsertElement, ShuffleVector | Unroll to scalar wire operations | Issue Bennett-vb2 |
+
+**The goal is Enzyme-class coverage:** if Enzyme can differentiate it, Bennett
+can reversibilise it. Every LLVM opcode, every common intrinsic, every language
+that compiles to LLVM.
+
+### Coverage North Star: Enzyme's frontier as ours
+
+Enzyme's real-world coverage story (from Moses & Churavy NeurIPS 2020 and the
+Enzyme.jl / Enzyme-MPI / Enzyme-GPU followups) is the honest north star:
+
+**"Every LLVM opcode that appears in pure numerical code from supported
+frontends, plus anything you write a custom rule for."**
+
+Where Enzyme stops — identical to where Bennett.jl will stop:
+
+1. **Inline assembly** (`callbr`, `asm!`). No general semantic model for opaque
+   machine code. Hard stop for both tools.
+2. **External functions without source or a custom rule**. Enzyme errors on
+   `call @printf`, `call @malloc`, raw syscalls, libc math without a registered
+   derivative. The escape hatch is `@enzyme_custom_rule` / `augmented_primal`.
+3. **Non-reproducible intrinsics**: `llvm.readcyclecounter`,
+   `llvm.thread.pointer`, `llvm.returnaddress`, `llvm.frameaddress` — read
+   external state with no pure semantics.
+4. **Complex C++/SEH exception handling** — Enzyme handles the simple
+   `invoke`/`landingpad` pair; full `catchswitch`/`catchpad`/`cleanuppad`
+   is historically fragile.
+5. **Coroutines** (`llvm.coro.*`) — not supported.
+
+**Bennett.jl's `register_callee!` IS our `@enzyme_custom_rule`.** Same escape
+hatch, same semantics: the user registers a pure reversible implementation of
+an opaque function and the compiler inlines it at gate level. Building out
+the rule library for common libraries (libc math, BLAS, MPI) is the path to
+Enzyme-level practical coverage.
+
+Bennett.jl has two additional frontiers Enzyme doesn't share:
+
+- **Concurrent atomic semantics**: `atomicrmw`/`cmpxchg`/`fence` are
+  decomposable under single-threaded collapse but not under true concurrency
+  (reversible circuits are synchronous by nature). Enzyme handles some
+  parallel semantics with custom rules; we commit to single-thread.
+- **Runtime exception paths**: Enzyme tolerates simple cases by treating the
+  unwind edge as dead. We need an explicit **exception-flag-wire model** for
+  faithful translation — every instruction has a guard, throw sets a flag,
+  downstream code MUXes on it. Tracked as design work when exception-heavy
+  code becomes a target.
+
+**The practical upshot:** no LLVM opcode is provably impossible to cover
+(Bennett 1973/1989 is universal for deterministic classical computation).
+Every gap reduces to either (a) a design decision about semantics — which
+Enzyme has already faced and resolved — or (b) a missing custom rule for an
+opaque external, which is a library-building task, not a fundamental one.
+
+---
+
+## 5. Three Pillars
+
+### Pillar 1: Instruction Coverage
+
+Every LLVM IR instruction from a pure function gets a reversible gate sequence.
+Integer ops map to classical reversible arithmetic. Float ops route through
+branchless soft-float implementations. Memory ops use a reversible memory model
+(persistent functional data structures or EXCH-based heaps).
+
+### Pillar 2: Space Optimization
+
+Full Bennett construction uses O(T) ancillae (one per intermediate value).
+This is catastrophically wasteful for real programs. Bennett.jl provides a
+spectrum of space-time tradeoffs:
+
+| Strategy | Space | Time | Source |
+|----------|-------|------|--------|
+| Full Bennett | O(T) | O(T) | Bennett 1973 |
+| Knill recursion | O(S log T) | O(T^{1+ε}) | Knill 1995 |
+| EAGER cleanup | O(optimal) | O(T) | Parent/Roetteler/Svore 2015 |
+| SAT pebbling | O(budget) | O(min) | Meuli et al. 2019 |
+| In-place ops | -50% per op | O(T) | Cuccaro et al. 2004 |
+
+Infrastructure built: dependency DAG extraction, Knill cost computation,
+WireAllocator with free!, Cuccaro in-place adder. Remaining: connect these
+into an actual ancilla-reducing `bennett()` via MDD graph + liveness analysis.
+
+### Pillar 3: Composability
+
+Reversible circuits compose naturally:
+- **Controlled circuits**: `controlled(circuit)` wraps every gate with a
+  control bit (NOT→CNOT, CNOT→Toffoli, Toffoli→decomposition)
+- **Function inlining**: `register_callee!(f)` enables gate-level inlining
+  of any pure Julia function
+- **Sturm.jl integration**: `when(qubit) do f(x) end` compiles f via
+  Bennett.jl and wraps in quantum control
+
+---
+
+## 6. Reversible Memory Model
+
+The hardest open problem. LLVM IR uses load/store/alloca for memory —
+destructive operations that overwrite previous values. Reversible computation
+cannot destroy information.
+
+### Approach A: Static Flattening (done)
+For statically-known memory (NTuple, fixed structs): flatten to wire arrays.
+GEP = compile-time offset. Load = CNOT copy. No runtime overhead.
+
+### Approach B: Persistent Functional Trees (primary research direction)
+Model memory as a persistent red-black tree (Okasaki 1998). Every store creates
+a new tree version; the old version is preserved as the ancilla state for
+Bennett uncomputation. O(log N) per access. Natural fit: the history IS the
+reversibility.
+
+### Approach C: EXCH-based Linear Heap (Axelsen/Glück 2013)
+Swap-based memory: EXCH exchanges register and memory cell contents. Preserves
+information bidirectionally. Linear reference counts ensure no sharing. The
+combination of linearity + reversibility = automatic garbage collection.
+
+### Approach D: QRAM (deferred)
+For truly data-dependent variable-index access: bucket-brigade QRAM or
+controlled-SWAP multiplexer. O(N) gates per access.
+
+---
+
+## 7. Version History
+
+| Version | Milestone | Status |
+|---------|-----------|--------|
+| v0.1 | Operator-overloading tracer (Traced{W}) | ✓ Archived |
+| v0.2 | LLVM IR approach — plain Julia, no special types | ✓ Complete |
+| v0.3 | Controlled circuits + multi-block IR (br, phi) | ✓ Complete |
+| v0.4 | Int16/32/64, explicit loops, tuple returns, LLVM.jl | ✓ Complete |
+| v0.5 | Float64 (soft-float), path-predicate phi resolution | ✓ Complete |
+| v0.6 | extractvalue, soft_fsub/fcmp/fdiv, division, register_callee! | ✓ Complete |
+| v0.7 | Static memory (NTuple GEP/load) | ✓ Partial (static done, dynamic open) |
+| v0.8 | Pebbling (Knill, DAG, Cuccaro adder) | ✓ Infrastructure (optimization WIP) |
+| v0.9 | Sturm.jl integration | Open |
+| v1.0 | Full LLVM IR coverage + space-optimized pebbling | Vision target |
+
+---
+
+## 8. Success Criteria for v1.0
+
+1. **Any pure Julia function on integers compiles to a correct reversible circuit**
+   — no manual annotation, no special types, no source modification
+
+2. **Float64 functions compile transparently** — `reversible_compile(f, Float64)`
+   produces correct circuits via soft-float routing
+
+3. **NTuple and fixed-size array input/output works** — pointer parameters
+   handled via static memory flattening
+
+4. **Space optimization reduces ancillae by ≥4x** on benchmark functions
+   (SHA-2 rounds, polynomial evaluation, sorting networks) relative to full
+   Bennett, matching PRS15 results
+
+5. **Gate counts within 2x of hand-optimized** for standard arithmetic
+   operations (addition, multiplication) using Cuccaro-style in-place circuits
+
+6. **Sturm.jl integration works end-to-end** — `when(qubit) do f(x) end`
+   compiles f via Bennett.jl and produces a correct quantum-controlled circuit
+
+7. **Reproducible benchmarks** — gate counts, ancilla counts, and circuit depths
+   documented for a standard set of functions and compared against published
+   results (PRS15 Table I/II, Meuli 2019 benchmarks)
+
+---
+
+## 9. Far Horizon — Sustainable AI via Thermally-Reversible Inference
+
+A v∞ aspiration, not a roadmap item. Captured here so that future agents
+understand the deepest motivation behind the advanced-arithmetic
+workstream and don't mistake it for incidental polish.
+
+**The premise.** Landauer's bound says erasing one bit dissipates
+`kT·ln(2)` ≈ 2.85 zJ at 300 K. Modern CMOS switching events burn ~10⁻¹⁵ J
+per gate — roughly six orders of magnitude above the Landauer floor.
+At rack and grid scale, this margin is what makes contemporary AI
+training thermally hostile. A fully thermodynamically-reversible
+substrate has no such floor on internal computation; it pays Landauer
+only on the bits that genuinely leave the system as output.
+
+**Why Bennett is the right front end.** A thermally-reversible NN
+substrate, when it exists, will need a compiler that can take
+arbitrary numerical Julia/C/Rust and produce reversible-by-construction
+gate networks. That is exactly what Bennett.jl does. The advanced-
+arithmetic primitives currently being built (parallel adder tree,
+Sun-Borissov polylog multiplier, QCLA chain) are precisely the
+matmul-heavy primitives a reversible inference engine needs.
+Composition into `reversible_dot` / `reversible_gemm` from those
+primitives is mechanical once the chain finishes.
+
+**Distinction from memory-reversible NNs.** This is *not* the RevNet /
+reversible-RNN line of work, which is a software trick on irreversible
+silicon to avoid storing activations during backprop. Those save DRAM
+and run on GPUs today. Bennett's interest is in the *thermodynamic*
+sense: every gate information-preserving, every reverse pass an
+honest run-the-circuit-backward.
+
+**The structural insight.** Backprop is reverse-mode autodiff;
+Bennett's construction is reverse-mode uncompute. Both compute an
+adjoint of the forward pass, but on different categories. In a
+thermally-reversible NN, training one step is *literally* the forward
+circuit applied, then the same circuit run in reverse with seeded
+gradients in the output register. The thermal cost is bounded by
+the entropy of the parameter update, not by total gate count.
+Enzyme cannot reach this angle because it assumes irreversible target
+hardware; Bennett's reverse construction is structurally the same
+operation that thermal reversibility requires.
+
+**Why this is not a current priority.**
+
+1. **No substrate.** Production thermally-reversible silicon does not
+   exist at NN scale. Adiabatic CMOS, superconducting reversible
+   logic (Likharev, Frank/Sandia) are decades from general
+   availability. Until then, the gates we emit run on conventional
+   irreversible hardware that pays the full thermal cost regardless
+   of the gate's logical reversibility.
+2. **The CMOS-to-Landauer gap is too wide for direct interest *yet*.**
+   Six orders of magnitude is the opportunity, not the deliverable;
+   capturing it requires the substrate to actually exist.
+3. **Bennett's nearer-term consumers** (Sturm.jl quantum control,
+   QSVT/QSP oracles, reversible memory primitives) are scalar-shaped,
+   not matrix-shaped. BLAS is out of scope per §9; reversible NNs
+   would re-open that scope.
+
+**What this changes about current work: nothing.** The path to this
+v∞ goes directly through the work already happening on advanced
+arithmetic and intrinsic coverage. No parallel track exists; no
+shortcut is available. Every closure on trig / hyperbolic / special
+function coverage, every QCLA polish, every adder-tree optimization
+is on the critical path. The most productive thing is to keep
+shipping the current backlog while knowing the goalpost is taller
+than v1.0 implies.
+
+If thermally-reversible substrates emerge before Bennett.jl reaches
+v1.0, this section becomes a roadmap. Until then, it is a compass.
+
+---
+
+## 10. Non-Goals
+
+- **Not the quantum-magic layer — but the classical-oracle core of one.**
+  Bennett.jl + BennettVM compile *classical* functions to reversible form. The
+  genuinely-quantum operations — superposition, measurement, entanglement,
+  interference — come from the quantum source language and live natively in the
+  quantum VM (and in Sturm.jl). This non-goal remains literally true even now
+  that the two repos are positioned as the classical-oracle-synthesis core of
+  the wider quantum compiler toolchain (§1.1): they synthesise the reversible
+  oracles the quantum layer controls, not the quantum gates themselves.
+
+- **Not a hardware synthesizer.** Bennett.jl produces gate-level Toffoli
+  networks. Mapping to specific hardware (ion traps, superconducting qubits)
+  is out of scope — in the toolchain of §1.1, hardware lowering of the quantum
+  VM is a downstream stage owned elsewhere.
+
+- **Not a replacement for hand-optimized circuits.** For critical kernels
+  (SHA-2, AES, elliptic curve), hand-optimized circuits will always be smaller.
+  Bennett.jl's value is *automation* — compile any function without manual
+  circuit design.
+
+---
+
+## 11. Key References
+
+All papers downloaded to `docs/literature/` with claims verified against text.
+
+| Tag | Paper | Key result |
+|-----|-------|------------|
+| BENNETT89 | Bennett 1989, SIAM J. Computing | Theorem 1: O(T^{1+ε}) time, O(S·log T) space |
+| KNILL95 | Knill 1995, arXiv:math/9508218 | Theorem 2.1: exact pebbling recursion |
+| PRS15 | Parent/Roetteler/Svore 2015, arXiv:1510.00377 | EAGER cleanup: 5.3x qubit reduction on SHA-2 |
+| MEULI19 | Meuli et al. 2019, arXiv:1904.02121 | SAT pebbling: 52.77% ancilla reduction |
+| CUCCARO04 | Cuccaro et al. 2004, arXiv:quant-ph/0410184 | In-place adder: 1 ancilla, 2n Toffoli |
+| OKASAKI99 | Okasaki 1999, J. Functional Programming | Persistent red-black trees |
+| AG13 | Axelsen/Glück 2013, LNCS 7948 | Reversible heap with EXCH + linear refs |
+| ENZYME20 | Moses/Churavy 2020, arXiv:2010.01709 | LLVM-level AD: activity analysis, shadow memory |
+| REQOMP24 | Paradis et al. 2024, Quantum 8:1258 | Lifetime-guided uncomputation (96% reduction) |

@@ -1,0 +1,547 @@
+"""
+    _bvmd_reject_normalised_alloca!(parsed)
+
+Bennett-bvmd (hostile-review defect D2): REFUSE, loudly, a ParsedIR carrying a
+BYTE-NORMALISED alloca on the CIRCUIT path.
+
+`_check_scale_coherence!` (`src/extract/instructions.jl`) rewrites
+`IRAlloca(d, 64, n)` to `IRAlloca(d, 8, 8n)` when every emitted offset off `d` is
+byte-stamped — the only way to give BennettVM ONE cell map for an object Julia
+codegen byte-addresses but the alloca arm word-reserves. That rewrite is gated on
+`ptr_cells`, which is an **EXTRACTION** flag, NOT a backend selector:
+`ptr_cells=true` + `lower()` is a live combination in this suite (`test_59zi`,
+`test_lf14`). So a normalised alloca does reach the gate backend, and the
+shadow-tape store/load path cannot execute it — `_lower_store_via_shadow!` and
+friends require `store width == alloca elem_width`, and here a 64-bit store meets
+an 8-bit element.
+
+**This is an honest fail-fast for a combination that used to work.** Before
+Bennett-bvmd the same `.ll` lowered to a circuit, because the circuit backend has
+its OWN coherent scheme (`lower_ptr_offset!` divides `offset_bytes * 8` by the
+ALLOCA's element width, so a byte GEP off a word alloca resolves correctly there).
+The normalisation is needed ONLY for the VM cell map, and it is not free.
+
+THE FIX that removes this refusal is to teach the shadow-tape lowering to span
+`width ÷ elem_width` consecutive slots for a store/load wider than the element —
+the bit range is already identical (`64·n == 8·8n`, and byte offset `o` selects
+bits `8o…8o+63` under either stamp), so it is a width-check relaxation across
+`_lower_store_via_shadow!`, `_emit_store_via_shadow_guarded!`,
+`_lower_store_via_shadow_checkpoint!`, `_lower_load_via_shadow!`,
+`_lower_load_multi_origin!` and `_pick_alloca_strategy`. That is a core change to
+the gate backend with its own gate-count obligations, so it is NOT taken here.
+
+The alternative to refusing — re-stamping the ACCESSES instead of the
+reservation — was built and REJECTED: it is not closed under function
+boundaries. See the ADMISSION block in `_check_scale_coherence!` for the executed
+witness (`Bennett-40ys`'s caller→callee `Pair40ys` set returned 30 for an oracle
+of 42).
+
+Detection is by the exact incompatibility, never by shape alone: a byte-element
+alloca is only rejected when a store or load whose width EXCEEDS that element
+width is actually addressed through it. A genuine `alloca [N x i8]` written with
+8-bit stores (Bennett-munq) is untouched.
+"""
+function _bvmd_reject_normalised_alloca!(parsed::ParsedIR)
+    # (1) byte-element allocas, by dest
+    byte_allocas = Dict{Symbol,Int}()
+    for b in parsed.blocks, i in b.instructions
+        i isa IRAlloca || continue
+        i.elem_width == 8 && i.n_elems isa ConstOperand &&
+            (byte_allocas[i.dest] = Int(i.n_elems.value))
+    end
+    isempty(byte_allocas) && return nothing
+    # (2) names transitively derived from one of them by constant offsets
+    derived = Dict{Symbol,Symbol}()      # ptr name -> alloca dest
+    for k in keys(byte_allocas); derived[k] = k; end
+    changed = true
+    while changed
+        changed = false
+        for b in parsed.blocks, i in b.instructions
+            i isa IRPtrOffset || continue
+            i.base isa SSAOperand || continue
+            haskey(derived, i.base.name) || continue
+            haskey(derived, i.dest) && continue
+            derived[i.dest] = derived[i.base.name]
+            changed = true
+        end
+    end
+    # (3) the actual incompatibility: a store/load WIDER than the element
+    for b in parsed.blocks, i in b.instructions
+        nm, w = if i isa IRStore && i.ptr isa SSAOperand
+            (i.ptr.name, i.width)
+        elseif i isa IRLoad && i.ptr isa SSAOperand
+            (i.ptr.name, i.width)
+        else
+            continue
+        end
+        root = get(derived, nm, nothing)
+        root === nothing && continue
+        w > 8 || continue
+        error("lower: ParsedIR carries the BYTE-NORMALISED `IRAlloca(:$(root), " *
+              "8, $(byte_allocas[root]))` that Bennett-bvmd's " *
+              "`_check_scale_coherence!` emits under `ptr_cells`, and a " *
+              "$(w)-bit $(i isa IRStore ? "store" : "load") is addressed " *
+              "through it. The gate backend's shadow-tape path requires " *
+              "`width == alloca elem_width` " *
+              "(`_lower_store_via_shadow!` / `_lower_load_via_shadow!`, " *
+              "src/lowering/memory.jl), so this cannot be lowered to a " *
+              "circuit. WHY THE REWRITE EXISTS: Julia codegen byte-addresses " *
+              "its own stack frames (`alloca [N x i64]` + `gep i8 …, 8k`) " *
+              "while the alloca arm word-reserves them, so without it " *
+              "BennettVM addresses cell +8k inside an N-cell reservation — a " *
+              "silent adjacent-allocation clobber. It is gated on `ptr_cells`, " *
+              "which is an EXTRACTION flag and NOT a backend selector, so it " *
+              "reaches `lower()` too. WORKAROUND: extract with " *
+              "`ptr_cells=false` for the circuit target. FIX (the bead that " *
+              "removes this refusal): relax the shadow-tape width checks to " *
+              "span `width ÷ elem_width` consecutive slots — the bit range is " *
+              "already identical, since `64·n == 8·8n`. " *
+              "(Bennett-bvmd, predicate `_bvmd_reject_normalised_alloca!`.)")
+    end
+    return nothing
+end
+
+function lower(parsed::ParsedIR; max_loop_iterations::Int=0, use_inplace::Bool=true,
+               fold_constants::Bool=true, compact_calls::Bool=false,
+               add::Symbol=:auto, mul::Symbol=:auto,
+               target::Symbol=:gate_count,
+               auto_self_reversing::Bool=true,
+               # Bennett-z2dj / T5-P6 (Step 2): persistent_tree dispatcher arm
+               # kwargs. Plumbed only — handlers land in Steps 3-9. The
+               # `persistent_info` per-function state dict is purely internal,
+               # constructed empty inside this function and populated by
+               # `lower_alloca!` (Step 4).
+               mem::Symbol = :auto,
+               persistent_impl::Symbol = :linear_scan,
+               hashcons::Symbol = :none)
+    add in (:auto, :ripple, :cuccaro, :qcla) ||
+        throw(ArgumentError("lower: unknown add strategy :$add; supported: :auto, :ripple, :cuccaro, :qcla"))
+    mul in (:auto, :shift_add, :qcla_tree) ||
+        throw(ArgumentError("lower: unknown mul strategy :$mul; supported: :auto, :shift_add, :qcla_tree (Bennett-tbm6: :karatsuba removed 2026-04-27)"))
+    # Bennett-z2dj / T5-P6 (Step 2): validate new kwargs at function entry,
+    # mirroring add/mul validation above. Only `:auto` / `:linear_scan` /
+    # `:none` defaults are wired in Step 2; non-default values are accepted
+    # at the surface (so Step 1's RED tests reach further) but the actual
+    # dispatch and handlers light up in Steps 3-9. Unknown symbols still
+    # error fast per CLAUDE.md §1.
+    mem in (:auto, :persistent) ||
+        throw(ArgumentError("lower: unknown mem :$mem; supported: :auto, :persistent"))
+    persistent_impl in (:linear_scan, :okasaki, :hamt, :cf) ||
+        throw(ArgumentError("lower: unknown persistent_impl :$persistent_impl; supported: :linear_scan (others NYI)"))
+    hashcons in (:none, :naive, :feistel) ||
+        throw(ArgumentError("lower: unknown hashcons :$hashcons; supported: :none (others NYI)"))
+    # Bennett-4fri / U30: `target` selects the objective the `:auto`
+    # dispatchers optimise for. `:gate_count` (default) preserves the
+    # pre-U30 choices; `:depth` switches `mul=:auto` to `qcla_tree`
+    # (O(log² n) T-depth vs shift-and-add's O(n)).
+    target in (:gate_count, :depth) || throw(ArgumentError(
+        "lower: unknown target :$target; supported: :gate_count, :depth"))
+    # Pre-resolve `mul=:auto` when the user asks for depth-optimised
+    # output. Downstream sees this as an explicit choice — no ctx field
+    # needed and no per-call-site threading beyond the existing `mul`.
+    if mul === :auto && target === :depth
+        mul = :qcla_tree
+    end
+    _bvmd_reject_normalised_alloca!(parsed)
+    wa = WireAllocator()
+    gates = ReversibleGate[]
+    vw = Dict{Symbol,Vector{Int}}()
+    input_wires = Int[]
+    input_widths = Int[]
+    gate_groups = GateGroup[]      # SSA instruction → gate range mapping
+
+    # Compute SSA liveness for in-place optimization
+    ssa_liveness = use_inplace ? compute_ssa_liveness(parsed) : Dict{Symbol,Int}()
+    inst_counter = Ref(0)
+
+    # T3b.3 / Bennett-cc0 M2a: ptr_provenance + alloca_info are per-function state,
+    # threaded into lower_block_insts! so allocas defined in one block are visible
+    # to stores/loads in later blocks. Previously these were re-initialised per
+    # block (bug), which hard-errored on branched stores — see L7a/L7b tests.
+    alloca_info = Dict{Symbol, Tuple{Int,Int}}()
+    ptr_provenance = Dict{Symbol, Vector{PtrOrigin}}()
+    # Bennett-z2dj / T5-P6 (Step 2): per-function persistent-impl state.
+    # Step 4 (`lower_alloca!`) populates an entry whenever an alloca takes
+    # the `:persistent_tree` strategy. Values are `PersistentMapImpl` (typed
+    # `Any` because of include order — see types.jl LoweringCtx note).
+    persistent_info = Dict{Symbol, Any}()
+
+    for (name, width) in parsed.args
+        wires = allocate!(wa, width)
+        vw[name] = wires
+        append!(input_wires, wires)
+        push!(input_widths, width)
+    end
+
+    blocks = parsed.blocks
+    block_map = Dict(b.label => b for b in blocks)
+
+    # Detect loops (back-edges) and compute acyclic topo order
+    back_edges = find_back_edges(blocks)
+    order = topo_sort(blocks; ignore_edges=back_edges)
+
+    # If there are loops, we need max_loop_iterations
+    if !isempty(back_edges) && max_loop_iterations <= 0
+        throw(ArgumentError("lower: loop detected in LLVM IR but max_loop_iterations not specified. " *
+              "Pass max_loop_iterations=N to reversible_compile."))
+    end
+
+    # Build loop info for each header
+    loop_headers = Set(dst for (_, dst) in back_edges)
+
+    # Bennett-jepw / U05-followup: a body block of an unrolled loop is fully
+    # lowered inside lower_loop! (the diamond-in-body fix uses iteration-local
+    # block_pred / branch_info dicts). Re-dispatching it at the top level
+    # would emit duplicate gates AND trigger phi resolution against block_pred
+    # that no longer holds the body-block entries (they live only in the
+    # iteration-local dicts). Collect every loop's body region up front and
+    # skip those labels in the function-level walk below.
+    loop_body_labels = Set{Symbol}()
+    for hl in loop_headers
+        h = block_map[hl]
+        hterm = h.terminator
+        (hterm isa IRBranch && hterm.cond !== nothing) || continue
+        ll = Set(s for (s, d) in back_edges if d == hl)
+        eot = !(hterm.true_label == hl || hterm.true_label in ll)
+        elabel = eot ? hterm.true_label : hterm.false_label
+        body = _collect_loop_body_blocks(h, block_map, elabel, ll, loop_headers, back_edges)
+        union!(loop_body_labels, body)
+    end
+
+    # track branch conditions and predecessors (for phi / multi-ret resolution)
+    branch_info = Dict{Symbol, Tuple{Vector{Int}, Symbol, Symbol}}()
+    preds = Dict{Symbol, Vector{Symbol}}()
+    block_order = Dict(order[i] => i for i in eachindex(order))
+
+    # Path predicates: 1-bit wire per block, true iff that block is active.
+    # Computed during lowering, used for phi resolution.
+    block_pred = Dict{Symbol, Vector{Int}}()
+
+    # Bennett-s0tn: shared loop-guard accumulator. `lower_loop!` pushes one
+    # LoopGuard per data-dependent loop header. The same vector instance is
+    # threaded into every per-block BlockLoweringOpts so guards accumulate
+    # across all loops in this function.
+    loop_guards = LoopGuard[]
+
+    ret_values = Tuple{Vector{Int}, Symbol}[]
+
+    for label in order
+        # Bennett-jepw: body blocks belong to a loop and were fully lowered
+        # by lower_loop! when its header was visited earlier in `order`.
+        label in loop_body_labels && continue
+
+        block = block_map[label]
+
+        # Compute block predicate from predecessors
+        if label == order[1]
+            # Entry block: predicate = 1 (always active)
+            _ws = wa.next_wire
+            _gs = length(gates) + 1
+            pw = allocate!(wa, 1)
+            push!(gates, NOTGate(pw[1]))  # set to 1
+            block_pred[label] = pw
+            if length(gates) >= _gs
+                push!(gate_groups, GateGroup(Symbol("__pred_", label),
+                      _gs, length(gates), pw, Symbol[], _ws, wa.next_wire - 1))
+            end
+        elseif !isempty(get(preds, label, Symbol[]))
+            # Merge block: OR of incoming predicates
+            _ws = wa.next_wire
+            _gs = length(gates) + 1
+            block_pred[label] = _compute_block_pred!(gates, wa, label, preds,
+                                                     branch_info, block_pred)
+            if length(gates) >= _gs
+                push!(gate_groups, GateGroup(Symbol("__pred_", label),
+                      _gs, length(gates), block_pred[label], Symbol[], _ws, wa.next_wire - 1))
+            end
+        end
+
+        # Bennett-x2iw / U88: pre-build the per-block opts bundle. Reused
+        # across both lower_loop!/lower_block_insts! paths and across all
+        # blocks of this function (alloca/provenance dicts must persist).
+        block_opts = BlockLoweringOpts(
+            block_pred     = block_pred,
+            ssa_liveness   = ssa_liveness,
+            inst_counter   = inst_counter,
+            gate_groups    = gate_groups,
+            compact_calls  = compact_calls,
+            globals        = parsed.globals,
+            add            = add,
+            mul            = mul,
+            alloca_info    = alloca_info,
+            ptr_provenance = ptr_provenance,
+            entry_label    = order[1],
+            loop_headers   = loop_headers,
+            # Bennett-s0tn: shared accumulator (same vector every block).
+            loop_guards    = loop_guards,
+            # Bennett-z2dj / T5-P6 (Step 2): forward dispatcher kwargs +
+            # per-function persistent_info dict so every LoweringCtx in
+            # this function sees the same state.
+            mem            = mem,
+            persistent_impl = persistent_impl,
+            hashcons       = hashcons,
+            persistent_info = persistent_info,
+        )
+
+        if label in loop_headers
+            # Unroll this loop (single group for entire loop body).
+            # Bennett-httg / U05: thread the full lowering context so body-block
+            # instructions route through the canonical `_lower_inst!` dispatcher.
+            _ws = wa.next_wire
+            _gs = length(gates) + 1
+            lower_loop!(gates, wa, vw, block, block_map, back_edges,
+                        max_loop_iterations, preds, branch_info, block_order;
+                        opts = block_opts)
+            if length(gates) >= _gs
+                push!(gate_groups, GateGroup(Symbol("__loop_", label),
+                      _gs, length(gates), Int[], Symbol[], _ws, wa.next_wire - 1))
+            end
+        else
+            lower_block_insts!(gates, wa, vw, block, preds, branch_info, block_order;
+                               opts = block_opts)
+        end
+
+        # Process terminator (for non-loop blocks AND after loop unrolling)
+        term = block.terminator
+        if term isa IRRet
+            _ws = wa.next_wire
+            _gs = length(gates) + 1
+            push!(ret_values, (copy(resolve!(gates, wa, vw, term.op, term.width)), label))
+            if length(gates) >= _gs
+                push!(gate_groups, GateGroup(Symbol("__ret_", label),
+                      _gs, length(gates), ret_values[end][1], _ssa_operands(term),
+                      _ws, wa.next_wire - 1))
+            end
+        elseif term isa IRBranch && term.cond !== nothing
+            if !(label in loop_headers)  # loop headers handle their own branches
+                _ws = wa.next_wire
+                _gs = length(gates) + 1
+                cw = resolve!(gates, wa, vw, term.cond, 1)
+                if length(gates) >= _gs
+                    push!(gate_groups, GateGroup(Symbol("__branch_", label),
+                          _gs, length(gates), cw, _ssa_operands(term),
+                          _ws, wa.next_wire - 1))
+                end
+                branch_info[label] = (cw, term.true_label, term.false_label)
+                push!(get!(preds, term.true_label, Symbol[]), label)
+                push!(get!(preds, term.false_label, Symbol[]), label)
+            end
+        elseif term isa IRBranch
+            if !(label in loop_headers)
+                push!(get!(preds, term.true_label, Symbol[]), label)
+            end
+        end
+    end
+
+    output_wires = if length(ret_values) == 1
+        ret_values[1][1]
+    else
+        _ws = wa.next_wire
+        _gs = length(gates) + 1
+        result = resolve_phi_predicated!(gates, wa, collect(ret_values), block_pred,
+                                         parsed.ret_width; branch_info)
+        if length(gates) >= _gs
+            push!(gate_groups, GateGroup(:__multi_ret_merge,
+                  _gs, length(gates), result, Symbol[], _ws, wa.next_wire - 1))
+        end
+        result
+    end
+
+    # Bennett-h0ai: build the LR with self_reversing initially false, then
+    # let `_infer_self_reversing` decide whether to promote. We MUST infer
+    # BEFORE `_fold_constants` because folding clears `gate_groups` (the
+    # producer-tags live there) and itself short-circuits on
+    # `lr.self_reversing == true`.
+    lr = LoweringResult(gates, wire_count(wa), input_wires, output_wires,
+                         input_widths, parsed.ret_elem_widths,
+                         gate_groups, false, loop_guards)
+
+    if auto_self_reversing
+        # The entry-block predicate NOTGate (driver.jl:104) leaves `pw[1]=1`
+        # at the end of the forward pass — that's the only "expected dirty"
+        # wire at the LR level. Pull its allowlist from `block_pred[order[1]]`.
+        # Bennett-s0tn: a function with a data-dependent loop always branches,
+        # so `_infer_self_reversing` already returns false for it; loop_guards
+        # is threaded through here defensively for the (impossible) promote.
+        trusted = get(block_pred, order[1], Int[])
+        if _infer_self_reversing(lr, trusted)
+            lr = LoweringResult(lr.gates, lr.n_wires, lr.input_wires,
+                                 lr.output_wires, lr.input_widths,
+                                 lr.output_elem_widths, lr.gate_groups, true,
+                                 lr.loop_guards)
+        end
+    end
+
+    if fold_constants
+        lr = _fold_constants(lr)
+    end
+
+    return lr
+end
+
+"""
+Constant folding pass: propagate known wire values through the gate list,
+eliminating gates whose controls are all constant and simplifying partially-
+constant gates.
+
+Single abstract-interpretation pass over `known::Dict{Int,Bool}` (per non-input
+wire's compile-time-constant value). Three operator-dispatch arms — `NOTGate`
+(flip-then-materialize), `CNOTGate` (constant-control collapses or pass-through),
+`ToffoliGate` (one-known-false noop / both-known-true target flip /
+one-known-true reduce-to-CNOT). Per Bennett-heup / U127, the "three concerns"
+framing in reviews/2026-04-21/12_torvalds.md B10 + 13_carmack.md F8 was
+empirically a single concern (constant propagation through reversible gates)
+with three operator cases; splitting would duplicate state-update logic.
+
+Default wired to `true` since Bennett-epwy / U28 (2026-04-24): the pass is
+strictly safe (only removes / simplifies gates, never adds). Empirical wins
+on the canonical benchmarks (live 2026-04-27, post-5qrn peephole layer):
+- polynomial `x*x + 3x + 1`  total 848 → 482; Toffoli 352 → 168
+- `x*x Int8`                 Toffoli 296 → 144; depth 97 → 89
+- `x*3 Int8` (optimize=false) gates ≥ 3× without folding
+
+Contracts pinned by `test/test_heup_fold_constants_contract.jl` (539
+assertions): per-arm dispatch witnesses, default-true at every entry point,
+self_reversing short-circuit (per Bennett-egu6 / U03), and reduction baselines.
+"""
+function _fold_constants(lr::LoweringResult)
+    # U03 / Bennett-egu6: a self-reversing primitive (e.g. Sun-Borissov
+    # mul, tabulate) is a closed sequence whose output lives on primary
+    # output wires and whose ancillae are already clean. Folding across
+    # it would rewrite the gate list and almost certainly break the
+    # self-uncomputing property. Skip it.
+    lr.self_reversing && return lr
+    input_set = Set(lr.input_wires)
+    # Initialize known values: all non-input wires start at 0
+    known = Dict{Int, Bool}()
+    for w in 1:lr.n_wires
+        w in input_set && continue
+        known[w] = false
+    end
+
+    folded = ReversibleGate[]
+    for gate in lr.gates
+        if gate isa NOTGate
+            if haskey(known, gate.target)
+                known[gate.target] = !known[gate.target]
+                # Don't emit — will be materialized at end if needed
+            else
+                push!(folded, gate)
+            end
+        elseif gate isa CNOTGate
+            c_known = haskey(known, gate.control)
+            t_known = haskey(known, gate.target)
+            if c_known && known[gate.control] == false
+                # XOR with 0 = noop
+            elseif c_known && known[gate.control] == true
+                # XOR with 1 = NOT target
+                if t_known
+                    known[gate.target] = !known[gate.target]
+                else
+                    push!(folded, NOTGate(gate.target))
+                end
+            else
+                # Control is data-dependent — target becomes unknown
+                if t_known
+                    # Must materialize target's current known value first
+                    if known[gate.target]
+                        push!(folded, NOTGate(gate.target))
+                    end
+                    delete!(known, gate.target)
+                end
+                push!(folded, gate)
+            end
+        elseif gate isa ToffoliGate
+            c1_known = haskey(known, gate.control1)
+            c2_known = haskey(known, gate.control2)
+            t_known = haskey(known, gate.target)
+
+            c1_val = c1_known ? known[gate.control1] : nothing
+            c2_val = c2_known ? known[gate.control2] : nothing
+
+            if (c1_val === false) || (c2_val === false)
+                # At least one control is known-false → gate is noop
+            elseif c1_val === true && c2_val === true
+                # Both controls true → target ^= 1
+                if t_known
+                    known[gate.target] = !known[gate.target]
+                else
+                    push!(folded, NOTGate(gate.target))
+                end
+            elseif c1_val === true
+                # Reduce to CNOT(c2, target)
+                if t_known
+                    if known[gate.target]; push!(folded, NOTGate(gate.target)); end
+                    delete!(known, gate.target)
+                end
+                push!(folded, CNOTGate(gate.control2, gate.target))
+            elseif c2_val === true
+                # Reduce to CNOT(c1, target)
+                if t_known
+                    if known[gate.target]; push!(folded, NOTGate(gate.target)); end
+                    delete!(known, gate.target)
+                end
+                push!(folded, CNOTGate(gate.control1, gate.target))
+            else
+                # Both controls unknown — emit as-is, target becomes unknown
+                if t_known
+                    if known[gate.target]; push!(folded, NOTGate(gate.target)); end
+                    delete!(known, gate.target)
+                end
+                push!(folded, gate)
+            end
+        end
+    end
+
+    # Materialize remaining known non-zero values
+    for (w, v) in known
+        if v
+            push!(folded, NOTGate(w))
+        end
+    end
+
+    # Rebuild gate groups (invalidated by folding — clear them).
+    # Bennett-s0tn: `_fold_constants` does NOT renumber wires (only deletes
+    # / simplifies gates; n_wires preserved), so the convergence wire
+    # indices in `loop_guards` stay valid — thread them through unchanged.
+    return LoweringResult(folded, lr.n_wires, lr.input_wires, lr.output_wires,
+                          lr.input_widths, lr.output_elem_widths,
+                          GateGroup[], false, lr.loop_guards)
+end
+
+# Bennett-x2iw / U88: optional state bundled in `opts::BlockLoweringOpts`.
+# Per-function caller-owned memory (alloca_info, ptr_provenance,
+# block_pred, gate_groups, inst_counter) lives in opts; every block call
+# in the same function shares one opts so allocas/provenance accumulate
+# across blocks. mux_counter stays block-local on the LoweringCtx —
+# synthetic SSA names embed inst.dest / inst.ptr.name as a globally-
+# unique hint, so per-block reset doesn't collide.
+function lower_block_insts!(gates, wa, vw, block, preds, branch_info, block_order;
+                           opts::BlockLoweringOpts = BlockLoweringOpts())
+    ctx = LoweringCtx(gates, wa, vw, preds, branch_info, block_order,
+                      opts.block_pred, opts.ssa_liveness, opts.inst_counter,
+                      opts.compact_calls, opts.alloca_info, opts.ptr_provenance,
+                      Ref(0), opts.globals, opts.add, opts.mul, opts.entry_label,
+                      Ref(false),   # Bennett-h0ai producer-tag side-channel
+                      # Bennett-z2dj / T5-P6 (Step 2): persistent_tree dispatcher
+                      opts.mem, opts.persistent_impl, opts.hashcons,
+                      opts.persistent_info,
+                      opts.loop_guards)   # Bennett-s0tn loop-guard accumulator
+    for inst in block.instructions
+        opts.inst_counter[] += 1
+        _ws = wa.next_wire
+        _gs = length(gates) + 1
+        ctx.last_inst_self_reversing[] = false   # reset before each dispatch
+
+        _lower_inst!(ctx, inst, block.label)
+
+        _ge = length(gates)
+        if _ge >= _gs && hasproperty(inst, :dest)
+            push!(opts.gate_groups, GateGroup(inst.dest, _gs, _ge,
+                  copy(get(vw, inst.dest, Int[])), _ssa_operands(inst),
+                  _ws, wa.next_wire - 1, Int[],
+                  ctx.last_inst_self_reversing[]))   # Bennett-h0ai
+        end
+    end
+end
+

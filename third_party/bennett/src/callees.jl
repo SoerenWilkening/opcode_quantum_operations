@@ -1,0 +1,147 @@
+# ---- Soft-float / memory callee registration (Bennett-19g6 extracted from Bennett.jl) ----
+#
+# Bennett-kmuj / U106: callees are grouped by domain into named tuples
+# so the registration loop is one declarative pass instead of 45 ad-hoc
+# `register_callee!` lines. Adding a new callee = append it to the
+# matching group; the loop registers it on module load.
+
+# Integer division / remainder (called by `lower_binop!` for udiv/sdiv/urem/srem).
+# Per Bennett-salb / U119, the registered callees are the throw-free `_compile`
+# variants — the public `soft_udiv` / `soft_urem` raise DivideError on b=0,
+# which would emit an external @ijl_throw that lower_call! cannot extract.
+const _CALLEES_INTEGER_DIV = (
+    _soft_udiv_compile, _soft_urem_compile,
+)
+
+# IEEE 754 binary 64-bit arithmetic.
+const _CALLEES_FP_BINARY = (
+    soft_fadd, soft_fsub, soft_fmul, soft_fdiv, soft_fma,
+)
+
+# IEEE 754 unary / sqrt (sign flip + square root).
+const _CALLEES_FP_UNARY = (
+    soft_fneg, soft_fsqrt,
+)
+
+# IEEE 754 rounding to integral (no precision loss; result still binary64).
+# Bennett-mq6f: `soft_round_away` (round-half-AWAY-from-zero, ≡ `llvm.round`)
+# is the LLVM-distinct sibling of `soft_round` (banker's ties-to-even,
+# ≡ `llvm.roundeven`). Both are registered so raw `.ll` ingest of either
+# intrinsic resolves cleanly; SoftFloat-typed `Base.round(::SoftFloat)`
+# routes to `soft_round` (matches Julia's hardware default).
+const _CALLEES_FP_ROUND = (
+    soft_floor, soft_ceil, soft_trunc, soft_round, soft_round_away,
+)
+
+# IEEE 754 binary min/max. Bennett-k2w6: two semantic pairs — `soft_fmin`
+# / `soft_fmax` are NaN-absorbing (≡ llvm.minnum / llvm.maxnum / IEEE 754
+# minNum/maxNum); `soft_fminimum` / `soft_fmaximum` are NaN-propagating
+# (≡ llvm.minimum / llvm.maximum / IEEE 754-2008 minimum/maximum, also
+# matches Julia Base.min/max bit-exactly).
+# Bennett-p19b: third semantic pair `soft_minimumnum` / `soft_maximumnum`
+# (≡ llvm.minimumnum / llvm.maximumnum / IEEE 754-2019 minimumNumber/
+# maximumNumber, LLVM 19+) — NaN-absorbing with the ±0 tie-break
+# specified rather than unspecified. Bit-identical to `soft_fmin` /
+# `soft_fmax` (which already chose the specified ±0 behavior); aliased
+# at the soft-float layer so the callee registry resolves the distinct
+# LLVM intrinsic names.
+const _CALLEES_FP_MINMAX = (
+    soft_fmin, soft_fmax, soft_fminimum, soft_fmaximum,
+    soft_minimumnum, soft_maximumnum,
+)
+
+# IEEE 754 comparison (returns i1). Bennett-d77b / U132: 6 new primitives
+# (ord, uno, one, ueq, ult, ule) complete the LLVM fcmp predicate table.
+# Combined with operand-swap dispatch in ir_extract.jl for ogt/oge/ugt/uge,
+# every LLVM fcmp predicate routes to a callee.
+const _CALLEES_FP_CMP = (
+    soft_fcmp_olt, soft_fcmp_oeq, soft_fcmp_ole, soft_fcmp_une,
+    soft_fcmp_ord, soft_fcmp_uno, soft_fcmp_one,
+    soft_fcmp_ueq, soft_fcmp_ult, soft_fcmp_ule,
+)
+
+# IEEE 754 width / signedness conversions.
+const _CALLEES_FP_CONV = (
+    soft_fpext, soft_fptrunc, soft_fptosi, soft_fptoui, soft_sitofp,
+)
+
+# IEEE 754 transcendentals (musl-derived branchless + Julia-idiom variants).
+const _CALLEES_FP_TRANS = (
+    soft_exp, soft_exp2,
+    soft_exp_fast, soft_exp2_fast,
+    soft_exp_julia, soft_exp2_julia,
+    soft_log, soft_log2, soft_log10,
+    soft_pow, soft_powi, soft_pow_julia,
+    soft_sin, soft_cos, soft_tan,
+    soft_atan, soft_atan2, soft_asin, soft_acos,
+    soft_tanh, soft_sinh, soft_cosh, soft_asinh, soft_acosh, soft_atanh,
+    soft_log1p, soft_expm1,
+)
+
+# Reversible mutable memory — MUX EXCH load/store (Bennett-cc0 M1, N·W ≤ 64).
+# Hand-written (4,8)/(8,8)/(2,8)/(2,16)/(4,16)/(2,32) plus
+# @eval-generated (3,8)/(5,8)/(6,8)/(7,8)/(3,16) — Bennett-nj6c filled the
+# remaining gaps in the N·W ≤ 64 lattice (2026-05-01, dnh phase 1a).
+const _CALLEES_MUX_EXCH = (
+    soft_mux_load_2x8,  soft_mux_store_2x8,
+    soft_mux_load_3x8,  soft_mux_store_3x8,
+    soft_mux_load_4x8,  soft_mux_store_4x8,
+    soft_mux_load_5x8,  soft_mux_store_5x8,
+    soft_mux_load_6x8,  soft_mux_store_6x8,
+    soft_mux_load_7x8,  soft_mux_store_7x8,
+    soft_mux_load_8x8,  soft_mux_store_8x8,
+    soft_mux_load_2x16, soft_mux_store_2x16,
+    soft_mux_load_3x16, soft_mux_store_3x16,
+    soft_mux_load_4x16, soft_mux_store_4x16,
+    soft_mux_load_2x32, soft_mux_store_2x32,
+)
+
+# Reversible mutable memory — path-predicate-guarded MUX stores
+# (Bennett-cc0 M2d / bucket C3) for stores in non-entry blocks.
+# Bennett-nj6c (2026-05-01) added (3,8)/(5,8)/(6,8)/(7,8)/(3,16).
+const _CALLEES_MUX_EXCH_GUARDED = (
+    soft_mux_store_guarded_2x8,
+    soft_mux_store_guarded_3x8,
+    soft_mux_store_guarded_4x8,
+    soft_mux_store_guarded_5x8,
+    soft_mux_store_guarded_6x8,
+    soft_mux_store_guarded_7x8,
+    soft_mux_store_guarded_8x8,
+    soft_mux_store_guarded_2x16,
+    soft_mux_store_guarded_3x16,
+    soft_mux_store_guarded_4x16,
+    soft_mux_store_guarded_2x32,
+)
+
+# Bennett-z2dj T5-P6: persistent-map callees for the :persistent_tree
+# alloca-strategy arm. `pmap_new` is NOT registered — its all-zero output is
+# reached for free via WireAllocator's zero invariant (consensus §3+§4).
+# Bennett-6883 (2026-05-18): :okasaki arm wired in.
+# Bennett-d746 (2026-05-20): :hamt arm wired in.
+# Bennett-qi6c (2026-05-20): :cf arm wired in — last of the four
+# persistent_impl candidates. `cf_reroot` is NOT registered: it is an
+# isolated documentation/test helper, never IRCall'd from the dispatcher
+# path (cf_pmap_get does its own O(max_n) Arr scan; the Diff-chain
+# unwind is handled by Bennett's reverse pass, not by an explicit
+# cf_reroot call). See src/persistent/research/cf_semi_persistent.jl
+# §"CORRESPONDENCE EVALUATION".
+const _CALLEES_PERSISTENT = (
+    linear_scan_pmap_set, linear_scan_pmap_get,
+    okasaki_pmap_set, okasaki_pmap_get,
+    hamt_pmap_set, hamt_pmap_get,
+    cf_pmap_set, cf_pmap_get,
+)
+
+# Single source of truth: every group above is registered exactly once.
+const _CALLEE_GROUPS = (
+    _CALLEES_INTEGER_DIV,
+    _CALLEES_FP_BINARY, _CALLEES_FP_UNARY, _CALLEES_FP_ROUND,
+    _CALLEES_FP_MINMAX,
+    _CALLEES_FP_CMP, _CALLEES_FP_CONV, _CALLEES_FP_TRANS,
+    _CALLEES_MUX_EXCH, _CALLEES_MUX_EXCH_GUARDED,
+    _CALLEES_PERSISTENT,
+)
+
+for group in _CALLEE_GROUPS, f in group
+    register_callee!(f)
+end
