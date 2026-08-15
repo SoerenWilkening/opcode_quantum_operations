@@ -93,6 +93,8 @@ add_library(cqops STATIC
     src/reg.c           # M07, Step 7 — handle table, tombstones, I2, D7a/D7b
     src/scratch.c       # M08, Step 8 — the scratch cq_bit array (no qubits)
     src/sandwich.c      # M09, Step 8 — the driver, I6(a)+(b), the epilogue
+    src/sink_printf.c   # M23, Step 9 — the default sink, one line per gate
+    src/sink_count.c    # M24, Step 9 — per-kind totals, T-count = 7×Toffoli
 )
 
 target_include_directories(cqops

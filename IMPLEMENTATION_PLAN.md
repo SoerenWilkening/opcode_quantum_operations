@@ -656,8 +656,8 @@ it grows.
 |---|---|---|---|
 | M21 | `angle.[ch]` | 80 | Pure classification of θ against §7's rows, tolerance configurable. Exhaustively testable, zero dependencies |
 | M22 | `rotate.[ch]` | 150 | §7 Ry/Rz per bit, the θ≡π asymmetry, measurement |
-| M23 | `sink_printf.c` | 70 | Default; CQ_lang's golden-trace format |
-| M24 | `sink_count.c` | 100 | Per-kind totals, peak live qubits, T-count = 7×Toffoli |
+| M23 | `sink_printf.c` | 70 | Default; CQ_lang's golden-trace **convention**, not its lines — the goldens are handle-level and a sink sees only qubit indices. `x`/`cx`/`ccx`/`ry`/`rz`/`mz`, operands `q<N>`, `%a` angles, flush per line. See the PRD §8 correction |
+| M24 | `sink_count.c` | 100 | Per-kind totals, T-count = 7×Toffoli. **NOT peak qubits** — Bennett's `peak_live_wires` is a simulator (Rule 13) and `cq_qubits_peak()` in M03 already has the number exactly. `total` = x+cx+ccx only. See the PRD §8 correction |
 | M25 | `sink_qec.c` | 100 | Conditional on `C_quantum_error_correction`; Ry/Rz stubbed per §7 |
 
 ### Layer 5 — shim
@@ -688,7 +688,7 @@ proceed). PRD increment mapping in the right column.
 | 6 | **`test_emit_fold.c` — L0, exhaustive.** Target/control ∈ {const-0, const-1, Q known-0, Q known-1, Q unknown}: `5 X + 25 CX + 125 CCX` = **155** cases, the full Cartesian product. Each pins **gates emitted, qubits allocated, resulting bit-kind, and shadow** — four *assertions* per case, not four cases. Plus **4** distinctness death-tests: `c == t` (CX) and `c1 == c2`, `c1 == t`, `c2 == t` (CCX). Each death-test needs **Q** operands, since the assert compares qubit indices and cannot fire on constants | M05 | **159/159** (155 + 4). This is the most important suite in the project — everything above it is Bennett transcribed against these three functions | 1 |
 | 7 | `test_reg.c` + `test_reg_invariants.inc` + `test_reg_death.c` — handles monotonic, never reused (D5); tombstones; I4 (all-constant register owns zero qubits); free of a dirty rail is a hard error **in M07, not merely somewhere**; I2 owner map catches a double-owned qubit; **D7a aborts and D7b deliberately does not** | M07 | **DONE** — 45 ctest green both configurations + ASan/UBSan | 1 |
 | 8 | `test_scratch.c`, `test_sandwich.c` — driver runs compute forwards, copyout, compute backwards; a synthetic step function's recorded stream is a **palindrome around the copyout**; I6 violation (target outside scratch) is caught in Debug | M08, M09 | All green | 1 |
-| 9 | `test_sink_printf.c`, `test_sink_count.c` — trace format matches CQ_lang's goldens; counter totals match the mock sink's stream | M23, M24 | **PRD Increment 1 complete** | 1 |
+| 9 | `test_sink_printf.c`, `test_sink_count.c` — the trace format is line-exact and its angles round-trip bit-exactly; counter totals match the mock sink's stream. **The gate as written was unsatisfiable and is corrected:** "matches CQ_lang's goldens" cannot hold, because all 239 goldens are handle-level and contain no gate lines at all — what M23 matches is the *convention* (PRD §8) | M23, M24 | **DONE** — 69 ctest green both configurations, 22/22 mutants killed. PRD Increment 1 complete | 1 |
 
 ### Phase B — kernels *(M10–M20 are independent after Step 9; build in any order or in parallel)*
 
@@ -743,7 +743,7 @@ parameter in the kernel test driver, not twelve new suites.
 | 22 | `test_gen_shim.py` — generator round-trips the real `opcode_table.yaml`; **emitted symbol count reconciles with Step 0.5**; every fp symbol gets a named abort body | M27 | Generator green | 8 |
 | 23 | `test_runtime.c` — the PRD §2.1 families: `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled[_inv]`, `cqrt_cswap` (constant ctrl = **0 gates**; quantum ctrl = Fredkin per bit) | M26, M28 | Full grid links; `nm` shows no undefined `cq_template_*` **from the opcode grid**. The 401 intrinsic/libm symbols come from CQ_lang's own archives and are deliberately *not* ours (PRD §1) — an unqualified "no undefined `cq_template_*`" cannot pass | 8 |
 | 24 | **L6** — link against CQ_lang's existing fixtures, diff emitted traces | — | Traces match | 8 |
-| 25 | **L7** — Grover per PRD §12. (a) compiles through `cqc`, links, emits a gate stream; (b) **classical mode**: `M_PI/2 → M_PI` runs deterministically and `cq_measure` returns what plain C computes; (c) counter sink reports Toffoli count, T-count, peak qubits, stable across runs and pinned | — | **v1 done** | 8 |
+| 25 | **L7** — Grover per PRD §12. (a) compiles through `cqc`, links, emits a gate stream; (b) **classical mode**: `M_PI/2 → M_PI` runs deterministically and `cq_measure` returns what plain C computes; (c) counter sink reports Toffoli count and T-count, **peak qubits from `cq_qubits_peak()` rather than from the sink** (PRD §8 correction), stable across runs and pinned | — | **v1 done** | 8 |
 
 ### Phase E — optional
 

@@ -26,10 +26,10 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
 > | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **Steps 1–8 have landed (2026-08-15): Layer 0, the emitter, the handle table
-> and the sandwich.** On disk and passing under **both** configurations,
-> **67 ctest tests** — and green again under a full ASan + UBSan build with
-> Homebrew clang:
+> **Steps 1–9 have landed (2026-08-15): Layer 0, the emitter, the handle table,
+> the sandwich, and both v1 sinks. PRD increment 1 is complete.** On disk and
+> passing under **both** configurations, **69 ctest tests** — and green again
+> under a full ASan + UBSan build with Homebrew clang:
 >
 > | Step | Module | Files | LOC / budget |
 > |---|---|---|---|
@@ -42,6 +42,8 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 7 | **M07** | `src/reg.[ch]` — handle table, tombstones, the sole deallocator, the I2 sweep, D7a/D7b | **283 / 180** — see below |
 > | 8 | **M08** | `src/scratch.[ch]` — the `cq_bit` array, no `cq_ctx` in the header, no release | 56 / 90 |
 > | 8 | **M09** | `src/sandwich.[ch]` — the driver, I6(a)+(b), `CQ_ZERO_BY_PALINDROME` — plus `cq_shadow_retire` (M02) and `cq_ctx_release_qubit` | 115 / 110 |
+> | 9 | **M23** | `src/sink_printf.[ch]` — the default sink, the §8 convention, `%a`, flush per line | 68 / 70 |
+> | 9 | **M24** | `src/sink_count.[ch]` — per-kind totals, T-count; **no qubit metric** | 84 / 100 |
 >
 > **The fold table has landed and is green at 159/159** (155 exhaustive + 4 distinctness
 > deaths), so the critical path is behind us. `cq_ctx` now exists: pool + shadow + a
@@ -67,9 +69,24 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > `cq_scratch_alloc`'s Debug `0xAA` poison, an equivalent mutant in isolation whose
 > value is proved by the paired mutation (see below).
 >
-> **Next is Step 9 — M23 `sink_printf` + M24 `sink_count`,** which completes PRD
-> increment 1. Still a plan: no kernel and no controlled axis (M06 is Step 20, not
-> Step 8, despite its low module number).
+> **Both sinks have landed and PRD increment 1 is complete. 22 mutations run
+> across M23 and M24, 22 killed, no survivors** — but read the mutation-harness
+> warning in the callouts below before running your own battery, because the first
+> run of this one was *invalid* and looked fine.
+>
+> **Step 9 found two documented requirements that were not satisfiable as written,
+> and both were corrected in the PRD rather than worked around in code.** (i) M23
+> cannot match "CQ_lang's golden-trace format": all 239 goldens are *handle*-level
+> `cqrt_*(hN)` call traces and a sink is handed only a `uint32_t` qubit index — so
+> what M23 borrows is the lexical *convention*, and its content is its own.
+> (ii) M24 cannot report "peak live qubits": Bennett's `peak_live_wires` is a
+> simulator (Rule 13) and `cq_qubits_peak()` in M03 already has the number exactly.
+> Full statements in PRD §8.
+>
+> **Next is Step 10 — K1 xor, K2 and, K3 or (M10 `kernels/bitwise.c`).** Kernels
+> M10–M20 are independent of each other and parallelisable from here. Still a plan:
+> no kernel and no controlled axis (M06 is Step 20, not Step 8, despite its low
+> module number).
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -376,6 +393,26 @@ constant*, never zero. The discriminator is `birth-value == 0`, and the fix need
 corrective `X`s driven from the mint record — which is **not** D6, since the value comes
 from the `alloc` literal, not from shadow precision. Decide **before Step 19**.
 
+**`590` — Step 24's oracle is unspecified: NORTH_STAR says "link and run", the plan
+says "traces match", and the goldens belong to a stub we replace. Bites Step 24.**
+Filed at Step 9. **This is NOT a question about which stream M23 writes to** — an
+earlier framing of this bead said so and was wrong, on a false premise worth naming
+because it is easy to re-acquire: that M26 must reprint CQ_lang's `cqrt_*` trace lines.
+Nothing says it must. `CQ_lang/runtime/cq_runtime.c` calls itself a **"trace-only
+runtime stub"**, its 239 goldens are CQ_lang's regression oracle for CQ_lang's own IR
+pass captured against that placeholder, and NORTH_STAR's finish-line condition 1 has
+the placeholders **gone** with the fixtures only required to "link against `libcqops`
+and run". Once the real backend is linked, nothing in the process emits those bytes.
+
+What is genuinely open: CQ_lang's runner is `"$TMP/slice" | diff -u - "$GOLDEN"`
+(`run_slice.sh:83`), diffing the binary's **entire stdout**, so it cannot be the Step 24
+runner unchanged — and IMPLEMENTATION_PLAN's "diff emitted traces / **Traces match**"
+names no oracle now that the stub's output is not one. NORTH_STAR condition 1 and the
+plan's Step 24 row are not the same criterion, and **the plan's row is the one to fix**.
+Candidates in the bead. M23's default stays **stdout** — that is ordinary library
+behaviour, not a concession — and `cq_sink_printf(FILE *)` lets any caller redirect in
+one line.
+
 **Smaller, filed** — `ckd.13` K12's quadratic ancilla scheme (32,960 qubits at W=64);
 `ckd.15` K10's three sources vs Rule 7's two; `ckd.16` M11/M12 shift-out-of-range disagreement.
 
@@ -585,13 +622,58 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   M08 owns the `cq_bit` array and its dispose asserts every bit is back to `CQ_BIT_ZERO`
   — a **kind** check, never a shadow read. That is what plan §3's "assert clean on
   release" actually becomes, and unlike a shadow reading it is implementable.
-- **Layers 0–2 exist; Layer 3 and above do not.** `src/bit.h`, `src/shadow.[ch]`,
-  `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]`, `src/emit.[ch]`, `src/reg.[ch]`,
-  `src/scratch.[ch]` and `src/sandwich.[ch]` are real as of Step 8 — but there is **no
-  kernel**, no sink beyond the vtable (M23–M25 are Step 9 and Phase D), and **no
-  controlled axis** (M06 is Step 20, despite its low module number). Check before you
-  cite — and read `third_party/bennett/COMMIT` rather than running `git log` inside it,
-  which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **Layers 0–2 exist, plus two of Layer 4's sinks; Layer 3 does not.** `src/bit.h`,
+  `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]`,
+  `src/emit.[ch]`, `src/reg.[ch]`, `src/scratch.[ch]`, `src/sandwich.[ch]`,
+  `src/sink_printf.[ch]` and `src/sink_count.[ch]` are real as of Step 9 — but there
+  is **no kernel** (M10–M20 are Phase B), no `sink_qec` (M25 is Step 26), no angle or
+  rotation module (M21/M22), and **no controlled axis** (M06 is Step 20, despite its
+  low module number). Check before you cite — and read `third_party/bennett/COMMIT`
+  rather than running `git log` inside it, which reports the *parent* repo's HEAD
+  because the snapshot has no `.git`.
+
+- **A MUTATION HARNESS THAT RESTORES WITH `mv` SILENTLY POISONS EVERY LATER MUTANT,
+  and Step 9 measured it.** `cp -f f f.bak` … `mv -f f.bak f` restores the *backup's*
+  mtime, which is older than the object built from the mutant — so `make` sees the
+  target as up to date and **the mutation stays in the binary**. The first Step 9
+  battery reported 20/20 killed while `src/sink_printf.c`'s object still carried
+  mutant M23-10, and the tell was subtle: `sink_count.c` mutations were "killed" by a
+  *printf* suite case. Restore with `cp` + `touch`, and re-check that the baseline is
+  green **before every mutant** — a battery that cannot detect its own leak reports
+  the leak as coverage. Same lesson as the guard-called-three-times finding, one level
+  up: the instrument needs its own instrument.
+
+- **OUR COUPLING TO CQ_LANG IS THE FROZEN `cqrt_*` ABI, AND NOTHING ELSE — not its
+  trace format, not its test harness.** libcqops is a linkable C library; CQ_lang is
+  one caller of it. `CQ_lang/runtime/cq_runtime.c` opens with "trace-only runtime
+  stub", and its 239 `.expected.log` goldens are CQ_lang's regression oracle for
+  CQ_lang's *own IR pass*, captured against that placeholder. They are **not** a
+  specification of our output, and NORTH_STAR's finish-line condition 1 agrees: the
+  placeholders are *gone* and the fixtures "link against `libcqops` and run". Do not
+  design a libcqops module around what CQ_lang's harness happens to diff.
+
+- **M23 prints `x`/`cx`/`ccx`, NOT `cqrt_x`/`cqrt_cnot`/`cqrt_toffoli`, and operands
+  are `q<N>` not `h<N>`.** CQ_lang's goldens are handle-level traces of the calls
+  coming *into* us; our gate stream is one level below and answers to us. `h<N>` is
+  unavailable anyway — a sink is handed a raw index and never sees a handle — and
+  would be a lie if it were available, because handles are monotonic and never reused
+  (D5) while qubit indices are recycled through the LIFO free list (D4). Angles print
+  with `%a` because angles are compared **bitwise** everywhere in this project and
+  `%a` is the only format that round-trips every finite double, subnormals included
+  (it does collapse all NaN encodings to bare `nan` — measured, and inherited).
+
+- **M24 HAS NO QUBIT METRIC, AND ADDING ONE IS A REGRESSION.** Plan §3's M24 row used
+  to say "peak live qubits"; it cannot and need not. Bennett's `peak_live_wires`
+  simulates (Rule 13 forbids one *anywhere*) and measures the all-zero-input run,
+  which is meaningless once operands are `CQ_BIT_ONE` or superposed; `ancilla_count`
+  is a property of a circuit object we do not hold. `cq_qubits_peak()` has had the
+  number exactly since Step 4 — `peak == minted`. The tempting sink-side substitute,
+  `max operand index + 1`, is a **lower bound**, because `cq_materialise` emits no
+  gate for a constant 0 and I6(b) pre-materialises scratch from `BIT_ZERO`, so a qubit
+  can be allocated, held and released without ever appearing in a gate. Likewise
+  `cq_count_total` is `x + cx + ccx` **only** — Bennett circuits contain no `Ry`/`Rz`/`Mz`,
+  so folding them in breaks the baseline comparison the sink exists for, and breaks it
+  only once §7 fires, long after the goldens are pinned.
 - **THE SAME GUARD CALLED THREE TIMES IS ONE MUTATION AWAY FROM UNTESTED, and Step 8
   measured it.** `cq_sandwich` verifies its region fingerprint after each of its three
   loops. With the obvious two death cases in place, deleting **any one of the three**
@@ -820,7 +902,7 @@ check, do not assume, and update this table when a step lands):
 | 1 — emission | **M05 `emit`** (the fold table — Rule 11) · M06 `controlled` |
 | 2 — registers, sandwich | **M07 `reg`** · **M08 `scratch`** · **M09 `sandwich`** |
 | 3 — kernels | M10 `bitwise` · M11 `shift_const` · M12 `shift_var` · M13 `cast` · M14 `add` · M15 `addacc` · M16 `cmp` · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |
-| 4 — analog, sinks | M21 `angle` · M22 `rotate` · M23 `sink_printf` · M24 `sink_count` · M25 `sink_qec` |
+| 4 — analog, sinks | M21 `angle` · M22 `rotate` · **M23 `sink_printf`** · **M24 `sink_count`** · M25 `sink_qec` |
 | 5 — shim | M26 `cq_runtime_impl.c` · M27 `gen_shim.py` · M28 generated `*.gen.c` (LOC-exempt) |
 
 Hand-written total ≈ **3,400 LOC** across 27 modules. Kernels M10–M20 are independent

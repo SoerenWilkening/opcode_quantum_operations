@@ -39,6 +39,10 @@ add_cqops_test(test_reg)          # M07, Step 7 — D5, tombstones, I4, D7a/D7b
 add_cqops_test(test_scratch)      # M08, Step 8 — the cq_bit array, no qubits
 add_cqops_test(test_sandwich)     # M09, Step 8 — the palindrome, I6(a)+(b)
 
+## Layer 4 — sinks. M25 sink_qec is Step 26, against C_quantum_error_correction.
+add_cqops_test(test_sink_printf)  # M23, Step 9 — the §8 format, %a, the flush
+add_cqops_test(test_sink_count)   # M24, Step 9 — per-kind totals, T-count
+
 ## Fail-loud paths. NOT WILL_FAIL — that inverts a non-zero exit code and does
 ## not invert a crash, so it cannot express "this abort()s" at all; see
 ## tests/support/death.h.

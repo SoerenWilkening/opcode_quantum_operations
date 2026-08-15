@@ -538,13 +538,106 @@ typedef struct {
 } cq_sink;
 ```
 
-v1 ships three: **printf** (default; one line per gate, the format CQ_lang's golden
-traces already use), **counter** (per-kind totals + peak live qubits, matching
-`gate_count` / `ancilla_count` in Bennett.jl so baselines are directly comparable), and
+v1 ships three: **printf** (default; one line per gate, in the *lexical convention*
+CQ_lang's golden traces use — see the correction below), **counter** (per-kind totals
+and T-count, matching `gate_count` / `t_count` in Bennett.jl so baselines are directly
+comparable), and
 **qec** (compiled only when `C_quantum_error_correction` is present; `qec_x`, `qec_cx`,
 `qec_ccx`, `qec_mz`, `Ry`/`Rz` stubbed). Selected at runtime via
 `cqops_set_sink()`; the default is chosen by environment variable so CQ_lang's existing
 fixtures need no changes.
+
+> **Two corrections, made at Step 9 when the two sinks were built. Both sentences
+> above were wrong as originally written, in ways that would have produced a
+> confident wrong number.**
+>
+> **(1) "The format CQ_lang's golden traces already use" can only mean the lexical
+> CONVENTION, never the lines.** CQ_lang's 239 goldens are HANDLE-level runtime
+> call traces — `cqrt_cnot(h1, h3)`, `cq_template_add_i32_hl(h6, -6) -> h7` — and
+> contain zero gate-level lines. Those calls come *into* us; what goes *out* is one
+> level below. A `cq_sink` is handed a raw `uint32_t` qubit index and a `double`
+> and never sees a handle, a width or a symbol name (§8's vtable is the whole of
+> its input), so it could not print a golden line if we wanted it to. What M23
+> borrows is the convention: lowercase op name, `(`, operands separated by `", "`,
+> `)`, **no** `->` (that arrow exists only to carry a return value, and all six
+> entries are `void`), newline, flush per line, `%a` for angles. What it supplies
+> is its own content — op names spelled exactly like the vtable entries they come
+> from (`x`, `cx`, `ccx`, `ry`, `rz`, `mz`) and operands `q<N>`, because a qubit
+> index is **not** a handle: handles are monotonic and never reused (D5) while
+> qubit indices are recycled through the LIFO free list (D4), so `h<N>` would
+> assert an identity that is false and would collide with M26's own numbering.
+>
+> `%a` is load-bearing rather than stylistic: angles are compared **bitwise**
+> throughout this project — `0.0` and `-0.0` are equal in C and are different gates
+> to emit — and `%a` is exact and round-trips through `strtod` for every double,
+> subnormals included. `%f` and `%g` do not.
+>
+> **(2) The counter sink does NOT report peak qubits, and never could.** Bennett's
+> `peak_live_wires` is a **simulation**: it walks a `Vector{Bool}` sized to the
+> circuit, applies every gate and counts simultaneously non-zero wires
+> (`diagnostics.jl:206-220`). Rule 13 forbids a simulator *anywhere*. It is also
+> ill-defined for us even setting that aside — it measures the all-zero-input run
+> (`bits = zeros(Bool, c.n_wires)`), our operands are routinely `CQ_BIT_ONE`, and a
+> qubit in superposition has no Bool value to be non-zero at all. Bennett's
+> `ancilla_count` is `length(c.ancilla_wires)`, a property of a circuit **object**,
+> and by Rule 13 we hold none.
+>
+> The number is not lost — it was already delivered at Step 4, by the pool. M03
+> records the identity `peak == minted`: a fresh index is minted only when the free
+> list is empty, i.e. only when `live` has already reached `minted`, so the
+> monotonic counter **is** the high-water mark. `cq_qubits_peak()` returns it
+> exactly, and §12's acceptance criterion below reads it from there. (The value is
+> maintained in both configurations; only the *assert* that the identity holds is
+> Debug-gated, so under Rule 17 do not call the identity verified from a Release
+> run.)
+>
+> **But it is not Bennett's number, and moving the computation does not make it
+> one.** `cq_qubits_peak()` is peak **allocated**; `peak_live_wires` is peak
+> **non-zero**, a function of the wire *values*, so a wire sitting at 0 does not
+> count towards it at all. The gap is not a rounding error on our circuits:
+> `cq_sandwich` pre-materialises the entire scratch region at zero gates (I6(b))
+> and every one of those qubits is born |0⟩. "Matching `gate_count` /
+> `ancilla_count` in Bennett.jl" was therefore a category error for this figure
+> however it is computed, which is why the sentence above drops the Bennett
+> comparison for the qubit count rather than re-pointing it at the pool. The
+> gate-count comparison is unaffected and stands.
+>
+> **A sink could only guess, and the guess would be low.** The single quantity
+> derivable from a gate stream is `max operand index + 1`, and that is a *lower
+> bound*: `cq_materialise` takes a qubit from the pool and emits **no** gate when
+> the constant was 0 (Rule 5), and `cq_sandwich` pre-materialises the whole scratch
+> region from `BIT_ZERO` (I6(b)) — so a qubit can be allocated, held and released
+> without ever appearing in a gate. Do not add such a field to M24. A number
+> silently smaller than the truth is worse than no number, because the D2 pool
+> ceiling is what stands between us and over-committing a QEC device.
+>
+> **`total` spans the Bennett triple only.** `gate_count` returns
+> `(total, NOT, CNOT, Toffoli)` with `total` the redundant sum of the other three,
+> and Bennett circuits contain no `Ry`, `Rz` or `Mz` at all. `cq_count_total` is
+> therefore `x + cx + ccx` and deliberately excludes the rotations and the
+> measurement — folding them in would break the comparison this sink exists to make
+> possible, and would break it only once §7 fires, i.e. long after the goldens were
+> pinned.
+>
+> **The stream is stdout, and that is not a concession to CQ_lang.** libcqops is a
+> linkable C library; CQ_lang is one caller. Our coupling to it is the frozen
+> `cqrt_*` ABI and nothing else — we satisfy that ABI, and we do not inherit its
+> trace. A library with a trace to emit and no other instruction writes it to
+> stdout, and `cq_sink_printf(FILE *)` lets any caller say otherwise in one line.
+>
+> **What this does disturb is Step 24's oracle, and that is filed as bd `590`.**
+> CQ_lang's fixture runner is `"$TMP/slice" | diff -u - "$GOLDEN"`
+> (`run_slice.sh:83`) — it diffs the binary's *entire* stdout against a golden that
+> was produced by `CQ_lang/runtime/cq_runtime.c`, a file whose own first line calls
+> it a **"trace-only runtime stub"**. Those goldens are CQ_lang's regression oracle
+> for CQ_lang's IR pass, captured against a placeholder backend. Once the real
+> backend is linked, the placeholder is gone — NORTH_STAR's finish-line condition 1
+> says exactly that, and asks only that the fixtures "link against `libcqops` and
+> run" — so there is no longer anything in the process that would emit those bytes,
+> and nothing for our stream to collide *with*. The open question is not which
+> stream M23 writes to; it is what Step 24 compares against, given that
+> IMPLEMENTATION_PLAN's "diff emitted traces / Traces match" and NORTH_STAR's
+> "link and run" are not the same criterion.
 
 ---
 
@@ -811,8 +904,10 @@ v1 is accepted when:
 2. Replacing `M_PI/2` with `M_PI` (classical mode) makes the whole program run
    deterministically and `cq_measure` returns the value plain C would compute — proving
    the oracle's arithmetic circuits are correct, with no quantum simulation anywhere.
-3. The counter sink reports Toffoli count, T-count (7 per Toffoli) and peak qubits,
-   and those numbers are stable across runs and pinned as goldens.
+3. The counter sink reports Toffoli count and T-count (7 per Toffoli); **peak qubits
+   comes from `cq_qubits_peak()`, not from the sink** — see the §8 correction for why
+   a streaming sink cannot compute it and the pool already has it exactly. Those
+   numbers are stable across runs and pinned as goldens.
 
 ---
 
