@@ -8,6 +8,7 @@ void cq_ctx_init(cq_ctx *ctx, const cq_sink *sink)
 {
     cq_qubits_init(&ctx->pool);
     cq_shadow_init(&ctx->shadow);
+    cq_reg_table_init(&ctx->regs);
     ctx->sink = sink ? sink : cq_sink_active();
 
 #if defined(CQOPS_DEBUG_INVARIANTS) && CQOPS_DEBUG_INVARIANTS
@@ -16,8 +17,16 @@ void cq_ctx_init(cq_ctx *ctx, const cq_sink *sink)
 #endif
 }
 
+/* Order is deliberate and it is the reverse of init. The register table goes
+ * first because it is the only member holding per-handle allocations, and
+ * DISPOSING IS NOT FREEING: it returns nothing to the pool, so a rail that was
+ * never `cqrt_free`d stays counted as live right up to the last statement here
+ * — the intended Rule-6 safe leak (PRD §10), not a tidy-up we may do quietly.
+ * Anything that swept the table releasing rails would be releasing them
+ * without evidence, which is the one unforgivable bug. */
 void cq_ctx_dispose(cq_ctx *ctx)
 {
+    cq_reg_table_dispose(&ctx->regs);
     cq_shadow_dispose(&ctx->shadow);
     cq_qubits_dispose(&ctx->pool);
     ctx->sink = NULL;

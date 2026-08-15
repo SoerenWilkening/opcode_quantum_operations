@@ -90,6 +90,7 @@ add_library(cqops STATIC
     src/sink.c          # M04, Step 5 — the §8 vtable, dispatch, CQOPS_SINK
     src/ctx.c           #      Step 6 — the shared context aggregate
     src/emit.c          # M05, Step 6 — the §3 fold table (critical path)
+    src/reg.c           # M07, Step 7 — handle table, tombstones, I2, D7a/D7b
 )
 
 target_include_directories(cqops

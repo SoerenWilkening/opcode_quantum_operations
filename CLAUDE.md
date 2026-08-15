@@ -26,8 +26,9 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
 > | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **Steps 1–5 have landed (2026-08-14): Layer 0 is complete.** On disk and passing
-> under both configurations, 18 ctest tests:
+> **Steps 1–7 have landed (2026-08-14): Layer 0, the emitter and the handle table.**
+> On disk and passing under **both** configurations, **46 ctest tests** — and green
+> again under a full ASan + UBSan build with Homebrew clang:
 >
 > | Step | Module | Files | LOC / budget |
 > |---|---|---|---|
@@ -37,13 +38,24 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 4 | **M03** | `src/qubits.[ch]`, plus `tests/support/death.[ch]` | 130 / 150 |
 > | 5 | **M04** | `src/sink.[ch]` + `cq_sink` in the public header, plus `tests/support/mock_sink.[ch]` | 108 / 90 · 139 / 120 |
 > | 6 | **M05** | `src/emit.[ch]` — the §3 fold table — plus `src/ctx.[ch]`, the shared context | 122 / 190 |
+> | 7 | **M07** | `src/reg.[ch]` — handle table, tombstones, the sole deallocator, the I2 sweep, D7a/D7b | **283 / 180** — see below |
 >
 > **The fold table has landed and is green at 159/159** (155 exhaustive + 4 distinctness
 > deaths), so the critical path is behind us. `cq_ctx` now exists: pool + shadow + a
 > borrowed sink, and in Debug the I6 scratch extent.
 >
-> **Next is Step 7 — M07 `reg`.** Still a plan: no register or handle table, no scratch,
-> no sandwich, no kernel, and no controlled axis (M06 is Step 20, not Step 7).
+> **M07 overshot its budget by 57% and landed as one module anyway** (54 header + 229
+> body, against a 300-line hard limit that is nowhere near). The overshoot is four
+> things §3's 180 did not anticipate: a **three-state** slot (§10 needs live / tombstone
+> / measured, and a boolean carries two), the `INT32_MAX` handle guard, the **D7a/D7b
+> split**, and the two-pass free. Plan §3's recorded seam — *table ↔ invariant
+> checking* — is unused and stays available: `cq_reg_audit`, `cq_reg_check_operands`
+> and `cq_reg_sources_alias` move to `src/reg_check.c` if `reg.c` passes 240.
+> `tests/test_reg.c` did hit the guard and split along the same line, into
+> `tests/test_reg_invariants.inc`.
+>
+> **Next is Step 8 — M08 `scratch` + M09 `sandwich` (I6).** Still a plan: no scratch,
+> no sandwich, no kernel, and no controlled axis (M06 is Step 20, not Step 8).
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -132,10 +144,16 @@ qubit" (PRD §3). Allocation is **lazy, per bit** — never at declaration, neve
 register (NORTH_STAR §2). Copies are always physical (allocate + CX), never aliases
 (**I2**) — *that* is what makes `cqrt_free` sound.
 
-**Rule 6 — Free only a provably-zero rail.** `cqrt_free` asserts every bit is
-`BIT_ZERO` or a known-zero qubit before returning qubits to the pool. **A free of a
-dirty rail is a hard error, not a warning** (PRD §10) — it is the exact signature of
-a silent state collapse. Likewise a qubit on the free list is `|0⟩` (**I3**), and
+**Rule 6 — Free only a provably-zero rail.** `cqrt_free` asserts that every
+**qubit-carrying** bit is provably `|0⟩` before returning qubits to the pool. **A free
+of a dirty rail is a hard error, not a warning** (PRD §10) — it is the exact signature
+of a silent state collapse. The scope is the point: this rule used to read "every bit is
+`BIT_ZERO` or a known-zero qubit", which rejects a `CQ_BIT_ONE` bit and so aborts on
+`int x = 5;` going out of scope — every ordinary classical local, and the exact shape L5
+requires to cost zero. By **I4** an all-constant rail owns zero qubits, so nothing can
+reach the free list; PRD §10's own "return every qubit `h` still owns" is the operative
+wording and this line now matches it. It does **not** let `ckd.18` through — there the
+bits *are* materialised qubits. Likewise a qubit on the free list is `|0⟩` (**I3**), and
 releasing one whose shadow is not known-zero is a hard error. Measurement is
 **terminal**: CQ_lang emits no adjoint and no `cqrt_free` for a measured handle, so
 we do not reclaim its qubits.
@@ -489,9 +507,9 @@ issue; `make test` is the local stand-in (lint, then both configurations).
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
-- **Layer 0 and the emitter exist; nothing above them does.** `src/bit.h`,
-  `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]` and
-  `src/emit.[ch]` are real as of Step 6 — but there is no register or handle table, no
+- **Layer 0, the emitter and the handle table exist; nothing above them does.**
+  `src/bit.h`, `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]`,
+  `src/emit.[ch]` and `src/reg.[ch]` are real as of Step 7 — but there is no
   scratch, no sandwich, no kernel, and **no controlled axis** (M06 is Step 20, despite
   its low module number). Check before you cite — and read
   `third_party/bennett/COMMIT` rather than running `git log` inside it, which reports
@@ -562,10 +580,16 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   plan splits `shift` into `shift_const`/`shift_var`, `add` into `add`/`addacc`, and
   `divrem` into `divrem_u`/`divrem_s`.
 - **Plan §0.3 prints `cq_ctrl_pop(cq_cxt*)`** — that is a typo for `cq_ctx*`.
-- **D7 aliasing is unproven, not impossible.** Nothing in CQ's docs forbids
-  `cq_template_add_i32(h, h)` or `_unc(out, out, b)`. v1 asserts loud and finds out
-  empirically. If it fires, the fix is a defensive `cqrt_copy` of the aliased operand
-  — **one place, not twelve** (risk R2).
+- **D7 aliasing is no longer unproven — it was measured at Step 7, and the two halves
+  came out OPPOSITE ways.** Over all 239 goldens (62,930 template calls, 25,147 `_unc`):
+  **D7a**, `out` among the sources, is **0** — hard error, *both* configurations.
+  **D7b**, two sources aliasing each other, is **599**, of which **10** are on v1's
+  integer surface (`cq_template_mul_i32(h10, h10)` at
+  `tests/e2e/slice_select_rail_alias_cond.expected.log:31`, and nine more) — **legal, and
+  a blanket abort would fail those shipped fixtures at Step 24**. The defensive
+  `cqrt_copy` is therefore *required*, at the M26 handle boundary in Step 23, before
+  Step 24 runs — still **one place, not twelve** (risk R2, PRD §15 D7a/D7b). A kernel
+  cannot do it: kernels see `cq_bit *` and `W`, never handles.
 
 ---
 
@@ -698,7 +722,7 @@ check, do not assume, and update this table when a step lands):
 |---|---|
 | 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · **M04 `sink`** |
 | 1 — emission | **M05 `emit`** (the fold table — Rule 11) · M06 `controlled` |
-| 2 — registers, sandwich | M07 `reg` · M08 `scratch` · M09 `sandwich` |
+| 2 — registers, sandwich | **M07 `reg`** · M08 `scratch` · M09 `sandwich` |
 | 3 — kernels | M10 `bitwise` · M11 `shift_const` · M12 `shift_var` · M13 `cast` · M14 `add` · M15 `addacc` · M16 `cmp` · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |
 | 4 — analog, sinks | M21 `angle` · M22 `rotate` · M23 `sink_printf` · M24 `sink_count` · M25 `sink_qec` |
 | 5 — shim | M26 `cq_runtime_impl.c` · M27 `gen_shim.py` · M28 generated `*.gen.c` (LOC-exempt) |

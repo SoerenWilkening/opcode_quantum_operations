@@ -420,6 +420,87 @@ whole suite on allocator luck. M03 now poisons the new tail with `0xAA` under
 `CQOPS_DEBUG_INVARIANTS` and validates on read. **M07's handle table and owner map
 (Step 7) and M08's scratch (Step 8) have the same shape and want the same treatment.**
 
+### Step 7 status (2026-08-14) — **M07 landed; D7 was measured and split**
+
+`src/reg.[ch]` (54 + 229 = **283** code lines against a **180** budget), plus
+`tests/test_reg.c` + `tests/test_reg_invariants.inc` + `tests/test_reg_death.c`.
+**45 ctest tests green under both configurations and under a full ASan + UBSan build**
+(Homebrew clang 22). `make lint` green. Twelve mutations run; ten killed outright, the
+two survivors are equivalent mutants (below).
+
+**The headline is not the module — it is that D7 stopped being a prediction.** Plan §4
+scheduled the aliasing question for empirical resolution at Step 24; it was resolvable
+now, from the goldens, and the answer contradicts risk R2 as written. Over all 239
+goldens — 62,930 `cq_template_*` calls, 25,147 `_unc` — `out` among the sources is
+**0**, and two sources aliasing each other is **599**, of which **10** are on v1's
+integer surface (`cq_template_mul_i32(h10, h10)` among them; CQ_lang ships
+`slice_select_rail_alias_cond.expected.log`). So "assert loud from Step 7" would have
+aborted at Step 24 on shipped fixtures. R2 and PRD §15 are amended to D7a/D7b; the
+defensive copy is now **required** at M26, filed as `bd -493`.
+
+**Deviations, all recorded rather than hidden:**
+
+1. **The budget overshot by 57%,** and the module landed whole. Four causes §3's 180 did
+   not anticipate: a three-state slot (§10 needs live/tombstone/measured), the
+   `INT32_MAX` handle guard, the D7a/D7b split, and the two-pass free. The recorded seam
+   — *table ↔ invariant checking* — is unused and stays available at a 240-line trigger
+   on `reg.c`. `tests/test_reg.c` **did** hit the 300 guard and split along that same
+   line into `tests/test_reg_invariants.inc`.
+2. **`cq_ctx` gained a struct tag.** It was an anonymous typedef; `reg.h` needs to name
+   a `cq_ctx *` without including `ctx.h`, so `reg.h` now carries the single
+   `typedef struct cq_ctx cq_ctx;` and `ctx.h` spells `struct cq_ctx { ... };`. The
+   graph stays acyclic: `bit.h ← reg.h ← ctx.h ← emit.h`.
+3. **`cq_reg_free` takes the zero-proof as a function pointer,** `int (*)(const cq_ctx *,
+   int32_t h, uint32_t q)`. This is M03's deviation 1 one level up, and it is a
+   **refusal** to settle `ckd.17` rather than an answer: passing both `h` and `q` leaves
+   that bead's own "per qubit or per register?" open in both directions. The library
+   ships **no** proof; `NULL` fails loud. The only proof in the tree is a `static` in the
+   two test files, named `proof_shadow_pre_kernel_only`.
+4. **Rule 6's literal wording was aborting on valid input** and has been rescoped in both
+   CLAUDE.md and PRD §10 to the rail's *qubit-carrying* bits. "Every bit is `BIT_ZERO` or
+   a known-zero qubit" rejects a `CQ_BIT_ONE`, i.e. `int x = 5;` going out of scope — and
+   makes L5's zero-cost classical path unreachable. It does **not** let `ckd.18` through.
+5. **A death test can now assert WHICH LAYER aborted.** Measured here: deleting M07's
+   `cq_reg_clean` call left all 24 reg tests green, because M03's own
+   `if (!proven_zero)` fired one layer down and the rail was merely half-returned to the
+   pool — precisely the trap §0 recorded when deleting M05's distinctness check still
+   aborted. The fix is one CTest property, `FAIL_REGULAR_EXPRESSION` on M03's message,
+   which unlike `PASS_REGULAR_EXPRESSION` does **not** displace the exit-code check.
+   **Use this wherever two layers guard one condition** — M08's scratch release at Step 8
+   is the next instance.
+
+**The two surviving mutants are equivalent, not gaps.** (i) `0xAA` → `0x00` tail fill:
+no slot state is numbered 0, so any non-`{1,2,3}` fill is an equally good poison — the
+numbering subsumes half the poison's job. (ii) forwarding `proof(...)` → literal `1` in
+the release loop: pass 1 has already established every answer is 1, so the two are
+behaviourally identical *unless* the clean-check is also removed, and that compound is
+killed.
+
+**A 46th test exists because an adversarial review found the audit's filter unpinned.**
+The `cq_reg_audit` sweep must skip **only** tombstones — a MEASURED rail keeps its qubits
+for the life of the program (§7 makes measurement terminal) and is therefore the one rail
+kind that must stay under the map's eye forever, while a tombstone's `bits` array is gone
+and its indices are back on the free list. Every `i2_*` death case used two **LIVE** rails,
+so narrowing the filter from `skip DEAD` to `skip everything non-LIVE` left all 45 tests
+green in **both** configurations — the project's only I2 detector going blind to measured
+rails, undetectably. Fixed by a pair that makes the filter observable:
+`the_audit_sweeps_a_measured_rail_without_a_false_positive` (ordinary) and
+`i2_measured_rail_shares_a_qubit_with_a_live_one` (Debug-only death), the latter verified
+by hand to fail under the narrowed filter and pass under the correct one.
+
+> **The general lesson, and it is the same one twice in one step.** A check that two
+> layers both perform, or that one state can reach by two routes, is untested until some
+> case *distinguishes* them. M07 hit this in the free path (M03's guard masking M07's,
+> §deviation 5) and again in the audit's state filter. **Before Step 8's scratch release,
+> ask of every new guard: which single case goes red if this exact line is deleted?**
+
+**One hazard found and deliberately NOT fixed here**, appended to `ckd.17`: nothing
+un-poisons the shadow entry of a released qubit, and a **reused** index keeps its old
+entry (`cq_ctx_fresh_qubit` only ensures up to `minted`, and `cq_shadow_ensure` returns
+early). Safe today only because the sole available evidence *is* the shadow; the moment
+ckd.17's structural certificate allows a free under a poisoned entry, the pool hands the
+next `cq_materialise` a genuinely `|0⟩` qubit carrying a stale determinate entry.
+
 ---
 
 ## 3. Module map
@@ -447,7 +528,7 @@ it grows.
 
 | ID | Module | LOC | Split seam |
 |---|---|---|---|
-| M07 | `reg.[ch]` — handle table, tombstones (D5), I2 owner map, D7 aliasing asserts | 180 | table ↔ invariant checking |
+| M07 | `reg.[ch]` — handle table, tombstones (D5), I2 owner-map **sweep**, D7a abort + D7b query | ~~180~~ **283 landed** | table ↔ invariant checking — unused; trigger at 240 in `reg.c` |
 | M08 | `scratch.[ch]` — acquire/release a `BIT_ZERO` scratch region, assert clean on release | 90 | — |
 | M09 | `sandwich.[ch]` — the §0.1 driver, I6 extent tracking | 110 | — |
 
@@ -503,7 +584,7 @@ proceed). PRD increment mapping in the right column.
 | 4 | `test_qubits.c` — LIFO order (D4); ceiling exceeded fails loud (D2); releasing a qubit whose shadow is not known-0 is a **hard error** (I3); peak tracking | M03 | All green | 1 |
 | 5 | `test_sink.c` + `mock_sink` — every vtable entry dispatches; env-var default selection | M04 + `mock_sink` | Recording sink usable by later tests | 1 |
 | 6 | **`test_emit_fold.c` — L0, exhaustive.** Target/control ∈ {const-0, const-1, Q known-0, Q known-1, Q unknown}: `5 X + 25 CX + 125 CCX` = **155** cases, the full Cartesian product. Each pins **gates emitted, qubits allocated, resulting bit-kind, and shadow** — four *assertions* per case, not four cases. Plus **4** distinctness death-tests: `c == t` (CX) and `c1 == c2`, `c1 == t`, `c2 == t` (CCX). Each death-test needs **Q** operands, since the assert compares qubit indices and cannot fire on constants | M05 | **159/159** (155 + 4). This is the most important suite in the project — everything above it is Bennett transcribed against these three functions | 1 |
-| 7 | `test_reg.c` — handles monotonic, never reused (D5); tombstones; I4 (all-constant register owns zero qubits); free of a dirty rail is a hard error; I2 owner map catches a double-owned qubit; **D7 aliasing asserts fire** | M07 | All green | 1 |
+| 7 | `test_reg.c` + `test_reg_invariants.inc` + `test_reg_death.c` — handles monotonic, never reused (D5); tombstones; I4 (all-constant register owns zero qubits); free of a dirty rail is a hard error **in M07, not merely somewhere**; I2 owner map catches a double-owned qubit; **D7a aborts and D7b deliberately does not** | M07 | **DONE** — 45 ctest green both configurations + ASan/UBSan | 1 |
 | 8 | `test_scratch.c`, `test_sandwich.c` — driver runs compute forwards, copyout, compute backwards; a synthetic step function's recorded stream is a **palindrome around the copyout**; I6 violation (target outside scratch) is caught in Debug | M08, M09 | All green | 1 |
 | 9 | `test_sink_printf.c`, `test_sink_count.c` — trace format matches CQ_lang's goldens; counter totals match the mock sink's stream | M23, M24 | **PRD Increment 1 complete** | 1 |
 
@@ -608,7 +689,7 @@ Steps 10–13 are genuinely independent and can run concurrently. Steps 14–17 
 | R1 | I6 violated by a kernel — a compute-half target outside scratch makes the reverse half silently non-cancelling | L2 fails, or worse, L2 passes and L3 fails only at some widths | Debug-build extent assert (§0.2) plus `const`-qualified control parameters. Both land in Step 8, before any kernel |
 | **R8** | **I6's *control* side — the hazard R1 does not describe.** A scratch bit read as a **control** while still `BIT_ZERO` folds to 0 gates forward; if a later step materialises it, the reverse replay emits a gate the forward never did. The sandwich stops cancelling and scratch is left dirty | **L1 stays GREEN — and in at least one regime L4 stays green too.** Replaying K12's forward list in reverse with `a` all `Q`, `b` all `ZERO` yields a *different gate multiset with the identical total count* (116/204/318/458/816 at W=3/4/5/6/8), so the count golden matches while the circuit is wrong. **Only L2/L3 can see that case at all.** Other regimes are luckier: `a` all `ONE` with `b` quantum breaks only gate *order* (a benign commuting reorder). `{ZERO,Q}`-only masks first fail at W=5 | **Closed by I6(b)** (§0.2): `cq_sandwich` pre-materialises the whole scratch region at step 0, so no fold on a scratch bit can fire and the two halves are identical by construction. Debug-asserted on entry to every compute half. Lands in **Step 8**, before Step 12. Still put the witnesses (`W=3`, `a=b={Q,ZERO,ZERO}`; `{ZERO,Q}`-only at `W=5`) in the fixed L1 mask set — a regression must not depend on random masks to be caught |
 | R9 | Pre-materialisation defeats **L5** — a fully-classical operation allocates scratch qubits it never needed | L5 fails: non-zero gates or qubits for the all-constant case | The all-classical path **short-circuits before `cq_sandwich` is entered** and folds to a constant directly (§0.2, consequence 2). This is a kernel-entry check, so it lands with the first sandwich kernel in Step 12 and is covered by L5's existing all-classical mask |
-| R2 | **D7 aliasing** — CQ's pass emits `add(h,h)` or `_unc(out,out,b)`. Every kernel assumes distinct registers | Only surfaces at Step 24 (L6), by which point twelve kernels exist | Assert loud from Step 7. If it fires, the fix is a defensive `cqrt_copy` of the aliased operand — one place, not twelve |
+| R2 | **D7 aliasing** — CQ's pass emits `add(h,h)` or `_unc(out,out,b)`. Every kernel assumes distinct registers | ~~Only surfaces at Step 24 (L6)~~ — **measured at Step 7 instead**, against all 239 goldens, which is 17 steps earlier than this row expected | **Split; the two halves came out opposite ways** (PRD §15 D7a/D7b). **D7a** (`out` among the sources): **0** of 25,147 `_unc` calls → hard error in *both* configurations. **D7b** (two sources aliasing): **599** occurrences, **10** on v1's integer surface including `cq_template_mul_i32(h10,h10)` → **legal, must not abort**. The defensive `cqrt_copy` is therefore **required, not contingent**, at the M26 handle boundary in Step 23 — still one place, not twelve. ~~Assert loud from Step 7~~ would abort at Step 24 on shipped fixtures |
 | R3 | Bennett.jl drift invalidates L4 goldens silently | Goldens diff after an unrelated pull | Pinned commit (Step 0.1); goldens carry the Bennett commit in a header comment |
 | R4 | K12 divrem exceeds 300 lines | `make lint` fails | Pre-planned split (M19/M20) already in the module map |
 | R5 | L4 goldens fragile w.r.t. D4 free-list discipline and D6 non-demotion | Goldens churn on unrelated changes | Pin **counts**, not traces, for kernels. Trace goldens only at L6 where CQ_lang owns the format |

@@ -22,12 +22,17 @@
 
 #include "bit.h"
 #include "qubits.h"
+#include "reg.h"
 #include "shadow.h"
 #include "sink.h"
 
-typedef struct {
+/* The TAG is required and the typedef is NOT repeated here: reg.h declares
+ * `typedef struct cq_ctx cq_ctx;` so that its own signatures can name a
+ * context it must not include. This struct was anonymous until Step 7. */
+struct cq_ctx {
     cq_qubit_pool   pool;
     cq_shadow_table shadow;
+    cq_reg_table    regs;     /* M07, Step 7 — handles, tombstones, I2, I4 */
     const cq_sink  *sink;     /* borrowed; see below on why it is resolved once */
 
 #if defined(CQOPS_DEBUG_INVARIANTS) && CQOPS_DEBUG_INVARIANTS
@@ -41,7 +46,7 @@ typedef struct {
      * written, and scratch is a contiguous cq_bit array. */
     const cq_bit *scratch_lo, *scratch_hi;
 #endif
-} cq_ctx;
+};
 
 /* Borrows `sink` — it must outlive the context. Resolved ONCE here rather
  * than per gate: cq_sink_active() re-reads the environment on every call,

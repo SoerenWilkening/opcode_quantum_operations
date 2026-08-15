@@ -221,9 +221,9 @@ typedef struct {
    one entry, not 128. Freed on cqrt_free; the table slot becomes a
    tombstone so handle numbering stays monotonic. */
 typedef struct {
-    uint32_t width;      /* 1, 8, 16, 32, 64 or 128                  */
-    cq_bit  *bits;       /* `width` entries, LSB at index 0          */
-    uint8_t  live;
+    uint32_t width;      /* 1..128; validated as a RANGE, not a whitelist */
+    cq_bit  *bits;       /* `width` entries, LSB at index 0; NULL once dead */
+    uint8_t  state;      /* CQ_SLOT_LIVE | CQ_SLOT_DEAD | CQ_SLOT_MEASURED */
 } cq_reg;
 
 /* Per-qubit classical shadow — the whole of our "simulation". */
@@ -233,8 +233,26 @@ typedef struct {
 } cq_shadow;
 ```
 
+> **Two Step-7 corrections to the struct above.** (1) The width comment used to read
+> "1, 8, 16, 32, 64 or 128", which was stale against the resolved **i80-is-in-scope**
+> decision (§1) — a whitelist would reject every i80 rail, so the check is a range,
+> `1 ≤ width ≤ 128`. (2) `uint8_t live` became `uint8_t state`, because §10 needs **three**
+> distinguishable outcomes and a boolean carries two: *live*; *dead* (a D5 tombstone —
+> qubits returned, `bits` freed, the slot kept forever so numbering stays monotonic); and
+> *measured*, which §7 makes **terminal** — CQ_lang emits no adjoint and no `cqrt_free`, so
+> the qubits are deliberately never reclaimed and the rail must still be swept by the I2
+> audit, which a tombstone must not be. Measured over the 239 goldens: 255 `cqrt_measure_*`
+> calls, **0** later freed and **0** later referenced. None of the three enumerators is
+> numbered 0, so an all-zero slot is not a valid state.
+
 **Handle table**: dense `int32_t` → `cq_reg`, monotonic allocation to match CQ_lang's
 existing trace convention (`h0`, `h1`, …). Handles are never reused; qubit *indices* are.
+Handle **0 is valid and live** — CQ_lang's counter is `static int32_t next_handle = 0;`
+with `return next_handle++;` (`runtime/cq_runtime.c:64,67`) and every golden opens `-> h0`,
+so the "no register" sentinel has to be **negative**. The counter is *process-global* and
+shared with `cqrt_tape_alloc` (prints `t<N>`) and `cqrt_qram_alloc_<W>` (prints `a<N>`):
+both are out of v1 scope, but a second counter for them later would diverge handle
+numbering and fail every L6 trace diff while every assert stayed silent.
 
 **Qubit pool**: monotonic counter + LIFO free list. A qubit returned to the free list is
 asserted to be |0⟩ (§11). The pool has a configurable ceiling so it can be matched
@@ -610,6 +628,21 @@ promotion never needs more than one control wire.
   nothing, a rail's qubits are returned **exactly once** — here — whether or not an `_unc`
   preceded it.
 
+  > **The assert is scoped to the rail's QUBIT-CARRYING bits, and that scope is
+  > load-bearing.** Read literally, "every bit is `BIT_ZERO` or a known-zero qubit"
+  > rejects a `CQ_BIT_ONE` bit — which aborts on `int x = 5;` going out of scope, i.e. on
+  > every ordinary classical local, and would make §11's L5 (zero gates, zero qubits,
+  > fully classical) unreachable. By **I4** an all-constant rail owns zero qubits, so
+  > nothing can reach the free list and nothing can collapse; a constant bit carries a
+  > canonical `q == 0` and owns no index at all. The operative wording is this bullet's
+  > own "return every qubit `h` still owns". Settled at Step 7; CLAUDE.md's Rule 6 was the
+  > imprecise restatement and has been corrected to match.
+  >
+  > **This does NOT resolve `ckd.18`.** There the rail's bits *are* qubits — `ry` at
+  > arbitrary θ materialises all 32 of them — physically holding `|5⟩` with an unknown
+  > shadow. The scope clarification exempts constants, not materialised bits, so the
+  > rotation-root free still hard-errors and `ckd.18` stays open.
+
   > **What "provably clean" reads is NOT settled by this bullet, and it is not obvious.** It
   > cannot be the two-bit shadow: §3's `CX` rule propagates `unknown`, so an uncomputed
   > *tainted* rail is all-`Q unknown` and a literal shadow check would hard-error on every
@@ -761,4 +794,18 @@ and diffs.
 | D4 | Free-list discipline | LIFO. Lowest-index-first (Bennett's `WireAllocator`) would give tighter peak counts but noisier trace diffs; revisit at L4 |
 | D5 | Handle reuse | Never — monotonic, matching CQ_lang's existing `h<N>` trace convention |
 | D6 | Shadow-driven demotion | A qubit whose shadow is *known* could be X'd to \|0⟩, freed, and folded back to a constant bit. Sound, and a real saving. Deliberately **not** in v1 — it makes the qubit count depend on shadow precision, which would make L4 goldens fragile. But see §10: it is also what would make forward and `_unc` gate counts agree, so revisit if that asymmetry becomes painful |
-| **D7** | **Operand aliasing** | Nothing in CQ's docs forbids `cq_template_add_i32(h, h)` or `_unc(out, out, b)`. Every kernel assumes distinct registers and I2 assumes distinct qubits. **v1: assert loud** and find out empirically whether the pass ever does it, rather than writing aliasing-safe kernels for a case that may not exist. If it fires, the fix is a defensive `cqrt_copy` of the aliased operand |
+| **D7a** | **Result aliases a source** — `_unc(out, out, b)` | **Measured 2026-08-14 at Step 7 over all 239 goldens: 0 occurrences in 25,147 `_unc` calls.** It also breaks §4's `dst ^= f(a,b)` outright. **Hard error, in BOTH configurations** — R2's whole value is firing during the L6 fixture run at Step 24, which Rule 17 pins under Release |
+| **D7b** | **Two sources alias each other** — `mul(h, h)` | **Measured the same way: 599 occurrences, of which 10 are on v1's integer surface.** CQ_lang ships a fixture named for it — `tests/e2e/slice_select_rail_alias_cond.expected.log:4` is `cq_template_icmp_slt_i32(h0, h0) -> h1`, and `:31` is `cq_template_mul_i32(h10, h10) -> h11`; also `spec_newcand_qsq_caller:13,16`, `spec_replan_qpow_caller:13,18`, `slice_i128_mulhi:4`. **This is LEGAL and must NOT abort.** The remedy is now required rather than contingent: a defensive `cqrt_copy` of one aliased source at the **M26 handle boundary** (Step 23), *before* Step 24 runs — one place, not twelve. M07 exposes the predicate; M26 acts on it |
+
+> **D7 used to be one row reading "v1: assert loud and find out empirically whether the
+> pass ever does it".** Step 7 did the measurement, and the two halves came out in
+> opposite directions — so the single row is now two. A blanket pairwise-distinctness
+> abort would fire at Step 24 on ten shipped CQ_lang fixture lines, and the reflex fix
+> for that would be to delete the whole check, losing the D7a detection that does matter.
+>
+> Why D7b cannot be left to the kernels: a kernel sees `cq_bit *` and `W` (§4), never
+> handles, so it cannot detect operand aliasing at all. What it *does* see is `a[i]` and
+> `b[i]` being the **same bit**, which reaches §3's `CCX` distinctness assert — an abort
+> from inside a kernel, seventeen steps from its cause, in Debug; and in Release that
+> check is compiled out and a malformed `CCX(q,q,t)` reaches the sink as a silent
+> miscompile. The remedy has to sit at the handle boundary.
