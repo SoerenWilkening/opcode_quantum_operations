@@ -108,6 +108,18 @@ int cq_mock_matches(const cq_mock *m, const cq_rec *want, size_t n)
     return 1;
 }
 
+int cq_mock_is_palindrome(const cq_mock *m, size_t n_head, size_t n_mid)
+{
+    if (m->n != 2u * n_head + n_mid) return 0;   /* length is part of the claim */
+
+    /* The tail runs backwards against the head: gate `n_head + n_mid + j` must
+     * be gate `n_head - 1 - j`, operand for operand. rec_eq compares angles
+     * bitwise, so a -0.0 that arrived as 0.0 is a difference. */
+    for (size_t j = 0; j < n_head; j++)
+        if (!rec_eq(&m->v[n_head + n_mid + j], &m->v[n_head - 1u - j])) return 0;
+    return 1;
+}
+
 void cq_mock_dump(const cq_mock *m, const char *label)
 {
     printf("# %s: %zu gate(s)\n", label ? label : "stream", m->n);

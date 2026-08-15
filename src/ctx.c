@@ -10,6 +10,7 @@ void cq_ctx_init(cq_ctx *ctx, const cq_sink *sink)
     cq_shadow_init(&ctx->shadow);
     cq_reg_table_init(&ctx->regs);
     ctx->sink = sink ? sink : cq_sink_active();
+    ctx->sandwich_depth = 0;
 
 #if defined(CQOPS_DEBUG_INVARIANTS) && CQOPS_DEBUG_INVARIANTS
     ctx->scratch_lo = NULL;
@@ -37,4 +38,13 @@ uint32_t cq_ctx_fresh_qubit(cq_ctx *ctx)
     uint32_t q = cq_qubits_acquire(&ctx->pool);
     cq_shadow_ensure(&ctx->shadow, cq_qubits_minted(&ctx->pool));
     return q;
+}
+
+/* Two statements, and the ORDER between them is the whole content of the
+ * ckd.17a certificate — see ctx.h. Do not reorder, do not separate, and do not
+ * grow a third statement between them. */
+void cq_ctx_release_qubit(cq_ctx *ctx, uint32_t q, int proven_zero)
+{
+    cq_qubits_release(&ctx->pool, q, proven_zero);
+    cq_shadow_retire(&ctx->shadow, q);
 }

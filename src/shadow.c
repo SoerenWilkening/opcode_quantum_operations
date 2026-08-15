@@ -123,3 +123,21 @@ void cq_shadow_rotate(cq_shadow_table *sh, uint32_t q)
     cq_shadow_bounds(sh, q);
     sh->e[q].unknown = 1;
 }
+
+/* --- Retirement (bd ckd.17a). The one write that clears `unknown`. ------- */
+
+void cq_shadow_retire(cq_shadow_table *sh, uint32_t q)
+{
+    cq_shadow_bounds(sh, q);
+
+    /* BOTH configurations. This is the Release backstop for the whole sandwich
+     * machinery: with the I6 sweeps compiled out, an entry that is determinate
+     * and non-zero at retirement time is a qubit demonstrably not in |0⟩ whose
+     * caller just certified it clean. */
+    if (!sh->e[q].unknown && sh->e[q].value != 0u)
+        cq_shadow_die("retire of a determinate NON-ZERO entry — "
+                      "the compute half did not cancel", q, sh->e[q].value);
+
+    sh->e[q].value = 0;
+    sh->e[q].unknown = 0;
+}

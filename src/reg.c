@@ -216,11 +216,20 @@ void cq_reg_free(cq_ctx *ctx, int32_t h, cq_zero_proof proof)
      *    would be a laundering site invisible to a grep for cq_reg_free, and
      *    it would defeat the whole reason M03 takes the evidence as an
      *    argument. `proof` cannot be NULL on this path — step 1 returns 0 for
-     *    any Q bit under a NULL proof, so the loop body is unreachable. */
+     *    any Q bit under a NULL proof, so the loop body is unreachable.
+     *
+     *    THROUGH cq_ctx_release_qubit, NOT cq_qubits_release DIRECTLY (Step 8,
+     *    bd ckd.17a). That joint releases and then retires the shadow entry,
+     *    in that order, and it is deliberately not scratch-specific — M09's
+     *    sandwich epilogue uses the identical path. Retiring here is also what
+     *    closes the hazard Step 7 recorded and left open: nothing un-poisoned
+     *    a released index, so a REUSED index kept its stale entry, because
+     *    cq_ctx_fresh_qubit only ensures up to `minted` and cq_shadow_ensure
+     *    returns early for an index it has already seen. */
     for (uint32_t i = 0; i < r->width; i++) {
         if (!cq_bit_is_qubit(r->bits[i])) continue;
         uint32_t q = cq_bit_qindex(r->bits[i]);
-        cq_qubits_release(&ctx->pool, q, proof(ctx, h, q));
+        cq_ctx_release_qubit(ctx, q, proof(ctx, h, q));
     }
 
     /* 3. ONLY NOW. Writing a constant over a Q bit before its release erases

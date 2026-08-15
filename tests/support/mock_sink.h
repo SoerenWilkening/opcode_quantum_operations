@@ -67,6 +67,25 @@ const cq_rec *cq_mock_at(const cq_mock *m, size_t i);   /* aborts if i >= n */
 /* Exact sequence comparison, length included. Returns 1 on match. */
 int  cq_mock_matches(const cq_mock *m, const cq_rec *want, size_t n);
 
+/* THE SANDWICH PALINDROME CHECK (Step 8; PRD §10 names this file as its home).
+ * Does the recorded stream read [head] [middle] [head reversed] — `n_head`
+ * gates, then `n_mid`, then the same `n_head` gates in reverse order? A length
+ * mismatch is a failure, never a truncation.
+ *
+ * WHY THIS AND NOT A GATE COUNT. Risk R8's measured witness: replaying K12's
+ * forward list in reverse under the pre-I6(b) rules yields a DIFFERENT gate
+ * multiset with the IDENTICAL total (816 at W=8), so L1 and L4 both stay green
+ * while scratch is left dirty. Only an ORDERED comparison of the stream sees
+ * it. PRD §10 adds the other half: cq_shadow_retire's determinate-non-zero
+ * check is inert once a rail is rotation-tainted, and on that surface this is
+ * the only detector with teeth.
+ *
+ * It lives here rather than in src/ because Rule 13 is a constraint on the
+ * library, not on the far side of the vtable — a gate is emitted through a
+ * function pointer and is gone from our side, and what a SINK does with it is
+ * the sink's business. */
+int  cq_mock_is_palindrome(const cq_mock *m, size_t n_head, size_t n_mid);
+
 /* Prints the recorded stream as TAP comments, so a failing golden shows what
  * was actually emitted instead of only that it differed. */
 void cq_mock_dump(const cq_mock *m, const char *label);

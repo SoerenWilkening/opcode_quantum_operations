@@ -26,9 +26,10 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
 > | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **Steps 1–7 have landed (2026-08-14): Layer 0, the emitter and the handle table.**
-> On disk and passing under **both** configurations, **46 ctest tests** — and green
-> again under a full ASan + UBSan build with Homebrew clang:
+> **Steps 1–8 have landed (2026-08-15): Layer 0, the emitter, the handle table
+> and the sandwich.** On disk and passing under **both** configurations,
+> **67 ctest tests** — and green again under a full ASan + UBSan build with
+> Homebrew clang:
 >
 > | Step | Module | Files | LOC / budget |
 > |---|---|---|---|
@@ -39,10 +40,12 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 5 | **M04** | `src/sink.[ch]` + `cq_sink` in the public header, plus `tests/support/mock_sink.[ch]` | 108 / 90 · 139 / 120 |
 > | 6 | **M05** | `src/emit.[ch]` — the §3 fold table — plus `src/ctx.[ch]`, the shared context | 122 / 190 |
 > | 7 | **M07** | `src/reg.[ch]` — handle table, tombstones, the sole deallocator, the I2 sweep, D7a/D7b | **283 / 180** — see below |
+> | 8 | **M08** | `src/scratch.[ch]` — the `cq_bit` array, no `cq_ctx` in the header, no release | 56 / 90 |
+> | 8 | **M09** | `src/sandwich.[ch]` — the driver, I6(a)+(b), `CQ_ZERO_BY_PALINDROME` — plus `cq_shadow_retire` (M02) and `cq_ctx_release_qubit` | 115 / 110 |
 >
 > **The fold table has landed and is green at 159/159** (155 exhaustive + 4 distinctness
 > deaths), so the critical path is behind us. `cq_ctx` now exists: pool + shadow + a
-> borrowed sink, and in Debug the I6 scratch extent.
+> borrowed sink, the `sandwich_depth` counter, and in Debug the I6 scratch extent.
 >
 > **M07 overshot its budget by 57% and landed as one module anyway** (54 header + 229
 > body, against a 300-line hard limit that is nowhere near). The overshoot is four
@@ -54,8 +57,19 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > `tests/test_reg.c` did hit the guard and split along the same line, into
 > `tests/test_reg_invariants.inc`.
 >
-> **Next is Step 8 — M08 `scratch` + M09 `sandwich` (I6).** Still a plan: no scratch,
-> no sandwich, no kernel, and no controlled axis (M06 is Step 20, not Step 8).
+> **The sandwich has landed and the `ckd.17a` certificate is on disk, not just
+> designed.** `cq_sandwich` pre-materialises (I6(b)), arms the extent for the two
+> compute halves only, replays the compute half at descending indices, and releases the
+> region through `cq_ctx_release_qubit(ctx, q, CQ_ZERO_BY_PALINDROME)` — the sole
+> `proven_zero` constant in `src/`. `cq_reg_free` was rewired through the same joint,
+> which closes the Step 7 hazard where a **reused** qubit index kept its stale shadow
+> entry. **32 mutations run across two rounds, 31 killed**; the one survivor is
+> `cq_scratch_alloc`'s Debug `0xAA` poison, an equivalent mutant in isolation whose
+> value is proved by the paired mutation (see below).
+>
+> **Next is Step 9 — M23 `sink_printf` + M24 `sink_count`,** which completes PRD
+> increment 1. Still a plan: no kernel and no controlled axis (M06 is Step 20, not
+> Step 8, despite its low module number).
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -388,6 +402,16 @@ from the `alloc` literal, not from shadow precision. Decide **before Step 19**.
   > read as a *control* hits `t.unknown |= c.unknown`, so with `c.unknown` freshly zeroed
   > the poison **stops propagating** and the shadow claims determinate downstream of a real
   > superposition. That disqualifies the `_unc` epilogue as a stamper on its own.
+  >
+  > **BUILT AT STEP 8, AND ONE DETAIL OF (b) CHANGED IN THE BUILDING.** The "order-sensitive
+  > region checksum" is checked after **each of the three loops**, the copyout included —
+  > the extent is deliberately disarmed there, so the fingerprint is the *only* thing that
+  > can see a copyout step reaching back into scratch. The second all-`CQ_BIT_Q` sweep the
+  > design implied on entry to the reverse half is **not** implemented: the baseline is
+  > taken all-`Q` and an unchanged fingerprint carries that forward, so a second sweep
+  > would have no case that distinguishes it. `cq_reg_free` now goes through the same
+  > `cq_ctx_release_qubit` joint, which closes the Step 7 hazard about a reused index
+  > keeping a stale entry.
 
 - **`_unc` vs `cqrt_free` ownership — `cqrt_free` is the SOLE deallocator.** `_unc`
   zeroes values in place and reclaims **nothing**: no pool operation, no bit-kind
@@ -517,6 +541,12 @@ The `tests/support/` harness is hand-rolled (no dependencies beyond libc).
 plan §2.2's list of five, added at Step 4 because Steps 4 and 6 need ten aborts between
 them. The other three land across Phase B: `refmodel`, `bitkinds`, `poolcheck`.
 
+**`FAIL_REGULAR_EXPRESSION` now discriminates within one module, not only between two.**
+Step 7 used it to prove M07's free aborted rather than M03's. Step 8 uses it to prove
+*which of three calls of the same guard* fired — the region fingerprint after the
+forward half, after the copyout, or after the reverse half. Same tool, finer grain; see
+the callout below for why it was needed.
+
 Some deaths are **Debug-only by design** — plan §2.1 gates the I2 owner map, the I6
 scratch-extent check and the §3 distinctness asserts on `CQOPS_DEBUG_INVARIANTS`. Those
 cases call `CQ_DEATH_SKIP_WITHOUT_INVARIANTS(...)` and report a **skip** in Release
@@ -526,7 +556,11 @@ configuration compiled out. Say which configuration a death was verified in (Rul
 `mock_sink` is the workhorse: it records the `(op, operands)` stream, compares against
 an expected sequence and dumps the actual one on failure, and feeds `CHECK_GATES` its
 three per-kind counts. **Angles compare bitwise, not with `==`** — `0.0` and `-0.0` are
-equal in C but are different gates to emit.
+equal in C but are different gates to emit. Step 8 added `cq_mock_is_palindrome(m,
+n_head, n_mid)`, the ordered check PRD §10 names as the **only** detector with teeth on
+the rotation-tainted surface, where `cq_shadow_retire` is inert — a gate *count* cannot
+see an R8 divergence, because K12's reversed forward list has a different multiset with
+the identical total.
 
 **Tests reach internal headers directly** — `tests/CMakeLists.txt` puts `src/` on
 `cqops_test_support`'s PUBLIC include path, so `test_bit.c` writes `#include "bit.h"`.
@@ -551,13 +585,31 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   M08 owns the `cq_bit` array and its dispose asserts every bit is back to `CQ_BIT_ZERO`
   — a **kind** check, never a shadow read. That is what plan §3's "assert clean on
   release" actually becomes, and unlike a shadow reading it is implementable.
-- **Layer 0, the emitter and the handle table exist; nothing above them does.**
-  `src/bit.h`, `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]`,
-  `src/emit.[ch]` and `src/reg.[ch]` are real as of Step 7 — but there is no
-  scratch, no sandwich, no kernel, and **no controlled axis** (M06 is Step 20, despite
-  its low module number). Check before you cite — and read
-  `third_party/bennett/COMMIT` rather than running `git log` inside it, which reports
-  the *parent* repo's HEAD because the snapshot has no `.git`.
+- **Layers 0–2 exist; Layer 3 and above do not.** `src/bit.h`, `src/shadow.[ch]`,
+  `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]`, `src/emit.[ch]`, `src/reg.[ch]`,
+  `src/scratch.[ch]` and `src/sandwich.[ch]` are real as of Step 8 — but there is **no
+  kernel**, no sink beyond the vtable (M23–M25 are Step 9 and Phase D), and **no
+  controlled axis** (M06 is Step 20, despite its low module number). Check before you
+  cite — and read `third_party/bennett/COMMIT` rather than running `git log` inside it,
+  which reports the *parent* repo's HEAD because the snapshot has no `.git`.
+- **THE SAME GUARD CALLED THREE TIMES IS ONE MUTATION AWAY FROM UNTESTED, and Step 8
+  measured it.** `cq_sandwich` verifies its region fingerprint after each of its three
+  loops. With the obvious two death cases in place, deleting **any one of the three**
+  left all 65 tests green — a later call caught what the deleted one would have. This is
+  the Step 6 and Step 7 lesson for the third time, and the fix is the same tool at a
+  finer grain: a CTest `FAIL_REGULAR_EXPRESSION` naming the **loop** that must catch each
+  case, plus a case that reaches the last check (a step that misbehaves only on the
+  reverse pass, which the forward pass cannot reach). The identical shape holds for the
+  two `sw_arm` calls. **Before adding a guard, ask which single case goes red if this
+  exact line is deleted — and if a later copy of the same guard would catch it, the
+  answer is "none".**
+- **`CQ_ZERO_BY_PALINDROME` is a literal `1`, so M03's `proven_zero` guard can never fire
+  for a sandwich.** The Release-configuration detector of a non-cancelling compute half
+  is `cq_shadow_retire`'s determinate-and-non-zero check in **M02**, not the pool and not
+  the Debug-gated fingerprint. PRD §10 bounds its reach exactly: complete across the
+  rotation-free kernel surface, **inert** once a rail is rotation-tainted — so never
+  report an L6 run as evidence the certificate held. On the poisoned surface the only
+  detector with teeth is `cq_mock_is_palindrome`, which lives in `tests/`.
 - **`cq_bit_coincident` has NO pointer-identity clause, and adding one breaks the fold
   table.** PRD §3 says the distinctness check "can only ever fire on `CQ_BIT_Q`
   operands, and cannot fire on two constants" — a pointer clause fires on one constant
@@ -766,7 +818,7 @@ check, do not assume, and update this table when a step lands):
 |---|---|
 | 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · **M04 `sink`** |
 | 1 — emission | **M05 `emit`** (the fold table — Rule 11) · M06 `controlled` |
-| 2 — registers, sandwich | **M07 `reg`** · M08 `scratch` · M09 `sandwich` |
+| 2 — registers, sandwich | **M07 `reg`** · **M08 `scratch`** · **M09 `sandwich`** |
 | 3 — kernels | M10 `bitwise` · M11 `shift_const` · M12 `shift_var` · M13 `cast` · M14 `add` · M15 `addacc` · M16 `cmp` · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |
 | 4 — analog, sinks | M21 `angle` · M22 `rotate` · M23 `sink_printf` · M24 `sink_count` · M25 `sink_qec` |
 | 5 — shim | M26 `cq_runtime_impl.c` · M27 `gen_shim.py` · M28 generated `*.gen.c` (LOC-exempt) |

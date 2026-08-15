@@ -540,6 +540,69 @@ early). Safe today only because the sole available evidence *is* the shadow; the
 ckd.17's structural certificate allows a free under a poisoned entry, the pool hands the
 next `cq_materialise` a genuinely `|0⟩` qubit carrying a stale determinate entry.
 
+### Step 8 status (2026-08-15) — **M08 + M09 landed; the `ckd.17a` certificate is code**
+
+`src/scratch.[ch]` (13 + 43 = **56** against a 90 budget) and `src/sandwich.[ch]`
+(10 + 105 = **115** against 110 — 5 over, no split), plus `cq_shadow_retire` in M02,
+`cq_ctx_release_qubit` and a `sandwich_depth` field in `cq_ctx`, and
+`cq_mock_is_palindrome` in the test support library. `cq_reg_free` was rewired through
+the new joint. **67 ctest tests green under both configurations and under a full
+ASan + UBSan build** (Homebrew clang). `make lint` green; `tests/test_sandwich.c` hit the
+300-line guard and split into `tests/test_sandwich_certificate.inc` along the
+driver-mechanics ↔ certificate seam.
+
+**The headline is not the driver — it is that the same guard called three times was one
+mutation away from untested.** 32 mutations were run in two rounds. Round 1 killed 22 of
+26; **three of the four survivors were the three `SW_VERIFY` calls**, each individually
+deletable because a later call caught what it would have. Round 2 added one mutation per
+`sw_arm` call and found the identical shape there. This is the Step 6 and Step 7 lesson
+for the third and fourth time, and it now has a general form worth stating:
+
+> **A guard is untested if a LATER COPY OF THE SAME GUARD would catch its cases.** Two
+> layers guarding one condition (Steps 6, 7) is the special case; N call sites of one
+> guard is the general one. The fix is `FAIL_REGULAR_EXPRESSION` at a finer grain — name
+> the *call site*, not just the module — plus a case that reaches the last site, which
+> has nothing after it to lean on. **A step function that misbehaves only on the reverse
+> pass is the construction that reaches it**, and it is not contrived: it is exactly the
+> asymmetry the reverse-half arming exists to catch.
+
+**Deviations from §0.1, all deliberate:**
+
+1. **The fingerprint is checked after the COPYOUT loop too,** which §0.1's "unchanged
+   across each half" does not require. It must be: the I6(a) extent is disarmed during
+   copyout, so the fingerprint is the only thing that can see a copyout step reaching
+   back into the region.
+2. **There is no second all-`CQ_BIT_Q` sweep on entry to the reverse half,** which §0.2's
+   third enforcement bullet implies. The baseline is taken all-`Q` and an unchanged
+   fingerprint carries that forward, so no case distinguishes the second sweep — and by
+   the rule above, that makes it a check that survives its own deletion.
+3. **`sandwich_depth` is on `cq_ctx` and is NOT Debug-gated,** unlike the extent beside
+   it. The nesting premise is `O(1)`, and it covers a case the extent cannot: a sandwich
+   attempted from a copyout step, where the extent is deliberately disarmed.
+4. **The epilogue carries a both-configuration `cq_bit_is_qubit` check** before
+   `cq_bit_qindex`. In Release the fingerprint is compiled out, and a constant's
+   canonical `q == 0` would otherwise release someone else's qubit. Its distinguishing
+   case passes in Debug and fails in Release — a concrete instance of why Rule 17 makes
+   both configurations mandatory rather than advisory.
+5. **The region is released in REVERSE index order.** The free list is LIFO (D4), so
+   pushing `n-1 .. 0` leaves index 0 on top and the next sandwich re-acquires the same
+   indices in the same ascending order. Two identical kernels therefore emit an identical
+   stream, which is what keeps an L6 diff quiet and an L4 golden reproducible.
+
+**The one surviving mutant is equivalent in isolation, and its pair proves the point.**
+Deleting `cq_scratch_alloc`'s Debug `0xAA` poison changes nothing on its own. But
+deleting the *initialiser loop* was killed in Debug **only because the poison was there**
+— and passed in Release, where there is no poison and `malloc` happened to return zeros.
+An all-zero `cq_bit` is a valid `CQ_BIT_ZERO`, so this is M03's Step 4 allocator-luck
+trap in its sharpest form.
+
+**Two things Step 8 changes for later steps.** `cq_reg_free` now retires shadow entries,
+which closes the hazard the Step 7 note above left open. And `CQ_ZERO_BY_PALINDROME` is
+a literal `1`, so M03's `proven_zero` guard can never fire for a sandwich: the
+Release-configuration detector of a non-cancelling compute half is **M02's**
+`cq_shadow_retire`, whose reach PRD §10 bounds exactly — complete across the
+rotation-free surface (Steps 10–17), inert once a rail is rotation-tainted.
+
 ---
 
 ## 3. Module map
