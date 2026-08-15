@@ -810,13 +810,30 @@ promotion never needs more than one control wire.
   > indices to the pool is laundering under another name.
 
   > **What "provably clean" reads is NOT settled by this bullet, and it is not obvious.** It
-  > cannot be the two-bit shadow: §3's `CX` rule propagates `unknown`, so an uncomputed
-  > *tainted* rail is all-`Q unknown` and a literal shadow check would hard-error on every
-  > legitimate sandwich kernel. The evidence has to be **structural** — the §4 kernel
+  > cannot be the two-bit shadow **on a tainted rail**: §3's `CX` rule propagates `unknown`,
+  > so an uncomputed *rotation-tainted* rail is all-`Q unknown` and a literal shadow check
+  > would hard-error on it. There the evidence has to be **structural** — the §4 kernel
   > contract plus I6 palindromic reversal — which means one sanctioned un-poisoning write,
   > the sole exception to §3's "conservative in the safe direction only". This bites M08's
   > "assert clean on release" at **Step 8, before any kernel exists**. Tracked separately;
   > **do not** weaken this hard error to a warning to make a fixture pass.
+  >
+  > **CORRECTED 2026-08-15 at Step 10 — the paragraph above said "every legitimate sandwich
+  > kernel" and that over-generalised, in a way that contradicted this same section three
+  > pages up.** `Ry`/`Rz` are the ONLY producers of `unknown` (`src/shadow.c:121` is the sole
+  > writer of `e[q].unknown = 1`); `CX` and `CCX` merely propagate what is already there. So
+  > **on the rotation-free surface — Steps 10 through 17, every kernel and no rotation —
+  > nothing is tainted, every shadow entry is determinate, and `cq_shadow_known_zero` is not
+  > conservative but EXACT.** It is a genuine free-time proof there, which is exactly the
+  > reach this section already claims two paragraphs earlier for `cq_shadow_retire`
+  > ("a complete detector … across the whole rotation-free kernel surface (Steps 10–17),
+  > because `Ry`/`Rz` are the only producers of `unknown`"). Read literally, the older
+  > wording said Step 10's L3 free must hard-error, and it does not: Step 10 frees its result
+  > rails through `cq_reg_free` with
+  > `tests/support/poolcheck.c:cq_pc_zero_proof_rotation_free`, and 75 ctest tests pass in
+  > both configurations. **The scope is the whole content of that proof and its name says so**
+  > — it becomes a laundering device the moment M22 lands at Step 19, which is what `ckd.17b`
+  > and `ckd.18` are about, and neither is answered by it.
 
 ---
 
@@ -827,9 +844,9 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 | Level | What | How |
 |---|---|---|
 | L0 | Fold table | Unit tests over all operand-state combinations in §3 |
-| L1 | **Kernel differential** | For each kernel: all `(a,b)` at W ∈ {1,2,4,8} × sampled classical/quantum bit-kind masks, compare shadow result against the C operator. Random sampling at W ∈ {16,32,64} |
-| L2 | Ancilla-clean | After every kernel call, assert the live-qubit set equals exactly `dst`'s qubits |
-| L3 | Uncompute round-trip | forward → `_unc` → assert `dst`'s **values** are all-zero. The pool is **not** restored yet — `_unc` reclaims nothing (§10). The harness then calls `cqrt_free` explicitly and asserts the pool is back to its pre-call state |
+| L1 | **Kernel differential** | For each kernel: all `(a,b)` at W ∈ {1,2,4,8} × classical/quantum bit-kind mask **pairs**, compare the result register's **value** against the C operator. Random sampling at W ∈ {16,32,64} |
+| L2 | Ancilla-clean | After every kernel call, assert **no index is live that no named register owns**, and that every index a named register owns is live |
+| L3 | Uncompute round-trip | forward → `_unc` → assert `dst`'s **values** are all-zero. The pool is **not** restored yet — `_unc` reclaims nothing (§10). The harness then frees `dst` explicitly and asserts **`live` is back to its pre-call value and every index `dst` held is back on the free list** |
 | L4 | Gate-count goldens | Pin per-kernel `(NOT, CNOT, Toffoli)` at each W. Cross-check against Bennett's published baselines where the construction matches, and document every deliberate delta. See the arity and staleness notes below — both bit an earlier draft |
 | L5 | Classical short-circuit | Assert **zero** gates and **zero** qubits for the fully-classical case, and exactly 1 qubit / 1 CX for `int a = 0; a \|= b << 3` |
 | L6 | CQ_lang e2e | Link against CQ_lang's existing fixtures, diff emitted traces |
@@ -837,6 +854,39 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 
 L1 and L5 are the two that actually catch bugs. L4 is what stops a "harmless" refactor
 from silently doubling the T-count.
+
+> **Three corrections made at Step 10, when the first kernel forced each of them from
+> prose into code. All three rows above are the corrected wording.**
+>
+> **L1 does not read "the shadow".** `shadow(dst)` is undefined for the bits of `dst` that
+> are still constants — and under the all-classical mask, which this same table calls L5,
+> *every* bit of `dst` is a constant and there is no shadow to read at all. The oracle is
+> the register's **value**: a constant bit contributes its kind, a qubit-carrying bit its
+> shadow value. `cqrt_measure` cannot serve — it emits `sink.mz`, which would pollute L4's
+> counts, and it is terminal (§7), which would make L3's free impossible.
+> `tests/support/poolcheck.c:cq_pc_value` is the reader.
+>
+> **L2 as originally worded was literally false whenever an operand was quantum.** An
+> operand register with any `CQ_BIT_Q` bit owns live qubits at the moment of the assertion,
+> and they are nobody's leak; only by I4 does "exactly `dst`'s qubits" ever hold. The
+> operative claim is the union form above. A **count** comparison is strictly weaker and
+> must not be substituted — leak one index and hand back another and the totals still
+> agree. `cq_pc_live_is_exactly` implements the set form.
+>
+> **L3 cannot compare `minted` or the free-list length.** Both are monotone
+> (`src/qubits.h`: "minted == live + free", "peak == minted"), so a round trip that
+> allocates `dst`'s qubits and returns them necessarily leaves `minted` higher. Requiring
+> them to match is requiring the kernel never to allocate — an earlier draft of the Step 10
+> driver did exactly that and failed 1,276,416 cases on its first run. What is both correct
+> and *stronger* is the per-index check: name `dst`'s indices before the free, and assert
+> each is back on the free list after. That also catches a free that released the wrong
+> index, which no count can see.
+>
+> **A mask is a PAIR, one per operand.** Every normative sentence here and in the plan says
+> "masks" in the singular, but risk R8's own mandated fixed witness is "`a` all `Q`, `b` all
+> `ZERO`" — an asymmetric pair, inexpressible if one mask applies to both operands. The two
+> operands are independent channels and the §3 fold table treats them so; a suite that
+> varies them together tests the diagonal of the space and calls it the space.
 
 **L0's size is 159** — `5 X + 25 CX + 125 CCX = 155` exhaustive cases (the full Cartesian
 product over the five operand kinds) plus the **4** distinctness death-tests of §3. Each of
@@ -963,6 +1013,7 @@ and diffs.
 | D5 | Handle reuse | Never — monotonic, matching CQ_lang's existing `h<N>` trace convention |
 | D6 | Shadow-driven demotion | A qubit whose shadow is *known* could be X'd to \|0⟩, freed, and folded back to a constant bit. Sound, and a real saving. Deliberately **not** in v1 — it makes the qubit count depend on shadow precision, which would make L4 goldens fragile. But see §10: it is also what would make forward and `_unc` gate counts agree, so revisit if that asymmetry becomes painful |
 | **D7a** | **Result aliases a source** — `_unc(out, out, b)` | **Measured 2026-08-14 at Step 7 over all 239 goldens: 0 occurrences in 25,147 `_unc` calls.** It also breaks §4's `dst ^= f(a,b)` outright. **Hard error, in BOTH configurations** — R2's whole value is firing during the L6 fixture run at Step 24, which Rule 17 pins under Release |
+| **D8** | **Shift amount out of range** — `x << k` with `k ≥ W` | **Resolved 2026-08-15 at Step 11 (bd `ckd.16`). MASK, THEN SATURATE — one formula for both paths:** `dst ^= sat_shift(a, k mod 2^⌈log₂W⌉)`, where `sat_shift` zero-fills (`shl`/`lshr`) or sign-fills (`ashr`) and so yields 0 / all-sign once the effective amount reaches `W`. **Deterministic, documented, never traps** — D3's posture, and for D3's reason: `k` is decoded from `W` classical bits, so its domain is `[0, 2^W)` and ordinary C reaches M11 with `k = 40` at i32. See the note below for why this is the *cheap* side |
 | **D7b** | **Two sources alias each other** — `mul(h, h)` | **Measured the same way: 599 occurrences, of which 10 are on v1's integer surface.** CQ_lang ships a fixture named for it — `tests/e2e/slice_select_rail_alias_cond.expected.log:4` is `cq_template_icmp_slt_i32(h0, h0) -> h1`, and `:31` is `cq_template_mul_i32(h10, h10) -> h11`; also `spec_newcand_qsq_caller:13,16`, `spec_replan_qpow_caller:13,18`, `slice_i128_mulhi:4`. **This is LEGAL and must NOT abort.** The remedy is now required rather than contingent: a defensive `cqrt_copy` of one aliased source at the **M26 handle boundary** (Step 23), *before* Step 24 runs — one place, not twelve. M07 exposes the predicate; M26 acts on it |
 
 > **D7 used to be one row reading "v1: assert loud and find out empirically whether the
@@ -972,8 +1023,58 @@ and diffs.
 > for that would be to delete the whole check, losing the D7a detection that does matter.
 >
 > Why D7b cannot be left to the kernels: a kernel sees `cq_bit *` and `W` (§4), never
-> handles, so it cannot detect operand aliasing at all. What it *does* see is `a[i]` and
-> `b[i]` being the **same bit**, which reaches §3's `CCX` distinctness assert — an abort
-> from inside a kernel, seventeen steps from its cause, in Debug; and in Release that
-> check is compiled out and a malformed `CCX(q,q,t)` reaches the sink as a silent
-> miscompile. The remedy has to sit at the handle boundary.
+> handles, so it cannot detect *handle* aliasing at all — and the remedy, a defensive
+> copy, is a handle-level act. What a kernel *does* see is `a[i]` and `b[i]` being the
+> **same bit**, which reaches §3's `CCX` distinctness assert — an abort from inside a
+> kernel, seventeen steps from its cause, in Debug; and in Release that check is compiled
+> out and a malformed `CCX(q,q,t)` reaches the sink as a silent miscompile. **Both halves
+> of that were MEASURED at Step 10 and are worse than this paragraph implied**, which is
+> why `cq_kernel_check_dst` now aborts on `a` and `b` overlapping *as arrays*, in both
+> configurations, with a message naming the missing M26 copy. That is a backstop on the
+> remedy, not a substitute for it: the remedy still sits at the handle boundary, and it is
+> what guarantees a kernel never sees the alias in the first place.
+>
+> **D8's asymmetry, since it is the whole reason for the answer.** Bennett's *constant*
+> path throws outside `0 ≤ k ≤ W`, so upstream never has to reconcile the two; we cannot
+> throw, so we must. The two paths were thought to differ by masking-versus-saturating,
+> and they do not: **the barrel saturates too.** Each of its `⌈log₂W⌉` stages zero-fills
+> the positions it shifts in (`arith.jl:355-400` — the destination is a fresh all-zero
+> register and out-of-range copies are simply not emitted), and saturating shifts compose,
+> so the variable path computes `sat_shift(a, k mod 2^S)` and not a rotate. It therefore
+> saturates unasked on the whole interval `[W, 2^S)`. Consequences, all measured
+> 2026-08-15:
+>
+> - **The conflict is a power-of-two artefact.** At `W ∈ {8,16,32,64,128}`, `2^S = W`, that
+>   interval is empty, and the paths differ at *every* `k ≥ W`. At **i80** they agree
+>   throughout `[80,128)` and first differ at `k = 128`. `ckd.16`'s worked i80 example
+>   (`k = 100`) does **not** reproduce — both paths give 0. Its `W=32, k=32` example does,
+>   and sharply: the constant path annihilates the value, the variable path returns it
+>   untouched.
+> - **Masking alone is not enough, which is a correction to `K04.md` §5(e) option 2.** At
+>   `W = 80`, masking to 7 bits leaves amounts in `[80,128)`, and a constant path that only
+>   masked would emit a shift by 100 on an 80-bit register. The rule is mask **and then**
+>   saturate — still zero gates and zero ancillae, just two operations rather than one.
+> - **The cost is roughly 200:1.** Making the *variable* path saturate needs an OR-reduction
+>   over the `W − S` amount bits it currently never reads, plus a controlled force of the
+>   result: `+156` gates and `+26` qubits at `W=32`, `+432` and `+72` at `W=80` — about
+>   `+19%` on the barrel, paid on every variable shift. Making the *constant* path mask and
+>   saturate is two classical operations on `k`.
+> - **Nothing in the corpus is affected.** 916 shift calls across the 239 goldens, 895 with
+>   a constant amount: **every one in `[0, W)`, none negative.** D8 defines behaviour for a
+>   case CQ_lang has never emitted, which is why the cheap side is the right side.
+>
+> **The deliberate delta, recorded so it is not mistaken for a bug.** D8 disagrees with
+> Bennett's constant path at exactly `k == W`, where `lower_shl!` returns 0 and D8 returns
+> `x` (for power-of-two `W`). Upstream *pins* that row — `test/test_zmw3_shift_bounds.jl`
+> asserts `isempty(gates_shl)` at `k == W` — so this is a knowing deviation, sibling to
+> K11's Cuccaro choice. It is forced: the alternative is to deviate from the *variable*
+> construction instead, at 19% of its gate count, and upstream pins nothing there at all
+> (`lower_var_*` is called by no test in Bennett's repository).
+>
+> **Two traps for the port, both from the same reading.** Bennett's `k` is
+> `ConstOperand.value::Int` built through `LLVMConstIntGetSExtValue`, so an i32 shift
+> amount of `0x80000000` arrives **negative**; ours is decoded from `cq_bit`s and has no
+> sign, so M11 must not inherit a signed `k` or the sign test that goes with it. And the
+> `s >= W && break` guard in all three `lower_var_*` functions is **unreachable** given
+> `_shift_stages`'s own bound (checked for every `W` in `[1,4096]`) — porting it as live
+> logic would be porting a branch upstream never takes.

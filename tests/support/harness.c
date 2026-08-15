@@ -16,11 +16,29 @@ int cq_h_streq(const char *a, const char *b)
     return strcmp(a, b) == 0;
 }
 
+/* See cq_h_mute in harness.h: set while a suite is deliberately provoking a
+ * failure in order to assert that the failure happens. */
+static int cq_h_muted = 0;
+
+void cq_h_mute(int on)
+{
+    cq_h_muted = on;
+}
+
+int cq_h_take_failures(void)
+{
+    int n = cq_h_case_failures;
+    cq_h_case_failures = 0;
+    return n;
+}
+
 void cq_h_fail(const char *file, int line, const char *fmt, ...)
 {
     va_list ap;
 
     cq_h_case_failures++;
+
+    if (cq_h_muted) return;
 
     /* TAP diagnostics: '#'-prefixed lines are legal anywhere in the stream,
      * so a failure can be reported the moment it happens rather than being
@@ -66,4 +84,23 @@ int cq_h_run(const cq_test_case *cases, size_t n)
     if (failed != 0) printf("# %zu of %zu case(s) FAILED\n", failed, n);
 
     return failed == 0 ? 0 : 1;
+}
+
+/* --- Command-line flags. See harness.h on what they cannot reach. -------- */
+
+static int    cq_h_argc;
+static char **cq_h_argv;
+
+void cq_h_args(int argc, char **argv)
+{
+    cq_h_argc = argc;
+    cq_h_argv = argv;
+}
+
+int cq_h_flag(const char *name)
+{
+    int i;
+    for (i = 1; i < cq_h_argc; i++)
+        if (cq_h_streq(cq_h_argv[i], name)) return 1;
+    return 0;
 }

@@ -95,6 +95,13 @@ add_library(cqops STATIC
     src/sandwich.c      # M09, Step 8 — the driver, I6(a)+(b), the epilogue
     src/sink_printf.c   # M23, Step 9 — the default sink, one line per gate
     src/sink_count.c    # M24, Step 9 — per-kind totals, T-count = 7×Toffoli
+
+    # Layer 3 — kernels. All independent of each other (plan §5).
+    src/kernels/bitwise.c      # M10, Step 10 — K1 xor, K2 and, K3 or; naturally
+                               # clean, no sandwich (kernel.h is header-only and
+                               # carries no translation unit, like bit.h)
+    src/kernels/shift_const.c  # M11, Step 11 — K4 constant shl/lshr/ashr, D8
+    src/kernels/cast.c         # M13, Step 11 — K5 sext/zext/trunc, two widths
 )
 
 target_include_directories(cqops

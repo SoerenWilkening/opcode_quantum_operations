@@ -285,8 +285,30 @@ No dependencies beyond libc (PRD §14), so hand-rolled:
 | `harness.[ch]` | 90 | `CHECK/CHECK_EQ/CHECK_GATES`, per-file `main`, TAP output, failure context |
 | `mock_sink.[ch]` | 120 | Recording sink: captures the `(op, operands)` stream; compare against expected, dump on failure. **The workhorse fixture** |
 | `refmodel.[ch]` | 150 | Plain-C reference semantics per opcode at each `W`, with correct masking and two's-complement edge cases |
-| `bitkinds.[ch]` | 110 | Build a register from `(value, quantum-mask)`; enumerate the mask sets used by L1 |
+| `bitkinds.[ch]` | 110 | Build a register from `(value, quantum-mask)`; enumerate the mask **pairs** used by L1 |
 | `poolcheck.[ch]` | 80 | Snapshot/diff the qubit pool; the automatic L2 and L3 assertions |
+| `kerneldrv.[ch]` | **249 landed** | **Added at Step 10.** The shared Phase-B driver §4 below assumes without naming — see the note. Split seam: **the sweep shapes move to `kernelsweep.c`, keeping `cq_kd_case`'s four levels in one file** — trigger at 260 in `kerneldrv.c` |
+| `kernelsweep.c` | **128 landed** | **Split from `kerneldrv.c` at Step 11** on this table's own recorded seam: the sweep SHAPES here, the four LEVELS next door |
+| `goldens.[ch]` | **221 landed** | **Added at Step 10.** L4's counts as an on-disk artifact: load, check, regenerate, and the risk-R3 commit cross-check. Split seam: **parse/write ↔ check**, i.e. the file format leaves and `cq_gold_check` stays — trigger at 260 in `goldens.c` |
+
+> **The last two are beyond this table's original five, like `death.[ch]` before them, and
+> the gap was structural rather than accidental.** §4's Phase B gate says the four levels are
+> "applied automatically by the **shared kernel driver** rather than written per kernel", and
+> §4 Step 20 says re-running every kernel under control "costs one parameter in the kernel
+> test driver, not twelve new suites" — but no file, no budget and no module row was ever
+> assigned to that driver, and the same was true of `tests/goldens/`. Both are load-bearing
+> for eleven kernel modules, so they are named here now. Neither is exempt from Rule 12; §2.3
+> covers `tests/` explicitly.
+>
+> **A packed `uint64_t` in `refmodel` and `bitkinds` is not an I5 violation.** I5 forbids a
+> packed scalar in the *representation* — in a register, a peephole or a kernel — because it
+> caps width at 64 and forces a two-word split plus a 128-bit variant of every fold. These
+> two are the *reference* and the test-side *specification*: PRD §11 defines L1 as "compare
+> against the C operator", which needs a C scalar by construction, and this table's own
+> `bitkinds` row prescribes "(value, quantum-mask)". What they build is an ordinary `cq_bit`
+> array, tested for I1 like any other. The cap it imposes is real and bounded — W ≤ 64, which
+> covers every width L1 tests — and an i80 or i128 kernel would need a two-word reference.
+> `cq_ref_mask` aborts rather than truncating if asked for one.
 
 ### 2.3 The 300-line guard
 
@@ -605,6 +627,213 @@ rotation-free surface (Steps 10–17), inert once a rail is rotation-tainted.
 
 ---
 
+### Step 11 status (2026-08-15) — **M11 + M13 landed; `ckd.16` resolved as D8**
+
+**87 ctest tests green in both configurations; `make lint` OK.** M11 is **63 lines** and
+M13 **42**, against 90 each.
+
+**The blocker was resolved in the source document first, and correcting the bead's own
+facts is what decided it.** `ckd.16` framed the conflict as saturate-versus-mask; the
+barrel **also saturates** (each stage zero-fills, and saturating shifts compose), so the
+variable path is `sat_shift(a, k mod 2^S)` and the disagreement is a **power-of-two
+artefact** — at i80 the two paths agree throughout `[80,128)`, which is the opposite of
+what the bead reached for. Full statement in PRD §15 D8; K04.md §5(e) carries a
+correction box. Measured over the 239 goldens: 916 shift calls, 895 with a constant
+amount, **every one in `[0,W)`**, so D8 defines behaviour CQ_lang has never emitted, and
+the cheap side was the right side. **In M11 the mask half is structural, not arithmetic**:
+the kernel reads only the low `S` bits of the amount, exactly as the barrel reads only
+`b[0..S-1]` as MUX controls.
+
+**Two driver generalisations, both forced by kernels rather than by taste.** K4 needs an
+operand CONSTRAINED CLASSICAL (a quantum amount is M12's, not M11's); K5 is UNARY WITH TWO
+WIDTHS and its values run to 128 bits. Both went into `cq_kd_spec` as zero-defaulting
+trailing members, so Step 10's specs compile untouched, and `cq_kernel_check_dst` grew an
+N-ary form because it was **mis-sized for `F != T`** — that guard is the structural
+defence against K05.md's named trunc-looks-like-a-slice aliasing.
+
+**The verification pass found more than the code did.** 43 mutants, 27 killed; every one
+of the 22 pure-logic mutants died, and the survivors clustered in exactly two places —
+guards with no death test, and assertions masked by other assertions. Seven fixes:
+
+1. **L2's set check was masked by L3's COUNT for a whole step.** All three
+   `cq_pc_live_is_exactly` calls could be deleted together and the suite stayed green,
+   because the provocation moved `live` and `cq_pc_same` caught it. The test named for L2
+   was passing on L3. Closed with a fault that **nets to zero** — acquire one ancilla,
+   release one belonging to a source — and re-verified by re-running the same mutation.
+2. **Two thirds of the L4 tuple was a tautology** in both new suites:
+   `CHECK_GATES(0, cx, 0, 0, want_cx, 0)`, literal 0 against literal 0, with the
+   unobserved zeros written into 159 golden rows. A regression from Step 10, caused by a
+   bespoke measurement helper that returned only `cx`.
+3. **`_unc` was not pinned at all** for M11 or M13 — 0 unc rows against `bitwise.counts`'
+   21 — because the same helpers called the kernel once.
+4. **`sext` had no independent oracle**: `cq_ref_w_sext` is a bit-for-bit transcription of
+   the kernel, same bounds and same sign index, so an error made once and repeated was
+   invisible to L1 (a wrong-sign-bit mutant passed all 8 cases). `cq_ref_sext`'s
+   shift-free `(t ^ sign) - sign` identity was dead code with no caller; it is now the
+   oracle.
+5. **No death test for either module** — four hard errors between them, all deletable
+   with the suite green, including cast.c's width guard, which prevents a heap overrun
+   rather than a wrong answer.
+6. **The overlap death case overlapped by TWO elements**, so a one-element off-by-one in
+   `cq_kernel_overlap2` survived. Now minimal.
+7. **i80 and i128 were absent from the shift sweep and goldens** — and i80 is the *only*
+   shipped width where D8's saturating branch can fire, carrying 47% of the corpus's 909
+   shift calls. Adding them needed a two-word shift reference, which now also
+   cross-checks the one-word model below 64.
+
+**Carried forward:** M12 (Step 14) must match D8 exactly. A review proved a verbatim
+barrel port does — 0 mismatches over 402,444 model cases — but nothing in the repository
+*makes* it, so the obligation is now written into that step's bead.
+
+---
+
+### Step 10 status (2026-08-15) — **M10 landed, and the shared Phase-B gate is now a thing rather than a plan**
+
+**75 ctest tests green in both configurations; `make lint` OK.** M10 is **40 lines against a
+100 budget** — the three kernels really are three loops. Everything else Step 10 cost went
+into the machinery the next seven kernel steps inherit.
+
+**The ports are transcriptions and were independently re-verified against the pinned
+snapshot**, not against our own emitter: the three fenced excerpts in K01/K02/K03 §1 are
+byte-for-byte `arith.jl:284-291`, `:268-272`, `:274-282` (SHA-256 matched on both sides),
+each is the sole definition in the tree, the gate field orders in `gates.jl:12-22` and the
+`⊻=` semantics in `simulator.jl:1-3` confirm which operand is the target, and the pinned
+commit matches. `xor` = 2W CNOT, `and` = W Toffoli, `or` = 2W CNOT + W Toffoli, at every W.
+
+**Five test-support files landed, two of them beyond §2.2's list.** `refmodel`, `bitkinds`
+and `poolcheck` as budgeted; `kerneldrv` and `goldens` because §4's Phase B gate assumed
+both and assigned neither (§2.2 above now names them). `harness.[ch]` grew
+`cq_h_args`/`cq_h_flag` and `CQ_TEST_MAIN_ARGV`, for the one suite that has a mode as well
+as a verdict.
+
+**What the four levels became, once they had to be code.** All four rows of §4's gate were
+imprecise in ways that only a running driver could expose; the corrected wording is in §4
+and PRD §11, and the substance is:
+
+1. **L1 reads a VALUE, not "the shadow".** `shadow(dst)` is undefined for a constant bit,
+   and under the all-classical mask — which the same table calls L5 — *every* bit of `dst`
+   is one.
+2. **L2's "exactly `dst`'s qubits" is false whenever an operand is quantum.** The operative
+   claim is the union form, as a SET: no index is live that no named register owns. A count
+   is strictly weaker — leak one index and hand back another and the totals agree.
+3. **L3 cannot compare `minted` or the free-list length.** Both are monotone. The first
+   draft of `cq_pc_same` compared all three and **failed 1,276,416 cases on its first run**
+   — a fair sample of what "assert the pool, never assume it" costs when the assertion is
+   wrong. What replaced it is *stronger*, not weaker: name `dst`'s indices before the free
+   and assert each is back on the free list, which also catches a free that released the
+   wrong index.
+4. **A mask is a PAIR.** Every normative sentence said "masks" in the singular, but R8's own
+   mandated witness — `a` all `Q`, `b` all `ZERO` — is inexpressible that way.
+
+**The W=8 sweep is capped, and the cap is printed by every run.** The full product is 20
+mask pairs × 65,536 value pairs × 3 kernels = 3.9M cases, measured at 43 s in Debug against
+a 0.8 s suite. So W ≤ 5 runs the **full cross product**, W=8 runs **every value pair** with
+the mask rotating (~3,300 values per mask) plus the four corners against every mask, and
+W ∈ {16,32,64} is deterministically sampled from a width-seeded xorshift. Total: **3.9 s
+Debug, 0.9 s Release.** Coverage was moved, not lost — but it was moved, and a run that says
+so in its own output is the only kind of cap this project allows.
+
+**L4's goldens are DATA, and risk R3 now has teeth.** `tests/goldens/bitwise.counts` carries
+the Bennett SHA on a `# bennett:` line, and `cq_gold_open` compares it against
+`third_party/bennett/COMMIT` — so a re-pinned snapshot whose goldens were not regenerated is
+red, which is exactly the silent invalidation R3 describes and which a header comment nobody
+reads cannot catch. Note the COMMIT file is a *document*: the SHA is on its `commit:` line,
+and reading its first line yields a title that would never change on a re-pin. Forward and
+`unc` are pinned as separate rows, and an unvisited row is a failure — a golden that claims
+a width is pinned while nothing checks it is a coverage hole reported as coverage.
+
+**`ctest` does not forward trailing arguments, and the documented regeneration command was a
+hard error.** `ctest --test-dir build-release -R kernel -- --update-goldens` fails with
+`CMake Error: Unknown argument: --` and runs zero tests, on ctest 4.3.2 — the `-- <args>`
+idiom belongs to `cmake --build`. Measured four ways (with `--`, without, bare, `--` first);
+all four error. The mechanism is `CQOPS_UPDATE_GOLDENS=1` in the environment, which passes
+through the existing `ENVIRONMENT` test property untouched; the property must **not** be
+taught to set that variable, or it would pin it and make the command-line form inoperative.
+`--update-goldens` still works when a test binary is run directly.
+
+**One new hard error, in both configurations: `cq_kernel_check_dst` (D7a at the kernel
+boundary).** It is not a duplicate of M07's handle-level check — a kernel is handed three
+`cq_bit` arrays and is entered directly by the driver, and will be entered by M26 after
+handles are resolved away. Its distinguishing case is `dst == a` with a **classical** `a`:
+M05's distinctness check compares qubit indices and cannot fire on constants, so with the
+guard deleted the fold table folds happily and the kernel returns a wrong answer in silence,
+in *both* configurations. D7b is deliberately not checked — it is legal, and a kernel cannot
+see it anyway.
+
+**Two defects found in the K-docs while porting, neither affecting the goldens.** Bennett
+runs `_fold_constants` **by default** (`Bennett.jl:146`, applied at `driver.jl:375-377`),
+which falsifies the partial-constant *comparison* numbers in K01 §5.2 and K02 §5.2 — at
+default options upstream also pays zero Toffoli for `x & 0x0f`. The headline formulas are
+untouched, because they are pinned at all-quantum operands where the pass provably does
+nothing. And every `PRD-v1.md` / plan line citation in the three K-docs is stale by 95–183
+lines. Both filed.
+
+#### The second pass — a mutation battery and three adversarial reviews
+
+**62 mutants, 37 killed. The split is the whole finding: 22 of 24 LIBRARY mutants died,
+and 21 of 25 TEST-ASSERTION mutants survived.** That asymmetry is not noise. Mutating an
+assertion to always-true cannot fail on a correct library — there is nothing for it to
+catch — so the survivors were not proof of weak assertions, they were proof that **nothing
+in the suite had ever watched one fire**. The two library survivors were both ORDERING
+changes (`xor`'s two CX swapped, `or`'s two CCX controls swapped): semantically equivalent,
+invisible to L1/L2/L3 and to every count, and still a change to a stream `bitwise.c`
+claims to keep in Bennett's order "so L6 trace diffs stay attributable".
+
+**Seven fixes went in, and one of them was a measured silent miscompile in the driver:**
+
+1. **L2 ran only after the forward call.** A reviewer built the witness: a kernel that
+   acquires one ancilla and releases one qubit belonging to a *source* nets to zero, so
+   `live` matches, every value is right, and **the whole suite passed green in both
+   configurations** — with a source register naming an index on the free list and an
+   unowned ancilla live. I2 and I3 both lies; the next `cq_materialise` hands the same
+   physical qubit to unrelated data. L2 now runs three times: after the forward, after the
+   uncompute, and after the free.
+2. **The source-KIND check crossed the uncompute axis** — Rule 14, risk R6 by name. It is
+   now `KINDS_TOO` after the forward and `VALUE_ONLY` after the uncompute. Inert today
+   (nothing can rotate a source before Step 19) and load-bearing for Step 21, which is the
+   step whose entire subject is that asymmetry.
+3. **D7a's guard compared base pointers, and its justification was false on this module's
+   own calling convention.** `cq_scratch_span` exists so a kernel can be handed sub-arrays
+   of one region, and `bitwise.h` says K9 and K12 will do exactly that — so partial
+   overlap is representable, and `cq_kernel_xor(ctx, &r[0], &r[2], b, 4)` passed the guard
+   and returned a wrong answer with no diagnostic in **both** configurations. Now a range
+   comparison through `uintptr_t`.
+4. **D7b was wrong in both directions at the kernel boundary.** Measured: Debug aborted
+   from M05 with a message naming the fold table rather than the alias; Release returned
+   normally having emitted `ccx q0 q0 q2` — a Toffoli whose two controls are one physical
+   qubit — straight to the sink. It stays legal at the HANDLE boundary, where M26's
+   defensive copy is the remedy; reaching a kernel means that copy is missing, and now
+   says so.
+5. **The W=8 mask rotation aliased.** `p = (p+1) % np` with `np=20` and `span=256` has
+   `gcd = 4`, so each mask only ever met value pairs with `vb ≡ p (mod 4)` — the
+   all-quantum mask saw only odd `vb`. Now the all-quantum mask gets the full cross
+   product outright and the rest draw from a seeded xorshift.
+6. **The R3 remedy could not be executed.** The commit-mismatch abort fired before the
+   writer on the update path, so a checking run and an update run failed identically and
+   the only way to follow the instruction the message printed was to hand-edit the
+   `# bennett:` line — the exact silent re-pinning the check exists to prevent. The update
+   run is now exempt and adopts the snapshot's SHA from a live measurement. Verified end
+   to end by faking a re-pin.
+7. **`the_three_kernels_allocate_only_dst` asserted nothing about allocation** — a
+   not-equal-to-one-constant test on a total `check_counts` had already pinned exactly. It
+   now snapshots the pool and asserts `minted` and **`peak`** both move by exactly `W`,
+   which is the "0 ancillae" claim and is a strictly different one from L2's: L2 looks
+   after the call, so a kernel that took scratch and tidily gave it back passes it.
+
+**And the assertions are now falsifiable — `tests/test_kerneldrv.c`, 8 cases.** Five
+deliberately broken kernels (wrong value, leaked ancilla, materialised source, cost on the
+classical path) plus direct unit tests of the poolcheck helpers, each asserting the driver
+**refuses**, with a `CQ_EXPECT_CLEAN` control asserting it accepts a correct one. This is
+`test_harness_negative`'s argument one level up, and it caught its own first bug: the
+source-materialising fault searched only `a`, which under its mask had no constant bit, so
+the provocation never provoked and the case correctly reported the assertion as vacuous.
+
+**78 ctest tests green in both configurations, `make lint` OK. Debug is UBSan-only on this
+host** (Apple clang's ASan runtime, already documented), so the ASan half of Debug coverage
+was absent for the battery too — Rule 17.
+
+---
+
 ## 3. Module map
 
 LOC figures are budgets, not measurements. Every module names the seam it splits on if
@@ -638,10 +867,10 @@ it grows.
 
 | ID | Module | Kernel | LOC | Split seam |
 |---|---|---|---|---|
-| M10 | `kernels/bitwise.c` | K1 xor, K2 and, K3 or | 100 | — |
-| M11 | `kernels/shift_const.c` | K4 constant shl/lshr/ashr | 90 | — |
+| M10 | `kernels/bitwise.[ch]` | K1 xor, K2 and, K3 or | **40 / 100** | — |
+| M11 | `kernels/shift_const.[ch]` | K4 constant shl/lshr/ashr, **D8** | **63 / 90** | — |
 | M12 | `kernels/shift_var.c` | variable shifts (barrel over K10) | 130 | — |
-| M13 | `kernels/cast.c` | K5 sext/zext/trunc | 90 | — |
+| M13 | `kernels/cast.[ch]` | K5 sext/zext/trunc; unary, **two widths** | **42 / 90** | — |
 | M14 | `kernels/add.c` | K6 add, K7 sub | 190 | `add.c` ↔ `sub.c` |
 | M15 | `kernels/addacc.c` | K8 Cuccaro in-place accumulator | 120 | — |
 | M16 | `kernels/cmp.c` | K9 eq/ult/slt + 7 derived predicates | 200 | primitives ↔ predicate derivation |
@@ -697,14 +926,37 @@ kernel driver rather than written per kernel:
 
 | Level | Assertion | Mechanism |
 |---|---|---|
-| **L1** | `shadow(dst) == refmodel(a, b)` for all `(a,b)` at `W ∈ {1,2,4,8}`, × bit-kind masks; random sampling at `W ∈ {16,32,64}` | `bitkinds` + `refmodel` |
-| **L2** | After the call, the live-qubit set equals **exactly** `dst`'s qubits | `poolcheck`, automatic on every L1 case |
-| **L3** | forward → `_unc` → `dst`'s **values** all-zero; then an explicit `cqrt_free` → pool restored. Asserted on **values and pool state only, never bit-kinds** (PRD §10). Note `_unc` alone does **not** restore the pool — it reclaims nothing, so the free is a required third step, not a tidy-up | `poolcheck`, automatic |
-| **L4** | `(NOT, CNOT, Toffoli)` at each `W` matches the golden, cross-checked against the Step 0.2 formula | `sink_count` + `tests/goldens/`, `--update-goldens` to regenerate |
+| **L1** | `value(dst) == refmodel(a, b)` for all `(a,b)` at `W ∈ {1,2,4,8}`, × bit-kind mask **pairs**; random sampling at `W ∈ {16,32,64}` | `bitkinds` + `refmodel` |
+| **L2** | After the call, **no index is live that no named register owns**, and every index a named register owns is live | `poolcheck`, automatic on every L1 case |
+| **L3** | forward → `_unc` → `dst`'s **values** all-zero; then an explicit free → **`live` restored and every index `dst` held back on the free list**. Asserted on **values and pool state only, never bit-kinds** (PRD §10). Note `_unc` alone does **not** restore the pool — it reclaims nothing, so the free is a required third step, not a tidy-up | `poolcheck`, automatic |
+| **L4** | `(NOT, CNOT, Toffoli)` at each `W` matches the golden, cross-checked against the Step 0.2 formula | `sink_count` + `tests/goldens/`, `CQOPS_UPDATE_GOLDENS=1` to regenerate |
 
-Bit-kind masks are not purely random. The fixed set always includes: all-classical
-(this is **L5** — zero gates, zero qubits), all-quantum, alternating, LSB-only, MSB-only,
-and a one-bit-quantum sweep across all `W` positions. Random masks are sampled on top.
+Bit-kind masks are not purely random, and they are **pairs — one mask per operand**. The
+fixed set always includes: all-classical (this is **L5** — zero gates, zero qubits),
+all-quantum, alternating, LSB-only, MSB-only, a one-bit-quantum sweep across all `W`
+positions, **and the asymmetric pairs risk R8 names, which no symmetric set can express**.
+Random masks are sampled on top.
+
+> **Four corrections landed in this table at Step 10**, when the first kernel forced each
+> from prose into code. **L1 does not read "the shadow"** — `shadow(dst)` is undefined for a
+> constant bit, and under the all-classical mask *every* bit of `dst` is one; the oracle is
+> the register's **value**. **L2's "exactly `dst`'s qubits"** was literally false whenever an
+> operand was quantum. **L3 cannot compare `minted` or the free-list length** — both are
+> monotone, so a round trip that allocates and returns necessarily leaves `minted` higher; an
+> earlier draft of the driver compared them and failed 1,276,416 cases on its first run. And
+> **`ctest` does not forward trailing arguments to test binaries**: `ctest … -- --update-goldens`
+> is not merely unimplemented, it is a hard error (`CMake Error: Unknown argument: --`,
+> measured on ctest 4.3.2) that runs zero tests. The `--` idiom belongs to `cmake --build`.
+> The mechanism is the environment variable above; `--update-goldens` still works when a test
+> binary is run directly. Full statements in PRD §11.
+>
+> **L3's row used to name `cqrt_free`, which does not exist until Step 23** (M26). What
+> exists from Step 7 is `cq_reg_free(ctx, h, proof)`, and the library ships **no** proof —
+> `NULL` means "no evidence" and fails loud. Step 10 passes
+> `tests/support/poolcheck.c:cq_pc_zero_proof_rotation_free`, whose name is its scope: sound
+> on the rotation-free surface (Steps 10–17) because `cq_shadow_rotate` is the only producer
+> of `unknown`, and a laundering device the moment M22 lands at Step 19. It does **not**
+> answer `ckd.17b` or `ckd.18`.
 
 | Step | Kernels | Module | PRD |
 |---|---|---|---|

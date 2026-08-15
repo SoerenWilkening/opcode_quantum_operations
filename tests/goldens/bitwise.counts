@@ -1,0 +1,69 @@
+# M10 kernels/bitwise.c — K1 xor, K2 and, K3 or
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+xor       forward    1     0     2        0
+xor       unc        1     0     2        0
+and       forward    1     0     0        1
+and       unc        1     0     0        1
+or        forward    1     0     2        1
+or        unc        1     0     2        1
+xor       forward    2     0     4        0
+xor       unc        2     0     4        0
+and       forward    2     0     0        2
+and       unc        2     0     0        2
+or        forward    2     0     4        2
+or        unc        2     0     4        2
+xor       forward    4     0     8        0
+xor       unc        4     0     8        0
+and       forward    4     0     0        4
+and       unc        4     0     0        4
+or        forward    4     0     8        4
+or        unc        4     0     8        4
+xor       forward    8     0    16        0
+xor       unc        8     0    16        0
+and       forward    8     0     0        8
+and       unc        8     0     0        8
+or        forward    8     0    16        8
+or        unc        8     0    16        8
+xor       forward   16     0    32        0
+xor       unc       16     0    32        0
+and       forward   16     0     0       16
+and       unc       16     0     0       16
+or        forward   16     0    32       16
+or        unc       16     0    32       16
+xor       forward   32     0    64        0
+xor       unc       32     0    64        0
+and       forward   32     0     0       32
+and       unc       32     0     0       32
+or        forward   32     0    64       32
+or        unc       32     0    64       32
+xor       forward   64     0   128        0
+xor       unc       64     0   128        0
+and       forward   64     0     0       64
+and       unc       64     0     0       64
+or        forward   64     0   128       64
+or        unc       64     0   128       64

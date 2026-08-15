@@ -1,0 +1,195 @@
+# M13 kernels/cast.c — K5 sext/zext/trunc
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+zext_f1   forward    1     0     1        0
+zext_f1   unc        1     0     1        0
+sext_f1   forward    1     0     1        0
+sext_f1   unc        1     0     1        0
+trunc_f1  forward    1     0     1        0
+trunc_f1  unc        1     0     1        0
+zext_f1   forward    8     0     1        0
+zext_f1   unc        8     0     1        0
+sext_f1   forward    8     0     8        0
+sext_f1   unc        8     0     8        0
+zext_f1   forward   16     0     1        0
+zext_f1   unc       16     0     1        0
+sext_f1   forward   16     0    16        0
+sext_f1   unc       16     0    16        0
+zext_f1   forward   32     0     1        0
+zext_f1   unc       32     0     1        0
+sext_f1   forward   32     0    32        0
+sext_f1   unc       32     0    32        0
+zext_f1   forward   64     0     1        0
+zext_f1   unc       64     0     1        0
+sext_f1   forward   64     0    64        0
+sext_f1   unc       64     0    64        0
+zext_f1   forward   80     0     1        0
+zext_f1   unc       80     0     1        0
+sext_f1   forward   80     0    80        0
+sext_f1   unc       80     0    80        0
+zext_f1   forward  128     0     1        0
+zext_f1   unc      128     0     1        0
+sext_f1   forward  128     0   128        0
+sext_f1   unc      128     0   128        0
+trunc_f8  forward    1     0     1        0
+trunc_f8  unc        1     0     1        0
+zext_f8   forward    8     0     8        0
+zext_f8   unc        8     0     8        0
+sext_f8   forward    8     0     8        0
+sext_f8   unc        8     0     8        0
+trunc_f8  forward    8     0     8        0
+trunc_f8  unc        8     0     8        0
+zext_f8   forward   16     0     8        0
+zext_f8   unc       16     0     8        0
+sext_f8   forward   16     0    16        0
+sext_f8   unc       16     0    16        0
+zext_f8   forward   32     0     8        0
+zext_f8   unc       32     0     8        0
+sext_f8   forward   32     0    32        0
+sext_f8   unc       32     0    32        0
+zext_f8   forward   64     0     8        0
+zext_f8   unc       64     0     8        0
+sext_f8   forward   64     0    64        0
+sext_f8   unc       64     0    64        0
+zext_f8   forward   80     0     8        0
+zext_f8   unc       80     0     8        0
+sext_f8   forward   80     0    80        0
+sext_f8   unc       80     0    80        0
+zext_f8   forward  128     0     8        0
+zext_f8   unc      128     0     8        0
+sext_f8   forward  128     0   128        0
+sext_f8   unc      128     0   128        0
+trunc_f16 forward    1     0     1        0
+trunc_f16 unc        1     0     1        0
+trunc_f16 forward    8     0     8        0
+trunc_f16 unc        8     0     8        0
+zext_f16  forward   16     0    16        0
+zext_f16  unc       16     0    16        0
+sext_f16  forward   16     0    16        0
+sext_f16  unc       16     0    16        0
+trunc_f16 forward   16     0    16        0
+trunc_f16 unc       16     0    16        0
+zext_f16  forward   32     0    16        0
+zext_f16  unc       32     0    16        0
+sext_f16  forward   32     0    32        0
+sext_f16  unc       32     0    32        0
+zext_f16  forward   64     0    16        0
+zext_f16  unc       64     0    16        0
+sext_f16  forward   64     0    64        0
+sext_f16  unc       64     0    64        0
+zext_f16  forward   80     0    16        0
+zext_f16  unc       80     0    16        0
+sext_f16  forward   80     0    80        0
+sext_f16  unc       80     0    80        0
+zext_f16  forward  128     0    16        0
+zext_f16  unc      128     0    16        0
+sext_f16  forward  128     0   128        0
+sext_f16  unc      128     0   128        0
+trunc_f32 forward    1     0     1        0
+trunc_f32 unc        1     0     1        0
+trunc_f32 forward    8     0     8        0
+trunc_f32 unc        8     0     8        0
+trunc_f32 forward   16     0    16        0
+trunc_f32 unc       16     0    16        0
+zext_f32  forward   32     0    32        0
+zext_f32  unc       32     0    32        0
+sext_f32  forward   32     0    32        0
+sext_f32  unc       32     0    32        0
+trunc_f32 forward   32     0    32        0
+trunc_f32 unc       32     0    32        0
+zext_f32  forward   64     0    32        0
+zext_f32  unc       64     0    32        0
+sext_f32  forward   64     0    64        0
+sext_f32  unc       64     0    64        0
+zext_f32  forward   80     0    32        0
+zext_f32  unc       80     0    32        0
+sext_f32  forward   80     0    80        0
+sext_f32  unc       80     0    80        0
+zext_f32  forward  128     0    32        0
+zext_f32  unc      128     0    32        0
+sext_f32  forward  128     0   128        0
+sext_f32  unc      128     0   128        0
+trunc_f64 forward    1     0     1        0
+trunc_f64 unc        1     0     1        0
+trunc_f64 forward    8     0     8        0
+trunc_f64 unc        8     0     8        0
+trunc_f64 forward   16     0    16        0
+trunc_f64 unc       16     0    16        0
+trunc_f64 forward   32     0    32        0
+trunc_f64 unc       32     0    32        0
+zext_f64  forward   64     0    64        0
+zext_f64  unc       64     0    64        0
+sext_f64  forward   64     0    64        0
+sext_f64  unc       64     0    64        0
+trunc_f64 forward   64     0    64        0
+trunc_f64 unc       64     0    64        0
+zext_f64  forward   80     0    64        0
+zext_f64  unc       80     0    64        0
+sext_f64  forward   80     0    80        0
+sext_f64  unc       80     0    80        0
+zext_f64  forward  128     0    64        0
+zext_f64  unc      128     0    64        0
+sext_f64  forward  128     0   128        0
+sext_f64  unc      128     0   128        0
+trunc_f80 forward    1     0     1        0
+trunc_f80 unc        1     0     1        0
+trunc_f80 forward    8     0     8        0
+trunc_f80 unc        8     0     8        0
+trunc_f80 forward   16     0    16        0
+trunc_f80 unc       16     0    16        0
+trunc_f80 forward   32     0    32        0
+trunc_f80 unc       32     0    32        0
+trunc_f80 forward   64     0    64        0
+trunc_f80 unc       64     0    64        0
+zext_f80  forward   80     0    80        0
+zext_f80  unc       80     0    80        0
+sext_f80  forward   80     0    80        0
+sext_f80  unc       80     0    80        0
+trunc_f80 forward   80     0    80        0
+trunc_f80 unc       80     0    80        0
+zext_f80  forward  128     0    80        0
+zext_f80  unc      128     0    80        0
+sext_f80  forward  128     0   128        0
+sext_f80  unc      128     0   128        0
+trunc_f128 forward    1     0     1        0
+trunc_f128 unc        1     0     1        0
+trunc_f128 forward    8     0     8        0
+trunc_f128 unc        8     0     8        0
+trunc_f128 forward   16     0    16        0
+trunc_f128 unc       16     0    16        0
+trunc_f128 forward   32     0    32        0
+trunc_f128 unc       32     0    32        0
+trunc_f128 forward   64     0    64        0
+trunc_f128 unc       64     0    64        0
+trunc_f128 forward   80     0    80        0
+trunc_f128 unc       80     0    80        0
+zext_f128 forward  128     0   128        0
+zext_f128 unc      128     0   128        0
+sext_f128 forward  128     0   128        0
+sext_f128 unc      128     0   128        0
+trunc_f128 forward  128     0   128        0
+trunc_f128 unc      128     0   128        0

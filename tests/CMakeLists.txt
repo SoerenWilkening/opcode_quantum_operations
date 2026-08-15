@@ -1,10 +1,32 @@
 ## Test support library. Grows as the §2.2 harness files land: mock_sink at
-## Step 5, refmodel / bitkinds / poolcheck across Phase B.
+## Step 5, refmodel / bitkinds / poolcheck at Step 10 with the first kernels.
+##
+## kerneldrv and goldens are BEYOND §2.2's list of five, like death.c before
+## them. Plan §4's Phase B gate asks for a "shared kernel driver" that applies
+## L1-L4 "rather than written per kernel", and for "tests/goldens/,
+## --update-goldens to regenerate", and assigns neither to a file. These are
+## those two. Eleven kernel modules and Step 20's controlled re-run all land
+## against them.
 
 add_library(cqops_test_support STATIC
     support/harness.c
     support/death.c
     support/mock_sink.c
+    support/refmodel.c      # Step 10 — plain-C semantics, the L1 reference
+    support/bitkinds.c      # Step 10 — (value, quantum-mask) -> register
+    support/poolcheck.c     # Step 10 — the automatic L2 and L3 assertions
+    support/kerneldrv.c     # Step 10 — the shared Phase-B four-level gate
+    support/kernelsweep.c   # Step 11 — the sweep shapes (plan §2.2's split seam)
+    support/goldens.c       # Step 10 — L4's pinned counts, on disk
+)
+
+## L4's goldens are DATA, read at run time, so the suite can compare the
+## commit they were pinned against with the snapshot actually on disk — risk
+## R3 ("Bennett.jl drift invalidates L4 goldens silently") mitigated by a
+## check rather than by a comment nobody reads.
+target_compile_definitions(cqops_test_support PUBLIC
+    CQOPS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens"
+    CQOPS_BENNETT_COMMIT="${CMAKE_SOURCE_DIR}/third_party/bennett/COMMIT"
 )
 
 ## src/ is PRIVATE on the cqops target, because none of it is public API. The
@@ -38,6 +60,17 @@ add_cqops_test(test_emit_fold)    # M05, Step 6 — L0, 155 exhaustive cases
 add_cqops_test(test_reg)          # M07, Step 7 — D5, tombstones, I4, D7a/D7b
 add_cqops_test(test_scratch)      # M08, Step 8 — the cq_bit array, no qubits
 add_cqops_test(test_sandwich)     # M09, Step 8 — the palindrome, I6(a)+(b)
+
+## Layer 3 — kernels. The first exercise of the shared Phase-B driver.
+add_cqops_test(test_kernel_bitwise)   # M10, Step 10 — K1/K2/K3, L1-L5
+add_cqops_test(test_kernel_shift)     # M11, Step 11 — K4 constant shifts, D8
+add_cqops_test(test_kernel_cast)      # M13, Step 11 — K5 casts, two widths, i128
+
+## The driver's own assertions, made falsifiable — test_harness_negative's
+## argument one level up. A mutation battery found five of the Phase-B pool
+## assertions surviving mutation to always-true: correct, load-bearing, and
+## never once observed to fire. This provokes each one.
+add_cqops_test(test_kerneldrv)        # Step 10 — the infrastructure's gate
 
 ## Layer 4 — sinks. M25 sink_qec is Step 26, against C_quantum_error_correction.
 add_cqops_test(test_sink_printf)  # M23, Step 9 — the §8 format, %a, the flush
@@ -185,6 +218,55 @@ set_tests_properties(test_sandwich_death.a_multi_gate_step_is_not_an_involution
 set_tests_properties(test_sandwich_death.an_unproven_release_is_refused_before_anything_is_retired
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "retire of a determinate")
+
+## M10, Step 10. All five abort in BOTH configurations — D7a for M07's reason
+## (src/reg.h): R2's value is firing during the Step 24 fixture run, which
+## Rule 17 pins under Release.
+add_cqops_death_test(test_kernel_bitwise_death CASES
+    dst_aliases_a_quantum_source
+    dst_aliases_a_classical_source
+    dst_aliases_the_second_source
+    dst_overlaps_a_source_without_sharing_a_base
+    the_two_sources_are_the_same_register
+    a_width_of_zero
+    a_negative_width
+)
+
+## WHICH LAYER ABORTED, the fourth instance. `dst == a` is guarded by
+## cq_kernel_check_dst here and — for a QUANTUM lane, in Debug only — by M05's
+## §3 distinctness assert one level down. Without this property, deleting the
+## kernel's check would leave dst_aliases_a_quantum_source green on M05's
+## backstop. (dst_aliases_a_classical_source needs no property: M05's check
+## compares qubit indices and cannot fire on constants, so nothing beneath the
+## kernel guards it in either configuration — which is precisely why it is the
+## case that goes red if cq_kernel_check_dst is deleted.)
+set_tests_properties(test_kernel_bitwise_death.dst_aliases_a_quantum_source
+                     test_kernel_bitwise_death.dst_aliases_the_second_source
+                     test_kernel_bitwise_death.the_two_sources_are_the_same_register
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "§3 distinctness")
+
+## M11 and M13, Step 11. FILED BY A MUTATION BATTERY: both modules shipped with
+## four hard errors between them and no death test, and deleting each left all
+## 80 tests green. cast.c's width guard prevents a heap overrun, not a wrong
+## answer, and its own comment records it as a both-configuration error because
+## Step 24 runs under Release.
+add_cqops_death_test(test_kernel_step11_death CASES
+    a_quantum_shift_amount
+    a_quantum_bit_above_the_stages_is_fine
+    a_shift_dst_overlaps_its_source
+    a_widening_cast_that_narrows
+    a_narrowing_cast_that_widens
+    a_sign_extension_that_narrows
+    a_cast_dst_overlaps_its_source
+)
+
+## WHICH LAYER ABORTED. The shift-amount guard is M11's own; nothing beneath it
+## would speak for a CLASSICAL amount, but for a quantum one M05's distinctness
+## assert could — in Debug. Pinning the message keeps the case honest.
+set_tests_properties(test_kernel_step11_death.a_quantum_shift_amount
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "§3 distinctness")
 
 add_cqops_death_test(test_qubits_death CASES
     ceiling_exceeded

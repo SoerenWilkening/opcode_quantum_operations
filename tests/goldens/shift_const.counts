@@ -1,0 +1,225 @@
+# M11 kernels/shift_const.c — K4 constant shl/lshr/ashr (D8)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+shl_k0    forward    1     0     1        0
+shl_k0    unc        1     0     1        0
+lshr_k0   forward    1     0     1        0
+lshr_k0   unc        1     0     1        0
+ashr_k0   forward    1     0     1        0
+ashr_k0   unc        1     0     1        0
+shl_k1    forward    1     0     1        0
+shl_k1    unc        1     0     1        0
+lshr_k1   forward    1     0     1        0
+lshr_k1   unc        1     0     1        0
+ashr_k1   forward    1     0     1        0
+ashr_k1   unc        1     0     1        0
+shl_k0    forward    2     0     2        0
+shl_k0    unc        2     0     2        0
+lshr_k0   forward    2     0     2        0
+lshr_k0   unc        2     0     2        0
+ashr_k0   forward    2     0     2        0
+ashr_k0   unc        2     0     2        0
+shl_k1    forward    2     0     1        0
+shl_k1    unc        2     0     1        0
+lshr_k1   forward    2     0     1        0
+lshr_k1   unc        2     0     1        0
+ashr_k1   forward    2     0     2        0
+ashr_k1   unc        2     0     2        0
+shl_k2    forward    2     0     2        0
+shl_k2    unc        2     0     2        0
+lshr_k2   forward    2     0     2        0
+lshr_k2   unc        2     0     2        0
+ashr_k2   forward    2     0     2        0
+ashr_k2   unc        2     0     2        0
+shl_k0    forward    4     0     4        0
+shl_k0    unc        4     0     4        0
+lshr_k0   forward    4     0     4        0
+lshr_k0   unc        4     0     4        0
+ashr_k0   forward    4     0     4        0
+ashr_k0   unc        4     0     4        0
+shl_k1    forward    4     0     3        0
+shl_k1    unc        4     0     3        0
+lshr_k1   forward    4     0     3        0
+lshr_k1   unc        4     0     3        0
+ashr_k1   forward    4     0     4        0
+ashr_k1   unc        4     0     4        0
+shl_k2    forward    4     0     2        0
+shl_k2    unc        4     0     2        0
+lshr_k2   forward    4     0     2        0
+lshr_k2   unc        4     0     2        0
+ashr_k2   forward    4     0     4        0
+ashr_k2   unc        4     0     4        0
+shl_k4    forward    4     0     4        0
+shl_k4    unc        4     0     4        0
+lshr_k4   forward    4     0     4        0
+lshr_k4   unc        4     0     4        0
+ashr_k4   forward    4     0     4        0
+ashr_k4   unc        4     0     4        0
+shl_k0    forward    8     0     8        0
+shl_k0    unc        8     0     8        0
+lshr_k0   forward    8     0     8        0
+lshr_k0   unc        8     0     8        0
+ashr_k0   forward    8     0     8        0
+ashr_k0   unc        8     0     8        0
+shl_k1    forward    8     0     7        0
+shl_k1    unc        8     0     7        0
+lshr_k1   forward    8     0     7        0
+lshr_k1   unc        8     0     7        0
+ashr_k1   forward    8     0     8        0
+ashr_k1   unc        8     0     8        0
+shl_k4    forward    8     0     4        0
+shl_k4    unc        8     0     4        0
+lshr_k4   forward    8     0     4        0
+lshr_k4   unc        8     0     4        0
+ashr_k4   forward    8     0     8        0
+ashr_k4   unc        8     0     8        0
+shl_k8    forward    8     0     8        0
+shl_k8    unc        8     0     8        0
+lshr_k8   forward    8     0     8        0
+lshr_k8   unc        8     0     8        0
+ashr_k8   forward    8     0     8        0
+ashr_k8   unc        8     0     8        0
+shl_k0    forward   16     0    16        0
+shl_k0    unc       16     0    16        0
+lshr_k0   forward   16     0    16        0
+lshr_k0   unc       16     0    16        0
+ashr_k0   forward   16     0    16        0
+ashr_k0   unc       16     0    16        0
+shl_k1    forward   16     0    15        0
+shl_k1    unc       16     0    15        0
+lshr_k1   forward   16     0    15        0
+lshr_k1   unc       16     0    15        0
+ashr_k1   forward   16     0    16        0
+ashr_k1   unc       16     0    16        0
+shl_k8    forward   16     0     8        0
+shl_k8    unc       16     0     8        0
+lshr_k8   forward   16     0     8        0
+lshr_k8   unc       16     0     8        0
+ashr_k8   forward   16     0    16        0
+ashr_k8   unc       16     0    16        0
+shl_k16   forward   16     0    16        0
+shl_k16   unc       16     0    16        0
+lshr_k16  forward   16     0    16        0
+lshr_k16  unc       16     0    16        0
+ashr_k16  forward   16     0    16        0
+ashr_k16  unc       16     0    16        0
+shl_k0    forward   32     0    32        0
+shl_k0    unc       32     0    32        0
+lshr_k0   forward   32     0    32        0
+lshr_k0   unc       32     0    32        0
+ashr_k0   forward   32     0    32        0
+ashr_k0   unc       32     0    32        0
+shl_k1    forward   32     0    31        0
+shl_k1    unc       32     0    31        0
+lshr_k1   forward   32     0    31        0
+lshr_k1   unc       32     0    31        0
+ashr_k1   forward   32     0    32        0
+ashr_k1   unc       32     0    32        0
+shl_k16   forward   32     0    16        0
+shl_k16   unc       32     0    16        0
+lshr_k16  forward   32     0    16        0
+lshr_k16  unc       32     0    16        0
+ashr_k16  forward   32     0    32        0
+ashr_k16  unc       32     0    32        0
+shl_k32   forward   32     0    32        0
+shl_k32   unc       32     0    32        0
+lshr_k32  forward   32     0    32        0
+lshr_k32  unc       32     0    32        0
+ashr_k32  forward   32     0    32        0
+ashr_k32  unc       32     0    32        0
+shl_k0    forward   64     0    64        0
+shl_k0    unc       64     0    64        0
+lshr_k0   forward   64     0    64        0
+lshr_k0   unc       64     0    64        0
+ashr_k0   forward   64     0    64        0
+ashr_k0   unc       64     0    64        0
+shl_k1    forward   64     0    63        0
+shl_k1    unc       64     0    63        0
+lshr_k1   forward   64     0    63        0
+lshr_k1   unc       64     0    63        0
+ashr_k1   forward   64     0    64        0
+ashr_k1   unc       64     0    64        0
+shl_k32   forward   64     0    32        0
+shl_k32   unc       64     0    32        0
+lshr_k32  forward   64     0    32        0
+lshr_k32  unc       64     0    32        0
+ashr_k32  forward   64     0    64        0
+ashr_k32  unc       64     0    64        0
+shl_k64   forward   64     0    64        0
+shl_k64   unc       64     0    64        0
+lshr_k64  forward   64     0    64        0
+lshr_k64  unc       64     0    64        0
+ashr_k64  forward   64     0    64        0
+ashr_k64  unc       64     0    64        0
+shl_k0    forward   80     0    80        0
+shl_k0    unc       80     0    80        0
+lshr_k0   forward   80     0    80        0
+lshr_k0   unc       80     0    80        0
+ashr_k0   forward   80     0    80        0
+ashr_k0   unc       80     0    80        0
+shl_k1    forward   80     0    79        0
+shl_k1    unc       80     0    79        0
+lshr_k1   forward   80     0    79        0
+lshr_k1   unc       80     0    79        0
+ashr_k1   forward   80     0    80        0
+ashr_k1   unc       80     0    80        0
+shl_k40   forward   80     0    40        0
+shl_k40   unc       80     0    40        0
+lshr_k40  forward   80     0    40        0
+lshr_k40  unc       80     0    40        0
+ashr_k40  forward   80     0    80        0
+ashr_k40  unc       80     0    80        0
+shl_k80   forward   80     0     0        0
+shl_k80   unc       80     0     0        0
+lshr_k80  forward   80     0     0        0
+lshr_k80  unc       80     0     0        0
+ashr_k80  forward   80     0    80        0
+ashr_k80  unc       80     0    80        0
+shl_k0    forward  128     0   128        0
+shl_k0    unc      128     0   128        0
+lshr_k0   forward  128     0   128        0
+lshr_k0   unc      128     0   128        0
+ashr_k0   forward  128     0   128        0
+ashr_k0   unc      128     0   128        0
+shl_k1    forward  128     0   127        0
+shl_k1    unc      128     0   127        0
+lshr_k1   forward  128     0   127        0
+lshr_k1   unc      128     0   127        0
+ashr_k1   forward  128     0   128        0
+ashr_k1   unc      128     0   128        0
+shl_k64   forward  128     0    64        0
+shl_k64   unc      128     0    64        0
+lshr_k64  forward  128     0    64        0
+lshr_k64  unc      128     0    64        0
+ashr_k64  forward  128     0   128        0
+ashr_k64  unc      128     0   128        0
+shl_k128  forward  128     0   128        0
+shl_k128  unc      128     0   128        0
+lshr_k128 forward  128     0   128        0
+lshr_k128 unc      128     0   128        0
+ashr_k128 forward  128     0   128        0
+ashr_k128 unc      128     0   128        0
