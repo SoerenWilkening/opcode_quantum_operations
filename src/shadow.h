@@ -15,14 +15,26 @@
  * indices, not cq_bits. By the time a §3 fold row reaches the shadow, every
  * surviving operand is CQ_BIT_Q, so M01 never enters.
  *
- * THERE IS DELIBERATELY NO UN-POISON. Nothing here can return an entry to
- * determinate once it is unknown; a fresh entry is born known-0 and that is
- * the only way an entry is ever clean. This is not an oversight — bd ckd.17
- * (P0, OPEN) owns the question of where the structural zero certificate lives
- * and who may stamp it, and shipping a general setter here would settle that
- * blocker by accident, in the one direction that can launder a dirty rail
- * into a provably-clean one. Whoever resolves ckd.17 adds the write here,
- * named so a grep finds every caller.
+ * THERE IS DELIBERATELY NO UN-POISON OF A LIVE QUBIT, and there never will be.
+ * Nothing here can return a live entry to determinate once it is unknown. The
+ * reason is structural, not stylistic: a certified-but-live qubit read as a
+ * CONTROL hits `t.unknown |= c.unknown`, so with c.unknown freshly zeroed the
+ * poison STOPS PROPAGATING and the shadow starts claiming determinate
+ * downstream of a genuine superposition — the one direction the discipline
+ * above forbids.
+ *
+ * cq_shadow_retire — DESIGNED at bd ckd.17 (settled 2026-08-15), NOT YET ON
+ * DISK; it arrives with M09 at Step 8 — is NOT an exception to that, and this
+ * note is here so that whoever adds it does not add something else instead.
+ * Its precondition is that cq_qubits_release has ALREADY RETURNED for
+ * the index, so it never runs on a live qubit — and by I3 an index on the free
+ * list IS |0⟩, which makes {value 0, unknown 0} the CORRECT entry for it,
+ * bit-for-bit what cq_shadow_ensure writes for a freshly minted one. Birth and
+ * retirement are one rule; only the fact that `minted` never decreases had
+ * hidden that. The single caller is cq_ctx_release_qubit, where the ORDER is
+ * the enforcement. See PRD §10 for the certificate and IMPLEMENTATION_PLAN
+ * §0.1 for the sandwich half; bd ckd.17b (the CQ_lang rail at cqrt_free) is
+ * still OPEN and is not answered by this write.
  */
 #ifndef CQOPS_SHADOW_H
 #define CQOPS_SHADOW_H

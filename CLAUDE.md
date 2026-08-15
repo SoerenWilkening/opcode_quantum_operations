@@ -325,34 +325,69 @@ never settle it implicitly in code. `bd show <id>` for the full statement of eac
 
 ### Open
 
-**`ckd.17` — what evidence does `cqrt_free`'s "provably clean" assert actually read?
-Bites M08 at Step 8, before any kernel exists.** It **cannot** be the two-bit shadow:
-§3's `CX` rule is `t.unknown |= c.unknown` and poison is sticky, so after any sandwich
-kernel on a tainted operand every bit of the rail is `Q unknown` — a literal shadow
-check hard-errors on every legitimate program, and M08's "assert clean on release"
-fails the same way on scratch. The proof must be **structural** (the §4 kernel contract
-plus I6 palindromic reversal), which requires **one sanctioned un-poisoning write** —
-the sole exception to "conservative in the safe direction only". That exception is
-itself a miscompile vector: applied to a rail whose XOR did *not* cancel, it launders a
-dirty rail into a provably-clean one and removes the project's only defence. Decide
-where the certificate lives, who may stamp it, and how a grep finds every caller.
+**`ckd.17b` — what evidence does `cqrt_free`'s "provably clean" assert read for a
+CQ_lang RAIL? Bites Step 23, presents at Step 24.** **`ckd.17a`, the scratch half, is
+RESOLVED — see below.** What is left is the half no in-library theorem can reach: a
+sandwich certificate covers **none** of the corpus's 51,696 frees, because none of them
+is on a scratch region. Measured 2026-08-15 over the 239 goldens: only **25,138 (49%)**
+follow a `cq_template_*_unc`; **26,504 (51%)** are rails last written by a bare
+`cqrt_toffoli` (19,153) or `cqrt_cnot` (7,223) — Phase-4 control flags that CQ_lang
+uncomputes by **re-applying the same self-inverse gate**, with no `_unc` anywhere
+(`slice_control_select_compound.expected.log:15-18` is the worked case). Two witnesses
+show the general case is not provable here at all: `slice_loop_break.expected.log:10-25`
+rests on loop-condition algebra that never reaches us, and
+`specialize_transitive_caller.expected.log:3-16` uncomputes by recomputing into a
+**different handle**, defeating any handle-keyed matching. At Step 23 M26 picks at one
+greppable site between `CQOPS_FREE_ABORT` (default) and `CQOPS_FREE_RETIRE` (tombstone;
+the indices leave circulation forever so I3 holds absolutely). **There is no
+`CQOPS_FREE_TRUST` and one must never be added.**
 
-**`ckd.18` — the rotation-root free breaks the assert *and* I3 on a fixture CQ_lang
-ships as correct. Will abort Step 24.** `slice_uncompute_dead_dag.expected.log`:
-`alloc_i32(5) → ry(θ) → ry(−θ) → cqrt_free`, with **no `_unc` anywhere**, so no
-uncompute certificate can exist. In our model `alloc(5)` is all-constant with zero
-qubits (I4); `ry` at arbitrary θ materialises all 32 bits with shadow *unknown*; poison
-is sticky so `ry(−θ)` does not clear it. At the free the rail is physically `|5⟩` — two
-qubits at `|1⟩` — with an unknown shadow. The hard error fires on valid input; and
-suppressing it is worse, pushing two `|1⟩` qubits onto the free list, breaking I3 and
-handing a non-`|0⟩` qubit to the next `cq_materialise`. Emitting the corrective `X`s
-needs the value, i.e. D6, which is out of v1. Decide **before Step 19** (M22 rotate).
+**`ckd.18` — the rotation-root free breaks the assert *and* I3 on fixtures CQ_lang
+ships as correct. Will abort Step 24.** `alloc_i32(5) → ry(θ) → ry(−θ) → cqrt_free`,
+with **no `_unc` anywhere**, so no uncompute certificate can exist. In our model
+`alloc(5)` is all-constant with zero qubits (I4); `ry` materialises all 32 bits with
+shadow *unknown*; poison is sticky so `ry(−θ)` does not clear it. At the free the rail
+is physically `|5⟩`. Suppressing the error is worse — it pushes `|1⟩` qubits onto the
+free list, breaking I3.
+**Scope measured 2026-08-15, and the bead was filed 25× too narrow in one direction and
+12× too wide in the other.** It is **25** frees across many fixtures, not one — and the
+partition is perfect: the 25 are exactly the `ry`-rooted ones, every one born from a
+**non-zero** `alloc` literal with an exact `(θ, −θ)` history. The other 12
+rotation-rooted frees are `rz`-only on rails born `0`, and `Rz` on a definite value is a
+**global phase** (Rule 15: "`Rz` on a constant is **nothing** at every φ") — those rails
+are genuinely `|0⟩` and freeable; they hard-error only because `cq_shadow_rotate`
+poisons unconditionally, which is **M21's** business (§7 angle classification), not this
+bead's. **The tempting wrong fix is wrong on all 25:** cancellation restores the *birth
+constant*, never zero. The discriminator is `birth-value == 0`, and the fix needs
+corrective `X`s driven from the mint record — which is **not** D6, since the value comes
+from the `alloc` literal, not from shadow precision. Decide **before Step 19**.
 
 **Smaller, filed** — `ckd.13` K12's quadratic ancilla scheme (32,960 qubits at W=64);
-`ckd.14` M09 step granularity + the scratch shadow-poison rule; `ckd.15` K10's three
-sources vs Rule 7's two; `ckd.16` M11/M12 shift-out-of-range disagreement.
+`ckd.15` K10's three sources vs Rule 7's two; `ckd.16` M11/M12 shift-out-of-range disagreement.
 
 ### Resolved 2026-08-14 — recorded so they are not re-litigated
+
+- **`ckd.17a` (scratch) and `ckd.14` — SETTLED 2026-08-15. The certificate is not stored;
+  it is an ACT.** Both beads were one mechanism seen from two sides. **(a) One gate per
+  step** — forced, because the driver re-calls `compute(env, s)` with the *same* argument
+  on the reverse pass, so a step must be an involution; `K06.md:566-586` and
+  `K10.md:153-171` each give a worked block that is not. **(b) `cq_sandwich` contains no
+  shadow call at all** — it asserts its *own premises* (no nesting; every scratch bit
+  `CQ_BIT_ZERO` on entry then `CQ_BIT_Q` after step 1; an order-sensitive region checksum
+  unchanged across each half), and K06's "assert-and-reset the scratch shadow" and K11's
+  "the driver does not reset, so the free aborts" were both mis-framed. **(c) The write is
+  a RETIREMENT, not an un-poison:** `cq_shadow_retire(sh, q)` runs strictly *after*
+  `cq_qubits_release` returns, so it never touches a live qubit, and by **I3** `{0, 0}` is
+  the *correct* entry for a free-list index — bit-for-bit what `cq_shadow_ensure` writes
+  for a fresh one. Birth and retirement are one rule. **(d) One joint, and the order is the
+  enforcement:** `cq_ctx_release_qubit(ctx, q, proven_zero)` = release, then retire.
+  **(e) One named literal, `CQ_ZERO_BY_PALINDROME`, in M09's epilogue** — the sole
+  `proven_zero` constant in `src/`, resting on three premises (one-gate-per-step, I6(a),
+  I6(b)). Full statement in PRD §10 and plan §0.1.
+  > **Why a live qubit may never be certified, structurally:** a certified-but-live qubit
+  > read as a *control* hits `t.unknown |= c.unknown`, so with `c.unknown` freshly zeroed
+  > the poison **stops propagating** and the shadow claims determinate downstream of a real
+  > superposition. That disqualifies the `_unc` epilogue as a stamper on its own.
 
 - **`_unc` vs `cqrt_free` ownership — `cqrt_free` is the SOLE deallocator.** `_unc`
   zeroes values in place and reclaims **nothing**: no pool operation, no bit-kind
@@ -507,6 +542,15 @@ issue; `make test` is the local stand-in (lint, then both configurations).
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
+- **`cq_sandwich` DISARMS the I6 extent for the copyout, and arms it only for the two
+  compute halves.** Copyout targets `dst`, which is *outside* scratch, so an extent armed
+  across all three loops makes `src/emit.c`'s I6(a) check fire on every sandwich kernel.
+  The plausible wrong fix — widening the extent to cover `dst` — silently disables I6(a)
+  for the compute halves too, which is R1 with the detector removed.
+- **M08 ships no release a kernel can call; M09 owns the scratch qubits end to end.**
+  M08 owns the `cq_bit` array and its dispose asserts every bit is back to `CQ_BIT_ZERO`
+  — a **kind** check, never a shadow read. That is what plan §3's "assert clean on
+  release" actually becomes, and unlike a shadow reading it is implementable.
 - **Layer 0, the emitter and the handle table exist; nothing above them does.**
   `src/bit.h`, `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]`,
   `src/emit.[ch]` and `src/reg.[ch]` are real as of Step 7 — but there is no

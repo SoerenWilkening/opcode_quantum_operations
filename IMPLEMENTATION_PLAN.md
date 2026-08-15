@@ -33,15 +33,54 @@ shared driver runs it forwards, copies out, and runs it backwards:
 /* sandwich.h */
 typedef void (*cq_step_fn)(cq_ctx *ctx, void *env, int step);
 
-void cq_sandwich(cq_ctx *ctx,
+void cq_sandwich(cq_ctx *ctx, cq_scratch *scr,
                  cq_step_fn compute, int n_compute,
                  cq_step_fn copyout, int n_copyout,
                  void *env);
-/*  for s in [0, n_compute):  compute(env, s)
- *  for s in [0, n_copyout):  copyout(env, s)
- *  for s in (n_compute, 0]:  compute(env, s)      <- reversal is structural
+/*  0. no nested sandwich; take the region
+ *  1. pre-materialise every bit of `scr`                    <- I6(b)
+ *  2. ARM the I6 extent; for s in [0, n_compute):  compute(env, s)
+ *  3. DISARM;             for s in [0, n_copyout):  copyout(env, s)
+ *  4. RE-ARM;             for s in (n_compute, 0]:  compute(env, s)
+ *  5. release `scr`'s qubits                       <- reversal is structural
  */
 ```
+
+> **This prototype used to omit `scr`, and it could not do its job.** §0.2 requires the
+> driver to pre-materialise the whole scratch region at step 0, which it cannot do for a
+> region it is never handed. Corrected 2026-08-15 when `ckd.14` was resolved; M09 must be
+> written against *this* signature.
+
+**The step granularity contract: ONE GATE PER STEP.** This is `ckd.14(a)`, and it is
+forced rather than chosen. The driver re-calls `compute(env, s)` with the **same**
+argument on the reverse pass, so a step undoes itself only if it is an **involution** —
+and a multi-gate block generally is not. Two independent worked witnesses, both in the
+ported construction specs:
+
+- `K06.md:566-586` — re-running the 5-gate ripple-carry block from its post-state leaves
+  `c_{i+1} = c·(a ⊕ b ⊕ 1)`, i.e. **dirty whenever `c_i = 1` and `a_i = b_i`**. The correct
+  reverse is `g5,g4,g3,g2,g1`, which one-gate-per-step makes the driver's index reversal
+  *be*.
+- `K10.md:153-171` — the natural 4-gate mux block leaves `r = c·(t ⊕ f)` after two
+  applications. (K01's 2-gate block *is* self-inverse — two commuting CXs into one target
+  — which is why the trap does not show up there.)
+
+I6(b) does **not** rescue a multi-gate step: pre-materialisation fixes *which* gates a step
+emits and says nothing about their *order*. If M09 ever grows a multi-gate step API it must
+reverse gate order *within* the step too — and `CQ_ZERO_BY_PALINDROME` below becomes
+unfounded while every test stays green.
+
+**The scratch shadow rule: `cq_sandwich` contains NO shadow call.** This is `ckd.14(b)`,
+and it resolves K06 §5 D3 against K11 §scratch by finding that both readings were
+mis-framed. K06 was right that cleanliness must be established **structurally** and that a
+literal Rule-6 shadow check hard-errors on every sandwich kernel; it was wrong that the
+driver "asserts and resets the scratch shadow". K11 was right that the driver performs no
+shadow reset; it was wrong to conclude the free must therefore abort. What the driver
+actually asserts are **its own premises** — no nested sandwich, every scratch bit
+`CQ_BIT_ZERO` on entry and `CQ_BIT_Q` after step 1, and an order-sensitive region checksum
+unchanged across each half. The shadow entries are retired **as a consequence** of the
+qubits going back to the pool, through the same shared path `cq_reg_free` uses. See PRD §10
+for the certificate itself.
 
 Reversal becomes impossible to get wrong per-kernel, and each kernel shrinks to a step
 function plus an `env` struct. It also lines up exactly with the v2 optimisation recorded
@@ -529,8 +568,8 @@ it grows.
 | ID | Module | LOC | Split seam |
 |---|---|---|---|
 | M07 | `reg.[ch]` — handle table, tombstones (D5), I2 owner-map **sweep**, D7a abort + D7b query | ~~180~~ **283 landed** | table ↔ invariant checking — unused; trigger at 240 in `reg.c` |
-| M08 | `scratch.[ch]` — acquire/release a `BIT_ZERO` scratch region, assert clean on release | 90 | — |
-| M09 | `sandwich.[ch]` — the §0.1 driver, I6 extent tracking | 110 | — |
+| M08 | `scratch.[ch]` — allocate/dispose the `cq_bit` **array**; dispose asserts every bit is back to `CQ_BIT_ZERO` (a **kind** check, never a shadow read). **Ships no release a kernel can call** | 90 | — |
+| M09 | `sandwich.[ch]` — the §0.1 driver. **Owns the scratch qubits end to end**: pre-materialises at step 0 (I6(b)) and releases in its own epilogue. I6 extent armed for the **compute halves only** | 110 | the checksum helper moves to `scratch.c` — **never** the release, which would reopen "a kernel can call it" |
 
 ### Layer 3 — kernels *(all independent of each other; parallelisable)*
 

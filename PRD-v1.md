@@ -643,6 +643,79 @@ promotion never needs more than one control wire.
   > shadow. The scope clarification exempts constants, not materialised bits, so the
   > rotation-root free still hard-errors and `ckd.18` stays open.
 
+  > **THE STRUCTURAL ZERO CERTIFICATE — `ckd.17a`, settled 2026-08-15.**
+  >
+  > **It is not stored, because it is not a thing. It is an act.** `ckd.17` asked whether
+  > the certificate lives per qubit in the shadow or per register in M07; both presuppose
+  > storage and both are wrong. What lands is a **retirement** of the shadow entry of an
+  > index that has *already gone back to the pool*:
+  >
+  > ```c
+  > void cq_shadow_retire(cq_shadow_table *sh, uint32_t q);   /* bd ckd.17 */
+  > ```
+  >
+  > **The governing rule, which decides every candidate stamper mechanically:** *a
+  > certificate may only be written on a qubit that has already left data use* — the write
+  > runs strictly **after** `cq_qubits_release` has returned for that index. One joint
+  > enforces it, and the order is the enforcement:
+  >
+  > ```c
+  > void cq_ctx_release_qubit(cq_ctx *ctx, uint32_t q, int proven_zero)
+  > {
+  >     cq_qubits_release(&ctx->pool, q, proven_zero);   /* aborts unless proven */
+  >     cq_shadow_retire(&ctx->shadow, q);               /* reached only if it did */
+  > }
+  > ```
+  >
+  > **This is therefore NOT the "sanctioned exception to shadow conservatism" the bead
+  > feared.** It never runs on a live qubit, so poison stays sticky for every qubit any live
+  > bit holds. And by **I3** an index on the free list *is* `|0⟩`, so `{value 0, unknown 0}`
+  > is the **correct** entry for it — bit-for-bit what `cq_shadow_ensure` already writes for
+  > a freshly *minted* index. Birth and retirement are one rule; only the fact that `minted`
+  > never decreases had hidden that. Both bytes are always written: a bit poisoned while it
+  > held 1 has a **frozen** value byte (`X` is a no-op under poison, and `cx`/`ccx` update
+  > `value` only when `!unknown`), so clearing `unknown` alone would publish a stale byte as
+  > determinate.
+  >
+  > A qubit that is still live must **never** carry a certificate, and the reason is
+  > structural rather than statistical: a certified-but-live qubit read as a **control** hits
+  > `t.unknown |= c.unknown`, so with `c.unknown` freshly zeroed **the poison stops
+  > propagating** and the shadow starts claiming determinate downstream of a genuine
+  > superposition — the one direction the shadow discipline forbids. That alone disqualifies
+  > the `_unc` epilogue as a stamper, before any counting argument.
+  >
+  > **Who may stamp: one named literal, in M09.** The sandwich driver owns the scratch
+  > qubits end to end — it materialises the region at step 0 (I6(b)) and releases it in its
+  > own epilogue, passing `CQ_ZERO_BY_PALINDROME`. That literal is the **sole** `proven_zero`
+  > constant in `src/`, and it is irreducible: Rule 13 forbids the library holding the gate
+  > stream that would let it *compute* the answer, so "a sandwich cleans its own scratch" is
+  > asserted exactly once, by the code that owns the construction. **It rests on three
+  > premises — one gate per step (`ckd.14a`), I6(a), and I6(b) — and deleting any one makes
+  > it a laundering site.** Not the `_unc` epilogue, not M07, not M08 (which ships no release
+  > a kernel can call), and not a kernel — there is no API through which one could.
+  >
+  > **Verified, never recomputed.** Recomputing the expected value is a simulator, which is
+  > forbidden outright. Instead: `cq_shadow_retire` hard-errors in **both** configurations if
+  > the entry is determinate and non-zero — a complete detector of a non-cancelling sandwich
+  > across the whole rotation-free kernel surface (Steps 10–17), because `Ry`/`Rz` are the
+  > only producers of `unknown`. It is **inert on the L6 corpus**, where nearly every rail is
+  > rotation-tainted, so never report an L6 run as evidence that the certificate held. The
+  > ordered-stream palindrome check in `mock_sink` is the only thing with teeth on the
+  > poisoned surface, and it lives in `tests/`, where Rule 13 permits the recording.
+  >
+  > **`ckd.17b` — a CQ_lang rail at `cqrt_free` — is NOT settled and is filed separately.**
+  > A sandwich certificate reaches *none* of the corpus's 51,696 frees, because none of them
+  > is on a scratch region; and no in-library theorem can cover the general case
+  > (`slice_loop_break.expected.log:10-25` rests on loop-condition algebra that never reaches
+  > us; `specialize_transitive_caller.expected.log:3-16` uncomputes by recomputing into a
+  > *different* handle, defeating any handle-keyed matching). At Step 23 M26 chooses at one
+  > greppable call site between **`CQOPS_FREE_ABORT`** (the default — Rule 6 as written) and
+  > **`CQOPS_FREE_RETIRE`** (tombstone the handle and take its indices out of circulation
+  > forever, so they never reach the free list and I3 holds absolutely — PRD §10's
+  > already-blessed safe leak, applied at the free instead of at a withheld one).
+  > **There is no `CQOPS_FREE_TRUST` and one must never be added:** releasing unproven
+  > indices to the pool is laundering under another name.
+
   > **What "provably clean" reads is NOT settled by this bullet, and it is not obvious.** It
   > cannot be the two-bit shadow: §3's `CX` rule propagates `unknown`, so an uncomputed
   > *tainted* rail is all-`Q unknown` and a literal shadow check would hard-error on every
