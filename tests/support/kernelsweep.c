@@ -39,6 +39,42 @@ static const int SAMPLED_W[] = { 16, 32, 64 };
 
 enum { SAMPLES_PER_MASK = 64, MAX_PAIRS = 128 + 12 };
 
+/* SAMPLING DEPTH IS MEASURED IN WORK, NOT IN CASES — added 2026-08-16 after
+ * the sweep was timed per width rather than counted.
+ *
+ * THE OLD SHAPE WAS QUADRATIC IN W AND NOBODY HAD NOTICED. The fixed mask set
+ * grows LINEARLY with the width — it contains a one-bit-quantum sweep across
+ * all W positions, so `np` is W + 12 — while the samples per mask were a flat
+ * 64 and the cost of a single case is itself linear in W, since the kernel
+ * emits O(W) gates and the harness builds O(W) bits per operand. Product:
+ * O(W^2). Measured on the compare suite in Debug, seconds per width block:
+ *
+ *      W=16  1.70    W=32  5.21    W=64 17.19    W=80 25.86
+ *
+ * — 75% of the whole sweep in the top two widths, against 3.5% for everything
+ * at W <= 8. The wide widths were quietly eating the suite.
+ *
+ * THE FIX KEEPS EVERY MASK AND SHORTENS THE RANDOM TAIL. Nothing named is
+ * dropped: all-classical, all-quantum, alternating, LSB-only, MSB-only, the
+ * full one-bit-quantum sweep and R8's asymmetric pairs are all still crossed
+ * with the four corners at every width. What scales is only the DEPTH of the
+ * random sampling on top, as 1024/W, so each width gets a comparable share of
+ * the budget instead of a share proportional to W. 64 samples at W=16, 32 at
+ * W=32, 16 at W=64, 12 at W=80, 8 at W=128.
+ *
+ * WHY 1024, AND WHY A FLOOR OF 8: the constant is chosen so the widths at and
+ * below 16 are UNCHANGED — this must not weaken anything that was already
+ * cheap — and the floor keeps a real random tail at i128, which is reachable
+ * only through casts and is where the reference's 64-bit word seam lives. */
+static int samples_for(int W)
+{
+    int n = 1024 / (W > 0 ? W : 1);
+
+    if (n > SAMPLES_PER_MASK) n = SAMPLES_PER_MASK;
+    if (n < 8) n = 8;
+    return n;
+}
+
 static uint32_t pairs_for(const cq_kd_spec *k, int W, cq_bk_pair *out,
                           uint32_t cap)
 {
@@ -120,7 +156,7 @@ static void sweep_full_cross(const cq_kd_spec *k, int W)
  *   2^i and 2^i - 1          one lane hot; and a carry/borrow that propagates
  *                            exactly i positions, for every i
  *   0x55.. / 0xAA..          alternating, the mask-vs-value interaction
- * plus SAMPLES_PER_MASK seeded-random pairs, which is what covers the
+ * plus samples_for(W) seeded-random pairs, which is what covers the
  * combinations nobody thought to name. */
 static uint32_t structured_pairs(int W, uint64_t *va, uint64_t *vb, uint32_t cap)
 {
@@ -191,7 +227,7 @@ static void sweep_values(const cq_kd_spec *k, int W)
          * each pair, which left every mask meeting an unpredictable slice of
          * the value space. Every mask now meets the same named corners plus
          * its own random draw. */
-        for (int s = 0; s < SAMPLES_PER_MASK; s++) {
+        for (int s = 0; s < samples_for(W); s++) {
             cq_kd_case2(k, W, cq_bk_rng_next(&rng) & mask,
                         cq_bk_rng_next(&rng) & mask, &pairs[p]);
             cases++;
@@ -202,7 +238,7 @@ static void sweep_values(const cq_kd_spec *k, int W)
            "pairs = %llu cases — NOT value-exhaustive; see kernelsweep.c on "
            "why exhaustion at this width bought nothing the W<=5 full cross "
            "does not already have\n",
-           k->name, W, ns, SAMPLES_PER_MASK, np, (unsigned long long)cases);
+           k->name, W, ns, samples_for(W), np, (unsigned long long)cases);
     fflush(stdout);
 }
 
@@ -240,7 +276,7 @@ static void sweep_sampled(const cq_kd_spec *k, int W)
             cases++;
         }
 
-        for (int s = 0; s < SAMPLES_PER_MASK; s++) {
+        for (int s = 0; s < samples_for(W); s++) {
             v[0] = rnd_w(&rng, W);
             v[1] = rnd_w(&rng, W);
             v[2] = rnd_w(&rng, W);
@@ -249,8 +285,9 @@ static void sweep_sampled(const cq_kd_spec *k, int W)
         }
     }
 
-    printf("# %s W=%2d sampled: %u mask pairs x %d cases = %llu cases "
-           "(seed 0xC0FFEE^W)\n", k->name, W, np, SAMPLES_PER_MASK + 4,
+    printf("# %s W=%2d sampled: %u mask pairs x (4 corners + %d sampled) = "
+           "%llu cases (seed 0xC0FFEE^W; sampling depth is 1024/W, see "
+           "samples_for)\n", k->name, W, np, samples_for(W),
            (unsigned long long)cases);
     fflush(stdout);
 }

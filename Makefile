@@ -8,8 +8,8 @@ BUILD_DEBUG   ?= build-debug
 BUILD_RELEASE ?= build-release
 
 # ctest is SERIAL by default and nobody had tried otherwise until 2026-08-16.
-# Measured on this box: Debug 97.6s serial -> 55.0s at -j12, bounded below by
-# the longest single binary (test_kernel_cmp). Nothing here shares state
+# Measured on this box: Debug 35.0s serial -> 25.4s at -j12, bounded below by
+# the longest single binary (test_kernel_cmp, ~24s). Nothing here shares state
 # between test binaries — each builds its own cq_ctx and its own pool, and the
 # only files written are per-kernel goldens under an update run — so the
 # parallel run is not a weaker run. Override with `make test CTEST_JOBS=1` if

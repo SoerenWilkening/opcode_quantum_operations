@@ -657,7 +657,7 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 # Tests run under BOTH — the invariant checks are the point of Debug,
 # and Release is what gets its gate counts pinned (Rule 17).
 # -j is worth using: ctest is SERIAL by default, and no test binary shares
-# state with another. Measured 2026-08-16: Debug 97.6s -> 55.0s at -j12,
+# state with another. Measured 2026-08-16: Debug 35.0s -> 25.4s at -j12,
 # bounded below by the longest single binary. `make test` passes it for you.
 ctest --test-dir build-debug   -j 8 --output-on-failure
 ctest --test-dir build-release -j 8 --output-on-failure
