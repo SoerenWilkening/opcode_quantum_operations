@@ -248,6 +248,95 @@ CQ_TEST(l5_catches_a_cost_on_the_classical_path)
                      cq_kd_case2(&bad, 2, 0x2u, 0x1u, &CC));
 }
 
+/* ---- The shapes the default call path cannot serve. --------------------- */
+
+/* K9's shape: operands `W` bits, result one bit. Added at Step 13 with bd zwh,
+ * because until then `call_kernel`'s default branch was correct by COINCIDENCE
+ * — every arity-2 kernel on it happened to have `w_dst == w[0]`. */
+static void narrow_dst_shape(int W, cq_kd_shape *out)
+{
+    cq_kd_default_shape(W, out);
+    out->w_dst = 1;
+}
+
+/* M13's shape, minus the adapter: the default branch reads `src[1]`, which
+ * cq_kd_case fills only for `i < n_src`. */
+static void unary_shape(int W, cq_kd_shape *out)
+{
+    cq_kd_default_shape(W, out);
+    out->n_src = 1;
+}
+
+/* What makes the narrow shape legal — the spec SAYING which of the two widths
+ * the kernel's `W` means. This is exactly M16's `call_eq` in miniature. */
+static void call_narrow(cq_ctx *ctx, cq_bit *dst, const cq_bit *const *src,
+                        const cq_kd_shape *sh)
+{
+    (void)sh;
+    cq_kernel_xor(ctx, dst, src[0], src[1], 1);
+}
+
+static cq_ref_w refn_narrow(const cq_ref_w *s, const cq_kd_shape *sh)
+{
+    (void)sh;
+    return cq_ref_w_make(cq_ref_xor(s[0].lo, s[1].lo, 1), 0u, 1);
+}
+
+/* THE FAULT IS THAT NOTHING GOES WRONG, which is why it needs a case of its
+ * own. A narrow-dst spec with no adapter runs the kernel at `w_dst` and is then
+ * compared against a reference computed from the same `w_dst`: L1 agrees, L2
+ * and L3 agree, L4 pins whatever it measured, and W-1 of the W bits are never
+ * touched by anything. There is no wrong answer anywhere for another assertion
+ * to catch — the suite simply tests a narrower kernel than it believes it does.
+ *
+ * The unary leg is the louder half and is included because it is the same
+ * mistake: without the refusal the driver reads `src[1]`, which cq_kd_case
+ * never filled. That is why shape_of RETURNS rather than recording and pressing
+ * on, and why the check sits before fx_open. */
+CQ_TEST(the_driver_refuses_a_shape_its_default_call_path_cannot_serve)
+{
+    const cq_kd_spec narrow = { "narrow-no-adapter", k_good, cq_ref_xor,
+                                narrow_dst_shape, NULL, NULL };
+    const cq_kd_spec unary  = { "unary-no-adapter", k_good, cq_ref_xor,
+                                unary_shape, NULL, NULL };
+    const cq_kd_spec fixed  = { "narrow-with-adapter", k_good, cq_ref_xor,
+                                narrow_dst_shape, call_narrow, refn_narrow };
+
+    CQ_EXPECT_CAUGHT("w_dst != w[0] and no call adapter — the kernel would have "
+                     "run at dst's width and passed",
+                     cq_kd_case2(&narrow, 2, 0x2u, 0x1u, &QQ));
+
+    CQ_EXPECT_CAUGHT("a unary shape and no call adapter — the default path "
+                     "would read src[1], which was never filled",
+                     cq_kd_case2(&unary, 2, 0x2u, 0x1u, &QQ));
+
+    /* The negative control, and it is the point: the SAME narrow shape is
+     * accepted the moment the spec names the width. Without this the refusal
+     * could be "reject every shaped spec" and look identical. */
+    CQ_EXPECT_CLEAN("the same narrow shape, with an adapter",
+                    cq_kd_case2(&fixed, 2, 0x2u, 0x1u, &QQ));
+
+    /* And L4's path takes the same refusal — cq_kd_measure and cq_kd_peak go
+     * through shape_of too, and both had to learn to bail without opening a
+     * fixture they would then leak. */
+    {
+        cq_counter fwd, unc;
+        uint32_t peak = 7u, owned = 7u;
+
+        CQ_EXPECT_CAUGHT("cq_kd_measure on the same refused spec",
+                         cq_kd_measure(&narrow, 2, &fwd, &unc));
+        CQ_EXPECT_CAUGHT("cq_kd_peak on the same refused spec",
+                         owned = cq_kd_peak(&narrow, 2, &peak));
+
+        /* Asserted OUTSIDE the mute, deliberately: a CHECK inside it would be
+         * counted as the failure CQ_EXPECT_CAUGHT is looking for, so the case
+         * would pass whatever these returned. */
+        CHECK_EQ(cq_count_total(&fwd) + cq_count_total(&unc), 0);
+        CHECK_EQ(owned, 0);
+        CHECK_EQ(peak, 0);
+    }
+}
+
 /* ---- The poolcheck helpers refuse, directly. ---------------------------- */
 
 typedef struct { cq_ctx ctx; cq_counter cnt; cq_sink sink; } pc_fx;
@@ -325,6 +414,7 @@ CQ_TEST_MAIN(
     CQ_CASE(l2_catches_a_leak_that_nets_to_zero),
     CQ_CASE(the_kind_check_catches_a_materialised_source),
     CQ_CASE(l5_catches_a_cost_on_the_classical_path),
+    CQ_CASE(the_driver_refuses_a_shape_its_default_call_path_cannot_serve),
     CQ_CASE(cq_pc_same_sees_a_changed_live_count),
     CQ_CASE(cq_pc_live_is_exactly_sees_an_unowned_qubit),
     CQ_CASE(cq_pc_indices_are_free_sees_an_index_that_did_not_come_back)

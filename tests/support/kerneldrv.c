@@ -28,14 +28,56 @@ void cq_kd_default_shape(int W, cq_kd_shape *out)
     }
 }
 
-static void shape_of(const cq_kd_spec *k, int W, cq_kd_shape *sh)
+/* Returns 1 if the shape is one this driver can actually drive. A malformed
+ * shape RETURNS EARLY rather than recording a failure and pressing on, and the
+ * distinction is load-bearing: both refusals below describe a spec the default
+ * call path would then dereference wrongly, so continuing turns a diagnosable
+ * failure into a crash — or, worse, into a green run.
+ *
+ * THE DEFAULT CALL PATH IS DEFINED ONLY FOR THE ARITY-2, ONE-WIDTH SHAPE, and
+ * before Step 13 that was true by coincidence rather than by construction
+ * (bd zwh). call_kernel's default branch is
+ *
+ *     k->kernel(ctx, dst, src[0], src[1], sh->w_dst);
+ *
+ * which makes two assumptions the cq_kd_shape type does not enforce. It reads
+ * `src[1]`, which cq_kd_case fills only for `i < n_src`; and it passes
+ * `w_dst` as the kernel's `W`, although Rule 7's `W` is the OPERAND width.
+ * Those agree for every kernel whose result is as wide as its operands, which
+ * is all of them but K9 — whose `dst` is one bit, and which therefore supplies
+ * a call adapter passing `sh->w[0]`.
+ *
+ * THE FAILURE MODE IS SILENT AND GREEN, which is why this is a refusal and not
+ * a comment. A spec with `w_dst = 1` and no adapter runs the kernel at W=1 and
+ * then compares it against a reference computed from the same `w_dst` — so L1
+ * agrees, L4 pins whatever it measured, and nothing anywhere notices that
+ * fifteen of the sixteen bits were never tested. K10's three-source mux (bd
+ * ckd.15) and M12's variable shifts are the next two shapes where the widths
+ * stop agreeing.
+ *
+ * Provoked, and observed to refuse, in tests/test_kerneldrv.c. */
+static int shape_of(const cq_kd_spec *k, int W, cq_kd_shape *sh)
 {
     cq_kd_default_shape(W, sh);
     if (k->shape) k->shape(W, sh);
 
-    if (sh->n_src < 1 || sh->n_src > CQ_KD_MAX_SRC)
+    if (sh->n_src < 1 || sh->n_src > CQ_KD_MAX_SRC) {
         cq_h_fail(__FILE__, __LINE__, "%s: shape declares %d sources",
                   k->name, sh->n_src);
+        return 0;
+    }
+
+    if (!k->call && (sh->n_src != 2 || sh->w_dst != sh->w[0])) {
+        cq_h_fail(__FILE__, __LINE__,
+                  "%s: shape is n_src=%d, w_dst=%d, w[0]=%d, and the spec "
+                  "supplies no call adapter. The default path passes w_dst as "
+                  "the kernel's W and reads src[1]; it cannot know which width "
+                  "this kernel's W means. Add a `call` (see M13's casts and "
+                  "M16's compares)", k->name, sh->n_src, sh->w_dst, sh->w[0]);
+        return 0;
+    }
+
+    return 1;
 }
 
 typedef struct {
@@ -130,7 +172,8 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
     int32_t hs[CQ_KD_MAX_SRC + 1];
     int classical = 1;
 
-    shape_of(k, W, &sh);
+    /* Before fx_open, so a refused shape allocates nothing to leak. */
+    if (!shape_of(k, W, &sh)) return;
     fx_open(&f);
 
     for (int i = 0; i < sh.n_src; i++) {
@@ -274,12 +317,13 @@ void cq_kd_case2(const cq_kd_spec *k, int W, uint64_t va, uint64_t vb,
 /* --- L4's measurement, and the peak. ------------------------------------- */
 
 /* Both build the same all-quantum fixture, so it lives once. Returns dst's
- * handle; the operand handles are not needed by either caller. */
+ * handle, or -1 for a shape this driver refuses — in which case the fixture was
+ * never opened and the caller must not close it. */
 static int32_t measure_setup(fixture *f, const cq_kd_spec *k, int W,
                              cq_kd_shape *sh, cq_bit **dst,
                              const cq_bit **src)
 {
-    shape_of(k, W, sh);
+    if (!shape_of(k, W, sh)) return -1;
     fx_open(f);
 
     int32_t h[CQ_KD_MAX_SRC];
@@ -311,6 +355,8 @@ void cq_kd_measure(const cq_kd_spec *k, int W, cq_counter *forward,
     const cq_bit *src[CQ_KD_MAX_SRC];
     int32_t hd = measure_setup(&f, k, W, &sh, &dst, src);
 
+    if (hd < 0) { cq_count_reset(forward); cq_count_reset(unc); return; }
+
     cq_count_reset(&f.cnt);
     call_kernel(k, &f.ctx, dst, src, &sh);
     *forward = f.cnt;
@@ -330,6 +376,8 @@ uint32_t cq_kd_peak(const cq_kd_spec *k, int W, uint32_t *peak_delta)
     cq_bit *dst;
     const cq_bit *src[CQ_KD_MAX_SRC];
     int32_t hd = measure_setup(&f, k, W, &sh, &dst, src);
+
+    if (hd < 0) { *peak_delta = 0u; return 0u; }
 
     cq_pc_snap before = cq_pc_take(&f.ctx);
     call_kernel(k, &f.ctx, dst, src, &sh);

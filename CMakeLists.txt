@@ -102,6 +102,12 @@ add_library(cqops STATIC
                                # carries no translation unit, like bit.h)
     src/kernels/shift_const.c  # M11, Step 11 — K4 constant shl/lshr/ashr, D8
     src/kernels/cast.c         # M13, Step 11 — K5 sext/zext/trunc, two widths
+    src/kernels/add.c          # M14, Step 12 — K6 add, K7 sub. THE FIRST
+                               # SANDWICH USERS: ripple-carry per PRD §4, not
+                               # Cuccaro (that is K8, Step 15)
+    src/kernels/cmp.c          # M16, Step 13 — K9 icmp, all ten predicates.
+                               # eq/ult/slt are ported; the other seven are
+                               # lower_icmp!'s own dispatch over them
 )
 
 target_include_directories(cqops

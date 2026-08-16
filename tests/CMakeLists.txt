@@ -65,6 +65,8 @@ add_cqops_test(test_sandwich)     # M09, Step 8 — the palindrome, I6(a)+(b)
 add_cqops_test(test_kernel_bitwise)   # M10, Step 10 — K1/K2/K3, L1-L5
 add_cqops_test(test_kernel_shift)     # M11, Step 11 — K4 constant shifts, D8
 add_cqops_test(test_kernel_cast)      # M13, Step 11 — K5 casts, two widths, i128
+add_cqops_test(test_kernel_add)       # M14, Step 12 — K6/K7, the first sandwiches
+add_cqops_test(test_kernel_cmp)       # M16, Step 13 — K9, the ten icmp predicates
 
 ## The driver's own assertions, made falsifiable — test_harness_negative's
 ## argument one level up. A mutation battery found five of the Phase-B pool
@@ -267,6 +269,45 @@ add_cqops_death_test(test_kernel_step11_death CASES
 set_tests_properties(test_kernel_step11_death.a_quantum_shift_amount
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "§3 distinctness")
+
+## M14, Step 12. ONE CASE PER ENTRY POINT — the only thing M07's, M08's and
+## M09's own suites cannot prove is that `cq_kernel_add` and `cq_kernel_sub`
+## each actually CALL cq_kernel_check_dst. No FAIL_REGULAR_EXPRESSION is owed,
+## and the reason is specific to the ALL-CLASSICAL alias these two cases use:
+## it takes the R9 short-circuit, so it never reaches cq_sandwich, and its only
+## emission is cq_emit_x on a constant, which carries no distinctness check.
+## Nothing beneath M14 speaks for that case in either configuration.
+##
+## The QUANTUM alias would be caught, by cq_shadow_retire in M02 — see the file
+## header, which used to say this kernel had no backstop at all and was wrong
+## about it. That is exactly why the registered cases are the classical ones.
+add_cqops_death_test(test_kernel_add_death CASES
+    add_dst_aliases_a_classical_source
+    sub_dst_aliases_a_classical_source
+)
+
+## M16, Step 13. Same argument as M14's, one predicate family at a time — and
+## `the_two_sources_are_the_same_register` is the sharpest case in the project
+## so far: with `eq(a,a)` on classical rails, deleting the guard returns the
+## RIGHT ANSWER with no diagnostic in either configuration, because a == a. It
+## is also the alias CQ_lang genuinely ships for this opcode
+## (slice_select_rail_alias_cond.expected.log:4, `icmp_slt_i32(h0, h0)`), whose
+## remedy is M26's defensive cqrt_copy at the handle boundary (bd -493).
+##
+## No FAIL_REGULAR_EXPRESSION is owed on any of them: every case uses
+## ALL-CLASSICAL rails, so the kernel takes the R9 short-circuit, never reaches
+## cq_sandwich, and emits only cq_emit_x on a constant — which carries no
+## distinctness check. Nothing beneath M16 speaks for these, in either
+## configuration.
+add_cqops_death_test(test_kernel_cmp_death CASES
+    eq_dst_aliases_a_classical_source
+    ult_dst_aliases_a_classical_source
+    slt_dst_aliases_a_classical_source
+    ugt_dst_aliases_a_classical_source
+    the_two_sources_are_the_same_register
+    a_width_of_zero
+    a_negative_width
+)
 
 add_cqops_death_test(test_qubits_death CASES
     ceiling_exceeded

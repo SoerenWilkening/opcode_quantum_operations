@@ -26,9 +26,10 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
 > | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **Steps 1–11 have landed (2026-08-15): Layer 0, the emitter, the handle table,
-> the sandwich, both v1 sinks, and five kernels (K1–K5).** On disk and passing
-> under **both** configurations, **87 ctest tests**:
+> **Steps 1–13 have landed (2026-08-16): Layer 0, the emitter, the handle table,
+> the sandwich, both v1 sinks, and eight kernels (K1–K7 and K9) — K6/K7 being the
+> FIRST SANDWICH USERS and K9 the first kernel whose `dst` is not `W` bits wide.**
+> On disk and passing under **both** configurations, **98 ctest tests**:
 >
 > | Step | Module | Files | LOC / budget |
 > |---|---|---|---|
@@ -51,6 +52,10 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 11 | **M11** | `src/kernels/shift_const.[ch]` — K4 constant shl/lshr/ashr, implementing **D8** | 63 / 90 |
 > | 11 | **M13** | `src/kernels/cast.[ch]` — K5 sext/zext/trunc; unary with **two widths** | 42 / 90 |
 > | 11 | — | `tests/support/kernelsweep.c` — the sweep shapes, split from `kerneldrv.c` on plan §2.2's recorded seam | 128 |
+> | 12 | **M14** | `src/kernels/add.[ch]` — K6 add, K7 sub. Ripple-carry, one gate per step, one `ripple` shared by both | 114 / 190 |
+> | 12 | — | `tests/test_kernel_add.c` + `test_kernel_add_upstream.inc` + `test_kernel_add_death.c` | 244 · 48 · 45 |
+> | 13 | **M16** | `src/kernels/cmp.[ch]` — K9 `icmp`, **all ten predicates**. Three ported primitives, seven derived by `lower_icmp!`'s own dispatch | 190 / 200 |
+> | 13 | — | `tests/test_kernel_cmp.c` + `test_kernel_cmp_derivation.inc` + `test_kernel_cmp_death.c`, and `cq_ref_icmp` in `refmodel` | 236 · 218 · 72 |
 >
 > **The fold table has landed and is green at 159/159** (155 exhaustive + 4 distinctness
 > deaths), so the critical path is behind us. `cq_ctx` now exists: pool + shadow + a
@@ -105,11 +110,89 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > casts are the only way an i128 register exists. `cq_kd_spec`'s trailing members
 > are zero-defaulting, so Step 10's specs compile untouched.
 >
-> **Next is Step 12 — K6 add and K7 sub, the FIRST SANDWICH KERNELS (M14).** That
-> is the step where the driver meets a kernel with something to leak, and where
-> risk R9's all-classical short-circuit is owed. Still a plan: no controlled axis
-> (M06 is Step 20, not Step 8, despite its low module number), and no rotation
-> (M21/M22 are Steps 18–19).
+> **Step 12 landed M14 and every figure in K06.md and K07.md is now confirmed by
+> execution rather than by hand.** All eight evaluated rows reproduce exactly —
+> add `(0, 7W, 4W−4) = 11W−4`, so **84** at i8; sub `(2W+2, 9W, 4W−4) = 15W−2`, so
+> **118** — as do all four hand-folds: `x+1` at four widths against Bennett's
+> published totals, `x+3`, `x−1`, and the R8 mixed-mask witness. Those documents
+> were derived with Julia not installed and said so; they are now measured.
+> **M14 is 114 lines against a 190 budget, so plan §3's `add.c ↔ sub.c` seam is
+> unused and stays available.** Risk **R9**'s short-circuit is in and is
+> bit-serial, not packed — add and sub ship at **i128** and i80 is explicitly
+> excluded from them (`opcode_table.yaml:184-185`, `:85`), so the suite sweeps the
+> ladder plus 128.
+>
+> **A 13-mutant battery over `add.c` killed every real mutant and left both
+> deliberately-equivalent controls alive.** Two findings from it are recorded in
+> `bd remember` and matter beyond this step: a **D1 violation** (two gates in one
+> sandwich step) aborts from `cq_shadow_retire` in **M02**, in *both*
+> configurations — not the pool, not the Debug fingerprint; and removing
+> pre-materialisation from `cq_sandwich` is caught by M09's own release epilogue
+> in Release, so **I6(b) has a both-configuration backstop.**
+>
+> **Step 13 landed M16 — all ten `icmp` predicates — and every figure in K09.md
+> §3.4 is now confirmed by execution rather than by hand.** Its six cost rows across
+> five widths expand to **fifty `(predicate, W)` cells, and all fifty reproduce
+> exactly, in both passes** — checked as tuples against
+> `tests/goldens/cmp.counts`: `eq` `10W−4`, `ne` `10W−5`, `ult`/`ugt` `12W+4`,
+> `ule`/`uge` `12W+3`, `slt`/`sgt` `16W+8`, `sle`/`sge` `16W+7` — so
+> **76 / 100 / 136** at i8 and **636 / 772 / 1032** at i64. So
+> does §3.3.1's per-mask fold rule, the one that had to be corrected twice: a
+> classical **ZERO** operand bit removes `4` gates from the operand `lower_ult!`
+> reads twice and `2` from every other, and a classical **ONE** removes **none**.
+> And so do §4's scratch figures, `2W−1` / `3W+1` / `5W+1`, measured as a peak
+> rather than inferred. That document was written with Julia not installed and
+> said so throughout; it is now measured. **i80 is newly pinned** — it is a
+> shipped `icmp` width (`opcode_table.yaml:222`) and K09.md's table stops at 64.
+>
+> **`bd -4tt` is RESOLVED for M16 and its premise turned out to be false.** K9
+> does not reuse K7's carry chain and does not need to: `lower_ult!`
+> (`arith.jl:449-463`) is its **own** upstream function — `lower_add!`'s
+> recurrence minus the trailing `CNOT(carry[i], result[i])` that makes the sum
+> bit, with its own `axnb` array and four gates per stage rather than five — so
+> porting it is Rule 1 applied literally, not a second transcription. Nothing was
+> exported from M14 and no Layer 3 API changed. **The M19/M20 half stays open**:
+> K12 costs itself `C_sub(W) = 7W−1`, which *is* K7's compute half, so unlike K9
+> it does want the recurrence itself.
+>
+> **M16 is 190 lines against a 200 budget, so plan §3's `primitives ↔ predicate
+> derivation` seam is unused on the source side and stays available.** The *test*
+> side split on exactly that seam: `test_kernel_cmp_derivation.inc` carries the
+> seven derived predicates and the fold formula, and the `.c` keeps the sweeps and
+> the goldens. **K9 is the only kernel that keeps Rule 7's single-`W` signature while
+> producing a result of a different width** — `icmp` is `i1`, and casts have two
+> widths but name both — so the shared driver is told through `cq_kd_shape`'s `w_dst`,
+> every call adapter passes `sh->w[0]` as the kernel's `W`, and a harness that
+> passed `w_dst` instead would run every compare at W=1 and pass.
+>
+> **A 20-mutant battery over `cmp.c` killed all 18 real mutants and left both
+> deliberately-equivalent controls alive.** Two findings worth carrying. First, the
+> assertion that catches a mis-transcribed derivation row is **L1 and only L1**:
+> every predicate is within one X of its sibling and four are exactly equal to it,
+> so `ugt`-meaning-`ule` moves no count, keeps the palindrome, and leaves scratch
+> clean. `each_derived_predicate_is_its_primitives_stream` is the structural
+> backstop — it compares two predicates' compute halves gate for gate on the *same
+> qubits*, by running both in one context so the released scratch comes back off the
+> LIFO free list at the same indices, which no gate count can do, and it is the
+> **sole** detector for a measured case: give `cq_kernel_ne` the operand swap and the
+> kernel stays *correct* (`a != b` is symmetric), every value, tuple, palindrome and
+> pool check agrees, eleven of twelve cases stay green — and the module has stopped
+> transcribing `lower_icmp!`. Second, about the
+> instrument: **building two targets in two `cmake --build` invocations defeats a
+> "was the mutated file recompiled?" leak check**, because the second build
+> correctly finds the object up to date and the check cannot tell that from a stale
+> object carrying the previous mutant. It fired on this battery's first run. Build
+> every target for one edit in **one** invocation.
+>
+> **Next is Step 14 — K10 mux (M17), then variable shifts as a barrel over it
+> (M12).** Read **`bd 84m`** first: K10.md was never re-issued under I6(b), so its
+> qubit table and its goldens are stale in the direction Step 13 has now measured
+> for K9, and it will fire the moment the counts are pinned. **`bd ckd.15`** is the
+> other one — K10's mux has **three** sources against Rule 7's two; note the test
+> driver already carries `CQ_KD_MAX_SRC = 3` and an N-ary shape/call/refn triple,
+> so the open question is the *kernel* contract, not the harness. Still a plan: no
+> controlled axis (M06 is Step 20, not Step 8, despite its low module number), and
+> no rotation (M21/M22 are Steps 18–19).
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -699,18 +782,64 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   M08 owns the `cq_bit` array and its dispose asserts every bit is back to `CQ_BIT_ZERO`
   — a **kind** check, never a shadow read. That is what plan §3's "assert clean on
   release" actually becomes, and unlike a shadow reading it is implementable.
-- **Layers 0–2 exist, plus two of Layer 4's sinks and the FIRST THREE kernels.**
+- **Layers 0–2 exist, plus two of Layer 4's sinks and EIGHT kernels — K1–K7 and K9.**
   `src/bit.h`, `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`, `src/ctx.[ch]`,
   `src/emit.[ch]`, `src/reg.[ch]`, `src/scratch.[ch]`, `src/sandwich.[ch]`,
-  `src/sink_printf.[ch]`, `src/sink_count.[ch]`, `src/kernels/kernel.h` and
-  `src/kernels/bitwise.[ch]` are real as of Step 10 — but there is **no other kernel**
-  (M11–M20 are still Phase B), no `sink_qec` (M25 is Step 26), no angle or rotation
-  module (M21/M22), and **no controlled axis** (M06 is Step 20, despite its low module
+  `src/sink_printf.[ch]`, `src/sink_count.[ch]`, `src/kernels/kernel.h`,
+  `src/kernels/bitwise.[ch]`, `src/kernels/shift_const.[ch]`, `src/kernels/cast.[ch]`,
+  `src/kernels/add.[ch]` and `src/kernels/cmp.[ch]` are real as of Step 13 — but
+  **M12, M15 and M17–M20 are still
+  Phase B**, there is no `sink_qec` (M25 is Step 26), no angle or rotation module
+  (M21/M22), and **no controlled axis** (M06 is Step 20, despite its low module
   number). Check before you cite — and read `third_party/bennett/COMMIT` rather than
   running `git log` inside it, which reports the *parent* repo's HEAD because the
   snapshot has no `.git`. **That COMMIT file is a document, not a bare SHA**: the hash
   is on its `commit:` line, and reading its first line gets you a title that would not
   change on a re-pin — which is exactly what a risk-R3 check must notice.
+
+- **K9's `dst` IS ONE BIT, AND `cq_kd_case`'s DEFAULT CALL PATH IS DEFINED ONLY FOR THE
+  ARITY-2, ONE-WIDTH SHAPE — `shape_of` now REFUSES anything else.** The default branch
+  passes `w_dst` as the kernel's `W` and reads `src[1]`; for every kernel whose result
+  is as wide as its operands those assumptions hold, so until Step 13 the default was
+  right *by coincidence*. A spec with `w_dst = 1` and no `call` adapter would **run
+  every case at W=1 and pass** — L1 compares it against a reference computed from the
+  same `w_dst`, so nothing disagrees and W−1 of the W bits are never touched. That is
+  now a refusal (`bd zwh`), provoked and observed to fire in
+  `test_kerneldrv.c:the_driver_refuses_a_shape_its_default_call_path_cannot_serve`,
+  with a negative control asserting the same narrow shape is *accepted* once the spec
+  supplies the adapter. Measured: delete the refusal and that is the only case that
+  goes red. M13's casts hit the same shape from the other side. `icmp` is `i1`
+  (`ir_types.jl:79`) and K9 is the only kernel that keeps Rule 7's **single-`W`
+  signature** while producing a result of a different width — casts have two widths
+  but name both, so they have no single `W` to disagree with. That is also why
+  `cq_kernel_check_dst`'s arity-2 form is wrong here — `cmp.c` calls
+  `cq_kernel_check_n(dst, 1, src, w, 2)` so the ranges are sized per operand.
+
+- **`icmp` IS IN SCOPE AT i80, unlike almost everything else at that width.** The i80
+  surface is deliberately narrow — `opcode_table.yaml:133-135` carries "EXACTLY the
+  extraction ops (and / icmp / lshr …)" — but `icmp` is one of them, at all ten
+  predicates (`:222`: `widths: [i1,i8,i16,i32,i64,i80]`). So K9's ladder is
+  `{1,8,16,32,64,80}` and its reference must be two-word, where add/sub go to i128 and
+  are **excluded** from i80 (`:85`). Do not carry "i80 is only `and/lshr/or/shl`" over
+  from the binary-op fence; that fence is about `binary_opcodes`, and compares are a
+  different family with their own row.
+
+- **FOUR PREDICATES SWAP THEIR OPERANDS AND FIVE INVERT THE FLAG, AND THE TWO SETS ARE
+  NOT THE SAME SET.** Swap: `ugt`, `ule`, `sgt`, `sle`. Invert: `eq`, `ult`, `ugt`,
+  `slt`, `sgt`. They overlap in `ugt` and `sgt` and disagree everywhere else, which is
+  the near-miss that makes `lower_icmp!`'s ten rows worth reading twice. **Nothing but
+  L1 can catch a wrong row**: measured at Step 13, `uge`-meaning-`ule` emits the same
+  tuple, keeps the palindrome, and leaves scratch clean. The raw scratch flags are the
+  *negations* — `a != b`, `a >=u b`, `a >=s b` — so the five that do **not** invert are
+  the ones that cost one X less, not more.
+
+- **A CLASSICAL `ONE` OPERAND BIT REMOVES NO GATES.** Only a classical `ZERO` does.
+  `CX(ONE, t)` folds to `X(t)` and `CCX(ONE, c, t)` to `CX(c, t)` — one gate either way
+  — so a partially-classical mask costs **≤** the all-quantum golden and `<` only when
+  the mask contains a `ZERO`. An L5 assertion written with `<` fails on
+  `icmp eq i8 %x, -1`. K09.md §3.3.1 asserted the opposite three times before an
+  adversarial pass caught it; the corrected rule is now executed rather than argued, in
+  `a_classical_zero_operand_bit_folds_by_k09s_own_formula`.
 
 - **`ctest` DOES NOT FORWARD TRAILING ARGUMENTS TO TEST BINARIES, and the command this
   file used to print was a hard error rather than an unimplemented one.**
@@ -1127,7 +1256,7 @@ check, do not assume, and update this table when a step lands):
 | 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · **M04 `sink`** |
 | 1 — emission | **M05 `emit`** (the fold table — Rule 11) · M06 `controlled` |
 | 2 — registers, sandwich | **M07 `reg`** · **M08 `scratch`** · **M09 `sandwich`** |
-| 3 — kernels | **M10 `bitwise`** (+ **`kernels/kernel.h`**, Rule 7's typedef) · **M11 `shift_const`** · M12 `shift_var` · **M13 `cast`** · M14 `add` · M15 `addacc` · M16 `cmp` · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |
+| 3 — kernels | **M10 `bitwise`** (+ **`kernels/kernel.h`**, Rule 7's typedef) · **M11 `shift_const`** · M12 `shift_var` · **M13 `cast`** · **M14 `add`** · M15 `addacc` · **M16 `cmp`** · M17 `mux` · M18 `mul` · M19 `divrem_u` · M20 `divrem_s` |
 | 4 — analog, sinks | M21 `angle` · M22 `rotate` · **M23 `sink_printf`** · **M24 `sink_count`** · M25 `sink_qec` |
 | 5 — shim | M26 `cq_runtime_impl.c` · M27 `gen_shim.py` · M28 generated `*.gen.c` (LOC-exempt) |
 

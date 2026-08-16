@@ -1,0 +1,59 @@
+# M14 kernels/add.c — K6 add, K7 sub (ripple-carry, sandwiched, all-quantum operands)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+add       forward    1     0     7        0
+add       unc        1     0     7        0
+sub       forward    1     4     9        0
+sub       unc        1     4     9        0
+add       forward    2     0    14        4
+add       unc        2     0    14        4
+sub       forward    2     6    18        4
+sub       unc        2     6    18        4
+add       forward    4     0    28       12
+add       unc        4     0    28       12
+sub       forward    4    10    36       12
+sub       unc        4    10    36       12
+add       forward    8     0    56       28
+add       unc        8     0    56       28
+sub       forward    8    18    72       28
+sub       unc        8    18    72       28
+add       forward   16     0   112       60
+add       unc       16     0   112       60
+sub       forward   16    34   144       60
+sub       unc       16    34   144       60
+add       forward   32     0   224      124
+add       unc       32     0   224      124
+sub       forward   32    66   288      124
+sub       unc       32    66   288      124
+add       forward   64     0   448      252
+add       unc       64     0   448      252
+sub       forward   64   130   576      252
+sub       unc       64   130   576      252
+add       forward  128     0   896      508
+add       unc      128     0   896      508
+sub       forward  128   258  1152      508
+sub       unc      128   258  1152      508

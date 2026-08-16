@@ -1,0 +1,187 @@
+# M16 kernels/cmp.c — K9 icmp, all ten predicates (sandwiched, all-quantum operands)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+eq        forward    1     1     5        0
+eq        unc        1     1     5        0
+eq        forward    2     1    13        2
+eq        unc        2     1    13        2
+eq        forward    4     1    29        6
+eq        unc        4     1    29        6
+eq        forward    8     1    61       14
+eq        unc        8     1    61       14
+eq        forward   16     1   125       30
+eq        unc       16     1   125       30
+eq        forward   32     1   253       62
+eq        unc       32     1   253       62
+eq        forward   64     1   509      126
+eq        unc       64     1   509      126
+eq        forward   80     1   637      158
+eq        unc       80     1   637      158
+ne        forward    1     0     5        0
+ne        unc        1     0     5        0
+ne        forward    2     0    13        2
+ne        unc        2     0    13        2
+ne        forward    4     0    29        6
+ne        unc        4     0    29        6
+ne        forward    8     0    61       14
+ne        unc        8     0    61       14
+ne        forward   16     0   125       30
+ne        unc       16     0   125       30
+ne        forward   32     0   253       62
+ne        unc       32     0   253       62
+ne        forward   64     0   509      126
+ne        unc       64     0   509      126
+ne        forward   80     0   637      158
+ne        unc       80     0   637      158
+ult       forward    1     5     7        4
+ult       unc        1     5     7        4
+ult       forward    2     7    13        8
+ult       unc        2     7    13        8
+ult       forward    4    11    25       16
+ult       unc        4    11    25       16
+ult       forward    8    19    49       32
+ult       unc        8    19    49       32
+ult       forward   16    35    97       64
+ult       unc       16    35    97       64
+ult       forward   32    67   193      128
+ult       unc       32    67   193      128
+ult       forward   64   131   385      256
+ult       unc       64   131   385      256
+ult       forward   80   163   481      320
+ult       unc       80   163   481      320
+ugt       forward    1     5     7        4
+ugt       unc        1     5     7        4
+ugt       forward    2     7    13        8
+ugt       unc        2     7    13        8
+ugt       forward    4    11    25       16
+ugt       unc        4    11    25       16
+ugt       forward    8    19    49       32
+ugt       unc        8    19    49       32
+ugt       forward   16    35    97       64
+ugt       unc       16    35    97       64
+ugt       forward   32    67   193      128
+ugt       unc       32    67   193      128
+ugt       forward   64   131   385      256
+ugt       unc       64   131   385      256
+ugt       forward   80   163   481      320
+ugt       unc       80   163   481      320
+ule       forward    1     4     7        4
+ule       unc        1     4     7        4
+ule       forward    2     6    13        8
+ule       unc        2     6    13        8
+ule       forward    4    10    25       16
+ule       unc        4    10    25       16
+ule       forward    8    18    49       32
+ule       unc        8    18    49       32
+ule       forward   16    34    97       64
+ule       unc       16    34    97       64
+ule       forward   32    66   193      128
+ule       unc       32    66   193      128
+ule       forward   64   130   385      256
+ule       unc       64   130   385      256
+ule       forward   80   162   481      320
+ule       unc       80   162   481      320
+uge       forward    1     4     7        4
+uge       unc        1     4     7        4
+uge       forward    2     6    13        8
+uge       unc        2     6    13        8
+uge       forward    4    10    25       16
+uge       unc        4    10    25       16
+uge       forward    8    18    49       32
+uge       unc        8    18    49       32
+uge       forward   16    34    97       64
+uge       unc       16    34    97       64
+uge       forward   32    66   193      128
+uge       unc       32    66   193      128
+uge       forward   64   130   385      256
+uge       unc       64   130   385      256
+uge       forward   80   162   481      320
+uge       unc       80   162   481      320
+slt       forward    1     9    11        4
+slt       unc        1     9    11        4
+slt       forward    2    11    21        8
+slt       unc        2    11    21        8
+slt       forward    4    15    41       16
+slt       unc        4    15    41       16
+slt       forward    8    23    81       32
+slt       unc        8    23    81       32
+slt       forward   16    39   161       64
+slt       unc       16    39   161       64
+slt       forward   32    71   321      128
+slt       unc       32    71   321      128
+slt       forward   64   135   641      256
+slt       unc       64   135   641      256
+slt       forward   80   167   801      320
+slt       unc       80   167   801      320
+sgt       forward    1     9    11        4
+sgt       unc        1     9    11        4
+sgt       forward    2    11    21        8
+sgt       unc        2    11    21        8
+sgt       forward    4    15    41       16
+sgt       unc        4    15    41       16
+sgt       forward    8    23    81       32
+sgt       unc        8    23    81       32
+sgt       forward   16    39   161       64
+sgt       unc       16    39   161       64
+sgt       forward   32    71   321      128
+sgt       unc       32    71   321      128
+sgt       forward   64   135   641      256
+sgt       unc       64   135   641      256
+sgt       forward   80   167   801      320
+sgt       unc       80   167   801      320
+sle       forward    1     8    11        4
+sle       unc        1     8    11        4
+sle       forward    2    10    21        8
+sle       unc        2    10    21        8
+sle       forward    4    14    41       16
+sle       unc        4    14    41       16
+sle       forward    8    22    81       32
+sle       unc        8    22    81       32
+sle       forward   16    38   161       64
+sle       unc       16    38   161       64
+sle       forward   32    70   321      128
+sle       unc       32    70   321      128
+sle       forward   64   134   641      256
+sle       unc       64   134   641      256
+sle       forward   80   166   801      320
+sle       unc       80   166   801      320
+sge       forward    1     8    11        4
+sge       unc        1     8    11        4
+sge       forward    2    10    21        8
+sge       unc        2    10    21        8
+sge       forward    4    14    41       16
+sge       unc        4    14    41       16
+sge       forward    8    22    81       32
+sge       unc        8    22    81       32
+sge       forward   16    38   161       64
+sge       unc       16    38   161       64
+sge       forward   32    70   321      128
+sge       unc       32    70   321      128
+sge       forward   64   134   641      256
+sge       unc       64   134   641      256
+sge       forward   80   166   801      320
+sge       unc       80   166   801      320

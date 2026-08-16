@@ -405,7 +405,8 @@ short-circuit                    if every operand bit is classical: fold to a co
                                  emit nothing, allocate nothing, and DO NOT enter here
 pre-materialise scratch          all scratch bits -> CQ_BIT_Q. 0 gates, W_scratch qubits
 compute  f into scratch          (Bennett's construction, verbatim)
-copy-out scratch → dst           (W CNOTs; this is the "^=")
+copy-out scratch → dst           (|dst| CNOTs, + 1 X where the raw flag is inverted;
+                                  this is the "^=" — see the note below on |dst| != W)
 reverse  the compute             (same gates, reverse order — all three gates are self-inverse)
 free     scratch
 ```
@@ -413,6 +414,18 @@ free     scratch
 Cost: 2× the compute half. Applies to `add`, `sub`, `eq`, `ult`, `slt`, `mux`,
 `mul`, `divrem`. Naturally clean already (no sandwich needed): `and`, `or`, `xor`,
 constant `shl/lshr/ashr`, `sext/zext/trunc`.
+
+> **CORRECTED 2026-08-16 at Step 13: the copy-out is `|dst|` CNOTs, not `W`, and the two
+> differ for K9.** This sketch read "W CNOTs" and that is right for every kernel whose
+> result is as wide as its operands — which is all of them but one. `icmp` produces a
+> **one-bit** flag (`ir_types.jl:79`; §6's K9 row already says "1-bit result"), so K9's
+> copy-out is **1 CNOT**, plus **1 X** for the five predicates whose raw scratch flag is
+> the negation of the answer. M09's driver never assumed otherwise — `cq_sandwich` takes
+> `n_copyout` as a parameter — but a reader sizing a copy-out loop from this line would
+> read off the end of a one-bit register, and a test harness doing the same would run
+> every compare at `W = 1` and pass. Measured and pinned in
+> `tests/test_kernel_cmp.c`; the general statement is `n_copyout` is the kernel's, and
+> only the compute half is replayed.
 
 **The pre-materialise step is not an optimisation — it is what makes the reverse half
 cancel** (`IMPLEMENTATION_PLAN.md` §0.2, invariant **I6(b)**, risk **R8**). Scratch is born
@@ -427,9 +440,30 @@ Two consequences worth stating here because they show up in the goldens:
 
 - It costs **qubits, never gates** — `cq_materialise` emits an `X` only if the constant was
   1, and scratch is always born 0.
-- Kernel gate counts become a function of **`W` alone**, independent of the operand bit-kind
-  mask. That is what makes one L4 golden per `(kernel, W)` sound, and it is a direct answer
-  to risk R5.
+- Kernel **qubit** counts become a function of **`W` alone**, independent of the operand
+  bit-kind mask, because pre-materialisation is unconditional and never consults the
+  operand kinds.
+
+  > **CORRECTED 2026-08-15, and the earlier wording said `gate` counts. It was false, and
+  > the licence it granted — that an L4 golden may be taken at any mask — was the dangerous
+  > half.** Pre-materialisation removes the *scratch* side's dependence on bit-kinds; it
+  > does nothing to the *operand* side, and it must not, because `a + 0`, `x − 1` and the
+  > `x + 1` constant-increment case all legitimately emit fewer gates — which is exactly
+  > what **L5** proves. A gate count is a function of `(W, operand mask)`. **Measured at
+  > Step 12**, not argued: K6 at `W = 3` with `a = b = {Q, ZERO, ZERO}` emits **19** gates
+  > sandwiched, against `11W − 4 = 29` at all-quantum
+  > (`tests/test_kernel_add.c`, `r8_the_mixed_kind_witness_mirrors_exactly_at_w3`;
+  > K06.md §3.7 derives the same number by hand).
+  >
+  > What I6(b) actually buys is **pass-symmetry at every mask** — forward and reverse emit
+  > the identical sequence — which is what makes a golden well-defined at all. One L4
+  > golden per `(kernel, W)` is sound because it is pinned at **one specific, reproducible
+  > mask**: all-quantum, which is the *fixed point* of the drift, since with no demotion
+  > (D6) a mask can only move towards `Q` between a forward call and its `_unc`. A golden
+  > at any other mask must pin that mask's own number. The last paragraph of this section
+  > already said "a deterministic function of `(W, operand bit-kinds)`" and was right;
+  > IMPLEMENTATION_PLAN §0.2 carries the corrected wording. Risk R5 is answered by pinning
+  > counts rather than traces, not by mask-independence.
 
 The **short-circuit** line is equally load-bearing in the other direction: without it,
 pre-materialisation would allocate scratch for a fully-classical operation and break **L5**'s

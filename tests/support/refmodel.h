@@ -44,6 +44,11 @@ uint64_t cq_ref_xor(uint64_t a, uint64_t b, int W);
 uint64_t cq_ref_and(uint64_t a, uint64_t b, int W);
 uint64_t cq_ref_or (uint64_t a, uint64_t b, int W);
 
+/* K6 and K7 have NO one-word form. They ship at i128 (opcode_table.yaml:184),
+ * so the two-word pair below is the oracle, and a one-word sibling would only
+ * ever be compared to it below 64 — where the two are provably the same
+ * expression. See the note in refmodel.c; do not add one. */
+
 /* K4, at the effective amount. D8's reduction is NOT applied here — the caller
  * applies it once, through cq_shift_stages/cq_shift_amount, so that the kernel
  * and the reference cannot disagree about the reduction itself. These take the
@@ -91,6 +96,33 @@ uint32_t cq_ref_w_popcount(cq_ref_w a);
 cq_ref_w cq_ref_w_shl (cq_ref_w a, int k, int W);
 cq_ref_w cq_ref_w_lshr(cq_ref_w a, int k, int W);
 cq_ref_w cq_ref_w_ashr(cq_ref_w a, int k, int W);
+
+/* K6, K7, width-generic to 128 — THE model L1 drives for add and sub, because
+ * both ship at i128 (opcode_table.yaml:184-185) where the one-word pair
+ * aborts. Word arithmetic with an explicit carry across the 64-bit seam, not a
+ * bit-serial ripple: the kernel under test IS a ripple-carry circuit, and a
+ * reference that shared its recurrence would share its mistakes. */
+cq_ref_w cq_ref_w_add(cq_ref_w a, cq_ref_w b, int W);
+cq_ref_w cq_ref_w_sub(cq_ref_w a, cq_ref_w b, int W);
+
+/* K9, width-generic to 128, and the ONE-BIT result is returned as a plain int
+ * because `icmp` is `i1` — the suite wraps it into a 1-bit cq_ref_w.
+ *
+ * NOT BY THE BIAS FLIP THE KERNEL USES. K9's `slt` copies both operands,
+ * inverts their sign bits and runs the unsigned comparator on the biased
+ * values (arith.jl:465-472). A reference doing the same would share the
+ * construction under test and could not disagree with it — this file's opening
+ * warning, applied to the one kernel where the temptation is a one-liner.
+ * cq_ref_icmp branches on the two sign bits instead, which is different
+ * reasoning reaching the same answer. Verified against a third model in
+ * tests/test_kernel_cmp.c: cq_ref_sext plus a plain C `<` on int64_t, at every
+ * width a 64-bit signed integer can hold. */
+typedef enum {
+    CQ_ICMP_EQ = 0, CQ_ICMP_NE,  CQ_ICMP_ULT, CQ_ICMP_UGT, CQ_ICMP_ULE,
+    CQ_ICMP_UGE,    CQ_ICMP_SLT, CQ_ICMP_SGT, CQ_ICMP_SLE, CQ_ICMP_SGE
+} cq_icmp_pred;
+
+int cq_ref_icmp(cq_icmp_pred p, cq_ref_w a, cq_ref_w b, int W);
 
 /* K5, width-generic to 128. `F` is the source width, `T` the destination. */
 cq_ref_w cq_ref_w_zext (cq_ref_w a, int F, int T);

@@ -53,6 +53,18 @@ uint64_t cq_ref_or(uint64_t a, uint64_t b, int W)
     return (a | b) & cq_ref_mask(W);
 }
 
+/* K6 and K7 HAVE NO ONE-WORD REFERENCE, deliberately — see cq_ref_w_add /
+ * cq_ref_w_sub at the foot of this file, and refmodel.h on why.
+ *
+ * A `(a + b) & cq_ref_mask(W)` pair was written here at Step 12 and REMOVED
+ * the same day, because the cross-check it existed for could not fail. Below
+ * 64 `lo_mask(W)` and `cq_ref_mask(W)` are provably the same function and
+ * `hi_mask(W)` is 0, so `cq_ref_w_add(A,B,W).lo == cq_ref_add(a,b,W)` reduces
+ * to `(a+b) & m == (a+b) & m` and `.hi == 0` holds whatever the carry does.
+ * Two models sharing an idiom cross-check nothing; the wide pair is now
+ * crossed against a BIT-SERIAL ripple at widths that actually span the 64-bit
+ * seam (tests/test_kernel_add.c). Do not re-add these. */
+
 /* --- K4. `k` arrives ALREADY REDUCED by D8; these are only sat_shift. ----- */
 
 uint64_t cq_ref_shl(uint64_t a, int k, int W)
@@ -166,6 +178,52 @@ cq_ref_w cq_ref_w_ashr(cq_ref_w a, int k, int W)
     return r;
 }
 
+/* --- K9's oracle. See refmodel.h on why it is not the kernel's bias flip. -- */
+
+/* Unsigned, two-word. Both operands arrive already masked to W, so the high
+ * word above W is zero in both and the comparison is exact at every width. */
+static int w_ult(cq_ref_w a, cq_ref_w b)
+{
+    return (a.hi != b.hi) ? (a.hi < b.hi) : (a.lo < b.lo);
+}
+
+/* Signed, by the SIGN BITS — not by biasing both operands with 2^(W-1) and
+ * calling w_ult, which is exactly what arith.jl:465-472 does and therefore
+ * exactly what this model must not do. Differing signs decide it outright;
+ * equal signs make the unsigned order the signed order. */
+static int w_slt(cq_ref_w a, cq_ref_w b, int W)
+{
+    int sa = cq_ref_w_bit(a, W - 1), sb = cq_ref_w_bit(b, W - 1);
+
+    if (sa != sb) return sa;
+    return w_ult(a, b);
+}
+
+/* The ten rows of lower_icmp! (arith.jl:409-418), transcribed once. The suite
+ * asserts the KERNEL against this; the derivation itself — that `ule` is
+ * `¬ult(b,a)` and not `¬ult(a,b)` — is the single most likely thing to be
+ * mis-transcribed in K9, which is why the two tables are written independently
+ * and crossed rather than shared. */
+int cq_ref_icmp(cq_icmp_pred p, cq_ref_w a, cq_ref_w b, int W)
+{
+    cq_ref_w_bounds(W);
+
+    switch (p) {
+    case CQ_ICMP_EQ:  return  cq_ref_w_eq(a, b);
+    case CQ_ICMP_NE:  return !cq_ref_w_eq(a, b);
+    case CQ_ICMP_ULT: return  w_ult(a, b);
+    case CQ_ICMP_UGT: return  w_ult(b, a);
+    case CQ_ICMP_ULE: return !w_ult(b, a);
+    case CQ_ICMP_UGE: return !w_ult(a, b);
+    case CQ_ICMP_SLT: return  w_slt(a, b, W);
+    case CQ_ICMP_SGT: return  w_slt(b, a, W);
+    case CQ_ICMP_SLE: return !w_slt(b, a, W);
+    case CQ_ICMP_SGE: return !w_slt(a, b, W);
+    }
+    cq_ref_die("unknown icmp predicate", (int)p);
+    return 0;
+}
+
 /* All three casts are written as EXPLICIT BIT LOOPS rather than as shifts of a
  * 128-bit value. It is slower and it is the point: a shifted-word reference
  * would need its own 128-bit shift, which is the thing most likely to be wrong
@@ -245,4 +303,33 @@ uint32_t cq_ref_w_popcount(cq_ref_w a)
     uint32_t n = 0;
     for (int i = 0; i < 128; i++) if (cq_ref_w_bit(a, i)) n++;
     return n;
+}
+
+/* --- K6, K7 at any width up to 128. --------------------------------------
+ *
+ * WORD ARITHMETIC, NOT A RIPPLE, AND THAT IS THE POINT. The kernel under test
+ * IS a ripple-carry circuit (Bennett `lower_add!`), so a reference written as
+ * a bit-serial carry recurrence would share the kernel's own algorithm — and
+ * a reference derived from the implementation proves nothing (refmodel.h). One
+ * machine add with a carry-out test is a different derivation of the same
+ * function, which is what a differential test needs.
+ *
+ * Two's complement needs no special case: unsigned wraparound is defined in C,
+ * so `a - b` is already `a + ~b + 1` mod 2^64 and the borrow is the same
+ * comparison the carry is.
+ *
+ * cq_ref_w_make masks to W afterwards, which is what makes each of these mod
+ * 2^W rather than mod 2^128: below 64 the operands cannot overflow the low
+ * word at all, at exactly 64 the wrap IS the reduction, and above 64 the carry
+ * genuinely crosses the seam. */
+cq_ref_w cq_ref_w_add(cq_ref_w a, cq_ref_w b, int W)
+{
+    uint64_t lo = a.lo + b.lo;
+    return cq_ref_w_make(lo, a.hi + b.hi + (uint64_t)(lo < a.lo), W);
+}
+
+cq_ref_w cq_ref_w_sub(cq_ref_w a, cq_ref_w b, int W)
+{
+    uint64_t lo = a.lo - b.lo;
+    return cq_ref_w_make(lo, a.hi - b.hi - (uint64_t)(a.lo < b.lo), W);
 }
