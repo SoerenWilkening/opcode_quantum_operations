@@ -384,13 +384,45 @@ This single shape satisfies all three axes at once:
   `f(a,b) ^ f(a,b) = 0`. ✔ Then free `out`'s qubits.
 - **Controlled** — promote the kernel's gates (§9).
 
+> **ARITY AND WIDTH ARE NOT PART OF THE CONTRACT — THE SEMANTICS ARE. Resolved
+> 2026-08-16 at Step 14 (`bd ckd.15`).** The form above is the canonical two-source,
+> one-width kernel and the C type the test driver and the shim share. The
+> **normative** clause is the other half of the sentence: `dst ^= f(sources)`, sources
+> unchanged, every internal ancilla at |0⟩. Three kernels in the §6 catalogue depart
+> from the literal form above, in two different ways, and none is an exception to the
+> rule:
+>
+> - **K5** (casts) is **unary with two widths** — `F` in, `T` out. It leaves the
+>   parameter list.
+> - **K9** (`icmp`) **keeps the parameter list and the type exactly**, and breaks only
+>   the unwritten assumption that `|dst| == W`: its `dst` is one bit while `W` is the
+>   operand width. `icmp` is `i1` (`ir_types.jl:79`), and K9 is the only kernel that
+>   keeps the single-`W` signature while its result is a different width — which is
+>   why the test driver has to be told through `cq_kd_shape`'s `w_dst` rather than
+>   through the signature.
+> - **K10** (`mux`) takes **three** sources — §6 already writes it `mux(dst,c,t,f)` —
+>   with `c` **one bit, not `W`**, because `lower_mux!` takes `cond` as a vector and
+>   reads only `cond[1]` (`arith.jl:529`) and the barrel passes the singleton
+>   `[b[k+1]]` (`arith.jl:361`, `:377`, `:397`).
+>
+> Such a kernel **declares its own signature and names every operand explicitly**.
+> What is *not* permitted: a fourth parameter carrying hidden state, an `_unc` entry
+> point (§10 — uncompute is the same kernel), or a `_controlled` variant (§9 — the
+> axis is an emitter mode). Inside a sandwich the extra operands live in the kernel's
+> own `env` struct, which is where every sandwich kernel's scratch pointers already
+> live. The D7a/D7b guard is N-ary for this reason — `cq_kernel_check_n` in
+> `src/kernels/kernel.h` sizes each overlap range **per operand**, so a differing
+> arity or width cannot produce a mis-sized guard, and a mis-sized guard is the I2
+> defence with the wrong bounds.
+
 **This is the reason v1 uses ripple-carry rather than Cuccaro for the out-of-place
 adder**, reversing an earlier recommendation. Cuccaro (`lower_add_cuccaro!`) is
 in-place — `(a,b) → (a, a+b)` — so its uncompute is the *reverse circuit*, not a re-run,
 which does not match CQ_lang's `_unc(out, src…)` "recompute from the still-live sources"
 contract (`docs/backend.md` §9.2). Bennett's `lower_add!` is already XOR-into-target;
 it only needs its carry chain cleaned. Cuccaro is still needed — as the *in-place*
-accumulator inside the multiplier (§6.4).
+accumulator inside the multiplier (**§6**'s catalogue, K8 and K11; the "§6.4" this
+line used to cite is dangling — §6 is a flat table with no numbered subsections).
 
 ---
 
@@ -413,7 +445,22 @@ free     scratch
 
 Cost: 2× the compute half. Applies to `add`, `sub`, `eq`, `ult`, `slt`, `mux`,
 `mul`, `divrem`. Naturally clean already (no sandwich needed): `and`, `or`, `xor`,
-constant `shl/lshr/ashr`, `sext/zext/trunc`.
+constant `shl/lshr/ashr`, `sext/zext/trunc`, **and `addacc` (K8)** — added
+2026-08-16 at Step 15, where both lists turned out to omit it although §6's
+catalogue row has always carried a ✔ in its Clean? column.
+
+> **AND K8 IS THE ONE KERNEL WITH NO CLASSICAL SHORT-CIRCUIT AT ALL — decided at
+> Step 15, because no document settled it.** The paragraph above ("if every
+> operand bit is classical: fold to a constant, emit nothing, allocate nothing,
+> and DO NOT enter here") is scoped to kernels CQ_lang can call on constants. K8
+> has **no `cqrt_*` symbol** — `opcode_table.yaml` routes no opcode to it — is
+> reachable only from K11 (M18, Step 16), and is handed pre-materialised scratch
+> by its only caller. A classical operand there is not a cheap case but an active
+> R1/R8 hazard, because K8 writes its own addend: a classical `b[i]` gets
+> materialised mid-construction and the reverse replay stops cancelling while L1
+> stays green. **K8 REFUSES a non-`CQ_BIT_Q` operand, loudly, in both
+> configurations** (`cq_addacc_check`), and `tests/test_kernel_addacc_death.c` is
+> what carries the coverage L5 carries elsewhere. Full statement in K08.md §5 D7.
 
 > **CORRECTED 2026-08-16 at Step 13: the copy-out is `|dst|` CNOTs, not `W`, and the two
 > differ for K9.** This sketch read "W CNOTs" and that is right for every kernel whose
@@ -488,8 +535,8 @@ anything, since the gate sequence is a deterministic function of `(W, operand bi
 | K7 | `sub(dst,a,b)` | `lower_sub!` + uncompute | sandwich | two's complement via K6 |
 | K8 | `addacc(acc,b)` in-place | `lower_add_cuccaro!` | ✔ | `acc += b`; 1 ancilla, self-cleaning |
 | K9 | `eq/ult/slt(dst,a,b)` | `lower_eq!/ult!/slt!` | sandwich | 1-bit result; other 7 predicates derive |
-| K10 | `mux(dst,c,t,f)` | `lower_mux!` | sandwich | also gives variable shifts |
-| K11 | `mul(dst,a,b)` | `lower_mul_wide!` | sandwich | shift-add over K8, copy-out, reverse |
+| K10 | `mux(dst,c,t,f)` | `lower_mux!` | sandwich | **three sources, `c` is 1 bit** — see §4; also gives variable shifts |
+| K11 | `mul(dst,a,b)` | `lower_mul_wide!` | sandwich | shift-add over K8, copy-out, reverse. **`W = 1` DELEGATES TO K2** — `lower_add_cuccaro!` is out of domain at `W ≤ 1` and the closed form's total is accidentally right there with the wrong split (K11.md §3). Rule 7's canonical shape, unchanged: the first kernel since K6/K7 that needs no departure from the parameter list |
 | K12 | `divrem(dst,a,b)` | `_soft_udiv_compile` | sandwich | restoring division: W × (K7, K9, K10) |
 
 Two notes on the catalogue:
@@ -1029,7 +1076,7 @@ v1 is accepted when:
 | 2 | K1–K5 (bitwise, constant shifts, casts) + `_hl`/`_lh` folding | L1/L2/L5 green for these ops |
 | 3 | K6–K7 (add, sub) with carry uncompute | L1–L4 green; `x+1` @ i8 count pinned |
 | 4 | K9 (compares, all 10 predicates) | L1–L4 green |
-| 5 | K10 (mux) + variable shifts; K8 (Cuccaro accumulator); K11 (mul) | L1–L4 green |
+| 5 | K10 (mux) + variable shifts; K8 (Cuccaro accumulator); K11 (mul) | L1–L4 green — **COMPLETE 2026-08-16** (Steps 14, 15, 16). K8 is the exception the criterion did not anticipate: it is not a Rule 7 kernel, so its levels are restated by hand and **L5 does not apply to it at all** (K08.md §5 D7) |
 | 6 | K12 (div/rem) | L1–L4 green |
 | 7 | `_unc` / `_inv` / `_controlled` axes; rotations + θ special cases; measurement | L3 green across all kernels; classical mode works |
 | 8 | Generated shim over the full integer grid (**1595**, or **1455** if i80 is ruled out of scope — §1); CQ_lang link; Grover | L6, L7 green — **v1 done** |
@@ -1045,7 +1092,7 @@ Increments 2–6 are independent after 1 and can be built in any order or in par
 include/cqops/cqops.h        public API: context, sink, config
 src/bit.[ch] reg.[ch] qubits.[ch] emit.[ch] rotate.[ch] controlled.[ch]
 src/sink_printf.c sink_count.c sink_qec.c
-src/kernels/{bitwise,shift,cast,add,cmp,mux,mul,divrem}.c
+src/kernels/{bitwise,shift,cast,add,addacc,cmp,mux,mul,divrem}.c
 shim/gen_shim.py             reads CQ_lang's tools/opcode_table.yaml
 shim/cq_runtime_impl.c       the cqrt_* surface
 shim/cq_templates_impl.c     generated dispatch (1595 thin wrappers; see §1 on i80)

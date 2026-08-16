@@ -681,9 +681,20 @@ guards with no death test, and assertions masked by other assertions. Seven fixe
    shift calls. Adding them needed a two-word shift reference, which now also
    cross-checks the one-word model below 64.
 
-**Carried forward:** M12 (Step 14) must match D8 exactly. A review proved a verbatim
-barrel port does — 0 mismatches over 402,444 model cases — but nothing in the repository
-*makes* it, so the obligation is now written into that step's bead.
+**~~Carried forward~~ DISCHARGED at Step 14, 2026-08-16.** The obligation was: *"M12
+must match D8 exactly. A review proved a verbatim barrel port does — 0 mismatches over
+402,444 model cases — but nothing in the repository makes it."* Something in the
+repository now does. `m11_and_m12_agree_at_every_width_amount_and_value`
+(`tests/test_kernel_shift_var_d8.inc`) drives **both modules** on the same
+`(W, k, value)` — the amount classical for M11 and all-quantum for M12, which is what
+stops the barrel delegating at every width except `W = 1`, where `L = 0` makes the
+delegation test vacuous and the comparison is honestly M11 against itself — over every
+shipped width `{1,2,3,4,5,8,16,32,64,80,128}`, every amount the
+construction can distinguish below i80 and a strided set with the `[W, 2^S)` bracket
+above it, and every direction. Neither module's own suite can make that assertion: each
+compares its kernel against a reference applying the same reduction through the same
+`cq_shift_stages`, so both can be green while disagreeing with each other about exactly
+the interval `ckd.16` was filed over.
 
 ---
 
@@ -869,13 +880,13 @@ it grows.
 |---|---|---|---|---|
 | M10 | `kernels/bitwise.[ch]` | K1 xor, K2 and, K3 or | **40 / 100** | — |
 | M11 | `kernels/shift_const.[ch]` | K4 constant shl/lshr/ashr, **D8** | **63 / 90** | — |
-| M12 | `kernels/shift_var.c` | variable shifts (barrel over K10) | 130 | — |
+| M12 | `kernels/shift_var.[ch]` | variable shifts (barrel over K10) | ~~130~~ **138 landed** | `mux block ↔ barrel schedule` — **taken**: the four-gate block is M17's `cq_mux_step`, called, not transcribed |
 | M13 | `kernels/cast.[ch]` | K5 sext/zext/trunc; unary, **two widths** | **42 / 90** | — |
 | M14 | `kernels/add.c` | K6 add, K7 sub | 190 | `add.c` ↔ `sub.c` |
-| M15 | `kernels/addacc.c` | K8 Cuccaro in-place accumulator | 120 | — |
+| M15 | `kernels/addacc.[ch]` | K8 Cuccaro in-place accumulator. **LANDED 2026-08-16 at 108 (93 body + 15 header) against 120, so no seam is owed.** Ships a `.h` because M18 consumes its block and step function, exactly as M17 does for M12 | 120 | — |
 | M16 | `kernels/cmp.c` | K9 eq/ult/slt + 7 derived predicates | 200 | primitives ↔ predicate derivation |
-| M17 | `kernels/mux.c` | K10 | 90 | — |
-| M18 | `kernels/mul.c` | K11 shift-add over K8 | 160 | — |
+| M17 | `kernels/mux.[ch]` | K10 select — **three sources**, `cond` is 1 bit (`ckd.15`) | **65 / 90** | — (unused; `cq_mux_step` is already exported for M12) |
+| M18 | `kernels/mul.[ch]` | K11 shift-add over K8. **LANDED 2026-08-16 at 110 (102 body + 8 header) against 160, so no seam is owed** — the module is small because the accumulator is M15's and the reversal is M09's, which is Rule 8 and Rule 1 paying off in the same file. Ships a `.h` for `cq_mul_steps`, which the suite needs as the palindrome's head length | 160 | — |
 | M19 | `kernels/divrem_u.c` | K12 unsigned restoring division | 220 | loop body ↔ driver |
 | M20 | `kernels/divrem_s.c` | signed wrappers, D3 div-by-zero | 110 | — |
 
@@ -990,8 +1001,8 @@ Random masks are sampled on top.
 | 12 | K6 add, K7 sub — **first sandwich users.** Ripple-carry per PRD §4, not Cuccaro | M14 | 3 |
 | 13 | K9 compares — eq/ult/slt primitives, then the 7 derived predicates (`ne=¬eq`, `ugt=ult(b,a)`, `ule=¬ult(b,a)`, `uge=¬ult(a,b)`, signed trio by sign-bit flip) | M16 | 4 |
 | 14 | K10 mux, then variable shifts as a barrel over it | M17, M12 | 5 |
-| 15 | K8 Cuccaro accumulator — in-place, self-cleaning, 1 ancilla. L4 golden `6W−5` | M15 | 5 |
-| 16 | K11 mul — shift-add over K8 | M18 | 5 |
+| 15 | K8 Cuccaro accumulator — in-place, self-cleaning, 1 **caller-supplied** ancilla. L4 golden `6W−5` **for `W ≥ 2` only** — at `W = 1` the closed form's components are `(0, 2, −1)` and the correct pin is `(0, 1, 0)`, re-derived rather than ported (K08.md §5 D1). **NOT a Rule 7 kernel and NOT drivable by the shared Phase-B gate** — `acc += b` is destructive and its inverse is the reverse circuit, so `test_kernel_addacc.c` restates L1/L2/L3/L4 by hand and **L5 does not apply** (K08.md §5 D7) | M15 | 5 |
+| 16 | K11 mul — shift-add over K8. **`W = 1` is a DELEGATION TO K2, not the closed form** — `lower_add_cuccaro!` is out of domain at `W ≤ 1` (adder.jl:66), and `13W² − 8W` evaluates to the right TOTAL (5) with the wrong split twice over: the formula says `(0,5,0)`, the uniform path emits `(0,3,2)`, and `a·b mod 2 = a ∧ b` is `(0,0,1)` (K11.md §3, §5 note 9). **The accumulate is `6W−5` STEPS, never one** — M18 calls `cq_addacc_step`, and a whole `cq_kernel_addacc` as one step would make the reverse half re-accumulate with `dst` already copied out (bd rhp). **Its L4 golden is SELF-PINNED**: shift-add over Cuccaro exists in no Bennett source, so Step 12's against-upstream gate has no analogue here and what replaces it is a decomposition check binding M18's per-accumulate cost to M15's *measured* one | M18 | 5 |
 | 17 | K12 divrem — unrolled restoring division over K7/K9/K10. Unsigned first, then signed + D3 | M19, M20 | 6 |
 
 **Step 12's extra gate:** the first sandwich kernel must pin `x+1` at `i8` against

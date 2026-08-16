@@ -3,10 +3,21 @@
  * BEYOND PLAN §2.2's LIST OF FIVE, and it is the file plan §4 assumes without
  * naming: "Every kernel step uses the same four-part gate, APPLIED
  * AUTOMATICALLY BY THE SHARED KERNEL DRIVER rather than written per kernel."
- * Eleven kernel modules land against it (Steps 10-17), and Step 20 re-runs
- * every one of them under cq_ctrl_push — which is only "one parameter in the
- * kernel test driver, not twelve new suites" (plan §4) if the driver is one
- * object.
+ * TEN kernel modules land against it, not eleven, and the exception is the
+ * interesting part. M10-M14 and M16-M20 do; M15 does NOT, and cannot. Cuccaro
+ * is `acc += b` — in place, destructive in its first operand and transiently in
+ * its second — and this driver hard-codes Rule 7's contract in three
+ * independent places: cq_kd_case mints `dst` as a fresh separate zero register,
+ * asserts every source unchanged in VALUE AND KIND after the forward, and
+ * implements L3 as a SECOND CALL required to return dst to zero (which for K8
+ * gives `acc + 2b`). cq_kd_spec has no member that could express any of it. So
+ * tests/test_kernel_addacc.c restates the levels by hand and its L3 is a
+ * descending-index replay — which is how K11's sandwich will undo it anyway.
+ * The count in this header said eleven until Step 15 measured otherwise.
+ *
+ * Step 20 re-runs every kernel that DOES land here under cq_ctrl_push — which
+ * is only "one parameter in the kernel test driver, not twelve new suites"
+ * (plan §4) if the driver is one object.
  *
  * WHAT IT ASSERTS, per case, all four at once:
  *

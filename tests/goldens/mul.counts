@@ -1,0 +1,47 @@
+# M18 kernels/mul.c — K11 mul (shift-add over K8 Cuccaro, sandwiched, all-quantum operands). SELF-PINNED: this composition exists nowhere in Bennett
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+mul       forward    1     0     0        1
+mul       unc        1     0     0        1
+mul       forward    2     0    26       10
+mul       unc        2     0    26       10
+mul       forward    3     0    63       30
+mul       unc        3     0    63       30
+mul       forward    4     0   116       60
+mul       unc        4     0   116       60
+mul       forward    5     0   185      100
+mul       unc        5     0   185      100
+mul       forward    8     0   488      280
+mul       unc        8     0   488      280
+mul       forward   16     0  2000     1200
+mul       unc       16     0  2000     1200
+mul       forward   32     0  8096     4960
+mul       unc       32     0  8096     4960
+mul       forward   64     0 32576    20160
+mul       unc       64     0 32576    20160
+mul       forward  128     0 130688    81280
+mul       unc      128     0 130688    81280

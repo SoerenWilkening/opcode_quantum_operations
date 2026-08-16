@@ -333,3 +333,41 @@ cq_ref_w cq_ref_w_sub(cq_ref_w a, cq_ref_w b, int W)
     uint64_t lo = a.lo - b.lo;
     return cq_ref_w_make(lo, a.hi - b.hi - (uint64_t)(a.lo < b.lo), W);
 }
+
+/* --- K11 at any width up to 128. ------------------------------------------
+ *
+ * SCHOOLBOOK ON 32-BIT LIMBS, WHICH IS A THIRD ALGORITHM AND THAT IS THE POINT.
+ * The kernel is bit-serial shift-add with a Cuccaro carry chain; mul.c's own
+ * classical fold is column accumulation; this is limb multiplication with an
+ * explicit high word. No two of the three share a recurrence, so none of them
+ * can share the others' mistakes. tests/test_kernel_mul.c crosses this against
+ * a fourth — a bit-serial shift-add over cq_ref_w_add — at widths spanning the
+ * 64-bit seam.
+ *
+ * NO __int128. It is a compiler extension, this project is C11 with no
+ * dependencies beyond libc, and the 64x64 -> 128 split below is the standard
+ * portable form. `mid` cannot overflow: p00>>32, p01&M and p10&M are each below
+ * 2^32, so their sum is below 3·2^32 < 2^64.
+ *
+ * Only the LOW 128 bits are formed, and cq_ref_w_make then reduces to W — which
+ * is right for every width because `mul` is same-width (opcode_table.yaml:186,
+ * no widening opcode anywhere in the table) and the high half is never
+ * computed by the kernel either. */
+static void mul64(uint64_t x, uint64_t y, uint64_t *lo, uint64_t *hi)
+{
+    const uint64_t M = 0xffffffffu;
+    uint64_t x0 = x & M, x1 = x >> 32, y0 = y & M, y1 = y >> 32;
+    uint64_t p00 = x0 * y0, p01 = x0 * y1, p10 = x1 * y0, p11 = x1 * y1;
+    uint64_t mid = (p00 >> 32) + (p01 & M) + (p10 & M);
+
+    *lo = (mid << 32) | (p00 & M);
+    *hi = p11 + (p01 >> 32) + (p10 >> 32) + (mid >> 32);
+}
+
+cq_ref_w cq_ref_w_mul(cq_ref_w a, cq_ref_w b, int W)
+{
+    uint64_t lo, hi;
+
+    mul64(a.lo, b.lo, &lo, &hi);
+    return cq_ref_w_make(lo, hi + a.lo * b.hi + a.hi * b.lo, W);
+}

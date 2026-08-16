@@ -105,6 +105,18 @@ cq_ref_w cq_ref_w_ashr(cq_ref_w a, int k, int W);
 cq_ref_w cq_ref_w_add(cq_ref_w a, cq_ref_w b, int W);
 cq_ref_w cq_ref_w_sub(cq_ref_w a, cq_ref_w b, int W);
 
+/* K11, width-generic to 128 — `mul` ships at i128 (opcode_table.yaml:186), and
+ * i128 is the only width where a reference's 64-bit seam is exercised at all.
+ * SAME-WIDTH: only the low W bits of the product exist, here and in the kernel,
+ * because there is no widening-multiply opcode in the table.
+ *
+ * Limb multiplication with an explicit high word, sharing no recurrence with
+ * either the circuit (bit-serial shift-add over a Cuccaro carry chain) or
+ * mul.c's classical fold (column accumulation). Three derivations of one
+ * function; a reference that shared the kernel's algorithm would share its
+ * mistakes, which is this file's opening warning. */
+cq_ref_w cq_ref_w_mul(cq_ref_w a, cq_ref_w b, int W);
+
 /* K9, width-generic to 128, and the ONE-BIT result is returned as a plain int
  * because `icmp` is `i1` — the suite wraps it into a 1-bit cq_ref_w.
  *

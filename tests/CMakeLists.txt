@@ -5,7 +5,7 @@
 ## them. Plan §4's Phase B gate asks for a "shared kernel driver" that applies
 ## L1-L4 "rather than written per kernel", and for "tests/goldens/,
 ## --update-goldens to regenerate", and assigns neither to a file. These are
-## those two. Eleven kernel modules and Step 20's controlled re-run all land
+## those two. TEN kernel modules and Step 20's controlled re-run all land
 ## against them.
 
 add_library(cqops_test_support STATIC
@@ -67,6 +67,21 @@ add_cqops_test(test_kernel_shift)     # M11, Step 11 — K4 constant shifts, D8
 add_cqops_test(test_kernel_cast)      # M13, Step 11 — K5 casts, two widths, i128
 add_cqops_test(test_kernel_add)       # M14, Step 12 — K6/K7, the first sandwiches
 add_cqops_test(test_kernel_cmp)       # M16, Step 13 — K9, the ten icmp predicates
+add_cqops_test(test_kernel_mux)       # M17, Step 14 — K10 select, THREE sources
+add_cqops_test(test_kernel_shift_var) # M12, Step 14 — the barrel, and D8 across
+                                      # the M11/M12 boundary
+add_cqops_test(test_kernel_addacc)    # M15, Step 15 — K8 Cuccaro. THE FIRST
+                                      # KERNEL THE SHARED DRIVER CANNOT DRIVE:
+                                      # `acc += b` is not `dst ^= f(a,b)`, so
+                                      # every level is restated by hand
+add_cqops_test(test_kernel_mul)       # M18, Step 16 — K11 mul. THE FIRST
+                                      # COMPOSITE whose inner construction is
+                                      # another module's whole kernel, and the
+                                      # most expensive thing the suite runs:
+                                      # one case is 2(13W^2-8W) gates over
+                                      # W^2+2W scratch qubits. Its sweep caps
+                                      # are printed, in
+                                      # tests/test_kernel_mul_sweep.inc
 
 ## The driver's own assertions, made falsifiable — test_harness_negative's
 ## argument one level up. A mutation battery found five of the Phase-B pool
@@ -308,6 +323,155 @@ add_cqops_death_test(test_kernel_cmp_death CASES
     a_width_of_zero
     a_negative_width
 )
+
+## M17 and M12, Step 14. Same argument as M14's and M16's — with the difference
+## that M12 could NOT use their trick, and paid for it.
+##
+## M14 and M16 register the ALL-CLASSICAL alias, which takes the R9
+## short-circuit and so has no layer beneath it. M12 cannot: a classical shift
+## amount DELEGATES to M11, whose own cq_kernel_check_dst would abort with the
+## identical message one module down. So M12's alias cases use a QUANTUM AMOUNT
+## to force the sandwich path — and that turned out not to be enough.
+##
+## MEASURED, by deleting cq_kernel_check_dst from barrel() and running them: all
+## three *_var_dst_aliases_its_source cases STILL ABORT, from M02's
+## cq_shadow_retire, in both configurations. Copy-out writes into `a`, the
+## reverse half replays against it as a control, the compute half stops
+## cancelling, and M09's epilogue catches it. That is the
+## a-death-test-can-pass-on-a-broken-library shape for the fifth time, and the
+## remedy is the same one: name the message the case must NOT abort with.
+##
+## M17 needs none. Measured the same way — with cq_kernel_check_n deleted from
+## cq_kernel_mux, all SIX mux cases go red. A classical `cond` takes the entry
+## dispatch, so the kernel never allocates scratch, never enters cq_sandwich,
+## and emits only cq_emit_x on a constant: no distinctness check, no palindrome
+## to break, nothing beneath it in either configuration.
+add_cqops_death_test(test_kernel_step14_death CASES
+    mux_dst_aliases_the_true_arm
+    mux_dst_aliases_the_false_arm
+    mux_dst_overlaps_the_condition
+    mux_both_arms_are_the_same_register
+    mux_the_condition_is_a_bit_of_an_arm
+    mux_a_width_of_zero
+    shl_var_dst_aliases_its_source
+    lshr_var_dst_aliases_its_source
+    ashr_var_dst_aliases_its_source
+    shift_var_the_value_is_the_amount
+    shift_var_a_width_of_zero
+)
+
+## WHICH LAYER ABORTED, the fifth instance and the first where the case had no
+## classical variant to fall back on. Without this, deleting M12's guard leaves
+## all three green on M02's epilogue with the rail already half-corrupted.
+##
+## shift_var_the_value_is_the_amount is deliberately NOT listed: measured, it
+## goes red outright with the guard deleted, because two SOURCES aliasing does
+## not corrupt the sandwich — it emits a malformed Toffoli whose two controls
+## are one physical qubit and returns the right value, which is exactly the
+## D7b hazard kernel.h describes and nothing downstream notices.
+set_tests_properties(test_kernel_step14_death.shl_var_dst_aliases_its_source
+                     test_kernel_step14_death.lshr_var_dst_aliases_its_source
+                     test_kernel_step14_death.ashr_var_dst_aliases_its_source
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "retire of a determinate")
+
+## AND ONE CASE THAT CANNOT BE DISCRIMINATED AT ALL, said out loud rather than
+## dressed up. At W = 0, cq_shift_stages returns 0, so amount_is_classical is
+## vacuously true whatever the amount's kinds are and M12 delegates — meaning
+## M11's identical guard would abort with the identical message. No regex
+## separates them. shift_var_a_width_of_zero is kept because it pins that the
+## entry point refuses W = 0 at all rather than allocating a zero-length region,
+## and it is recorded here as NOT proving M12 owns that refusal.
+
+## M15, Step 15. THIS SUITE IS K8's L5. Every other kernel folds an
+## all-classical operand to zero gates and zero qubits; K8 refuses one, because
+## it targets its own addend and a classical bit materialised mid-construction
+## makes the reverse replay stop cancelling while the value stays right. So
+## these are not defensive garnish around the module — they are the level that
+## the shared Phase-B gate carries as L5 everywhere else.
+##
+## NO FAIL_REGULAR_EXPRESSION IS OWED, and that was checked rather than assumed.
+## Nothing beneath M15 speaks for any of these cases: M05's §3 distinctness
+## assert compares qubit INDICES, so it is silent on a classical operand and
+## silent on two disjoint registers; none of these calls is inside a sandwich,
+## so M09 never runs; and M07 never sees a cq_bit array at all. Delete
+## cq_addacc_check and the classical cases emit a wrong circuit with a right
+## value in BOTH configurations.
+add_cqops_death_test(test_kernel_addacc_death CASES
+    classical_acc_bit
+    classical_addend_bit
+    classical_ancilla
+    classical_ancilla_at_width_one
+    acc_overlaps_the_addend
+    the_ancilla_is_inside_the_accumulator
+    a_width_of_zero
+    check_called_directly_with_a_zero_width
+    a_step_index_past_the_end
+    a_negative_step_index
+)
+
+## WHICH LAYER ABORTED — the Step 7/8 discriminator, this time with the masking
+## copy of the guard EARLIER in the call chain rather than later, and FILED BY A
+## MUTATION BATTERY rather than foreseen. `cq_addacc_check`'s width guard
+## survived mutation to always-true: both entry points call `cq_addacc_steps`
+## first, and its identical guard fires one layer up. The guard is still wanted,
+## because K11 calls cq_addacc_check directly and that path has no other check —
+## so the two messages were made disjoint and these two properties pin which one
+## spoke. Delete either guard and exactly one of the two cases goes red.
+set_tests_properties(test_kernel_addacc_death.a_width_of_zero
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "cq_addacc_check received")
+
+set_tests_properties(test_kernel_addacc_death.check_called_directly_with_a_zero_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "addacc: width is not positive")
+
+## AND THE OVERLAP GUARD, WHERE THE MASKING LAYER IS CONFIGURATION-DEPENDENT —
+## measured, not foreseen. Mutating cq_addacc_check's range test down to a
+## base-pointer comparison was killed in RELEASE by both overlap cases but in
+## DEBUG only by the_ancilla_is_inside_the_accumulator: with acc and b sharing
+## qubits, M05's §3 distinctness assert aborts one layer down, so the death test
+## still "passed" and hid the mutant. That is the Step 6/7 finding with the
+## masking layer present in one configuration only, which no single-configuration
+## battery would have separated. Pinning the message closes it in Debug too.
+set_tests_properties(test_kernel_addacc_death.acc_overlaps_the_addend
+                     test_kernel_addacc_death.the_ancilla_is_inside_the_accumulator
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "§3 distinctness")
+
+## M18, Step 16. Same argument as M14's and M16's: every case uses ALL-CLASSICAL
+## rails, so the kernel takes the R9 short-circuit, never allocates scratch,
+## never enters cq_sandwich, never reaches M15's cq_addacc_check, and emits only
+## cq_emit_x on a constant — which carries no distinctness check. Nothing
+## beneath M18 speaks for any of them in either configuration.
+##
+## the_two_sources_are_the_same_register is the sharpest: mul(dst,a,a) is x²,
+## which CQ_lang genuinely emits (cq_template_mul_i32(h10, h10)), and with the
+## guard deleted it returns the RIGHT ANSWER with no diagnostic.
+add_cqops_death_test(test_kernel_mul_death CASES
+    mul_dst_aliases_a_classical_source
+    mul_dst_aliases_the_second_source
+    mul_dst_overlaps_a_source_without_sharing_a_base
+    mul_the_two_sources_are_the_same_register
+    mul_a_width_of_zero
+    mul_a_negative_width
+    mul_steps_called_directly_with_a_zero_width
+)
+
+## WHICH LAYER ABORTED — the Step-15 shape, where the masking copy of the guard
+## is EARLIER in the call chain rather than later. cq_kernel_mul calls
+## cq_kernel_check_dst before it ever reaches cq_mul_steps, so M18's own width
+## guard is unreachable through the kernel and would survive mutation to
+## always-true. The two messages are disjoint and these pin which one spoke:
+## delete either guard and exactly one of the two cases goes red.
+set_tests_properties(test_kernel_mul_death.mul_a_width_of_zero
+                     test_kernel_mul_death.mul_a_negative_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "mul: width is not positive")
+
+set_tests_properties(test_kernel_mul_death.mul_steps_called_directly_with_a_zero_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "destination width is not positive")
 
 add_cqops_death_test(test_qubits_death CASES
     ceiling_exceeded

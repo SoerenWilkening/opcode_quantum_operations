@@ -1,0 +1,45 @@
+# M15 kernels/addacc.c — K8 Cuccaro accumulator (CLEAN, no sandwich; all-quantum operands, the only mask it accepts)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+addacc    forward    1     0     1        0
+addacc    reverse    1     0     1        0
+addacc    forward    2     0     6        1
+addacc    reverse    2     0     6        1
+addacc    forward    3     0    10        3
+addacc    reverse    3     0    10        3
+addacc    forward    4     0    14        5
+addacc    reverse    4     0    14        5
+addacc    forward    8     0    30       13
+addacc    reverse    8     0    30       13
+addacc    forward   16     0    62       29
+addacc    reverse   16     0    62       29
+addacc    forward   32     0   126       61
+addacc    reverse   32     0   126       61
+addacc    forward   64     0   254      125
+addacc    reverse   64     0   254      125
+addacc    forward  128     0   510      253
+addacc    reverse  128     0   510      253

@@ -1,0 +1,43 @@
+# M17 kernels/mux.c — K10 select (sandwiched, all-quantum operands including cond)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+mux       forward    1     0     7        2
+mux       unc        1     0     7        2
+mux       forward    2     0    14        4
+mux       unc        2     0    14        4
+mux       forward    4     0    28        8
+mux       unc        4     0    28        8
+mux       forward    8     0    56       16
+mux       unc        8     0    56       16
+mux       forward   16     0   112       32
+mux       unc       16     0   112       32
+mux       forward   32     0   224       64
+mux       unc       32     0   224       64
+mux       forward   64     0   448      128
+mux       unc       64     0   448      128
+mux       forward  128     0   896      256
+mux       unc      128     0   896      256

@@ -1,0 +1,91 @@
+# M12 kernels/shift_var.c — the barrel shifter (sandwiched, all-quantum value AND amount)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+shl_var   forward    1     0     1        0
+shl_var   unc        1     0     1        0
+shl_var   forward    2     0    20        4
+shl_var   unc        2     0    20        4
+shl_var   forward    3     0    51       12
+shl_var   unc        3     0    51       12
+shl_var   forward    4     0    70       16
+shl_var   unc        4     0    70       16
+shl_var   forward    5     0   121       30
+shl_var   unc        5     0   121       30
+shl_var   forward    8     0   202       48
+shl_var   unc        8     0   202       48
+shl_var   forward   16     0   530      128
+shl_var   unc       16     0   530      128
+shl_var   forward   32     0  1314      320
+shl_var   unc       32     0  1314      320
+shl_var   forward   64     0  3138      768
+shl_var   unc       64     0  3138      768
+shl_var   forward   80     0  4466     1120
+shl_var   unc       80     0  4466     1120
+shl_var   forward  128     0  7298     1792
+shl_var   unc      128     0  7298     1792
+lshr_var  forward    1     0     1        0
+lshr_var  unc        1     0     1        0
+lshr_var  forward    2     0    20        4
+lshr_var  unc        2     0    20        4
+lshr_var  forward    3     0    51       12
+lshr_var  unc        3     0    51       12
+lshr_var  forward    4     0    70       16
+lshr_var  unc        4     0    70       16
+lshr_var  forward    5     0   121       30
+lshr_var  unc        5     0   121       30
+lshr_var  forward    8     0   202       48
+lshr_var  unc        8     0   202       48
+lshr_var  forward   16     0   530      128
+lshr_var  unc       16     0   530      128
+lshr_var  forward   32     0  1314      320
+lshr_var  unc       32     0  1314      320
+lshr_var  forward   64     0  3138      768
+lshr_var  unc       64     0  3138      768
+lshr_var  forward   80     0  4466     1120
+lshr_var  unc       80     0  4466     1120
+lshr_var  forward  128     0  7298     1792
+lshr_var  unc      128     0  7298     1792
+ashr_var  forward    1     0     1        0
+ashr_var  unc        1     0     1        0
+ashr_var  forward    2     0    22        4
+ashr_var  unc        2     0    22        4
+ashr_var  forward    3     0    57       12
+ashr_var  unc        3     0    57       12
+ashr_var  forward    4     0    76       16
+ashr_var  unc        4     0    76       16
+ashr_var  forward    5     0   135       30
+ashr_var  unc        5     0   135       30
+ashr_var  forward    8     0   216       48
+ashr_var  unc        8     0   216       48
+ashr_var  forward   16     0   560      128
+ashr_var  unc       16     0   560      128
+ashr_var  forward   32     0  1376      320
+ashr_var  unc       32     0  1376      320
+ashr_var  forward   64     0  3264      768
+ashr_var  unc       64     0  3264      768
+ashr_var  forward  128     0  7552     1792
+ashr_var  unc      128     0  7552     1792

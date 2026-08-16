@@ -108,6 +108,21 @@ add_library(cqops STATIC
     src/kernels/cmp.c          # M16, Step 13 — K9 icmp, all ten predicates.
                                # eq/ult/slt are ported; the other seven are
                                # lower_icmp!'s own dispatch over them
+    src/kernels/mux.c          # M17, Step 14 — K10 select. THREE sources, which
+                               # bd ckd.15 resolved rather than smuggled
+    src/kernels/shift_var.c    # M12, Step 14 — variable shl/lshr/ashr as a
+                               # barrel over M17's block, exactly as upstream
+                               # composes them; a classical amount goes to M11
+    src/kernels/addacc.c       # M15, Step 15 — K8 Cuccaro. NOT a Rule 7 kernel:
+                               # `acc += b`, in place, destructive, and its
+                               # inverse is the reverse circuit rather than a
+                               # re-run. Exists solely as K11's accumulator
+    src/kernels/mul.c          # M18, Step 16 — K11 mul, shift-add over M15's
+                               # accumulator. THE DELIBERATE DELTA FROM UPSTREAM:
+                               # multiplier.jl:29 calls the ripple lower_add!,
+                               # and substituting Cuccaro is what collapses
+                               # scratch from 3W^2+W to W^2+2W. Self-pinned —
+                               # this composition exists nowhere in Bennett
 )
 
 target_include_directories(cqops
