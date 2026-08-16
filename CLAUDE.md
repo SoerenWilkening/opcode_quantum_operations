@@ -376,7 +376,7 @@ The levels, and what each one is actually for:
 | | Asserts | Notes |
 |---|---|---|
 | **L0** | The §3 fold table, exhaustively | **159** = 5 X + 25 CX + 125 CCX = **155** exhaustive over the 5 operand kinds, plus **4** distinctness death-tests (`c==t`; `c1==c2`, `c1==t`, `c2==t`). Each case pins gates emitted, qubits allocated, resulting bit-kind, **and** shadow — four *assertions* per case, not four cases. The table branches on **kind only, never shadow** (that is D6 no-demotion): only `3+9+27 = 39` gate-behaviour classes exist, and the 155 split is there to pin the shadow |
-| **L1** | `value(dst) == refmodel(a,b)` | Exhaustive at `W ∈ {1,2,4,8}` × bit-kind mask **pairs**; sampled at `W ∈ {16,32,64}`. **Not "the shadow"** — a constant bit has none, and under the all-classical mask every bit of `dst` is one |
+| **L1** | `value(dst) == refmodel(a,b)` | The **full cross product** — every `(a,b)` × every bit-kind mask **pair** — at `W ∈ {1,2,3,4,5}`; **structured corners + seeded sampling × every mask pair** from `W = 8` up. **NOT value-exhaustive at W = 8**, and that was measured, not conceded: at the all-quantum mask the emitted circuit is identical for all 65,536 pairs (the fold table reads *kind*, never value — D6), so it ran one gate sequence 65,536 times. **Not "the shadow"** either — a constant bit has none, and under the all-classical mask every bit of `dst` is one |
 | **L2** | **No index is live that no named register owns**, and every owned index is live | Automatic on every L1 case. "Exactly `dst`'s qubits" is false whenever an operand is quantum; a **count** is strictly weaker than the set |
 | **L3** | forward → `_unc` → all-zero, then free → **`live` restored and every index `dst` held back on the free list** | Values and pool state only — see Rule 14. **Never compare `minted` or the free-list length**: both are monotone, so they cannot return |
 | **L4** | `(NOT, CNOT, Toffoli)` per kernel per `W` | Pinned goldens, cross-checked against the Bennett gate-count formula |
@@ -656,8 +656,11 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 
 # Tests run under BOTH — the invariant checks are the point of Debug,
 # and Release is what gets its gate counts pinned (Rule 17).
-ctest --test-dir build-debug   --output-on-failure
-ctest --test-dir build-release --output-on-failure
+# -j is worth using: ctest is SERIAL by default, and no test binary shares
+# state with another. Measured 2026-08-16: Debug 97.6s -> 55.0s at -j12,
+# bounded below by the longest single binary. `make test` passes it for you.
+ctest --test-dir build-debug   -j 8 --output-on-failure
+ctest --test-dir build-release -j 8 --output-on-failure
 
 # The 300-line guard (Rule 12). Both spellings run tools/check_loc.sh.
 make lint

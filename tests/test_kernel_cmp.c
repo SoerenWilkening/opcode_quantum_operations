@@ -140,15 +140,18 @@ static uint32_t scratch_of(int prim, int W)
  * All ten get the FULL CROSS PRODUCT at W <= 5 — every value pair against
  * every mask pair, which is exhaustive over the space and not over a diagonal
  * of it — plus sampling at each shipped width including i80. The three
- * PRIMITIVES additionally get cq_kd_sweep's value-exhaustive W=8 stage, which
- * plan §4 asks for by name.
+ * PRIMITIVES additionally get cq_kd_sweep's W=8 stage: structured arithmetic
+ * corners plus seeded sampling, crossed with every mask pair. That stage used
+ * to be value-EXHAUSTIVE and was 63% of this suite for no coverage — see
+ * kernelsweep.c:structured_pairs, and note the plan §4 row that asked for it
+ * was corrected rather than quietly narrowed.
  *
  * The seven derived predicates are the SAME CIRCUIT as their primitive: the
  * same step function over the same scratch, differing only in which operand
  * arrives first and whether copy-out appends one X. That is asserted
  * structurally, on the recorded gate stream, in
  * `each_derived_predicate_is_its_primitives_stream` — which is a stronger
- * statement about them than a second value-exhaustive width would be. */
+ * statement about them than more values at one more width would be. */
 static void sweep_pred(const cmp_row *r)
 {
     if (r->primitive) {

@@ -926,7 +926,7 @@ kernel driver rather than written per kernel:
 
 | Level | Assertion | Mechanism |
 |---|---|---|
-| **L1** | `value(dst) == refmodel(a, b)` for all `(a,b)` at `W ∈ {1,2,4,8}`, × bit-kind mask **pairs**; random sampling at `W ∈ {16,32,64}` | `bitkinds` + `refmodel` |
+| **L1** | `value(dst) == refmodel(a, b)`: the **full cross product** — every `(a,b)` × every bit-kind mask **pair** — at `W ∈ {1,2,3,4,5}`; **structured corners + seeded sampling × every mask pair** at `W ∈ {8}` and above | `bitkinds` + `refmodel` |
 | **L2** | After the call, **no index is live that no named register owns**, and every index a named register owns is live | `poolcheck`, automatic on every L1 case |
 | **L3** | forward → `_unc` → `dst`'s **values** all-zero; then an explicit free → **`live` restored and every index `dst` held back on the free list**. Asserted on **values and pool state only, never bit-kinds** (PRD §10). Note `_unc` alone does **not** restore the pool — it reclaims nothing, so the free is a required third step, not a tidy-up | `poolcheck`, automatic |
 | **L4** | `(NOT, CNOT, Toffoli)` at each `W` matches the golden, cross-checked against the Step 0.2 formula | `sink_count` + `tests/goldens/`, `CQOPS_UPDATE_GOLDENS=1` to regenerate |
@@ -936,6 +936,31 @@ fixed set always includes: all-classical (this is **L5** — zero gates, zero qu
 all-quantum, alternating, LSB-only, MSB-only, a one-bit-quantum sweep across all `W`
 positions, **and the asymmetric pairs risk R8 names, which no symmetric set can express**.
 Random masks are sampled on top.
+
+> **CORRECTED 2026-08-16: L1's row said "all `(a,b)` at `W ∈ {1,2,4,8}`", and the `8` was
+> 63% of the compare suite and about half the add suite for almost no coverage.** The
+> exhaustion at `W = 8` — 65,536 value pairs at the all-quantum mask, then 65,536 again at
+> a random mask — was measured at 131,152 cases per kernel. It bought nothing the rest of
+> the sweep did not already have, and the reason is structural rather than statistical:
+> the §3 fold table dispatches on a bit's **kind** and never on a qubit's value (D6, no
+> demotion), and every kernel is width-generic over `reg->width` with **no width switch**
+> (I5, Rule 3). So **at the all-quantum mask the emitted circuit is identical for all
+> 65,536 pairs** — one fixed gate sequence, run 65,536 times through the classical shadow.
+> A fault that survives the `W ≤ 5` full cross product must be *width*-dependent, and
+> widths are covered by covering widths and by the structural checks (closed-form gate
+> counts, the palindrome, the peak), not by more values at one width. Values reach the
+> circuit only through classical lanes, and only as one bit per lane — a classical `ZERO`
+> folds its gate away, a classical `ONE` rewrites it and removes none — which named
+> corners exercise directly.
+>
+> **The replacement is broader as well as ~55× cheaper.** Exhaustion spent its whole
+> budget on **two** masks; the structured set (0, max, MSB, equal pairs, `v`/`v±1` both
+> orders, `2^i` and `2^i − 1` for every `i`, alternating) plus seeded sampling is crossed
+> with **every** mask pair, so the arithmetic corners now meet the asymmetric masks R8
+> names, which no value pair previously did. **Verified, not asserted:** the 20-mutant
+> battery over `src/kernels/cmp.c` was re-run against the reduced sweep and kills the same
+> set. `tests/support/kernelsweep.c:structured_pairs` carries the argument in place, and
+> every run still prints its own case counts — the no-silent-caps property is unchanged.
 
 > **Four corrections landed in this table at Step 10**, when the first kernel forced each
 > from prose into code. **L1 does not read "the shadow"** — `shadow(dst)` is undefined for a

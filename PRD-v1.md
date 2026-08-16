@@ -878,7 +878,7 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 | Level | What | How |
 |---|---|---|
 | L0 | Fold table | Unit tests over all operand-state combinations in §3 |
-| L1 | **Kernel differential** | For each kernel: all `(a,b)` at W ∈ {1,2,4,8} × classical/quantum bit-kind mask **pairs**, compare the result register's **value** against the C operator. Random sampling at W ∈ {16,32,64} |
+| L1 | **Kernel differential** | For each kernel, compare the result register's **value** against the C operator: the **full cross product** — every `(a,b)` × every bit-kind mask **pair** — at W ∈ {1,2,3,4,5}; **structured corners + seeded sampling, crossed with every mask pair**, at W = 8 and above. **Not value-exhaustive at W = 8** — see the note below |
 | L2 | Ancilla-clean | After every kernel call, assert **no index is live that no named register owns**, and that every index a named register owns is live |
 | L3 | Uncompute round-trip | forward → `_unc` → assert `dst`'s **values** are all-zero. The pool is **not** restored yet — `_unc` reclaims nothing (§10). The harness then frees `dst` explicitly and asserts **`live` is back to its pre-call value and every index `dst` held is back on the free list** |
 | L4 | Gate-count goldens | Pin per-kernel `(NOT, CNOT, Toffoli)` at each W. Cross-check against Bennett's published baselines where the construction matches, and document every deliberate delta. See the arity and staleness notes below — both bit an earlier draft |
@@ -888,6 +888,32 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 
 L1 and L5 are the two that actually catch bugs. L4 is what stops a "harmless" refactor
 from silently doubling the T-count.
+
+> **L1 IS NOT VALUE-EXHAUSTIVE AT W = 8, corrected 2026-08-16, and the reason is
+> structural rather than a concession to runtime.** This row read "all `(a,b)` at
+> W ∈ {1,2,4,8}", and the `8` cost 131,152 cases per kernel — 63% of the compare suite and
+> about half the add suite. It bought nothing the rest of the sweep did not already have.
+> The §3 fold table dispatches on a bit's **kind**, never on a qubit's value (§15 D6, no
+> demotion), and every kernel is width-generic over `reg->width` with **no width switch**
+> (I5). So **at the all-quantum mask the emitted circuit is byte-for-byte identical across
+> all 65,536 value pairs** — the suite ran one fixed gate sequence 65,536 times through the
+> classical shadow. Any fault surviving the W ≤ 5 full cross product, which is exhaustive
+> over the *product* of values and masks, must be **width**-dependent — a loop bound, an
+> MSB boundary, a carry that only exists above some length — and those are caught by
+> covering widths and by L4's closed forms, the sandwich palindrome and the qubit peak.
+>
+> **Values reach the circuit only through classical lanes, and only as one bit per lane:**
+> a classical `ZERO` control folds its gate away, a classical `ONE` rewrites it (`CX`→`X`,
+> `CCX`→`CX`) and removes none. Named corners — 0, max, MSB, equal pairs, `v`/`v±1` in both
+> orders, `2^i` and `2^i − 1` for every `i`, alternating — exercise that directly.
+>
+> **The replacement is broader, not just cheaper.** Exhaustion spent its entire budget on
+> **two** masks (all-quantum, plus one random draw per pair); the structured set plus seeded
+> sampling is crossed with **every** mask pair, so the arithmetic corners now meet the
+> asymmetric masks risk R8 names — which no value pair ever did. **Verified rather than
+> argued:** the 20-mutant battery over `src/kernels/cmp.c` was re-run against the reduced
+> sweep and kills the same set, and every run still prints its own case counts, so the
+> no-silent-caps property is unchanged.
 
 > **Three corrections made at Step 10, when the first kernel forced each of them from
 > prose into code. All three rows above are the corrected wording.**

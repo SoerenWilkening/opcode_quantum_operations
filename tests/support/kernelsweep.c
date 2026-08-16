@@ -80,21 +80,93 @@ static void sweep_full_cross(const cq_kd_spec *k, int W)
     fflush(stdout);
 }
 
+/* THE STRUCTURED VALUE SET, and it REPLACED VALUE EXHAUSTION AT W=8 on
+ * 2026-08-16. Read this before restoring the old loop.
+ *
+ * WHAT WAS THERE: every one of the 2^(2W) value pairs at the all-quantum mask,
+ * then every one of them AGAIN at a seeded-random mask, then the four corners
+ * at each mask — 131,152 cases per kernel at W=8, which was 63% of the entire
+ * compare suite and about half of the add suite.
+ *
+ * WHY IT BOUGHT ALMOST NOTHING HERE, and the argument is specific to this
+ * codebase rather than general test-design taste. The §3 fold table dispatches
+ * on a bit's KIND and never on a qubit's value (D6, no demotion), and every
+ * kernel is width-generic over `reg->width` with no width switch (I5, Rule 3).
+ * So **under the all-quantum mask the emitted circuit is identical for every
+ * one of those 65,536 pairs** — the first loop ran one fixed gate sequence
+ * 65,536 times through the classical shadow. A fault that survives W<=5, where
+ * the FULL cross product (every value pair x every mask pair) still runs, has
+ * to be width-dependent: a loop bound, an MSB boundary, a carry that only
+ * exists above some length. Those are found by covering WIDTHS and by the
+ * structural checks — the closed-form gate counts, the palindrome, the peak —
+ * not by more values at one width.
+ *
+ * WHERE VALUES DO REACH THE CIRCUIT: through classical lanes only, and only as
+ * one bit of information per lane. A classical ZERO control folds its gate
+ * away; a classical ONE rewrites it (CX->X, CCX->CX) and removes none. That is
+ * the K09.md §3.3.1 rule, and it is exercised by all-zeros, all-ones, single
+ * bits and alternating patterns — which are exactly what this set contains —
+ * far more directly than by enumeration.
+ *
+ * SO THIS IS NOT ONLY CHEAPER, IT IS BROADER. Exhaustion spent its budget on
+ * TWO masks (all-quantum, plus one random draw per pair). The structured set
+ * is crossed with EVERY fixed mask pair, so the arithmetic corners now meet the
+ * asymmetric masks risk R8 names, which no value pair ever did before.
+ *
+ * The classes, and why each is here:
+ *   0 / max / msb            the masking and sign boundaries
+ *   v, v         (equal)     the comparator's tie, the adder's doubling
+ *   v, v+1 / v+1, v          the top-differing-bit boundary, both orders
+ *   2^i and 2^i - 1          one lane hot; and a carry/borrow that propagates
+ *                            exactly i positions, for every i
+ *   0x55.. / 0xAA..          alternating, the mask-vs-value interaction
+ * plus SAMPLES_PER_MASK seeded-random pairs, which is what covers the
+ * combinations nobody thought to name. */
+static uint32_t structured_pairs(int W, uint64_t *va, uint64_t *vb, uint32_t cap)
+{
+    uint64_t m = cq_ref_mask(W);
+    uint64_t msb = (uint64_t)1 << (W - 1);
+    uint32_t n = 0;
+
+#define PUSH(x, y) do { if (n < cap) { va[n] = (x) & m; vb[n] = (y) & m; n++; } } while (0)
+    PUSH(0u, 0u);       PUSH(0u, m);        PUSH(m, 0u);        PUSH(m, m);
+    PUSH(msb, msb);     PUSH(msb, msb - 1); PUSH(msb - 1, msb); PUSH(msb, 0u);
+    PUSH(m, 1u);        PUSH(1u, m);        PUSH(1u, 1u);       PUSH(0u, 1u);
+    PUSH(0x5555555555555555ull, 0xAAAAAAAAAAAAAAAAull);
+    PUSH(0xAAAAAAAAAAAAAAAAull, 0x5555555555555555ull);
+
+    for (int i = 0; i < W; i++) {
+        uint64_t bit = (uint64_t)1 << i;
+
+        PUSH(bit, 0u);              /* one lane hot on a only            */
+        PUSH(0u, bit);              /* and on b only                     */
+        PUSH(bit, bit);             /* the same lane on both             */
+        PUSH(bit - 1u, 1u);         /* carry/borrow propagating i places  */
+        PUSH(bit, bit - 1u);        /* the ordering boundary at lane i    */
+    }
+#undef PUSH
+    return n;
+}
+
+/* Structured + sampled, crossed with EVERY mask pair. Replaces the value
+ * exhaustion described above; see structured_pairs for the argument, and
+ * IMPLEMENTATION_PLAN §4 / PRD §11, which were corrected to match. */
 static void sweep_values(const cq_kd_spec *k, int W)
 {
     cq_bk_pair pairs[MAX_PAIRS];
     uint32_t np = pairs_for(k, W, pairs, MAX_PAIRS);
+    uint64_t sa[8 * 64 + 32], sb[8 * 64 + 32];
+    uint32_t ns = structured_pairs(W, sa, sb, (uint32_t)(sizeof sa / sizeof sa[0]));
     uint64_t mask = cq_ref_mask(W);
-    uint64_t span = mask + 1u;
     uint64_t cases = 0;
     cq_bk_rng rng;
 
     cq_bk_rng_init(&rng, 0x5EEDC0DEull ^ (uint64_t)W);
 
     /* The all-quantum row is index 1 by construction. Asserted rather than
-     * assumed: reordering cq_bk_fixed_pairs would otherwise spend the full
-     * cross product on some other mask while still running 65,536 cases and
-     * still looking like complete coverage.
+     * assumed: it is the mask L4 pins and the one where no operand fold can
+     * hide a lane, so a reordering of cq_bk_fixed_pairs must not move it
+     * silently.
      *
      * CHECKED ON OPERAND 0 ONLY, AND NOT SKIPPED FOR SHAPED KERNELS. An
      * earlier draft skipped the whole check whenever a spec set a shape, on
@@ -105,42 +177,32 @@ static void sweep_values(const cq_kd_spec *k, int W)
      * six specs and protected none of them. */
     if (!cq_ref_w_eq(pairs[1].q[0], cq_ref_w_ones(W)))
         cq_h_fail(__FILE__, __LINE__,
-                  "cq_kd_sweep: fixed pair 1 is [%s], not all-quantum — the "
-                  "full cross product would be spent on the wrong mask",
+                  "cq_kd_sweep: fixed pair 1 is [%s], not all-quantum",
                   pairs[1].name);
 
-    for (uint64_t va = 0; va < span; va++)
-        for (uint64_t vb = 0; vb < span; vb++) {
-            cq_kd_case2(k, W, va, vb, &pairs[1]);
+    for (uint32_t p = 0; p < np; p++) {
+        for (uint32_t s = 0; s < ns; s++) {
+            cq_kd_case2(k, W, sa[s], sb[s], &pairs[p]);
             cases++;
         }
 
-    /* THE REST GET A RANDOMLY ASSIGNED MASK PER VALUE PAIR, and the assignment
-     * is random rather than a rotation for a measured reason. `p = (p+1) % np`
-     * looks uniform and is not: with np=20 and span=256, gcd(20,256) = 4, so
-     * mask index p only ever meets value pairs with `vb ≡ p (mod 4)` — each
-     * mask sees 64 of the 256 `vb` values, all in ONE residue class. A
-     * lane-specific fold bug needing a particular low bit of `b` is
-     * unreachable that way. A seeded xorshift has no such structure, and it is
-     * still deterministic, so a red run reproduces. */
-    for (uint64_t va = 0; va < span; va++)
-        for (uint64_t vb = 0; vb < span; vb++) {
-            cq_kd_case2(k, W, va, vb, &pairs[cq_bk_rng_below(&rng, np)]);
+        /* Seeded, so a red run reproduces from the printed seed. Per mask
+         * rather than per value pair: the old code drew a mask at random FOR
+         * each pair, which left every mask meeting an unpredictable slice of
+         * the value space. Every mask now meets the same named corners plus
+         * its own random draw. */
+        for (int s = 0; s < SAMPLES_PER_MASK; s++) {
+            cq_kd_case2(k, W, cq_bk_rng_next(&rng) & mask,
+                        cq_bk_rng_next(&rng) & mask, &pairs[p]);
             cases++;
         }
+    }
 
-    for (uint32_t q = 0; q < np; q++)
-        for (int c = 0; c < 4; c++) {
-            cq_kd_case2(k, W, (c & 1) ? mask : 0u, (c & 2) ? mask : 0u,
-                        &pairs[q]);
-            cases++;
-        }
-
-    printf("# %s W=%2d VALUE-EXHAUSTIVE (see kernelsweep.c on why this width "
-           "is not the full cross product): %llu value pairs all-quantum + "
-           "%llu at a seeded-random mask + %u masks x 4 corners = %llu cases\n",
-           k->name, W, (unsigned long long)(span * span),
-           (unsigned long long)(span * span), np, (unsigned long long)cases);
+    printf("# %s W=%2d STRUCTURED (%u named pairs + %d sampled) x %u mask "
+           "pairs = %llu cases — NOT value-exhaustive; see kernelsweep.c on "
+           "why exhaustion at this width bought nothing the W<=5 full cross "
+           "does not already have\n",
+           k->name, W, ns, SAMPLES_PER_MASK, np, (unsigned long long)cases);
     fflush(stdout);
 }
 
