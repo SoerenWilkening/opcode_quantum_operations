@@ -78,6 +78,43 @@ static void sweep(const cq_kd_spec *k)
 CQ_TEST(k6_add_sweep) { sweep(&ADD); }
 CQ_TEST(k7_sub_sweep) { sweep(&SUB); }
 
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+static const cq_kd_spec *const ADDS[] = { &ADD, &SUB };
+
+static void add_narrow(void)
+{
+    for (size_t i = 0; i < sizeof ADDS / sizeof ADDS[0]; i++)
+        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(ADDS[i], W, 1);
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    /* THE FIRST SANDWICH USERS UNDER THE AXIS, so this is where the composition
+     * is exercised at scale: I6's extent, the region fingerprint,
+     * CQ_ZERO_BY_PALINDROME and §9's promotion in one call. i80 is excluded from
+     * add and sub (opcode_table.yaml:85), as it is from the sweep. */
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };
+
+    cq_kd_for_each_region("add/sub", add_narrow);
+
+    for (size_t i = 0; i < sizeof ADDS / sizeof ADDS[0]; i++)
+        for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++)
+            reached += cq_kd_check_promotion(ADDS[i], widths[w]);
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}
+
 /* ---- One run at an EXPLICIT operand mask, with the stream recorded. ------ */
 
 /* Both passes, each into its own mock, so their counts are pinned separately
@@ -514,6 +551,7 @@ CQ_TEST(l1s_oracle_agrees_with_an_independent_bit_serial_model)
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(k6_add_sweep),
     CQ_CASE(k7_sub_sweep),
+    CQ_CASE(controlled),
     CQ_CASE(l4_goldens),
     CQ_CASE(k7_is_k6_plus_two_w_plus_one_per_compute_half),
     CQ_CASE(l4_x_plus_one_against_bennetts_published_baseline),

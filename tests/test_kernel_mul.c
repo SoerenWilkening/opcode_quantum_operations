@@ -549,6 +549,7 @@ CQ_TEST(the_classical_fold_writes_real_gates_into_a_quantum_dst)
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(k11_mul_sweep),
+    CQ_CASE(controlled),
     CQ_CASE(l4_goldens),
     CQ_CASE(the_compute_half_is_the_skeleton_plus_w_measured_k8_accumulates),
     CQ_CASE(the_partial_products_are_truncated_and_the_high_half_never_exists),

@@ -110,6 +110,60 @@ CQ_TEST(k5_zext_sweep)  { sweep_pairs(&ZEXT,  1); }
 CQ_TEST(k5_sext_sweep)  { sweep_pairs(&SEXT,  1); }
 CQ_TEST(k5_trunc_sweep) { sweep_pairs(&TRUNC, 0); }
 
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+/* A CAST'S SWEEP IS OVER A WIDTH PAIR, not a width, and the pair lives in
+ * g_F/g_T where cast_shape reads it — so the narrow body sets it explicitly
+ * rather than letting cq_kd_sweep_at pick. That is exactly why the region hook
+ * takes the suite's own body instead of imposing a shape. */
+static const cq_kd_spec *const CASTS[] = { &ZEXT, &SEXT, &TRUNC };
+
+static void cast_narrow(void)
+{
+    static const int small[] = { 1, 8, 16 };
+
+    for (size_t i = 0; i < sizeof CASTS / sizeof CASTS[0]; i++)
+        for (size_t a = 0; a < sizeof small / sizeof small[0]; a++)
+            for (size_t b = 0; b < sizeof small / sizeof small[0]; b++) {
+                int F = small[a], T = small[b];
+                int widening = (CASTS[i] != &TRUNC);
+
+                if (widening ? (T < F) : (T > F)) continue;
+                g_F = F; g_T = T;
+                cq_kd_sweep_at(CASTS[i], F, F <= 8);
+            }
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    cq_kd_for_each_region("cast", cast_narrow);
+
+    /* Every pair on the shipped ladder for the transform, including the ones
+     * that reach i128 — the only way an i128 register exists at all. */
+    for (size_t i = 0; i < sizeof CASTS / sizeof CASTS[0]; i++)
+        for (int a = 0; a < N_LADDER; a++)
+            for (int b = 0; b < N_LADDER; b++) {
+                int F = LADDER[a], T = LADDER[b];
+                int widening = (CASTS[i] != &TRUNC);
+
+                if (widening ? (T < F) : (T > F)) continue;
+                g_F = F; g_T = T;
+                reached += cq_kd_check_promotion(CASTS[i], F);
+            }
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}
+
 /* ---- The wide pairs, by hand, where the reference earns its keep. ------- */
 
 /* Runs one cast at one value and returns dst's two-word value. */
@@ -349,6 +403,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(k5_zext_sweep),
     CQ_CASE(k5_sext_sweep),
     CQ_CASE(k5_trunc_sweep),
+    CQ_CASE(controlled),
     CQ_CASE(wide_sext_fills_the_high_word),
     CQ_CASE(wide_i80_crosses_the_word_seam),
     CQ_CASE(sext_against_an_independently_derived_oracle),

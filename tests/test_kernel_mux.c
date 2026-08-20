@@ -181,6 +181,43 @@ CQ_TEST(k10_sweep_exhaustive_widths)
     for (int W = 1; W <= 5; W++) mux_full_cross(W);
 }
 
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+static void mux_narrow(void)
+{
+    /* mux_full_cross, NOT cq_kd_sweep_at: cq_kd_case2 fills values[2] with
+     * ZERO, so the ordinary sweep would run every exhaustive case with one arm
+     * pinned at 0 — green, and half a kernel. The region hook takes this
+     * suite's own body for exactly that reason. */
+    for (int W = 1; W <= 4; W++) mux_full_cross(W);
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    /* K10 has THREE sources and a one-bit `cond`, so this is the only place the
+     * promotion meets an operand narrower than the result. i80 is excluded, as
+     * it is from the sweep: opcode_table.yaml:88 says i80 is never a
+     * control-merged data value, which is what a select's arms are. */
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };
+
+    cq_kd_for_each_region("mux", mux_narrow);
+
+    for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++)
+        reached += cq_kd_check_promotion(&MUX, widths[w]);
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}
+
 /* THE LADDER STOPS AT 64 FOR THE SWEEP AND THE CAP IS DELIBERATE, so it is
  * printed rather than implied. i80 is excluded on purpose — opcode_table.yaml
  * :88 says i80 "is NEVER a control-merged data value", which is precisely what
@@ -360,6 +397,7 @@ CQ_TEST(the_scratch_is_2w_and_it_all_comes_back)
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(k10_sweep_exhaustive_widths),
+    CQ_CASE(controlled),
     CQ_CASE(k10_sweep_wide_widths),
     CQ_CASE(l4_goldens),
     CQ_CASE(the_evaluated_table_in_k10_matches_what_is_emitted),

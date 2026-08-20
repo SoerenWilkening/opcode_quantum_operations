@@ -32,6 +32,29 @@ void cq_emit_cx (cq_ctx *ctx, const cq_bit *c,        cq_bit *t);
 void cq_emit_ccx(cq_ctx *ctx, const cq_bit *c1,
                               const cq_bit *c2,       cq_bit *t);
 
+/* THE PHYSICAL TAIL, FOR M06 ONLY (Step 20). The three above are the full
+ * emitter: §9 row 0, then the §3 fold on the CONTROLS, then either §9's
+ * promotion or the gate itself. These two are that last clause on its own —
+ * materialise a constant target, push the gate, update the shadow — with NO
+ * control consultation of any kind.
+ *
+ * They exist because §9's promotion is expressed in gates, and a promotion that
+ * called cq_emit_* back would promote its own promotion. Nothing outside
+ * src/controlled.c may call them: a kernel that reaches for one is a kernel
+ * opting out of the controlled axis, which Rule 9 exists to make impossible.
+ *
+ * They do NOT re-run check_target. That is deliberate and it is the whole of
+ * I6's amendment for this step: I6 constrains the targets a KERNEL names, which
+ * the public entry points above have already checked. The promotion's extra
+ * target — M06's shared ancilla — is outside every scratch region by
+ * construction, and is sound there because the pair of Toffolis that touch it
+ * is self-inverse within one step. Widening the extent to cover it instead
+ * would silently disarm I6(a) for the whole compute half, which is the same
+ * wrong fix sandwich.h already records for the copyout. */
+void cq_emit_cx_phys (cq_ctx *ctx, const cq_bit *c,  cq_bit *t);
+void cq_emit_ccx_phys(cq_ctx *ctx, const cq_bit *c1,
+                                   const cq_bit *c2, cq_bit *t);
+
 /* Takes a qubit from the pool (guaranteed |0> by I3), emits X if the bit's
  * constant was 1, sets kind = CQ_BIT_Q.
  *

@@ -97,13 +97,29 @@ is never undone.
 The saving condition, in two parts. **Part (a) alone is what an earlier draft said, and it
 is not sufficient** — see the control-side hazard below.
 
-> **I6(a) — target side.** Inside a `cq_sandwich` compute half, every gate *target* is a
-> bit of the scratch region. Sources appear only as controls, and controls are never
-> materialised.
+> **I6(a) — target side.** Inside a `cq_sandwich` compute half, every gate *target a
+> KERNEL NAMES* is a bit of the scratch region. Sources appear only as controls, and
+> controls are never materialised.
 >
 > **I6(b) — control side.** Every bit of the scratch region is `CQ_BIT_Q` for the whole
 > duration of the compute half. `cq_sandwich` guarantees this by **pre-materialising the
 > entire scratch region at step 0**, before the first compute step runs.
+
+> **THE FOUR WORDS "A KERNEL NAMES" WERE ADDED AT STEP 20, and they are a narrowing rather
+> than a loophole.** §9's promotion of a Toffoli is `CCX(w,c1,anc); CCX(anc,c2,t);
+> CCX(w,c1,anc)`, and `anc` — M06's shared ancilla — is a target that is not a scratch bit
+> and could not be, since it must outlive the region rather than the step. What I6 protects
+> is that a step is an INVOLUTION, and the promoted block is: `A` and `B` are each
+> self-inverse, so `(ABA)² = I`, and the block is also a palindrome as a sequence, so the
+> recorded stream stays one. The enforcement follows the statement — `check_target` runs at
+> `cq_emit_*`'s public entry points, on the caller's target, and the promotion's physical
+> emitters deliberately do not re-run it. **Widening the extent to cover the ancilla instead
+> is the wrong fix and would disarm I6(a) for the whole compute half**, exactly as
+> `sandwich.h` already records for the copyout.
+>
+> **Step 20 also amended the one-gate-per-step premise to ONE INVOLUTION PER STEP** (PRD
+> §10). A promoted step is three gates; what `cq_sandwich`'s replay needs is that
+> `compute(env, s)` undoes itself, and `A·B·A` does.
 
 Together these make step `s` emit an identical gate sequence forwards and backwards, so
 replay-in-reverse cancels exactly.
@@ -181,6 +197,29 @@ void cq_ctrl_pop (cq_cxt*);                      /* releases it, asserted |0> */
 `cq_emit_x/cx/ccx` consult `ctx->ctrl_depth`. Every kernel becomes controlled for free —
 no kernel is aware the axis exists. Nested control ANDs the flags into a single wire on
 the second push, so the promotion never sees more than one control (PRD §9).
+
+**BUILT AT STEP 20, and five things about the shipped shape are worth recording.**
+
+1. **`ctrl_depth` is a STACK, not a counter.** Row 0 has three outcomes and a nested push
+   has to restore the previous one, so `cq_ctx` carries `cq_ctrl_stack ctrl` — frames of
+   `{mode, wire, owns_wire, and_a, and_b, anc, has_anc}` — and the emitter reads only the
+   top. The hot accessors are `static inline` over the STACK rather than over the context,
+   which is what lets `controlled.h` be included BY `ctx.h` without a cycle (reg.h's trick,
+   for reg.h's reason).
+2. **Three modes, not two.** `CQ_CTRL_OFF` covers both "no region" and "a region whose
+   control was `CQ_BIT_ONE`", because row 0 makes those the same thing to an emitter.
+3. **The emitter's clause order is load-bearing and asymmetric** — skip, then the §3 fold
+   on the CONTROLS, then the promotion, which comes BEFORE any fold on the TARGET. PRD §9
+   row A states why; getting it backwards is a controlled region silently made
+   unconditional, and it is invisible at the all-quantum mask.
+4. **The promotion emits through `cq_emit_cx_phys` / `cq_emit_ccx_phys`**, a physical tail
+   exported from M05 for M06 alone. A promotion that called `cq_emit_*` back would promote
+   its own promotion.
+5. **The test side is one setter, one push site and one loop** — `cq_kd_set_ctrl`,
+   `call_kernel`, `cq_kd_for_each_region` — and the region loop takes the SUITE's own sweep
+   body rather than imposing a shape, because a third of the catalogue has a bespoke one
+   (a cast sweeps a width PAIR; K10's mux must drive `cq_kd_case` directly, since
+   `cq_kd_case2` fills `values[2]` with zero). None of the 71 driver call sites changed.
 
 ### 0.4 A composite kernel calls another kernel's STEP FUNCTION — the Layer-3 export rule
 
@@ -359,8 +398,9 @@ No dependencies beyond libc (PRD §14), so hand-rolled:
 | `refmodel.[ch]` | 150 | Plain-C reference semantics per opcode at each `W`, with correct masking and two's-complement edge cases |
 | `bitkinds.[ch]` | 110 | Build a register from `(value, quantum-mask)`; enumerate the mask **pairs** used by L1 |
 | `poolcheck.[ch]` | 80 | Snapshot/diff the qubit pool; the automatic L2 and L3 assertions |
-| `kerneldrv.[ch]` | **249 landed** | **Added at Step 10.** The shared Phase-B driver §4 below assumes without naming — see the note. Split seam: **the sweep shapes move to `kernelsweep.c`, keeping `cq_kd_case`'s four levels in one file** — trigger at 260 in `kerneldrv.c` |
+| `kerneldrv.[ch]` | ~~249~~ **333 landed** (279 + 54) | **Added at Step 10.** The shared Phase-B driver §4 below assumes without naming — see the note. **SPLIT TWICE, both on recorded seams**: at Step 11 the sweep shapes went to `kernelsweep.c`, and at Step 20 the controlled axis took the body to **345 of 300** and the axis went to `kernelctrl.c`. The second seam is `the four LEVELS` against `the AXIS`, and it holds because `cq_kd_case` gained exactly three things from Step 20 (the control rail among the named registers, a control-aware L1 oracle, a per-mode L5) while everything else the axis needed was new code with no assertion in it. No third seam is recorded; the body is at 279 |
 | `kernelsweep.c` | **128 landed** | **Split from `kerneldrv.c` at Step 11** on this table's own recorded seam: the sweep SHAPES here, the four LEVELS next door |
+| `kernelctrl.[ch]` | **77 + 9 landed** | **Split from `kerneldrv.c` at Step 20**, when PRD §9's axis took that file past the guard. Carries the region mode, the one-bit control rail it mints, `cq_kd_for_each_region` and §9's gate-tuple transform. Its public surface is declared in `kerneldrv.h` with the rest of the driver — a suite should see one driver, not two |
 | `goldens.[ch]` | **221 landed** | **Added at Step 10.** L4's counts as an on-disk artifact: load, check, regenerate, and the risk-R3 commit cross-check. Split seam: **parse/write ↔ check**, i.e. the file format leaves and `cq_gold_check` stays — trigger at 260 in `goldens.c` |
 
 > **The last two are beyond this table's original five, like `death.[ch]` before them, and
@@ -936,7 +976,7 @@ it grows.
 | ID | Module | LOC | Split seam |
 |---|---|---|---|
 | M05 | `emit.[ch]` — §3 fold table, `cq_materialise`, distinctness asserts, I6 check | 190 | fold table ↔ materialisation |
-| M06 | `controlled.[ch]` — §9 promotion, control stack, shared ancilla, nested AND | 140 | — |
+| M06 | `controlled.[ch]` — §9 promotion, control stack, shared ancilla, nested AND. **LANDED 2026-08-20 at 233 (182 body + 51 header) against 140 — 66% over**, on M07's, M12's and M20's precedent. The overshoot is four things the 140 did not anticipate: row 0 is a whole extra DIMENSION (three modes, and a nested push must restore the previous one, so the state is a growable STACK rather than a counter); the nested AND owns a flag qubit it must uncompute and release, plus an idempotent case for pushing the same wire twice; the coincidence refusal (PRD §9 row B); and §7's two rotation rows plus D11's two refusals, which §3's row placed in M22 and which cannot live there — M22 must not know the axis exists | ~~140~~ **233 landed** | **`the stack and row 0` ↔ `§9's promotion table`** — recorded at Step 20, unused: `cq_ctrl_push`/`_pop`/the AND stay in `controlled.c`, and the three `promote_*`, the two rotations and the two refusals move to `src/controlled_promote.c` if the body passes 240 — the fixes an adversarial review forced took it from 162 to 182, so the headroom is now 58 |
 
 ### Layer 2 — registers and the sandwich
 
@@ -966,8 +1006,8 @@ it grows.
 
 | ID | Module | LOC | Notes |
 |---|---|---|---|
-| M21 | `angle.[ch]` | 80 | **DONE, Step 18 — 69/80, split 19 + 50 since Step 19 moved `CQ_ANGLE_PI` into the header so M22 has one home for it (18 + 51 before that).** Pure classification of θ against §7's rows, tolerance configurable. Exhaustively testable, zero dependencies. What §7 left open is now **PRD §15 D10**: the window is `tol·π` (ABSOLUTE), one refusal `\|θ\|·1.6e-16 ≤ tol·π` carries the error bound `\|θ − k·π\| ≤ 2·tol·π`, and `tol` is capped at `1e-3`. The θ-relative reading was built first and is a miscompile |
-| M22 | `rotate.[ch]` | 150 | §7 Ry/Rz per bit, the θ≡π asymmetry, measurement. **DONE, Step 19 — 96/150 (85 + 11 at the step's close; 83 + 11 after the adversarial review trimmed a guard).** THE FIRST CALLER OF `cq_shadow_rotate` IN `src/`, on exactly two of §7's twelve cells — the general-`Ry` row, both columns (**PRD §15 D12**). Carries `bd lk0`'s resolution — the `Z` is `sink.rz(q, π)`, no seventh vtable entry — and refuses to run inside a sandwich compute half, which is the only guard it owns outright. Split seam recorded: **`§7's rotation table ↔ measurement`**, `cq_measure` moving to `src/measure.c` if `rotate.c` passes 240 |
+| M21 | `angle.[ch]` | 80 | **DONE, Step 18; `bd fna`'s `k mod 4` split landed at Step 20 (73/80: 51 body + 22 header), so `CQ_ANGLE_HALF_TURN` is now `k ≡ 1 (mod 4)` and `CQ_ANGLE_NEG_HALF_TURN` is `k ≡ 3` — the two differ by a global −1 that nothing uncontrolled can observe, which is why M22 still emits the identical pair for both and `test_rotate_table.inc` pins that. It became load-bearing three ways at once (PRD §15 D11): the constant column owes `π·b` against `π·(1−b)`, the qubit column `∓π/2`, and `_inv` swaps the two while fixing 0 and 2. Step 18's own figure was 69/80, split 19 + 50 since Step 19 moved `CQ_ANGLE_PI` into the header so M22 has one home for it (18 + 51 before that).** Pure classification of θ against §7's rows, tolerance configurable. Exhaustively testable, zero dependencies. What §7 left open is now **PRD §15 D10**: the window is `tol·π` (ABSOLUTE), one refusal `\|θ\|·1.6e-16 ≤ tol·π` carries the error bound `\|θ − k·π\| ≤ 2·tol·π`, and `tol` is capped at `1e-3`. The θ-relative reading was built first and is a miscompile |
+| M22 | `rotate.[ch]` | 150 | §7 Ry/Rz per bit, the θ≡π asymmetry, measurement. **Step 20 took it to 119/150 (108 body + 11 header)**: row 0's skip at the top of each bit function (which has to be HERE, not in the emitter, because the general row materialises before it emits — so an M22 relying on `cq_emit_*` alone would take W qubits for a region that does not run), D11's refusal at the three folding sites with `half_turn_row` naming the parity, `cq_ctrl_ry`/`cq_ctrl_rz` for the two general rows, and a measurement refusal. **DONE, Step 19 — 96/150 (85 + 11 at the step's close; 83 + 11 after the adversarial review trimmed a guard).** THE FIRST CALLER OF `cq_shadow_rotate` IN `src/`, on exactly two of §7's twelve cells — the general-`Ry` row, both columns (**PRD §15 D12**). Carries `bd lk0`'s resolution — the `Z` is `sink.rz(q, π)`, no seventh vtable entry — and refuses to run inside a sandwich compute half, which is the only guard it owns outright. Split seam recorded: **`§7's rotation table ↔ measurement`**, `cq_measure` moving to `src/measure.c` if `rotate.c` passes 240 |
 | M23 | `sink_printf.c` | 70 | Default; CQ_lang's golden-trace **convention**, not its lines — the goldens are handle-level and a sink sees only qubit indices. `x`/`cx`/`ccx`/`ry`/`rz`/`mz`, operands `q<N>`, `%a` angles, flush per line. See the PRD §8 correction |
 | M24 | `sink_count.c` | 100 | Per-kind totals, T-count = 7×Toffoli. **NOT peak qubits** — Bennett's `peak_live_wires` is a simulator (Rule 13) and `cq_qubits_peak()` in M03 already has the number exactly. `total` = x+cx+ccx only. See the PRD §8 correction |
 | M25 | `sink_qec.c` | 100 | Conditional on `C_quantum_error_correction`; Ry/Rz stubbed per §7 |
@@ -1090,11 +1130,24 @@ documented, and never traps. Assert it does not trap; pin whatever it returns.
 |---|---|---|---|---|
 | 18 | `test_angle.c` — every row of §7's table incl. mod-4π vs mod-2π boundaries and tolerance edges. **The gate as written is not achievable in M21 and is corrected:** §7's table is six rows × TWO columns, and the constant/qubit split is Rule 15's whole point — choosing a column needs a `cq_bit`, so M21 pins the **ROW** and M22 owns the cells at Step 19 | M21 | **DONE** — 19 cases + 8 deaths green in both configurations, 39/39 real mutants killed with 4 deliberately-equivalent controls alive, then a 29-agent adversarial review whose 9 surviving findings added 3 cases and `-ffp-contract=off` | 7 |
 | 19 | `test_rotate.c` — **the θ≡π asymmetry**: `Ry(π)` on a constant bit flips it with **0 gates and 0 qubits**; on a qubit it emits `X` then `Z`. `Rz` on a constant is a no-op at every φ. Measurement returns shadow, 0 for unknown, emits `mz`, is terminal. **Two clarifications the step forced.** The `Z` had no vtable entry and no `cq_emit_*`; it is `sink.rz(q, π)` (**PRD §7**, `bd lk0`) — and note "`Ry(π) = XZ`" is a MATRIX product while "emit `X` then `Z`" is a CIRCUIT, so the emitted pair is `Z·X = Ry(3π)`, which is the same row up to a global −1 that no fixed spelling can remove. **Which rows poison is a decision, not a detail** — PRD §15 **D12**: only `Ry` off the lattice | M22 | **DONE** — 19 cases + 12 deaths green in both configurations at 94/150 LOC (83 + 11), 35/35 real mutants killed across three rounds | 7 |
-| 20 | `test_controlled.c` — promotion table verbatim from `controlled.jl`; ancilla shared across the region and returned |0⟩; nested control uses **one** control wire; **every Phase-B kernel re-runs its L1–L4 suite under `cq_ctrl_push`** | M06 | L1–L4 green under control for all kernels | 7 |
+| 20 | `test_controlled.c` — promotion table verbatim from `controlled.jl`; ancilla shared across the region and returned |0⟩; nested control uses **one** control wire; **every Phase-B kernel re-runs its L1–L4 suite under `cq_ctrl_push`**. **Three decisions came due with it and all three are now in the PRD rather than in code**: `bd skh` is **D13** (materialisation is UNPROMOTED, forced by one cell of an eight-row truth table), `bd pf4`'s D11 refusal is BUILT at one greppable site, and `bd fna`'s `k mod 4` split shipped first so the refusal can NAME the parity it refuses. **§9 grew three libcqops-side rows** (A: fold on controls first, promote before folding on the target; B: a control coinciding with an operand is a hard error, measured 0/4,918 in the corpus; C: D13) | M06 | **DONE** — 20 cases + 19 deaths green in both configurations, **195 ctest tests**; all ten Rule-7 kernel modules re-run L1/L2/L3/L5 under four regions and assert §9's tuple transform at every shipped width. **Two mutation batteries proposed 67 mutants; 56 landed, 51 killed in both configurations, 5 survived** — three of the five were real holes in the SUITE (D11's identity rows had no exemption case, the refusal MESSAGE was unread so `half_turn_row`'s parity was unpinned, and the driver never checked that a mode it calls quantum minted a WIRE) and are closed and re-verified by hand; the other two are genuinely equivalent and recorded at their sites on M09's `0xAA` precedent | 7 |
 | 21 | `test_unc.c` — `_unc` across every kernel; the PRD §10 asymmetry is **expected**, so forward and `_unc` counts are pinned **separately**. `_inv` for compare flags. `cqrt_free` of a dirty rail is a hard error | (thin, in M26) | **L3 green across all kernels** | 7 |
 
 Step 20's re-run is why the controlled axis is an emitter mode (§0.3): it costs one
-parameter in the kernel test driver, not twelve new suites.
+parameter in the kernel test driver, not twelve new suites. **Measured: the driver's own
+change is one setter, one push site in `call_kernel` and one region loop, and none of the
+71 driver call sites across twelve `.c` and eight `.inc` files moved.** What each suite adds
+is a sweep body and a `CQ_CASE`.
+
+**The controlled sweep is deliberately THINNER than the uncontrolled one, and it says so in
+its own output** (`bd mmv`). The promotion is a property of the emitter — per gate, and
+width-independent — so what the axis adds is its interaction with the §3 fold table, which
+is exhausted where the value cross product is: the four regions run the full cross at
+`W ≤ 5` (`W ≤ 4` for the barrel and `W ≤ 3` for K12, the two poles), and every shipped width
+is still covered by `cq_kd_check_promotion` at two kernel calls apiece. Measured on this box
+in Debug, kernel CPU across the eleven binaries went **171 s → 279 s (+63%)**, against the
+**~3.8×** a naive full re-run of every mode at every width was estimated to cost; the pole is
+still `test_kernel_shift_var`, 68 s → 95 s. Re-measure rather than quoting these (`bd 97s`).
 
 ### Phase D — shim, link, Grover
 

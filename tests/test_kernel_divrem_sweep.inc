@@ -115,3 +115,42 @@ CQ_TEST(k12_unsigned_sweep)
     dr_i128_case(&UDIV, 1);
     dr_i128_case(&UREM, 0);
 }
+
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+static void udivrem_narrow(void)
+{
+    /* W <= 3, not 5. K12 IS THE MOST EXPENSIVE THING THE SUITE RUNS — one udiv
+     * case is 2(34W^2+5W) gate emissions over 2(8W^2+4W-1) qubit acquisitions —
+     * and the promotion multiplies that by up to three. bd mmv's discipline is
+     * to budget it up front rather than after measuring, which is what this is.
+     * L1 is still EXHAUSTIVE over every (a,b) including b = 0 at these widths. */
+    for (int W = 1; W <= 3; W++) {
+        dr_sweep_small(&UDIV, W);
+        dr_sweep_small(&UREM, W);
+    }
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };
+    static const cq_kd_spec *const KS[] = { &UDIV, &UREM };
+
+    cq_kd_for_each_region("udiv/urem", udivrem_narrow);
+
+    for (size_t i = 0; i < sizeof KS / sizeof KS[0]; i++)
+        for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++)
+            reached += cq_kd_check_promotion(KS[i], widths[w]);
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}

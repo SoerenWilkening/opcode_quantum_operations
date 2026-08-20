@@ -14,9 +14,12 @@
 
 #include "support/kerneldrv.h"
 
+#include "controlled.h"
 #include "reg.h"
+#include "support/kernelctrl.h"
 #include "support/harness.h"
 #include "support/poolcheck.h"
+
 
 void cq_kd_default_shape(int W, cq_kd_shape *out)
 {
@@ -100,6 +103,12 @@ static void fx_close(fixture *f)
      * it is Rule 6 working, not a defect — cq_ctx_dispose returns nothing to
      * the pool, which is the intended Rule-6 safe leak (PRD §10, src/ctx.c). */
     cq_ctx_dispose(&f->ctx);
+
+    /* The control rail died with the context. Clearing the handle HERE rather
+     * than at each call site means a case that never minted one — a refused
+     * shape returns before cq_kd_ctrl_rail — cannot push the previous case's
+     * handle into a fresh table. */
+    cq_kd_ctrl_clear();
 }
 
 /* Rule 7's "leaving the sources unchanged", asserted rather than assumed.
@@ -147,11 +156,24 @@ static void check_source(const cq_ctx *ctx, int idx, int32_t h, cq_ref_w want,
     }
 }
 
+/* THE ONE PLACE THE AXIS ENTERS, and the granularity is deliberate: one push
+ * per kernel call, which is exactly what CQ_lang's ABI can express (a
+ * `cqrt_*_controlled` symbol prepends one i32 flag per template call; there is
+ * no push/pop bracket anywhere in it). Wrapping HERE rather than around
+ * cq_kd_case also controls the L3 uncompute pass, which is required — an
+ * uncontrolled uncompute after a controlled forward leaves dst at
+ * `ctrl · f(a,b)` and L3 goes red for the wrong reason. */
 static void call_kernel(const cq_kd_spec *k, cq_ctx *ctx, cq_bit *dst,
                         const cq_bit *const *src, const cq_kd_shape *sh)
 {
-    if (k->call) { k->call(ctx, dst, src, sh); return; }
-    k->kernel(ctx, dst, src[0], src[1], sh->w_dst);
+    const int32_t ch = cq_kd_ctrl_handle();
+
+    if (ch != CQ_REG_NONE) cq_ctrl_push(ctx, cq_reg_cbits(&ctx->regs, ch));
+
+    if (k->call) k->call(ctx, dst, src, sh);
+    else         k->kernel(ctx, dst, src[0], src[1], sh->w_dst);
+
+    if (ch != CQ_REG_NONE) cq_ctrl_pop(ctx);
 }
 
 static cq_ref_w call_ref(const cq_kd_spec *k, const cq_ref_w *v,
@@ -169,7 +191,7 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
     int32_t h[CQ_KD_MAX_SRC];
     const cq_bit *src[CQ_KD_MAX_SRC];
     cq_ref_w v[CQ_KD_MAX_SRC], qm[CQ_KD_MAX_SRC];
-    int32_t hs[CQ_KD_MAX_SRC + 1];
+    int32_t hs[CQ_KD_MAX_SRC + 2];   /* sources, dst, and the control rail */
     int classical = 1;
 
     /* Before fx_open, so a refused shape allocates nothing to leak. */
@@ -201,11 +223,23 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
     int32_t hd = cq_reg_alloc_zero(&f.ctx.regs, (uint32_t)sh.w_dst);
     cq_bit *dst = cq_reg_bits(&f.ctx.regs, hd);
 
+    /* The control rail is minted LAST, after dst, so that a controlled run and
+     * an uncontrolled one give the operands and dst the same qubit indices. */
+    cq_kd_ctrl_rail(&f.ctx);
+
     for (int i = 0; i < sh.n_src; i++) {
         src[i] = cq_reg_cbits(&f.ctx.regs, h[i]);
         hs[i] = h[i];
     }
     hs[sh.n_src] = hd;
+
+    /* L2 counts the control rail among the named registers when there is one:
+     * its qubit is owned, not leaked. `n_named` is the count BEFORE the free;
+     * afterwards dst is a tombstone and drops out. */
+    const int32_t ch = cq_kd_ctrl_handle();
+    const int has_ctrl = (ch != CQ_REG_NONE);
+    if (has_ctrl) hs[sh.n_src + 1] = ch;
+    const uint32_t n_named = (uint32_t)sh.n_src + 1u + (has_ctrl ? 1u : 0u);
 
     /* Everything up to here is scaffolding — materialising an operand bit that
      * held 1 emits an X. The counter is zeroed so L5 measures the KERNEL. */
@@ -214,14 +248,31 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
 
     call_kernel(k, &f.ctx, dst, src, &sh);
 
-    /* ---- L1: the value, against plain C. --------------------------------- */
-    cq_ref_w want = call_ref(k, v, &sh);
+    /* ---- L1: the value, against plain C. ---------------------------------
+     *
+     * BENNETT'S `controlled()` CONTRACT IS THE ORACLE UNDER A REGION:
+     * `(ctrl, x, 0) -> (ctrl, x, ctrl ? f(x) : 0)`. dst is minted all-ZERO, so
+     * the two off rows want plain zero and the two on rows want the same
+     * `f(a,b)` the uncontrolled call does. There is no simulator anywhere
+     * (Rule 13) and none is needed: the shadow is EXACT on a rail no general Ry
+     * has touched, so a materialised control with a determinate shadow makes
+     * the answer ordinary plain C.
+     *
+     * THE `ctrl = 0` ROWS ARE THE LOAD-BEARING ONES. They are the only thing in
+     * this project that can see a region that RAN when it should not have — and
+     * at the all-classical operand mask they are the only thing that can see it
+     * at all, because that is the only mask on which a kernel writes `dst`
+     * through cq_emit_x's constant row. */
+    const cq_kd_ctrl mode = cq_kd_get_ctrl();
+    const int ctrl_off = (mode == CQ_KD_CTRL_ZERO || mode == CQ_KD_CTRL_Q0);
+    cq_ref_w want = ctrl_off ? cq_ref_w_zero() : call_ref(k, v, &sh);
     cq_ref_w got  = cq_pc_value_w(&f.ctx, hd);
 
     if (!cq_ref_w_eq(got, want))
         cq_h_fail(__FILE__, __LINE__,
-                  "L1 %s W=%d [%s] a=0x%llx%016llx: dst = 0x%llx%016llx, want "
-                  "0x%llx%016llx", k->name, W, m->name,
+                  "L1 %s W=%d [%s] %s a=0x%llx%016llx: dst = 0x%llx%016llx, "
+                  "want 0x%llx%016llx", k->name, W, m->name,
+                  cq_kd_ctrl_name(cq_kd_get_ctrl()),
                   (unsigned long long)v[0].hi, (unsigned long long)v[0].lo,
                   (unsigned long long)got.hi,  (unsigned long long)got.lo,
                   (unsigned long long)want.hi, (unsigned long long)want.lo);
@@ -230,28 +281,90 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
         check_source(&f.ctx, i, h[i], v[i], qm[i], sh.w[i], k->name, KINDS_TOO);
 
     /* ---- L2: no qubit is live that an operand or dst does not own. ------- */
-    if (!cq_pc_live_is_exactly(&f.ctx, hs, (uint32_t)sh.n_src + 1u))
-        cq_h_fail(__FILE__, __LINE__, "L2 %s W=%d [%s]: after the FORWARD call",
-                  k->name, W, m->name);
+    if (!cq_pc_live_is_exactly(&f.ctx, hs, n_named))
+        cq_h_fail(__FILE__, __LINE__, "L2 %s W=%d [%s] %s: after the FORWARD "
+                  "call — and the promotion's shared ancilla must be back on "
+                  "the free list at cq_ctrl_pop", k->name, W, m->name,
+                  cq_kd_ctrl_name(cq_kd_get_ctrl()));
 
-    /* ---- L5: fully classical costs nothing at all. ----------------------- */
+    /* ---- L5: fully classical costs nothing at all — UNDER A CLASSICAL
+     *          CONTROL, and the qualifier is PRD §9 row 0's whole content.
+     *
+     * With no region, or a CQ_BIT_ZERO control (skipped), or a CQ_BIT_ONE one
+     * (verbatim), L5 is exactly what it was before Step 20: zero gates and zero
+     * qubits. A classical control is a DECISION, not a circuit.
+     *
+     * UNDER A QUANTUM CONTROL L5's ZERO IS NOT MERELY UNTRUE, IT IS WRONG TO
+     * WANT. The kernel's classical path writes `dst` through cq_emit_x, whose
+     * constant row rewrites the bit in place — unconditionally. Inside a
+     * promoted region that would run on BOTH branches, so M06 intercepts the
+     * row and the bit must become a wire driven by a real CX. The cost is
+     * therefore exactly the `dst` bits the classical path touched, in qubits,
+     * and it is a MEASUREMENT of that rather than a closed form, because how
+     * many times a kernel writes a lane is the kernel's business (K1 writes
+     * every lane twice; K6's fold writes only the set ones).
+     *
+     * The VALUE half is not weakened at all: L1 above still demands 0 at Q0 and
+     * `f(a,b)` at Q1, which is the assertion the whole row exists for. */
     if (classical) {
         cq_pc_snap now = cq_pc_take(&f.ctx);
+        const int quantum_ctrl = (mode == CQ_KD_CTRL_Q0 || mode == CQ_KD_CTRL_Q1);
 
-        if (cq_count_total(&f.cnt) != 0u)
-            cq_h_fail(__FILE__, __LINE__,
-                      "L5 %s W=%d: all-classical operands emitted %llu gates "
-                      "(x %llu, cx %llu, ccx %llu)", k->name, W,
-                      (unsigned long long)cq_count_total(&f.cnt),
-                      (unsigned long long)f.cnt.x, (unsigned long long)f.cnt.cx,
-                      (unsigned long long)f.cnt.ccx);
+        if (!quantum_ctrl) {
+            if (cq_count_total(&f.cnt) != 0u)
+                cq_h_fail(__FILE__, __LINE__,
+                          "L5 %s W=%d %s: all-classical operands emitted %llu "
+                          "gates (x %llu, cx %llu, ccx %llu)", k->name, W,
+                          cq_kd_ctrl_name(cq_kd_get_ctrl()),
+                          (unsigned long long)cq_count_total(&f.cnt),
+                          (unsigned long long)f.cnt.x,
+                          (unsigned long long)f.cnt.cx,
+                          (unsigned long long)f.cnt.ccx);
 
-        if (now.minted != before.minted || now.live != before.live)
-            cq_h_fail(__FILE__, __LINE__,
-                      "L5 %s W=%d: all-classical operands allocated qubits "
-                      "(live %u -> %u, minted %u -> %u); I4 says an "
-                      "all-constant register owns zero", k->name, W,
-                      before.live, now.live, before.minted, now.minted);
+            if (now.minted != before.minted || now.live != before.live)
+                cq_h_fail(__FILE__, __LINE__,
+                          "L5 %s W=%d %s: all-classical operands allocated "
+                          "qubits (live %u -> %u, minted %u -> %u); I4 says an "
+                          "all-constant register owns zero", k->name, W,
+                          cq_kd_ctrl_name(cq_kd_get_ctrl()),
+                          before.live, now.live, before.minted, now.minted);
+        } else {
+            uint32_t touched = 0u;
+            for (int i = 0; i < sh.w_dst; i++)
+                if (cq_bit_is_qubit(dst[i])) touched++;
+
+            /* A DELIBERATELY-EQUIVALENT SURVIVOR, RECORDED RATHER THAN
+             * DELETED — the precedent is M09's Debug `0xAA` scratch poison.
+             * Replacing this clause with `if (0)` survives the whole suite in
+             * both configurations, and it is genuinely equivalent rather than
+             * untested: it is a THEOREM of the L2 set check twenty lines above.
+             * At an all-classical mask every operand owns zero qubits (I4) and
+             * check_source has just asserted their KINDS unchanged, dst owns
+             * exactly `touched` by the definition of touched, and the control
+             * rail owns whatever it owned at `before` — so L2's "live is
+             * exactly the named registers' union" forces this delta.
+             *
+             * IT STAYS BECAUSE IT NAMES THE ROW. L2 fails with "a leaked
+             * ancilla"; this fails with PRD §9's own cost claim and the kernel,
+             * width and region that broke it. Do not "fix" the survivor by
+             * deleting the line — the same argument would delete every
+             * assertion that is implied by a stronger one somewhere else. */
+            if (now.live - before.live != touched)
+                cq_h_fail(__FILE__, __LINE__,
+                          "L5 %s W=%d %s: live grew by %u but %u dst bits "
+                          "became wires — a promoted classical fold costs "
+                          "exactly the lanes it writes, and nothing else",
+                          k->name, W, cq_kd_ctrl_name(cq_kd_get_ctrl()),
+                          now.live - before.live, touched);
+
+            if ((cq_count_total(&f.cnt) == 0u) != (touched == 0u))
+                cq_h_fail(__FILE__, __LINE__,
+                          "L5 %s W=%d %s: %llu gates but %u dst wires — a lane "
+                          "that became a wire was driven by a gate, and one "
+                          "that did not was not", k->name, W,
+                          cq_kd_ctrl_name(cq_kd_get_ctrl()),
+                          (unsigned long long)cq_count_total(&f.cnt), touched);
+        }
     }
 
     /* ---- L3: uncompute IS the same kernel, then the free. ---------------- */
@@ -274,7 +387,7 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
      * SOURCE nets to zero: `live` matches, every value is right, and the run is
      * green — while the source register names an index on the free list and an
      * unowned ancilla is live. I2 and I3 are both lies at that point. */
-    if (!cq_pc_live_is_exactly(&f.ctx, hs, (uint32_t)sh.n_src + 1u))
+    if (!cq_pc_live_is_exactly(&f.ctx, hs, n_named))
         cq_h_fail(__FILE__, __LINE__, "L2 %s W=%d [%s]: after the UNCOMPUTE",
                   k->name, W, m->name);
 
@@ -296,7 +409,10 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
         cq_h_fail(__FILE__, __LINE__, "L3 %s W=%d [%s]: see above",
                   k->name, W, m->name);
 
-    if (!cq_pc_live_is_exactly(&f.ctx, hs, (uint32_t)sh.n_src))
+    /* dst is a tombstone now, so it drops out of the named set; everything
+     * else — including the control rail — must still be live. */
+    hs[sh.n_src] = has_ctrl ? ch : CQ_REG_NONE;
+    if (!cq_pc_live_is_exactly(&f.ctx, hs, n_named - 1u))
         cq_h_fail(__FILE__, __LINE__, "L2 %s W=%d [%s]: after the FREE",
                   k->name, W, m->name);
 
@@ -340,6 +456,7 @@ static int32_t measure_setup(fixture *f, const cq_kd_spec *k, int W,
 
     int32_t hd = cq_reg_alloc_zero(&f->ctx.regs, (uint32_t)sh->w_dst);
     *dst = cq_reg_bits(&f->ctx.regs, hd);
+    cq_kd_ctrl_rail(&f->ctx);
     for (int i = 0; i < sh->n_src; i++)
         src[i] = cq_reg_cbits(&f->ctx.regs, h[i]);
 
@@ -393,3 +510,4 @@ uint32_t cq_kd_peak(const cq_kd_spec *k, int W, uint32_t *peak_delta)
     fx_close(&f);
     return owned;
 }
+

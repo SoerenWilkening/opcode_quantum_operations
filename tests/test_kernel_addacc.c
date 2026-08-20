@@ -37,6 +37,17 @@
  *       K11.md §2b's R8 trace). It is refused, loudly, and the refusals are
  *       tests/test_kernel_addacc_death.c.
  *
+ *   §9  HAS NO CASE HERE EITHER, and that is Rule 9 rather than a gap. The
+ *       controlled axis is an EMITTER MODE: K8 emits through cq_emit_x/cx/ccx
+ *       like everything else, so every gate cq_addacc_step produces is promoted
+ *       by M06 without this module knowing the axis exists — and there is no
+ *       `_controlled` variant of a step function, which plan §0.4 forbids by
+ *       name. What would be needed is a case exercising K8's gates INSIDE a
+ *       region, and there already is one: K11's `controlled` case sweeps the
+ *       multiplier under all four of §9's regions, and W of the accumulates in
+ *       every one of those cases are K8's. Adding a bespoke region case here
+ *       would test M06 a second time and K8 not at all.
+ *
  * THE MASK DIMENSION IS GONE FOR THE SAME REASON, and it is replaced rather
  * than dropped. L1 elsewhere crosses values with bit-kind mask PAIRS because
  * the §3 fold table branches on kind. Here exactly one mask is legal, so the

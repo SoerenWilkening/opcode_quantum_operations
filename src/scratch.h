@@ -4,10 +4,13 @@
  * materialise, and SHIPS NO RELEASE A KERNEL CAN CALL. M09's `cq_sandwich`
  * owns the scratch qubits end to end: it pre-materialises the region at step 0
  * (I6(b)) and releases it in its own epilogue. That split is not tidiness —
- * PRD §10 makes `CQ_ZERO_BY_PALINDROME` the sole `proven_zero` constant in
- * `src/`, resting on three premises (one gate per step, I6(a), I6(b)), and
- * only the code that runs the construction can assert them. An M08 release
- * would be a second stamping site with no premises at all.
+ * PRD §10 lets a `proven_zero` constant exist only where the code that RUNS a
+ * construction can assert that construction's premises. `CQ_ZERO_BY_PALINDROME`
+ * is M09's, resting on three (one involution per step, I6(a), I6(b)); Step 20
+ * added M06's `CQ_ZERO_BY_CTRL_UNCOMPUTE` for §9's shared ancilla, resting on
+ * three of its own. There are two, and there is no third. An M08 release would
+ * be a stamping site with no premises at all — which is the point of the rule,
+ * not an exception to it.
  *
  * NO cq_ctx ANYWHERE IN THIS HEADER, and that is the enforcement rather than
  * the convention. With no pool in reach M08 CANNOT allocate a qubit, so "a

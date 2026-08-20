@@ -51,6 +51,37 @@ CQ_TEST(k1_xor_sweep) { cq_kd_sweep(&K1); }
 CQ_TEST(k2_and_sweep) { cq_kd_sweep(&K2); }
 CQ_TEST(k3_or_sweep)  { cq_kd_sweep(&K3); }
 
+/* Step 20 — the same four levels under PRD §9's four regions, plus the
+ * promotion identity at every shipped width. A body and two calls, no new
+ * suite: that is what "the controlled axis is an emitter mode" buys
+ * (plan §0.3). */
+static const cq_kd_spec *const KS[] = { &K1, &K2, &K3 };
+
+static void bitwise_narrow(void)
+{
+    for (size_t i = 0; i < sizeof KS / sizeof KS[0]; i++)
+        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(KS[i], W, 1);
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64 };
+
+    cq_kd_for_each_region("bitwise", bitwise_narrow);
+
+    for (size_t i = 0; i < sizeof KS / sizeof KS[0]; i++)
+        for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++)
+            reached += cq_kd_check_promotion(KS[i], widths[w]);
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}
+
 /* ---- L4: the goldens, cross-checked against the Bennett formula. -------- */
 
 /* The closed forms, read off the three Julia bodies (K01.md §3, K02.md §3,
@@ -403,6 +434,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(k1_xor_sweep),
     CQ_CASE(k2_and_sweep),
     CQ_CASE(k3_or_sweep),
+    CQ_CASE(controlled),
     CQ_CASE(l4_goldens),
     CQ_CASE(l5_or_lane_with_a_constant_one),
     CQ_CASE(l5_or_lane_with_a_constant_zero),

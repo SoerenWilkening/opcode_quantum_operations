@@ -867,7 +867,8 @@ row 0.  ctrl is CQ_BIT_ZERO  → the whole region is skipped: 0 gates, 0 qubits
 
 Ry(θ) on qubit t →  Ry(θ/2)ₜ ; CX(ctrl,t) ; Ry(−θ/2)ₜ ; CX(ctrl,t)      (exact)
 Rz(φ) on qubit t →  Rz(φ/2)ₜ ; CX(ctrl,t) ; Rz(−φ/2)ₜ ; CX(ctrl,t)      (exact)
-a §7 fold row    →  HARD ERROR in v1 — see D11
+a §7 fold row    →  HARD ERROR in v1 — see D11.  BUILT at Step 20, in M06, at
+                    one greppable site (cq_ctrl_refuse_fold_row), naming the row
 ```
 
 **Row 0 is what keeps every zero-cost claim in this document true**, and it is the §3 fold
@@ -878,6 +879,50 @@ existence of this axis untouched; only a genuinely quantum control costs anythin
 The two rotation rows are exact rather than up-to-phase — at `ctrl = 0` the half-rotations
 cancel and at `ctrl = 1` the identity `X·R(α)·X = R(−α)` makes them add — and they stay
 inside §8's frozen six entries, so **the controlled axis needs no seventh entry either**.
+
+### Three more rows this side owes, added when M06 was built (Step 20)
+
+`controlled.jl` cannot supply any of these either, and unlike the rotations it is not
+because Bennett is classical — it is because upstream's promotion is defined only for a
+control wire *disjoint from the inner circuit*, and ours is an ordinary data bit.
+`controlled()` allocates `ctrl_wire = n_wires + 1` and asserts every inner gate stays
+within `1:n_wires`, so the question below simply cannot arise there.
+
+```
+row A.  FOLD ON CONTROLS FIRST; PROMOTE BEFORE FOLDING ON THE TARGET
+row B.  the control wire coincides with an operand of the gate it promotes
+            → HARD ERROR in v1, both configurations
+row C.  cq_materialise's X is NOT promoted
+```
+
+**Row A is the whole correctness of the emitter and it is not symmetric.** A §3 fold that
+reads a gate's **control** is a *semantic* simplification and survives any control:
+`CX(ZERO, t)` is the identity, and controlled-identity is the identity, so folding first
+and never promoting is right — promoting first would emit `CCX(w, ZERO, t)` for a gate that
+is not there. A fold that reads a gate's **target** is a *representation* choice and is
+invalid under a quantum control: `cq_emit_x` on a constant target rewrites the constant in
+place for zero gates, **unconditionally**, and inside a promoted region that runs on both
+branches. Getting this one backwards is a controlled region silently made unconditional,
+and it is **invisible at the all-quantum operand mask** — the only mask on which a kernel
+reaches that row is the all-classical one, which is L5's. `cq_kernel_xor` at an ordinary
+mixed mask is the live witness that a `CQ_BIT_ONE` target arises mid-kernel at all: a
+classical ONE source bit in control position folds `dst` from ZERO to ONE for zero gates.
+
+**Row B is well defined on one half and undefined on the other, and v1 refuses both.**
+Coincidence with the **target** requests a non-injective map — `if (q) q ^= 1` sends both
+|0⟩ and |1⟩ to |0⟩ — and in the Toffoli case additionally leaves the shared ancilla dirty,
+because gate 3 reads a control gate 2 has already flipped. There is no correct spelling.
+Coincidence with an inner **control** is by contrast exactly `q ∧ q = q`, so the right
+answer is to drop the duplicate and emit the gate one promotion level down:
+`CX(c,t)` under `ctrl == c` is `CX(c,t)` itself, and `CCX(c1,c2,t)` under `ctrl == c1` is
+`CCX(c1,c2,t)` uncontrolled — correct *and* ancilla-clean. **v1 refuses it anyway.**
+Measured over all 239 CQ_lang goldens: in every one of the 4,918 `cqrt_*_controlled` calls
+the control handle is distinct from every other operand, so the collapse would be untested
+behaviour sitting in the tree, and a hard error naming this row makes a re-pin that starts
+emitting it loud. The arithmetic is recorded here so enabling it later is an implementation
+rather than a re-derivation — the same posture D11 takes for the phases.
+
+**Row C is `bd skh`, and it is forced rather than chosen — see D13.**
 
 ---
 
@@ -993,9 +1038,10 @@ inside §8's frozen six entries, so **the controlled axis needs no seventh entry
   > superposition — the one direction the shadow discipline forbids. That alone disqualifies
   > the `_unc` epilogue as a stamper, before any counting argument.
   >
-  > **Who may stamp: one named literal, in M09.** The sandwich driver owns the scratch
+  > **Who may stamp: one named literal per CONSTRUCTION, and until Step 20 there was
+  > exactly one — M09's.** The sandwich driver owns the scratch
   > qubits end to end — it materialises the region at step 0 (I6(b)) and releases it in its
-  > own epilogue, passing `CQ_ZERO_BY_PALINDROME`. That literal is the **sole** `proven_zero`
+  > own epilogue, passing `CQ_ZERO_BY_PALINDROME`. That literal is the **first** `proven_zero`
   > constant in `src/`, and it is irreducible: Rule 13 forbids the library holding the gate
   > stream that would let it *compute* the answer, so "a sandwich cleans its own scratch" is
   > asserted exactly once, by the code that owns the construction. **It rests on three
@@ -1003,11 +1049,40 @@ inside §8's frozen six entries, so **the controlled axis needs no seventh entry
   > it a laundering site.** Not the `_unc` epilogue, not M07, not M08 (which ships no release
   > a kernel can call), and not a kernel — there is no API through which one could.
   >
+  > **STEP 20 ADDED A SECOND ONE, AND AMENDED TWO OF THOSE PREMISES.**
+  > `CQ_ZERO_BY_CTRL_UNCOMPUTE`, in M06, covers §9's shared Toffoli ancilla and the nested
+  > AND flag. It rests on three premises of its own: each wire is targeted ONLY by an
+  > identical PAIR of Toffolis (gates 1 and 3 of one promoted block, or the AND at push and
+  > its twin at pop) and a `CCX` is its own inverse; nothing else can target either, since
+  > they live in no register and no scratch region and `src/controlled.c` is their only
+  > writer; and they come off the pool, so they are born |0⟩ by I3.
+  >
+  > **It may NOT be `cq_shadow_known_zero`, and the trap is that the wrong choice passes.**
+  > The shadow's `CCX` rule is `t.unknown |= a.unknown | b.unknown` with no clearing path,
+  > so a POISONED control wire leaves the ancilla at `{value 0, unknown 1}` and a shadow
+  > check would refuse to release a qubit that is provably |0⟩ by construction — in both
+  > configurations. On the whole surface Step 20's own gate exercises, every wire is
+  > determinate (no kernel suite rotates), so the unsound evidence agrees with the sound one
+  > and the abort waits for the corpus. `tests/test_controlled_region.inc` drives a poisoned
+  > wire on purpose for exactly that reason.
+  >
+  > **The two amended premises.** (1) *One gate per step* becomes **one INVOLUTION per
+  > step**: a promoted Toffoli is three gates, and the block `A·B·A` is a palindrome of
+  > self-inverse gates, so `(ABA)² = I` and the driver's replay-at-the-same-index still
+  > cancels — and the recorded stream stays a palindrome, since a palindromic block reversed
+  > is itself. (2) *I6(a), every compute-half gate target is a scratch bit*, becomes **every
+  > gate target A KERNEL NAMES is a scratch bit**: the promotion introduces one target that
+  > is not, M06's own ancilla, and it is sound there because the pair of Toffolis that touch
+  > it is self-inverse within one step. `cq_emit_cx_phys`/`cq_emit_ccx_phys` therefore do not
+  > re-run `check_target`, which the public entry points have already done on the caller's
+  > target. Widening the extent to cover the ancilla instead would silently disarm I6(a) for
+  > the whole compute half — the same wrong fix `sandwich.h` already records for the copyout.
+  >
   > **Verified, never recomputed.** Recomputing the expected value is a simulator, which is
   > forbidden outright. Instead: `cq_shadow_retire` hard-errors in **both** configurations if
   > the entry is determinate and non-zero — a complete detector of a non-cancelling sandwich
-  > across the whole rotation-free kernel surface (Steps 10–17), because `Ry`/`Rz` are the
-  > only producers of `unknown`. It is **inert on the L6 corpus**, where nearly every rail is
+  > across the whole rotation-free kernel surface (Steps 10–17), because a general `Ry` is
+  > the only producer of `unknown` (D12). It is **inert on the L6 corpus**, where nearly every rail is
   > rotation-tainted, so never report an L6 run as evidence that the certificate held. The
   > ordered-stream palindrome check in `mock_sink` is the only thing with teeth on the
   > poisoned surface, and it lives in `tests/`, where Rule 13 permits the recording.
@@ -1292,8 +1367,9 @@ and diffs.
 | **D9** | **K12's scratch scheme, and the three kernel-shape choices that ride with it** | **Resolved 2026-08-16 at Step 0 (bd `ckd.13`, and the M19/M20 half of bd `4tt`) and SHIPPED as M19/M20 the same day. Five parts, all measured — see the note below.** **(a) FLAT** scratch: one sandwich for the whole kernel, fresh per-iteration scratch, no per-iteration uncompute. **(b)** `fits` is read straight off the comparator carry-out `ucar[t][W]`, not materialised as `not1(ult(…))` — which is what **M16 already ships**. **(c)** the quotient bit is one `CX(fits → q[i])`, not Bennett's `or`+`mux`. **(d)** the initial remainder's upper `W−1` bits are a **pre-materialised scratch register**, so every iteration costs the same. **(e)** M14 and M16 **export their compute halves** as indexed step blocks and M19 composes them with M17's — K12 re-transcribes nothing (plan §0.4). Pinned: `udiv` `34W²+5W` gates over `8W²+4W−1` qubits — **2216 / 543 at i8, 557 696 / 131 583 at i128** |
 | **D10** | **What §7's angle tolerance is relative TO** | **Resolved 2026-08-17 at Step 18 (bd `dl7`) and SHIPPED as M21 the same day. The window is `tol · π` — ABSOLUTE, a fraction of the lattice modulus, not of θ — plus one refusal, `\|θ\| · 1.6e-16 ≤ tol·π`, and a cap `0 ≤ tol ≤ 1e-3`. §7 said only "1e-12 relative" and left the scale unstated; the natural reading, relative to `\|θ\|`, was built first and is a MISCOMPILE. See the note below** |
 | **D7b** | **Two sources alias each other** — `mul(h, h)` | **Measured the same way: 599 occurrences, of which 10 are on v1's integer surface.** CQ_lang ships a fixture named for it — `tests/e2e/slice_select_rail_alias_cond.expected.log:4` is `cq_template_icmp_slt_i32(h0, h0) -> h1`, and `:31` is `cq_template_mul_i32(h10, h10) -> h11`; also `spec_newcand_qsq_caller:13,16`, `spec_replan_qpow_caller:13,18`, `slice_i128_mulhi:4`. **This is LEGAL and must NOT abort.** The remedy is now required rather than contingent: a defensive `cqrt_copy` of one aliased source at the **M26 handle boundary** (Step 23), *before* Step 24 runs — one place, not twelve. M07 exposes the predicate; M26 acts on it |
-| **D11** | **What §7's zero-gate and global-phase rows do inside a §9 controlled region** | **Resolved 2026-08-17 at Step 19 (bd `pf4`). A CONSTANT control folds the region away (§9 row 0), so §7 applies verbatim and Rule 15's zero-cost claim is untouched. A QUANTUM control makes every folding row wrong — the four zero-gate cells by exactly `Rz(α)` on the control wire, and the half-turn's qubit cell, which emits but realises the row only up to a phase — per-bit, with α given below — and `v1 REFUSES rather than emitting it`: M06 hard-errors at Step 20 when a §7 fold row is reached under a quantum control. The arithmetic is recorded here so Step 20 implements rather than re-derives. See the note below** |
+| **D11** | **What §7's zero-gate and global-phase rows do inside a §9 controlled region** | **Resolved 2026-08-17 at Step 19 (bd `pf4`) and BUILT at Step 20 in M06 — the refusal is one function, `cq_ctrl_refuse_fold_row`, and all five folding cells call it. A CONSTANT control folds the region away (§9 row 0), so §7 applies verbatim and Rule 15's zero-cost claim is untouched. A QUANTUM control makes every folding row wrong — the four zero-gate cells by exactly `Rz(α)` on the control wire, and the half-turn's qubit cell, which emits but realises the row only up to a phase — per-bit, with α given below — and `v1 REFUSES rather than emitting it`: M06 hard-errors at Step 20 when a §7 fold row is reached under a quantum control. The arithmetic is recorded here so Step 20 implements rather than re-derives. See the note below** |
 | **D12** | **Which §7 rows poison the shadow** | **Resolved 2026-08-17 at Step 19 and SHIPPED as M22 the same day. ONLY `Ry` at an angle off the π-lattice poisons. A diagonal gate — every `Rz`, and the `Z` of the θ ≡ π row — cannot move a computational-basis value, so a determinate entry stays determinate and `cq_shadow_known_zero` remains EXACT rather than becoming conservative. `cq_shadow_rotate` is unchanged; what this decides is which rows call it. See the note below** |
+| **D13** | **Whether `cq_materialise`'s `X` is promoted inside a §9 region** (`bd skh`, deferred at Step 6) | **Resolved 2026-08-20 at Step 20: NO — materialisation is UNPROMOTED, and it is forced rather than chosen. M06 hooks `cq_emit_x/cx/ccx` and nothing else, so `cq_materialise`'s deliberate bypass to the sink is already the correct behaviour and Step 20 changed no code — only the comment, from a deferral into the decision. D11's constant column is stated to be contingent on this answer. See the note below** |
 
 > ### D10 — the window is absolute, and the relative reading was built and measured first
 >
@@ -1607,6 +1683,54 @@ and diffs.
 > at `cqrt_free`. A **seventh vtable entry** (`sink.z` / `sink.phase`) was rejected outright:
 > it forks a frozen ABI for something `Rz(π)` already expresses (`lk0`).
 
+> ### D13 — materialisation changes a bit's ENCODING, and an encoding is not conditional
+>
+> `cq_materialise` emits its `X` straight to the sink rather than through `cq_emit_x`
+> (`src/emit.c`), which was recorded at Step 6 as the *conservative* choice and explicitly
+> not a settled one: once M06 makes `cq_emit_x` promote, routing through it would emit
+> `CX(ctrl, fresh)` instead of `X(fresh)` and leave the new wire entangled with the control.
+> `bd skh` framed that as a genuine trade — "the whole routine should be a no-op when the
+> control is clear" against "materialisation is a pure representation change".
+>
+> **It is not a trade. The algebra decides it, and the bead's own framing of the tension is
+> false.** Let `b` be the rail's classical value before the region, `c` an inner control and
+> `k` the control branch. The required semantics is `b ⊕ (k ∧ c)`.
+>
+> | | fresh wire holds | after the promoted `CX → CCX` |
+> |---|---|---|
+> | **unpromoted** | `b` | `b ⊕ (k ∧ c)` — exactly the requirement |
+> | promoted | `k ∧ b` | `k ∧ (b ⊕ c)` |
+>
+> The two agree at `b = 0` everywhere and at `b = 1, k = 1`. They disagree in exactly one
+> cell — **`b = 1, k = 0`** — where the promoted choice yields 0 and the rail must still
+> read 1. That is the `ctrl = 0` branch, which is the branch row 0 exists to leave alone.
+>
+> **"A side effect when the control is clear" is the wrong reading of what changes.**
+> Unpromoted materialisation changes the rail's REPRESENTATION — constant → qubit, so the
+> rail now owns a qubit it did not (I4) — while leaving its VALUE identical on both
+> branches. The promoted choice is the one with a state-visible effect, and it is a value
+> corruption. The "no-op when clear" premise is delivered at a different layer and only for
+> a classical control: row 0 skips the whole region for a `CQ_BIT_ZERO` one, so nothing is
+> materialised at all. For a genuinely quantum control there is no clear-control *case*,
+> only a branch — and on that branch the rail must still read its old value, which means it
+> must become a wire, because `k` is not known at emit time. Corroboration from the frozen
+> ABI: `cqrt_alloc` has no `_controlled` axis at any width, so "allocate under control" is
+> not an operation CQ_lang can ask for.
+>
+> **It has a shipped witness, so it is not hypothetical.**
+> `slice_control_cond_onward_phase.expected.log` (and `slice_control_switch_datamux`) copy a
+> rail born `10` into one born `3` under a quantum control, and `10 & 3` has bit 1 set in
+> **both** — a constant-ONE target materialised inside a controlled region.
+>
+> **What can and cannot falsify it.** Not a gate count: both choices emit exactly two gates
+> and differ only in the KIND of the first. Not the L4 goldens: they are pinned at the
+> all-quantum mask, where `dst` is minted all-ZERO and no materialising `X` occurs at all.
+> Not "every Phase-B kernel green under `cq_ctrl_push`" *at the all-quantum mask*, for the
+> same reason. The fixture that decides it is a **constant-ONE target under a control whose
+> shadow is ZERO**, asserted on the resulting VALUE — at ctrl shadow 1 the two choices
+> agree. `tests/test_controlled_region.inc:materialisation_is_not_promoted` is that fixture,
+> and the driver's `CQ_KD_CTRL_Q0` row reaches the same cell through every kernel.
+>
 > ### D12 — a diagonal rotation does not poison, and that keeps the shadow exact
 >
 > `cq_shadow_rotate` poisons unconditionally and is the **only** producer of `unknown`

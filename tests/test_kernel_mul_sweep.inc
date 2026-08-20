@@ -184,3 +184,37 @@ CQ_TEST(k11_mul_sweep)
     sweep_wide(&MUL, 64);
     sweep_wide(&MUL, 128);
 }
+
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+static void mul_narrow(void)
+{
+    for (int W = 1; W <= 5; W++) sweep_small(W);
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    /* K11 IS THE FIRST COMPOSITE UNDER THE AXIS: its inner construction is
+     * M15's whole accumulator, and K8 is not a Rule 7 kernel and has no
+     * controlled path of its own. It does not need one — the axis is an emitter
+     * mode, so every gate cq_addacc_step emits is promoted exactly as K11's own
+     * are, and this case is where that composition is actually exercised. */
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };
+
+    cq_kd_for_each_region("mul", mul_narrow);
+
+    for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++)
+        reached += cq_kd_check_promotion(&MUL, widths[w]);
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}

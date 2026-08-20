@@ -206,3 +206,41 @@ static void sweep_dir(int dir)
 CQ_TEST(k10_barrel_shl_sweep)  { sweep_dir(DIR_SHL);  }
 CQ_TEST(k10_barrel_lshr_sweep) { sweep_dir(DIR_LSHR); }
 CQ_TEST(k10_barrel_ashr_sweep) { sweep_dir(DIR_ASHR); }
+
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+static void barrel_narrow(void)
+{
+    /* THE BARREL IS THE LONGEST POLE IN THE SUITE UNCONTROLLED (bd 97s), so the
+     * controlled body is the narrowest in the project: W <= 4, all three
+     * directions. A barrel case is ~10WL gates over a W(3L+1)-qubit region and
+     * the promotion multiplies that by up to three; four regions at the full
+     * ladder would move the whole Debug run on its own. */
+    for (int dir = 0; dir < N_DIRS; dir++)
+        for (int W = 1; W <= 4; W++) sweep_small(&SPEC[dir], W);
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };
+
+    cq_kd_for_each_region("barrel", barrel_narrow);
+
+    for (int dir = 0; dir < N_DIRS; dir++)
+        for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++) {
+            if (dir == DIR_ASHR && widths[w] == 80) continue;
+            reached += cq_kd_check_promotion(&SPEC[dir], widths[w]);
+        }
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}

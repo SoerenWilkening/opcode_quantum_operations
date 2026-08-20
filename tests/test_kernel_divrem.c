@@ -500,5 +500,6 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(r9_all_classical_operands_never_enter_the_sandwich),
     CQ_CASE(the_classical_fold_writes_real_gates_into_a_quantum_dst),
     CQ_CASE(l1s_oracle_agrees_with_the_hardware_divider),
-    CQ_CASE(k12_unsigned_sweep)
+    CQ_CASE(k12_unsigned_sweep),
+    CQ_CASE(controlled)
 )

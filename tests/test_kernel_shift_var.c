@@ -321,6 +321,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(k10_barrel_shl_sweep),
     CQ_CASE(k10_barrel_lshr_sweep),
     CQ_CASE(k10_barrel_ashr_sweep),
+    CQ_CASE(controlled),
     CQ_CASE(l4_goldens),
     CQ_CASE(the_w8_column_is_k10s_table_corrected_for_i6b),
     CQ_CASE(the_stream_is_a_palindrome_around_the_copyout),

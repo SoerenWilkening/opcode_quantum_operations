@@ -16,6 +16,7 @@
 #include "rotate.h"
 
 #include "angle.h"
+#include "controlled.h"
 #include "emit.h"
 #include "reg.h"
 #include "shadow.h"
@@ -42,18 +43,62 @@ static void refuse_inside_a_sandwich(const cq_ctx *ctx, const char *op)
                       "so the reverse replay cannot cancel (Rule 4, I6)", op);
 }
 
+/* --- PRD §15 D11, named row by row ---------------------------------------- */
+
+/* THE STRING IS THE POINT. §9's promotion table says a §7 FOLD row is a hard
+ * error in v1, and D11 tabulates the control-side phase each one owes; a
+ * refusal that could not say WHICH row would leave the reader to rediscover the
+ * table. Naming the half turn's parity is also what bd fna's split bought — the
+ * constant column owes pi.b at k = 1 and pi.(1-b) at k = 3, and the qubit
+ * column -pi/2 against +pi/2, so the two are different gates and were one class
+ * until Step 20. */
+static const char *half_turn_row(int neg, int was_qubit)
+{
+    if (was_qubit)
+        return neg ? "Ry, theta = 3pi (mod 4pi), qubit column (alpha = +pi/2)"
+                   : "Ry, theta = pi  (mod 4pi), qubit column (alpha = -pi/2)";
+
+    return neg ? "Ry, theta = 3pi (mod 4pi), constant column (alpha = pi.(1-b))"
+               : "Ry, theta = pi  (mod 4pi), constant column (alpha = pi.b)";
+}
+
 /* --- PRD §7, the Ry column ----------------------------------------------- */
 
 void cq_rotate_ry_bit(cq_ctx *ctx, cq_bit *b, double theta)
 {
     refuse_inside_a_sandwich(ctx, "ry");
 
-    switch (cq_angle_ry_row(theta)) {
-    case CQ_ANGLE_IDENTITY:       /* theta = 0  (mod 4pi): the operator is I  */
-    case CQ_ANGLE_NEG_IDENTITY:   /* theta = 2pi (mod 4pi): -I, a global -1   */
-        return;                   /* both columns: nothing. D11 under control */
+    /* §9 row 0: a CQ_BIT_ZERO control skips the region, 0 gates and 0 qubits.
+     * It has to be tested HERE rather than left to cq_emit_x, because the
+     * general row below materialises before it emits — so an M22 that relied on
+     * the emitter alone would take W qubits for a rotation that does not
+     * happen. Row 0's CQ_BIT_ONE case needs nothing: the region is the
+     * uncontrolled one verbatim, which is what this function already is. */
+    if (cq_ctrl_skipping(&ctx->ctrl)) return;
 
-    case CQ_ANGLE_HALF_TURN: {
+    const cq_angle_class row = cq_angle_ry_row(theta);
+
+    switch (row) {
+    case CQ_ANGLE_IDENTITY:       /* theta = 0  (mod 4pi): the operator is I  */
+        return;                   /* controlled-I is I; exempt from D11       */
+
+    case CQ_ANGLE_NEG_IDENTITY:   /* theta = 2pi (mod 4pi): -I, a global -1   */
+        /* A global phase is only global until something controls it: this cell
+         * owes Rz(pi) on the control wire, PER BIT — a W-bit Ry(2pi) is
+         * (-1)^W, so one Z per register is a miscompile at every even W. */
+        cq_ctrl_refuse_fold_row(ctx,
+            "Ry, theta = 2pi (mod 4pi), either column (alpha = pi)");
+        return;                   /* both columns: nothing                    */
+
+    /* THE TWO PARITIES FALL THROUGH TO ONE BODY, and that is the point of the
+     * split rather than an oversight (bd fna). Uncontrolled they are the same
+     * cell — Ry(pi) and Ry(3pi) differ by a global -1 no instrument here can
+     * see — so M22 must keep emitting the identical pair for both;
+     * tests/test_rotate_table.inc pins k = 1, k = 3 and k = -1 as byte-
+     * identical and is the regression guard for exactly that. What M21's new
+     * class buys is that D11 can NAME which parity it is refusing. */
+    case CQ_ANGLE_HALF_TURN:
+    case CQ_ANGLE_NEG_HALF_TURN: {
         /* Rule 15's asymmetry, and cq_emit_x IS the split: on a constant it
          * flips in place for zero gates and zero qubits, on a qubit it emits
          * the gate and updates the shadow. The kind is CAPTURED because the
@@ -65,6 +110,14 @@ void cq_rotate_ry_bit(cq_ctx *ctx, cq_bit *b, double theta)
          * what M06 makes it do at Step 20 (cq_emit_x promotes to cq_emit_cx,
          * and a quantum control materialises a constant target). */
         const int was_qubit = cq_bit_is_qubit(*b);
+
+        /* BOTH COLUMNS FOLD, so both refuse — the constant one by emitting
+         * nothing at all, the qubit one by realising the row only up to the
+         * `+i` of Rz(pi).X = Y. §9's wording ("a §7 fold row") is deliberately
+         * broader than "the zero-gate rows" for exactly this cell. */
+        cq_ctrl_refuse_fold_row(ctx,
+            half_turn_row(row == CQ_ANGLE_NEG_HALF_TURN, was_qubit));
+
         cq_emit_x(ctx, b);
         if (was_qubit)
             cq_sink_rz(ctx->sink, cq_bit_qindex(*b), CQ_ANGLE_PI);   /* bd lk0 */
@@ -81,7 +134,14 @@ void cq_rotate_ry_bit(cq_ctx *ctx, cq_bit *b, double theta)
     if (cq_bit_is_const(*b)) cq_materialise(ctx, b);
     {
         const uint32_t q = cq_bit_qindex(*b);
-        cq_sink_ry(ctx->sink, q, theta);
+
+        /* THE ONE §7 ROW THAT NEEDS NO REFUSAL: it does not fold, so §9's
+         * `R(theta/2); CX; R(-theta/2); CX` promotes it EXACTLY, with no
+         * residual phase to hand-derive. cq_ctrl_ry is that, and is one
+         * cq_sink_ry when no region is open. The shadow effect stays here
+         * because it is D12's decision, not the emitter's — and the promotion
+         * adds none of its own, since its two CXs cancel. */
+        cq_ctrl_ry(ctx, q, theta);
         cq_shadow_rotate(&ctx->shadow, q);
     }
 }
@@ -91,6 +151,7 @@ void cq_rotate_ry_bit(cq_ctx *ctx, cq_bit *b, double theta)
 void cq_rotate_rz_bit(cq_ctx *ctx, cq_bit *b, double phi)
 {
     refuse_inside_a_sandwich(ctx, "rz");
+    if (cq_ctrl_skipping(&ctx->ctrl)) return;                    /* §9 row 0 */
 
     /* §7 gives Rz exactly ONE special row, phi = 0 (mod 4pi). phi = 2pi is -I
      * and phi = pi is -iZ, and neither is folded — cq_angle_rz_row collapses
@@ -102,10 +163,17 @@ void cq_rotate_rz_bit(cq_ctx *ctx, cq_bit *b, double phi)
      * value is a global phase — it is not even representable, since by I4 the
      * bit owns no wire. This is the cell that keeps a classical rail classical
      * through any number of Rz calls. */
-    if (cq_bit_is_const(*b)) return;
+    if (cq_bit_is_const(*b)) {
+        cq_ctrl_refuse_fold_row(ctx,
+            "Rz, otherwise, constant column (alpha = (2b-1).phi/2)");
+        return;
+    }
 
-    /* The qubit column. No cq_shadow_rotate: D12. */
-    cq_sink_rz(ctx->sink, cq_bit_qindex(*b), phi);
+    /* The qubit column. No cq_shadow_rotate: D12 — and the promotion adds none
+     * either, because controlled-Rz is diagonal exactly as Rz is, so the whole
+     * four-gate block still cannot move a computational-basis value. That is
+     * what keeps the corpus's twelve rz-rooted rails freeable under the axis. */
+    cq_ctrl_rz(ctx, cq_bit_qindex(*b), phi);
 }
 
 /* --- The register forms -------------------------------------------------- */
@@ -135,6 +203,7 @@ void cq_rotate_rz(cq_ctx *ctx, int32_t h, double phi)
 void cq_measure(cq_ctx *ctx, int32_t h, uint64_t *lo, uint64_t *hi)
 {
     refuse_inside_a_sandwich(ctx, "measure");
+    cq_ctrl_refuse_measurement(ctx);
 
     /* MARK FIRST, AND THE ORDER IS THE POINT. cq_reg_mark_measured refuses any
      * state but LIVE, so a second measure — or a measure of a tombstone —

@@ -181,6 +181,46 @@ CQ_TEST(k9_signed_family_sweep)
     for (int i = 6; i <= 9; i++) sweep_pred(&ROWS[i]);
 }
 
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+static void cmp_narrow(void)
+{
+    /* ALL TEN PREDICATES, because a derived row differs from its primitive by
+     * an operand swap or a trailing X and only L1 can tell them apart — the
+     * finding that made `each_derived_predicate_is_its_primitives_stream`
+     * necessary. Narrowing to the three primitives here would drop exactly the
+     * seven rows that are hardest to see. */
+    for (int i = 0; i < N_ROWS; i++)
+        for (int W = 1; W <= 4; W++) cq_kd_sweep_at(&ROWS[i].spec, W, 1);
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    /* K9's `dst` IS ONE BIT, so the promotion has a shape here it has nowhere
+     * else: a single-lane result driven by a compare's whole scratch region.
+     * i80 is in the ladder because icmp ships there (opcode_table.yaml:222) and
+     * i128 is not, because it does not (the mirror image of add/sub's fence). */
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 80 };
+
+    cq_kd_for_each_region("icmp", cmp_narrow);
+
+    for (int i = 0; i < N_ROWS; i++)
+        for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++)
+            reached += cq_kd_check_promotion(&ROWS[i].spec, widths[w]);
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}
+
 /* ---- L4: the goldens, at the all-quantum mask. -------------------------- */
 
 /* K09.md §3.2, from the compute half outward:
@@ -395,6 +435,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(k9_eq_family_sweep),
     CQ_CASE(k9_unsigned_family_sweep),
     CQ_CASE(k9_signed_family_sweep),
+    CQ_CASE(controlled),
     CQ_CASE(l4_goldens),
     CQ_CASE(the_w8_column_matches_k09s_evaluated_table),
     CQ_CASE(the_stream_is_a_palindrome_around_the_copyout),

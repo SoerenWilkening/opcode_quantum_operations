@@ -62,6 +62,49 @@
 /* K10's mux is the widest arity in the catalogue: cond, then two arms. */
 enum { CQ_KD_MAX_SRC = 3 };
 
+/* --- Step 20: the whole of "one parameter, not twelve new suites". --------
+ *
+ * PRD §9's controlled axis is an EMITTER MODE, so a kernel needs no change to
+ * become controlled and neither does its spec. What the driver needs is a
+ * control rail to push, and one place to push it: `call_kernel`, which is the
+ * sole route from all five kernel invocations in this file to a kernel. Setting
+ * the mode is therefore a driver-scoped SETTER rather than a parameter — there
+ * are 71 entry-point call sites across twelve .c files and eight .inc files,
+ * and none of them changes.
+ *
+ * FIVE MODES, BECAUSE §9 ROW 0 HAS THREE ROWS AND THE QUANTUM ONE HAS TWO
+ * BRANCHES. The two Q modes emit the IDENTICAL circuit — the fold table reads
+ * kind and never shadow (D6) — and differ only in what the answer is, which is
+ * Bennett's `controlled()` contract: `(ctrl, x, 0) -> (ctrl, x, ctrl ? f(x) : 0)`.
+ *
+ * CQ_KD_CTRL_Q0 IS THE SHARPEST OF THE FIVE and it is not a formality. At an
+ * all-classical operand mask it is the only fixture in the project that can see
+ * a controlled region silently made unconditional: the kernel's L5 short-circuit
+ * writes `dst` through `cq_emit_x`, whose constant row rewrites a bit in place
+ * for zero gates, and if M06 did not intercept that row the rail would be
+ * flipped on BOTH branches — value `f(a,b)` where the answer is 0. Nothing at
+ * the all-quantum mask can reach that row, and no gate count can see it.
+ *
+ * NONE IS ZERO so the zero-initialised default is exactly the behaviour every
+ * suite had before Step 20, and the numbering is pinned rather than commented,
+ * on CQ_BIT_ZERO's and CQ_ANGLE_GENERAL's precedent. */
+typedef enum {
+    CQ_KD_CTRL_NONE = 0,   /* no region at all                              */
+    CQ_KD_CTRL_ZERO,       /* CQ_BIT_ZERO: row 0 skips — 0 gates, 0 qubits  */
+    CQ_KD_CTRL_ONE,        /* CQ_BIT_ONE:  row 0 emits it verbatim          */
+    CQ_KD_CTRL_Q0,         /* a wire whose shadow is 0: promoted, dst stays */
+    CQ_KD_CTRL_Q1          /* a wire whose shadow is 1: promoted, dst = f   */
+} cq_kd_ctrl;
+
+_Static_assert(CQ_KD_CTRL_NONE == 0,
+               "a zero-initialised driver runs uncontrolled, as it did before "
+               "Step 20");
+
+void        cq_kd_set_ctrl(cq_kd_ctrl mode);
+cq_kd_ctrl  cq_kd_get_ctrl(void);
+const char *cq_kd_ctrl_name(cq_kd_ctrl mode);
+
+
 /* The per-width shape of one kernel call. `classical[i]` names the bits of
  * source i that MUST be classical — the driver clears them from every mask it
  * generates, so a constrained operand is never handed a qubit. `~0` means the
@@ -138,5 +181,38 @@ void cq_kd_measure(const cq_kd_spec *k, int W,
  * water mark. A clean kernel has them equal — a kernel that took scratch and
  * tidily released it does not, and L2 cannot see the difference. */
 uint32_t cq_kd_peak(const cq_kd_spec *k, int W, uint32_t *peak_delta);
+/* THE STEP-20 GATE, AND IT TAKES THE SUITE'S OWN SWEEP RATHER THAN IMPOSING
+ * ONE. Runs `body` four times, once under each of §9's regions, printing which.
+ *
+ * A fixed shape would have been wrong for a third of the catalogue and wrong
+ * SILENTLY: a cast's sweep is over a width PAIR that its own spec adapter
+ * reads, and K10's mux must drive cq_kd_case directly because cq_kd_case2 fills
+ * values[2] with zero — so a mux swept "the ordinary way" runs every case with
+ * one arm pinned at 0 and prints a six-figure case count for half a kernel.
+ * Passing the suite's own body keeps each of those exactly as it already is.
+ *
+ * `body` should be the suite's sweep at its CHEAP widths only. The promotion is
+ * a property of the emitter — per gate, and width-independent — so what the
+ * axis adds is its interaction with the §3 fold table, which is exhausted where
+ * the value cross product is exhaustive. Every shipped width is still covered,
+ * by cq_kd_check_promotion below, at two kernel calls apiece. */
+void cq_kd_for_each_region(const char *what, void (*body)(void));
+
+/* §9's promotion maps the by-kind tuple exactly — X→CX, CX→CCX, CCX→3 CCX — so
+ * at the ALL-QUANTUM mask `(x, cx, ccx)` becomes `(0, x, cx + 3·ccx)`. Asserted
+ * against the SAME RUN's uncontrolled measurement, so it reads no golden and
+ * `CQOPS_UPDATE_GOLDENS=1` cannot bless a promotion that stopped promoting.
+ *
+ * Scoped to the all-quantum mask, and there only: away from it a gate that
+ * folded to nothing uncontrolled can emit under promotion. That is the same
+ * mask every L4 golden is pinned at.
+ *
+ * RETURNS THE UNCONTROLLED FORWARD TOTAL, and a caller that ignores it can go
+ * silently vacuous. Zero is not a defect — measure_setup drives every operand
+ * all-ones, and for K4 that saturates under D8 at every non-power-of-two width
+ * (the amount is masked to ceil(log2 W) bits, so W = 3, 5 and 80 shift by more
+ * than W and `shl`/`lshr` emit nothing at all). The caller therefore owns the
+ * non-vacuity claim: sum these over the ladder and assert it is non-zero. */
+uint64_t cq_kd_check_promotion(const cq_kd_spec *k, int W);
 
 #endif /* CQOPS_TEST_KERNELDRV_H */

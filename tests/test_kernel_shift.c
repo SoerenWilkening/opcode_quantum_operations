@@ -88,6 +88,42 @@ CQ_TEST(k4_shl_sweep)  { sweep_shift(&SHL);  }
 CQ_TEST(k4_lshr_sweep) { sweep_shift(&LSHR); }
 CQ_TEST(k4_ashr_sweep) { sweep_shift(&ASHR); }
 
+/* Step 20 — the same four levels under PRD §9's four regions, plus §9's
+ * gate-tuple transform at every shipped width. The sweep body is this suite's
+ * OWN, at its cheap widths only: the promotion is per gate and width-
+ * independent, so what the axis adds is its interaction with the §3 fold table,
+ * which is exhausted where the value cross product is. Every shipped width is
+ * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+static const cq_kd_spec *const SHIFTS[] = { &SHL, &LSHR, &ASHR };
+
+static void shift_narrow(void)
+{
+    for (size_t i = 0; i < sizeof SHIFTS / sizeof SHIFTS[0]; i++)
+        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(SHIFTS[i], W, 1);
+}
+
+CQ_TEST(controlled)
+{
+    uint64_t reached = 0u;
+
+    /* i80 and i128 are in the promotion ladder for the same reason they are in
+     * the sweep: i80 carries 47% of the corpus's shift calls and is where D8's
+     * saturating branch lives. */
+    static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 80, 128 };
+
+    cq_kd_for_each_region("shift_const", shift_narrow);
+
+    for (size_t i = 0; i < sizeof SHIFTS / sizeof SHIFTS[0]; i++)
+        for (size_t w = 0; w < sizeof widths / sizeof widths[0]; w++)
+            reached += cq_kd_check_promotion(SHIFTS[i], widths[w]);
+    /* NOT VACUOUS: the identity above is an equality between two measurements,
+     * and it holds trivially where the uncontrolled tuple is empty. K4 makes
+     * that a real case rather than a hypothetical — its all-ones L4 fixture
+     * saturates under D8 at every non-power-of-two width — so the ladder has to
+     * say it reached something. */
+    CHECK(reached > 0u);
+}
+
 /* ---- D8, corner by corner, against a hand-written expectation. ---------- */
 
 /* Runs one (op, W, k) and returns dst's value. Deliberately does NOT go
@@ -370,6 +406,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(k4_shl_sweep),
     CQ_CASE(k4_lshr_sweep),
     CQ_CASE(k4_ashr_sweep),
+    CQ_CASE(controlled),
     CQ_CASE(d8_a_shift_by_exactly_the_width_is_the_identity),
     CQ_CASE(d8_masking_alone_is_not_enough_at_a_non_power_of_two_width),
     CQ_CASE(d8_a_width_of_one_ignores_the_amount_entirely),

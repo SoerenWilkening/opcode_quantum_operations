@@ -2,6 +2,8 @@
 
 #include "sandwich.h"
 
+#include "controlled.h"
+
 #include "bit.h"
 #include "emit.h"
 
@@ -14,10 +16,17 @@
 #  define CQ_SW_DEBUG 0
 #endif
 
-/* THE SOLE `proven_zero` CONSTANT IN src/, and it is irreducible (PRD §10).
+/* THE SCRATCH REGION'S `proven_zero` CONSTANT, and it is irreducible (PRD §10).
  * Rule 13 forbids the library holding the gate stream that would let it
  * COMPUTE the answer, so "a sandwich cleans its own scratch" is asserted
  * exactly once, by the code that owns the construction.
+ *
+ * IT WAS THE SOLE ONE IN src/ UNTIL STEP 20. M06's CQ_ZERO_BY_CTRL_UNCOMPUTE is
+ * the second and the last: §9's shared Toffoli ancilla and its nested AND flag
+ * are cleaned by a construction M09 does not own and cannot see. PRD §10's rule
+ * is not "one constant" — it is that a constant may exist only where the code
+ * that RUNS a construction can assert that construction's premises, which is
+ * exactly why M08 ships no release a kernel could call.
  *
  * IT RESTS ON THREE PREMISES, AND DELETING ANY ONE MAKES IT A LAUNDERING SITE:
  *
@@ -135,6 +144,21 @@ void cq_sandwich(cq_ctx *ctx, cq_scratch *scr,
                   "the outer palindrome", ctx->sandwich_depth, 0);
 
     ctx->sandwich_depth = 1;
+
+    /* 0b. PRD §9 ROW 0: A SKIPPED REGION COSTS ZERO QUBITS, NOT ONLY ZERO
+     * GATES, and this is the only place that can deliver the second half.
+     * Every cq_emit_* already returns immediately under a CQ_BIT_ZERO control,
+     * so the gates are gone — but step 1 below takes the whole scratch region
+     * from the pool before any gate is emitted, and §9's row 0 says "0 gates,
+     * 0 qubits". Returning here is what makes that literally true through the
+     * kernel surface: `dst` is untouched, which is exactly right for a region
+     * that does not run, and the caller's cq_scratch_dispose still finds every
+     * bit at CQ_BIT_ZERO because nothing materialised one.
+     *
+     * The entry checks above have ALREADY run, deliberately: a malformed call
+     * is a caller bug whether or not its region is skipped, and a guard that
+     * switches off under a control is a guard with a hole in it. */
+    if (cq_ctrl_skipping(&ctx->ctrl)) { ctx->sandwich_depth = 0; return; }
 
     /* 1. Pre-materialise the whole region (I6(b), risk R8).
      *

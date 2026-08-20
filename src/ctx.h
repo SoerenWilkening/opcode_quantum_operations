@@ -21,6 +21,7 @@
 #define CQOPS_CTX_H
 
 #include "bit.h"
+#include "controlled.h"
 #include "qubits.h"
 #include "reg.h"
 #include "shadow.h"
@@ -42,6 +43,14 @@ struct cq_ctx {
      * not: a sandwich attempted from a COPYOUT step, where the extent is
      * deliberately disarmed and so cannot answer. */
     int             sandwich_depth;
+
+    /* M06, Step 20 — PRD §9's control stack. NOT Debug-gated, and for a
+     * stronger reason than sandwich_depth's: this one CHANGES BEHAVIOUR, and
+     * the house rule is that CQOPS_DEBUG_INVARIANTS gates checking and never
+     * behaviour, so that both configurations emit the identical gate stream
+     * (include/cqops/cqops.h). Empty means no region is open and every
+     * cq_emit_* takes the path it took before Step 20 existed. */
+    cq_ctrl_stack   ctrl;
 
 #if defined(CQOPS_DEBUG_INVARIANTS) && CQOPS_DEBUG_INVARIANTS
     /* I6 (plan §0.2): inside a cq_sandwich compute half, every gate TARGET is
@@ -86,9 +95,13 @@ uint32_t cq_ctx_fresh_qubit(cq_ctx *ctx);
  * and it is why the two calls may never be reordered or separated.
  *
  * `proven_zero` is the caller's evidence and stays the caller's problem — this
- * function adds none. Its two callers are cq_reg_free, which forwards a
- * per-qubit proof (M07), and cq_sandwich's epilogue, which passes the sole
- * literal CQ_ZERO_BY_PALINDROME (M09). Retirement here also closes the Step 7
+ * function adds none. Its THREE callers are cq_reg_free, which forwards a
+ * per-qubit proof (M07); cq_sandwich's epilogue, which passes
+ * CQ_ZERO_BY_PALINDROME (M09); and cq_ctrl_pop, which passes
+ * CQ_ZERO_BY_CTRL_UNCOMPUTE for the shared Toffoli ancilla and the nested AND
+ * flag (M06, Step 20). Those two literals are the only ones in src/ and there
+ * is no third: PRD §10's rule is that a constant may exist only where the code
+ * that RUNS a construction can assert that construction's premises. Retirement here also closes the Step 7
  * hazard appended to ckd.17: nothing used to un-poison a released index, so a
  * REUSED index kept its stale entry — cq_ctx_fresh_qubit only ensures up to
  * `minted`, and cq_shadow_ensure returns early. */

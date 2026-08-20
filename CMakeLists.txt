@@ -107,6 +107,8 @@ add_library(cqops STATIC
     src/sink.c          # M04, Step 5 — the §8 vtable, dispatch, CQOPS_SINK
     src/ctx.c           #      Step 6 — the shared context aggregate
     src/emit.c          # M05, Step 6 — the §3 fold table (critical path)
+    src/controlled.c    # M06, Step 20 — §9's promotion, the control stack,
+                        # the shared ancilla, the nested AND, D11's refusal
     src/reg.c           # M07, Step 7 — handle table, tombstones, I2, D7a/D7b
     src/scratch.c       # M08, Step 8 — the scratch cq_bit array (no qubits)
     src/sandwich.c      # M09, Step 8 — the driver, I6(a)+(b), the epilogue

@@ -2,6 +2,8 @@
 
 #include "emit.h"
 
+#include "controlled.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,25 +60,69 @@ void cq_materialise(cq_ctx *ctx, cq_bit *b)
     uint32_t q = cq_ctx_fresh_qubit(ctx);   /* |0> by I3; shadow born known-0 */
     *b = cq_bit_qubit(q);
 
-    /* The X goes straight to the sink rather than through cq_emit_x. That is
-     * deliberate and it is the conservative choice: when M06 lands at Step 20,
-     * cq_emit_x will consult ctx->ctrl_depth and promote X to CX, and it is
-     * NOT settled whether materialising a constant inside a controlled region
-     * should be promoted — a promoted materialisation leaves the fresh qubit
-     * entangled with the control rather than in a definite state. Routing
-     * through cq_emit_x here would answer that question by accident. Filed;
-     * M06 decides. */
+    /* THE X GOES STRAIGHT TO THE SINK, AND SINCE STEP 20 THAT IS A DECISION
+     * RATHER THAN A DEFERRAL (bd skh, resolved as UNPROMOTED). M06 hooks
+     * cq_emit_x/cx/ccx and nothing else, so materialisation is untouched by the
+     * controlled axis — which is the CORRECT answer, not a happy accident of
+     * layering, and PRD §15 D11's constant column is stated to depend on it.
+     *
+     * The algebra, with `b` the rail's classical value before the region, `c` an
+     * inner control and `k` the control branch. The required semantics is
+     * `b ⊕ (k ∧ c)`. Unpromoted, the fresh qubit holds `b` unconditionally and
+     * the promoted CX→CCX gives exactly that. Promoted, the fresh qubit would be
+     * `k ∧ b` and the result `k ∧ (b ⊕ c)` — which disagrees in exactly one
+     * cell, `b = 1, k = 0`, the branch on which the rail must still read its old
+     * value. Materialisation changes a bit's ENCODING (constant → qubit, I4),
+     * never its VALUE, and an encoding is not conditional on anything.
+     *
+     * There IS a shipped witness, so this is not hypothetical:
+     * CQ_lang's slice_control_cond_onward_phase fixture copies h5 (born 10)
+     * into h1 (born 3) under a quantum control, and `10 & 3` has bit 1 set in
+     * both — a constant-ONE target materialised inside a controlled region. */
     if (was_one) {
         cq_sink_x(ctx->sink, q);
         cq_shadow_x(&ctx->shadow, q);
     }
 }
 
-/* --- The fold table. PRD §3, row for row. ------------------------------- */
+/* --- The physical tail (M06 calls these; see emit.h). ------------------- */
+
+void cq_emit_cx_phys(cq_ctx *ctx, const cq_bit *c, cq_bit *t)
+{
+    if (cq_bit_is_const(*t)) cq_materialise(ctx, t);     /* c = Q, t constant */
+
+    uint32_t cq_ = cq_bit_qindex(*c), tq = cq_bit_qindex(*t);
+    cq_sink_cx(ctx->sink, cq_, tq);
+    cq_shadow_cx(&ctx->shadow, cq_, tq);
+}
+
+void cq_emit_ccx_phys(cq_ctx *ctx, const cq_bit *c1, const cq_bit *c2, cq_bit *t)
+{
+    if (cq_bit_is_const(*t)) cq_materialise(ctx, t);
+
+    uint32_t a = cq_bit_qindex(*c1), b = cq_bit_qindex(*c2);
+    uint32_t tq = cq_bit_qindex(*t);
+    cq_sink_ccx(ctx->sink, a, b, tq);
+    cq_shadow_ccx(&ctx->shadow, a, b, tq);
+}
+
+/* --- The fold table. PRD §3, row for row, under PRD §9 row 0. ----------- */
+
+/* THE ORDER OF THE THREE CLAUSES IN EACH FUNCTION IS LOAD-BEARING, and
+ * src/controlled.h states the rule at length: row 0's SKIP first, then the §3
+ * fold on the CONTROLS (a control fold is semantic and survives any control),
+ * then §9's promotion — which comes BEFORE any fold that reads the TARGET,
+ * because a target fold is a representation choice and rewriting a constant in
+ * place is unconditional. Getting that last one backwards is a controlled
+ * region silently made unconditional, and it is invisible at the all-quantum
+ * operand mask. */
 
 void cq_emit_x(cq_ctx *ctx, cq_bit *t)
 {
     check_target(ctx, t);
+
+    if (cq_ctrl_skipping(&ctx->ctrl)) return;            /* §9 row 0          */
+    if (cq_ctrl_wire(&ctx->ctrl)) { cq_ctrl_promote_x(ctx, t); return; }
 
     /* Row 1: t constant -> flip the constant in place, 0 gates, 0 qubits.
      * This single line is the whole classical short-circuit for X, and the
@@ -94,15 +140,15 @@ void cq_emit_cx(cq_ctx *ctx, const cq_bit *c, cq_bit *t)
     check_distinct(c, t, "§3 distinctness: CX control == target");
     check_target(ctx, t);
 
+    if (cq_ctrl_skipping(&ctx->ctrl)) return;            /* §9 row 0          */
+
     if (cq_bit_is_zero(*c)) return;                      /* c = ZERO: nothing */
     if (cq_bit_is_one(*c)) { cq_emit_x(ctx, t); return; }/* c = ONE:  X(t)    */
 
     /* c = Q from here. */
-    if (cq_bit_is_const(*t)) cq_materialise(ctx, t);     /* c = Q, t constant */
+    if (cq_ctrl_wire(&ctx->ctrl)) { cq_ctrl_promote_cx(ctx, c, t); return; }
 
-    uint32_t cq_ = cq_bit_qindex(*c), tq = cq_bit_qindex(*t);
-    cq_sink_cx(ctx->sink, cq_, tq);
-    cq_shadow_cx(&ctx->shadow, cq_, tq);
+    cq_emit_cx_phys(ctx, c, t);
 }
 
 void cq_emit_ccx(cq_ctx *ctx, const cq_bit *c1, const cq_bit *c2, cq_bit *t)
@@ -111,6 +157,8 @@ void cq_emit_ccx(cq_ctx *ctx, const cq_bit *c1, const cq_bit *c2, cq_bit *t)
     check_distinct(c1, t,  "§3 distinctness: CCX control 1 == target");
     check_distinct(c2, t,  "§3 distinctness: CCX control 2 == target");
     check_target(ctx, t);
+
+    if (cq_ctrl_skipping(&ctx->ctrl)) return;            /* §9 row 0          */
 
     /* Either control ZERO: nothing. */
     if (cq_bit_is_zero(*c1) || cq_bit_is_zero(*c2)) return;
@@ -124,10 +172,7 @@ void cq_emit_ccx(cq_ctx *ctx, const cq_bit *c1, const cq_bit *c2, cq_bit *t)
     if (cq_bit_is_one(*c1)) { cq_emit_cx(ctx, c2, t); return; }
 
     /* Both controls Q. */
-    if (cq_bit_is_const(*t)) cq_materialise(ctx, t);
+    if (cq_ctrl_wire(&ctx->ctrl)) { cq_ctrl_promote_ccx(ctx, c1, c2, t); return; }
 
-    uint32_t a = cq_bit_qindex(*c1), b = cq_bit_qindex(*c2);
-    uint32_t tq = cq_bit_qindex(*t);
-    cq_sink_ccx(ctx->sink, a, b, tq);
-    cq_shadow_ccx(&ctx->shadow, a, b, tq);
+    cq_emit_ccx_phys(ctx, c1, c2, t);
 }

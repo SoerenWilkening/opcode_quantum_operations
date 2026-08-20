@@ -114,7 +114,20 @@ cq_angle_class cq_angle_lattice(double theta, double tol)
 
     if (m == 0) return CQ_ANGLE_IDENTITY;       /* θ ≡ 0  (mod 4π) */
     if (m == 2) return CQ_ANGLE_NEG_IDENTITY;   /* θ ≡ 2π (mod 4π) */
-    return CQ_ANGLE_HALF_TURN;                  /* θ ≡ π  (mod 2π) */
+
+    /* THE HALF TURN SPLITS BY PARITY (bd fna, PRD §15 D11 obligation (i)).
+     * Uncontrolled the two are one row: Ry(π) and Ry(3π) differ by a global −1
+     * that nothing in v1 can observe, and M22 emits the identical `x; rz(π)`
+     * pair for both — tests/test_rotate_table.inc pins that and must stay
+     * green. The parity becomes load-bearing the moment §9 controls the row,
+     * because a global phase is only global until something controls it: D11's
+     * control-side angle is π·b at k ≡ 1 and π·(1−b) at k ≡ 3 on the constant
+     * column, and −π/2 against +π/2 on the qubit column. It matters a third
+     * time for `_inv`, since negating θ swaps k ≡ 1 ↔ 3 while fixing 0 and 2 —
+     * so a merged row would make `cqrt_ry_<W>_controlled_inv` disagree with its
+     * own forward. M21 computed `m` and threw the distinction away until now. */
+    return (m == 1) ? CQ_ANGLE_HALF_TURN        /* θ ≡ π  (mod 4π) */
+                    : CQ_ANGLE_NEG_HALF_TURN;   /* θ ≡ 3π (mod 4π) */
 }
 
 cq_angle_class cq_angle_ry_row(double theta)

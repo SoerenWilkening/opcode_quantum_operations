@@ -11,6 +11,7 @@ void cq_ctx_init(cq_ctx *ctx, const cq_sink *sink)
     cq_reg_table_init(&ctx->regs);
     ctx->sink = sink ? sink : cq_sink_active();
     ctx->sandwich_depth = 0;
+    cq_ctrl_stack_init(&ctx->ctrl);
 
 #if defined(CQOPS_DEBUG_INVARIANTS) && CQOPS_DEBUG_INVARIANTS
     ctx->scratch_lo = NULL;
@@ -27,6 +28,10 @@ void cq_ctx_init(cq_ctx *ctx, const cq_sink *sink)
  * without evidence, which is the one unforgivable bug. */
 void cq_ctx_dispose(cq_ctx *ctx)
 {
+    /* FIRST, and it is the only member whose dispose can fail: an unbalanced
+     * cq_ctrl_push left flag qubits live, and saying so here names the cause
+     * rather than letting it surface as a leaked index in someone's L2. */
+    cq_ctrl_stack_dispose(&ctx->ctrl);
     cq_reg_table_dispose(&ctx->regs);
     cq_shadow_dispose(&ctx->shadow);
     cq_qubits_dispose(&ctx->pool);

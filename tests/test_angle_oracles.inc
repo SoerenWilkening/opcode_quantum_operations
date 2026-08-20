@@ -68,6 +68,7 @@ static const char *cname(cq_angle_class c)
     case CQ_ANGLE_IDENTITY:     return "IDENTITY";
     case CQ_ANGLE_NEG_IDENTITY: return "NEG_IDENTITY";
     case CQ_ANGLE_HALF_TURN:    return "HALF_TURN";
+    case CQ_ANGLE_NEG_HALF_TURN:return "NEG_HALF_TURN";
     }
     return "(invalid)";
 }
@@ -101,13 +102,24 @@ static const char *cname(cq_angle_class c)
 
 /* The row §7 gives to θ = k·π, written from the table's own wording rather than
  * from angle.c: "θ ≡ 0 (mod 4π)" is k ≡ 0 (mod 4), "θ ≡ 2π (mod 4π)" is
- * k ≡ 2 (mod 4), "θ ≡ π (mod 2π)" is every odd k. */
+ * k ≡ 2 (mod 4), and "θ ≡ π (mod 2π)" — every odd k — is the row PRD §15 D11
+ * splits by parity, k ≡ 1 against k ≡ 3. */
 static cq_angle_class row_of_index(long k)
 {
     long m = ((k % 4) + 4) % 4;
     if (m == 0) return CQ_ANGLE_IDENTITY;
     if (m == 2) return CQ_ANGLE_NEG_IDENTITY;
-    return CQ_ANGLE_HALF_TURN;
+    return (m == 1) ? CQ_ANGLE_HALF_TURN : CQ_ANGLE_NEG_HALF_TURN;
+}
+
+/* Negating θ maps k to −k, which swaps k ≡ 1 ↔ 3 and FIXES 0 and 2. That is
+ * the whole of D11's obligation (iii) — the `_inv` axis — so the sign-symmetry
+ * case below asserts the SWAP rather than tolerating it as a don't-care. */
+static cq_angle_class mirror_row(cq_angle_class c)
+{
+    if (c == CQ_ANGLE_HALF_TURN)     return CQ_ANGLE_NEG_HALF_TURN;
+    if (c == CQ_ANGLE_NEG_HALF_TURN) return CQ_ANGLE_HALF_TURN;
+    return c;
 }
 
 /* ORACLE 1 — parity, by a different reduction. */
@@ -121,7 +133,8 @@ static cq_angle_class ref_row(double theta, double tol)
 
     if (fabs(r) <= w || fabs(r - turn) <= w)                  return CQ_ANGLE_IDENTITY;
     if (fabs(r - 2.0 * REF_PI) <= w)                          return CQ_ANGLE_NEG_IDENTITY;
-    if (fabs(r - REF_PI) <= w || fabs(r - 3.0 * REF_PI) <= w) return CQ_ANGLE_HALF_TURN;
+    if (fabs(r - REF_PI) <= w)                                return CQ_ANGLE_HALF_TURN;
+    if (fabs(r - 3.0 * REF_PI) <= w)                          return CQ_ANGLE_NEG_HALF_TURN;
     return CQ_ANGLE_GENERAL;
 }
 

@@ -17,6 +17,9 @@ add_library(cqops_test_support STATIC
     support/poolcheck.c     # Step 10 — the automatic L2 and L3 assertions
     support/kerneldrv.c     # Step 10 — the shared Phase-B four-level gate
     support/kernelsweep.c   # Step 11 — the sweep shapes (plan §2.2's split seam)
+    support/kernelctrl.c    # Step 20 — the controlled axis: the region mode,
+                            # the control rail, §9's gate-tuple transform. Split
+                            # from kerneldrv.c when the axis took it to 345/300
     support/goldens.c       # Step 10 — L4's pinned counts, on disk
 )
 
@@ -107,6 +110,116 @@ add_cqops_test(test_kernel_sdivrem)   # M20 — K12 sdiv/srem. The signed path w
 ## assertions surviving mutation to always-true: correct, load-bearing, and
 ## never once observed to fire. This provokes each one.
 add_cqops_test(test_kerneldrv)        # Step 10 — the infrastructure's gate
+
+## Layer 1 — the controlled axis. L0 for §9, on test_emit_fold's shape: the
+## promotion is swept over the product of the control's KIND and §3's own 5 / 25
+## / 125 operand combinations, 775 cases, each pinning the ordered stream, the
+## qubits allocated, the target's kind AND its shadow.
+add_cqops_test(test_controlled)   # M06, Step 20 — §9 row 0, the promotion, the
+                                  # shared ancilla, the nested AND, §7's two
+                                  # rotation rows under §9, and bd skh's one
+                                  # falsifying fixture
+
+## M06's hard errors, Step 20. EVERY ONE ABORTS IN BOTH CONFIGURATIONS: the
+## guards are about what gets EMITTED, and a promotion that pushed a malformed
+## Toffoli at the sink in Release while aborting in Debug would be the worst of
+## both. No case here carries CQ_DEATH_SKIP_WITHOUT_INVARIANTS.
+add_cqops_death_test(test_controlled_death CASES
+    pop_with_no_region_open
+    an_unbalanced_push_is_caught_at_dispose
+    push_inside_a_sandwich_compute_half
+    the_control_wire_is_the_target_of_an_x
+    the_control_wire_is_the_target_of_a_cx
+    the_control_wire_is_the_target_of_a_ccx
+    the_control_wire_is_a_control_of_a_cx
+    the_control_wire_is_a_control_of_a_ccx
+    a_nested_regions_and_input_is_the_target_of_a_gate
+    a_nested_regions_inner_control_is_the_target_of_a_gate
+    an_enclosing_regions_wire_is_the_target_of_a_gate
+    the_control_wire_is_the_target_of_a_rotation
+    ry_2pi_under_a_quantum_control
+    ry_half_turn_on_a_constant_under_a_quantum_control
+    ry_half_turn_on_a_qubit_under_a_quantum_control
+    ry_neg_half_turn_under_a_quantum_control
+    rz_on_a_constant_under_a_quantum_control
+    a_measurement_inside_a_quantum_controlled_region
+    a_measurement_inside_a_skipped_region
+)
+
+## WHICH LAYER ABORTED, for the sixth time (Steps 6, 7, 8, 11, 15 before this).
+## The five coincidence cases could each reach a guard one layer down if M06's
+## were deleted — cq_shadow_ccx's own distinctness assert, or cq_emit_ccx's —
+## and BOTH of those are Debug-gated, so in Release the mutant would emit a
+## malformed gate and the death would simply stop happening. Pinning M06's own
+## message is what keeps the case honest in the configuration that matters.
+##
+## ONE BLOCK PER TEST, COMPOSED, NEVER TWO: set_tests_properties OVERWRITES a
+## property, so a second block naming a test already named above would silently
+## disarm this one and leave 100% green with nothing to look at.
+## FAIL_REGULAR_EXPRESSION AND NOT PASS_, and the difference is load-bearing:
+## PASS_ DISPLACES the exit-code check, so pinning "the message contains D11"
+## that way would trade the death test's own contract for a substring. The
+## patterns below therefore name the layers that must NOT have spoken.
+set_tests_properties(test_controlled_death.the_control_wire_is_the_target_of_an_x
+                     test_controlled_death.the_control_wire_is_the_target_of_a_cx
+                     test_controlled_death.the_control_wire_is_the_target_of_a_ccx
+                     test_controlled_death.the_control_wire_is_the_target_of_a_rotation
+                     test_controlled_death.the_control_wire_is_a_control_of_a_cx
+                     test_controlled_death.the_control_wire_is_a_control_of_a_ccx
+                     test_controlled_death.a_nested_regions_and_input_is_the_target_of_a_gate
+                     test_controlled_death.a_nested_regions_inner_control_is_the_target_of_a_gate
+                     test_controlled_death.an_enclosing_regions_wire_is_the_target_of_a_gate
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "distinctness;shadow:")
+
+## The five D11 refusals must come from M06's ONE greppable site — not from M22
+## having quietly grown a second copy of the decision, and not from a rotation
+## reaching the pool or the shadow first. That shared tripwire is the
+## `rotate:;qubit pool:;distinctness` list, and it is REPEATED in each block
+## below rather than set once, because set_tests_properties OVERWRITES.
+##
+## AND THE ROW NAME IS PINNED, WHICH IT WAS NOT UNTIL NOW. src/rotate.c's
+## half_turn_row() takes a parity and a column and returns the string D11
+## tabulates a phase for; inverting the parity argument — passing
+## `row == CQ_ANGLE_HALF_TURN` where the code says NEG — was MEASURED to survive
+## the whole 195-test suite in both configurations, because every case here
+## asserted only that SOMETHING aborted. The parity is precisely what bd fna's
+## `k mod 4` split was owed for: uncontrolled the two half turns are one cell
+## and M22 emits the identical pair for both, so nothing else in the project can
+## tell them apart, and D11 gives them DIFFERENT control-side phases
+## (pi.b against pi.(1-b) on the constant column, -pi/2 against +pi/2 on the
+## qubit one). A refusal that names the wrong row sends the reader to the wrong
+## line of the PRD's table, which for a hand-derived phase table this project
+## has no instrument to check is the whole cost of getting it wrong.
+##
+## THE PATTERNS ARE NEGATIVE, one per case, naming the string the OTHER parity
+## or the OTHER column would have printed. Each also catches an inverted
+## `was_qubit`, which the battery never tried: the constant-rail cases must
+## never say "qubit column" and the qubit-rail case must never say "constant
+## column". FAIL_ and not PASS_ throughout, for the reason stated above — PASS_
+## displaces the exit-code check, so pinning the message that way would trade
+## the death test's own contract for a substring match.
+set_tests_properties(test_controlled_death.ry_2pi_under_a_quantum_control
+                     test_controlled_death.rz_on_a_constant_under_a_quantum_control
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "rotate:;qubit pool:;distinctness")
+
+## k = 1 (mod 4), constant column: "theta = pi  (mod 4pi) … (alpha = pi.b)".
+set_tests_properties(test_controlled_death.ry_half_turn_on_a_constant_under_a_quantum_control
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "rotate:;qubit pool:;distinctness;theta = 3pi;qubit column")
+
+## k = 1 (mod 4), qubit column: "theta = pi  (mod 4pi) … (alpha = -pi/2)".
+set_tests_properties(test_controlled_death.ry_half_turn_on_a_qubit_under_a_quantum_control
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "rotate:;qubit pool:;distinctness;theta = 3pi;constant column")
+
+## k = 3 (mod 4), constant column: "theta = 3pi (mod 4pi) … (alpha = pi.(1-b))".
+## `alpha = pi.b` cannot match that — after "pi" comes "." then "(" — and is
+## exactly what the k = 1 spelling prints, so it is the crisp discriminator.
+set_tests_properties(test_controlled_death.ry_neg_half_turn_under_a_quantum_control
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "rotate:;qubit pool:;distinctness;alpha = pi.b;qubit column")
 
 ## Layer 4 — the analog surface and the sinks. M25 sink_qec is Step 26, against
 ## C_quantum_error_correction.

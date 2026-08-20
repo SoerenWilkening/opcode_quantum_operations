@@ -68,11 +68,14 @@ typedef enum {
     CQ_ANGLE_GENERAL = 0,    /* none of the below, within tolerance          */
     CQ_ANGLE_IDENTITY,       /* θ ≡ 0  (mod 4π) — the operator is I          */
     CQ_ANGLE_NEG_IDENTITY,   /* θ ≡ 2π (mod 4π) — the operator is −I         */
-    CQ_ANGLE_HALF_TURN       /* θ ≡ π  (mod 2π) — Ry: ±XZ.  Rz: ∓iZ          */
+    CQ_ANGLE_HALF_TURN,      /* θ ≡ π  (mod 4π) — Ry: +XZ.  Rz: −iZ          */
+    CQ_ANGLE_NEG_HALF_TURN   /* θ ≡ 3π (mod 4π) — Ry: −XZ.  Rz: +iZ          */
 } cq_angle_class;
 
 _Static_assert(CQ_ANGLE_GENERAL == 0,
                "a zero-initialised cq_angle_class must be the safe row");
+_Static_assert(CQ_ANGLE_NEG_HALF_TURN == 4,
+               "the numbering is read by M06 as well as M21 and M22");
 
 /* PRD §7's default, and PRD §15 D10's upper bound on it.
  *
