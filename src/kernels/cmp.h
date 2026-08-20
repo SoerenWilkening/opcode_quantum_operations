@@ -26,14 +26,46 @@
  * of those axes. Ten entry points over one shared body is the cost of that, and
  * it is paid once here.
  *
- * K9 DOES NOT REUSE K7's CARRY CHAIN, and the question is a real one (bd -4tt):
- * M14's kernels are whole sandwiches with a static step function, and
- * cq_sandwich refuses to nest, so nothing of M14 is callable from here. It does
- * not need to be. `lower_ult!` is its OWN upstream function — `lower_add!`'s
- * recurrence (adder.jl:8-16) minus the trailing `CNOT(carry[i], result[i])`
- * that produces the sum bit, plus its own `axnb` array — so porting it is
- * Rule 1 applied literally, not a second transcription of K7. What bd -4tt
- * leaves open is the M19/M20 half, at Step 17.
+ * K9 DOES NOT REUSE K7's CARRY CHAIN, and the question was a real one (bd 4tt):
+ * at Step 13 M14's kernels were whole sandwiches with a file-static step
+ * function, and cq_sandwich refuses to nest, so nothing of M14 was callable
+ * from here. It does not need to be. `lower_ult!` is its OWN upstream function
+ * — `lower_add!`'s recurrence (adder.jl:8-16) minus the trailing
+ * `CNOT(carry[i], result[i])` that produces the sum bit, plus its own `axnb`
+ * array — so porting it is Rule 1 applied literally, not a second
+ * transcription of K7.
+ *
+ * M16 IS ITSELF AN EXPORTER AS OF STEP 17 — bd 4tt RESOLVED 2026-08-16 as plan
+ * §0.4 / PRD §15 D9(e), and shipped. K12's per-iteration comparator IS this
+ * module's `ult` compute half, so `ult_compute` and the `ult` half of `cmp_env`
+ * are now `cq_ult_step` over a `cq_ult_block`, on the shape M15's
+ * `cq_addacc_step` and M17's `cq_mux_step` already had. M19 maps a contiguous
+ * run of its own step indices onto `[0, cq_ult_steps(W))`, `W` times. K9 emits
+ * the same gates in the same order and its goldens did not move. Two things
+ * about that export:
+ *
+ *   - **What K12 wants is the RAW CARRY-OUT, and that is what this module
+ *     already produces.** `layout`'s PRIM_ULT sets `raw = &carry[W]`, which is
+ *     `a >=u b` verbatim, and `cq_kernel_uge` copies it out unchanged —
+ *     Bennett's `lower_not1!(lower_ult!(…))` double negation folded into the
+ *     copy-out (K09.md §5 delta 2). PRD §15 D9(b) makes K12 read the same wire
+ *     rather than re-materialise `ult` and `fits`: keeping the Bennett-IR shape
+ *     would have put TWO different realisations of `uge` in one library, with
+ *     the more expensive one in the only kernel that invokes it `W` times per
+ *     call. Worth `4W` gates and `2W` qubits to K12.
+ *   - **The block's operands may be scratch sub-arrays, including a view that
+ *     ALIASES a register an earlier step wrote.** K12 binds `ua` to its shifted
+ *     remainder, which overlaps the previous iteration's mux output (K12.md
+ *     §2.1a). That is legal because `ua` is only ever a control; guards compare
+ *     RANGES, never base pointers.
+ *
+ * RULE 12: `cmp.c` IS NOW AT EXACTLY 200/200. The export cost ten lines, not
+ * thirty, because `cq_ult_step` REPLACED `ult_compute` rather than being added
+ * beside it — so plan §3's recorded seam (`primitives ↔ predicate derivation`,
+ * moving to `src/kernels/cmp_prim.c`) was not taken and has zero headroom left.
+ * The next line added to this module takes it. The hard limit is 300, so this
+ * is a scheduled split rather than a wall, but do not add "just one more" here
+ * without moving the three primitives out first.
  *
  * ALL THREE PRIMITIVES ARE DIRTY BY DESIGN and therefore sandwiched.
  * `lower_eq!` leaves `diff` and the OR-prefix behind, `lower_ult!` leaves `nb`,
@@ -88,5 +120,45 @@ void cq_kernel_sle(cq_ctx *ctx, cq_bit *dst,
                    const cq_bit *a, const cq_bit *b, int W);
 void cq_kernel_sge(cq_ctx *ctx, cq_bit *dst,
                    const cq_bit *a, const cq_bit *b, int W);
+
+/* --- `lower_ult!`'s compute half, exported for M19 (plan §0.4, D9(e)). ----
+ *
+ * WHAT K12 WANTS IS THE RAW CARRY-OUT, AND `carry[W]` IS IT. It is the carry
+ * out of `a + ~b + 1`, so it is `1` exactly when `a >=u b` — the `fits` of a
+ * restoring division step, with no `ult` wire, no `not1` and no negation at
+ * all. That is not a K12 shortcut: `cq_kernel_uge` already copies this same bit
+ * out unchanged (cmp.c's `layout`, `raw = &carry[W]`), which is Bennett's
+ * double negation folded into the copy-out, K09.md §5 delta 2. PRD §15 D9(b)
+ * makes K12 read the same wire rather than re-materialise `not1(ult(...))`;
+ * doing otherwise would have put TWO realisations of `uge` in one library, with
+ * the more expensive one in the only kernel that invokes it W times per call.
+ *
+ * THE BLOCK ALLOCATES NOTHING and `a`/`b` MAY BE SCRATCH SUB-ARRAYS, including
+ * a view that overlaps a register an earlier step wrote — plan §0.4 obligations
+ * 2, 3 and 4. K12 binds `a` to its shifted remainder `r_in[t]`, which aliases
+ * the previous iteration's mux output (K12.md §2.1a). Sound because `a` and `b`
+ * reach the emitter only through `cq_emit_*`'s `const cq_bit *` controls, so
+ * neither is ever a target; guards compare RANGES, never base pointers.
+ *
+ * `carry` IS W+1 BITS, NOT W. Off-by-one here writes past the caller's
+ * sub-array — which cq_scratch_span cannot catch, since it hands out a bare
+ * pointer — so a consumer's layout must budget `3W + 1` for the three vectors. */
+typedef struct {
+    const cq_bit *a, *b;   /* controls only; may be scratch views, may overlap */
+    cq_bit       *nb;      /* ~b, W bits                                       */
+    cq_bit       *carry;   /* W+1 bits; carry[W] IS `a >=u b`                  */
+    cq_bit       *axnb;    /* a ^ ~b, W bits                                   */
+    int           W;
+} cq_ult_block;
+
+/* `6W + 1` at every W >= 1 — one gate per step, so this is also the gate count
+ * at the all-quantum mask: `(W+1, 3W, 2W)`. It is `lower_ult!`'s `6W + 3` minus
+ * the two-gate result-wire tail (arith.jl:461-462) that only the generic
+ * `lower_icmp!` dispatcher needs. */
+int cq_ult_steps(int W);
+
+/* One gate of the block, `u` in [0, cq_ult_steps(W)). Out of range is a hard
+ * error in BOTH configurations, for cq_sub_step's reason. */
+void cq_ult_step(cq_ctx *ctx, const cq_ult_block *k, int u);
 
 #endif /* CQOPS_KERNELS_CMP_H */

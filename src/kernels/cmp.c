@@ -50,18 +50,22 @@
  * operand swap and a trailing negation, exactly as `lower_icmp!` has it. */
 enum { PRIM_EQ, PRIM_ULT, PRIM_SLT };
 
-/* `ua` / `ub` are WHAT THE ult RECURRENCE COMPARES, and that is the whole of
+/* `u.a` / `u.b` are WHAT THE ult RECURRENCE COMPARES, and that is the whole of
  * the sharing between ult and slt: `lower_slt!` biases `a` and `b` into `af`
  * and `bf` and then calls `lower_ult!` on those (arith.jl:471), so slt's
  * Phase C is the ult step function verbatim with its operands re-pointed at
- * scratch. `a` and `b` stay separate because slt's own Phase A needs them. */
+ * scratch. `a` and `b` stay separate because slt's own Phase A needs them.
+ *
+ * THE ult HALF IS NOW `cq_ult_block`, A PUBLIC TYPE (cmp.h, plan §0.4). Nothing
+ * about K9 changed with it — the same four gates per stage in the same order,
+ * and slt still re-points the block at its biased copies — but M19 can be
+ * handed the comparator instead of re-typing it, which is D9(e). */
 typedef struct {
     cq_bit       *dst;
     const cq_bit *a, *b;
-    const cq_bit *ua, *ub;
+    cq_ult_block  u;                      /* ult: a, b, nb, carry, axnb, W */
     cq_bit       *diff, *orr;             /* eq  */
     cq_bit       *af, *bf;                /* slt */
-    cq_bit       *nb, *carry, *axnb;      /* ult */
     const cq_bit *raw;
     int           W;
 } cmp_env;
@@ -115,32 +119,50 @@ static void eq_compute(cq_ctx *ctx, void *env, int s)
  * Step 2W is the `+1` of two's complement. Under I6(b) `carry[0]` is already a
  * qubit, so this X IS EMITTED and the j == 3 Toffoli at i == 0 stays a
  * Toffoli; that one step is the entire 12W+2 -> 12W+4 re-issue (K09.md §3). */
-static void ult_compute(cq_ctx *ctx, void *env, int s)
+int cq_ult_steps(int W)
 {
-    const cmp_env *e = (const cmp_env *)env;
-    int W = e->W;
+    if (W <= 0) cq_kernel_die("ult: width is not positive");
+    return 6 * W + 1;                      /* 2W complement + 1 seed + 4W */
+}
 
-    if (s < 2 * W) {
-        int i = s / 2;
+void cq_ult_step(cq_ctx *ctx, const cq_ult_block *k, int u)
+{
+    int W = k->W;
 
-        if (s % 2 == 0) cq_emit_cx(ctx, &e->ub[i], &e->nb[i]);   /* copy */
-        else            cq_emit_x (ctx,            &e->nb[i]);   /* flip */
+    /* The width guard is cq_ult_steps'; its message is DISJOINT from this one
+     * so a death test can say which spoke. This range check is the consumer's:
+     * M19 maps a contiguous run of its own indices onto [0, 6W+1), and an
+     * off-by-one would land in the stage loop and emit a plausible wrong gate
+     * rather than fail. */
+    if (u < 0 || u >= cq_ult_steps(W))
+        cq_kernel_die("ult: step index outside [0, cq_ult_steps(W))");
+
+    if (u < 2 * W) {
+        int i = u / 2;
+
+        if (u % 2 == 0) cq_emit_cx(ctx, &k->b[i], &k->nb[i]);   /* copy */
+        else            cq_emit_x (ctx,           &k->nb[i]);   /* flip */
         return;
     }
 
-    if (s == 2 * W) { cq_emit_x(ctx, &e->carry[0]); return; }
+    if (u == 2 * W) { cq_emit_x(ctx, &k->carry[0]); return; }
 
     /* c_out = MAJ(a, ~b, c_in) = (a & ~b) ^ ((a ^ ~b) & c_in), with the two
      * halves as separate Toffolis and `axnb` holding a ^ ~b. THE ORDER IS
      * LOAD-BEARING: j == 3 reads `axnb[i]`, which j == 0 and j == 1 build. */
-    int u = s - (2 * W + 1), i = u / 4;
+    int v = u - (2 * W + 1), i = v / 4;
 
-    switch (u % 4) {
-    case 0:  cq_emit_cx (ctx, &e->ua[i],               &e->axnb[i]);       break;
-    case 1:  cq_emit_cx (ctx, &e->nb[i],               &e->axnb[i]);       break;
-    case 2:  cq_emit_ccx(ctx, &e->ua[i],  &e->nb[i],   &e->carry[i + 1]);  break;
-    default: cq_emit_ccx(ctx, &e->axnb[i], &e->carry[i], &e->carry[i + 1]); break;
+    switch (v % 4) {
+    case 0:  cq_emit_cx (ctx, &k->a[i],                &k->axnb[i]);       break;
+    case 1:  cq_emit_cx (ctx, &k->nb[i],               &k->axnb[i]);       break;
+    case 2:  cq_emit_ccx(ctx, &k->a[i],    &k->nb[i],  &k->carry[i + 1]);  break;
+    default: cq_emit_ccx(ctx, &k->axnb[i], &k->carry[i], &k->carry[i + 1]); break;
     }
+}
+
+static void ult_compute(cq_ctx *ctx, void *env, int s)
+{
+    cq_ult_step(ctx, &((const cmp_env *)env)->u, s);
 }
 
 /* `lower_slt!`, arith.jl:465-472: copy both operands, flip the MSB of each —
@@ -170,7 +192,7 @@ static void slt_compute(cq_ctx *ctx, void *env, int s)
     if (s == 2 * W)     { cq_emit_x(ctx, &e->af[W - 1]); return; }
     if (s == 2 * W + 1) { cq_emit_x(ctx, &e->bf[W - 1]); return; }
 
-    ult_compute(ctx, env, s - (2 * W + 2));
+    cq_ult_step(ctx, &e->u, s - (2 * W + 2));
 }
 
 /* The "^=" of Rule 7's contract, and the only place `dst` is written on the
@@ -189,9 +211,9 @@ static void copyout(cq_ctx *ctx, void *env, int s)
 
 static int n_compute_of(int prim, int W)
 {
-    if (prim == PRIM_EQ)  return 5 * W - 3;      /* 2W + 3(W-1) */
-    if (prim == PRIM_ULT) return 6 * W + 1;      /* 2W + 1 + 4W */
-    return 8 * W + 3;                            /* 2W + 2 + (6W+1) */
+    if (prim == PRIM_EQ)  return 5 * W - 3;              /* 2W + 3(W-1)     */
+    if (prim == PRIM_ULT) return cq_ult_steps(W);        /* 6W + 1          */
+    return 2 * W + 2 + cq_ult_steps(W);                  /* 8W + 3          */
 }
 
 /* ONE CONTIGUOUS REGION, carved into named sub-arrays. emit.c's I6(a) check is
@@ -204,8 +226,9 @@ static void layout(cmp_env *e, cq_scratch *scr, int prim)
     uint32_t W = (uint32_t)e->W;
 
     e->diff = e->orr = e->af = e->bf = NULL;
-    e->nb = e->carry = e->axnb = NULL;
-    e->ua = e->ub = NULL;
+    e->u.nb = e->u.carry = e->u.axnb = NULL;
+    e->u.a  = e->u.b = NULL;
+    e->u.W  = e->W;
 
     if (prim == PRIM_EQ) {
         cq_scratch_alloc(scr, 2u * W - 1u);
@@ -217,24 +240,24 @@ static void layout(cmp_env *e, cq_scratch *scr, int prim)
 
     if (prim == PRIM_ULT) {
         cq_scratch_alloc(scr, 3u * W + 1u);
-        e->nb    = cq_scratch_span(scr, 0u,          W);
-        e->carry = cq_scratch_span(scr, W,           W + 1u);
-        e->axnb  = cq_scratch_span(scr, 2u * W + 1u, W);
-        e->ua = e->a;
-        e->ub = e->b;
-        e->raw = &e->carry[W];
+        e->u.nb    = cq_scratch_span(scr, 0u,          W);
+        e->u.carry = cq_scratch_span(scr, W,           W + 1u);
+        e->u.axnb  = cq_scratch_span(scr, 2u * W + 1u, W);
+        e->u.a = e->a;
+        e->u.b = e->b;
+        e->raw = &e->u.carry[W];
         return;
     }
 
     cq_scratch_alloc(scr, 5u * W + 1u);
-    e->af    = cq_scratch_span(scr, 0u,          W);
-    e->bf    = cq_scratch_span(scr, W,           W);
-    e->nb    = cq_scratch_span(scr, 2u * W,      W);
-    e->carry = cq_scratch_span(scr, 3u * W,      W + 1u);
-    e->axnb  = cq_scratch_span(scr, 4u * W + 1u, W);
-    e->ua = e->af;                       /* ult runs over the biased copies */
-    e->ub = e->bf;
-    e->raw = &e->carry[W];
+    e->af      = cq_scratch_span(scr, 0u,          W);
+    e->bf      = cq_scratch_span(scr, W,           W);
+    e->u.nb    = cq_scratch_span(scr, 2u * W,      W);
+    e->u.carry = cq_scratch_span(scr, 3u * W,      W + 1u);
+    e->u.axnb  = cq_scratch_span(scr, 4u * W + 1u, W);
+    e->u.a = e->af;                      /* ult runs over the biased copies */
+    e->u.b = e->bf;
+    e->raw = &e->u.carry[W];
 }
 
 static int all_const(const cq_bit *v, int W)

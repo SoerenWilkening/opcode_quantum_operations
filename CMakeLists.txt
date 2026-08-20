@@ -54,8 +54,25 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     cqops_select_sanitizers(CQOPS_SANITIZER_FLAGS)
 endif()
 
+## -ffp-contract=off is NOT a style choice and NOT an optimisation setting: it
+## makes M21's classification a function of the ANGLE rather than of the host.
+## Measured at Step 18 — `a*b + c` may be contracted into one fused multiply-add
+## at the compiler's discretion (clang defaults to `on` for C, gcc to `fast`),
+## and src/angle.c's residual `fabs(theta - k*CQ_ANGLE_PI)` is exactly that
+## shape. Contracted, it measures against the EXACT product; uncontracted,
+## against the rounded one. Building the same source with -march=native changed
+## 1,429 of 250,000 near-lattice classifications, first at
+## theta = 0x1.019c501fbacffp+9 (GENERAL uncontracted, IDENTITY fused).
+##
+## BOTH ANSWERS SATISFY D10 — the fused one is strictly more accurate — so this
+## is a REPRODUCIBILITY fix, not a correctness one. It matters because M22 turns
+## these rows into emitted gates at Step 19 and this project pins gate counts as
+## L4 goldens (risk R5): a golden that moved with the host's -march would be
+## unpinnable. Every module below Layer 4 is integer-only, so the flag costs
+## nothing anywhere else.
 target_compile_options(cqops_build_flags INTERFACE
     -Wall -Wextra -Werror -Wconversion
+    -ffp-contract=off
     $<$<CONFIG:Debug>:-fno-omit-frame-pointer;-g>
     ${CQOPS_SANITIZER_FLAGS}
 )
@@ -123,6 +140,34 @@ add_library(cqops STATIC
                                # and substituting Cuccaro is what collapses
                                # scratch from 3W^2+W to W^2+2W. Self-pinned —
                                # this composition exists nowhere in Bennett
+    src/kernels/divrem_u.c     # M19, Step 17 — K12 udiv/urem, PRD §15 D9. FLAT
+                               # scratch, ONE sandwich, W iterations of M16's
+                               # cq_ult_step + M14's cq_sub_step + M17's
+                               # cq_mux_step. TRANSCRIBES NO GATE LIST: it is a
+                               # step-index map, a scratch layout and the L5
+                               # short-circuit. The largest object in v1 —
+                               # 8W^2+4W-1 qubits, 131,583 at the shipped i128
+    src/kernels/divrem_s.c     # M20, Step 17 — K12 sdiv/srem. Sign-magnitude
+                               # over M19, with the ONE gate list K12 does not
+                               # get from a sibling: _cond_negate_inplace!
+
+    # Layer 4 — the analog surface. Everything above this line is a classical
+    # permutation over {X, CX, CCX} (Rule 4), which is the surface the two-bit
+    # shadow is EXACT on and the surface cq_pc_zero_proof_rotation_free rests
+    # on. M21 is where that stops being the whole story — though it emits
+    # nothing itself: it decides which of PRD §7's rows an angle sits on, and
+    # M22 (Step 19) is what acts on the answer.
+    src/angle.c                # M21, Step 18 — §7's row selection. Pure, no
+                               # internal dependencies, no state but one
+                               # configurable tolerance
+    src/rotate.c               # M22, Step 19 — §7's twelve cells and the
+                               # terminal measurement. THE FIRST CALLER OF
+                               # cq_shadow_rotate IN src/: the rotation-free
+                               # surface ends here, on exactly one of the
+                               # twelve cells, the general-Ry row's two
+                               # (PRD §15 D12), and
+                               # cq_pc_zero_proof_rotation_free stops being
+                               # exact for anything that meets that cell
 )
 
 target_include_directories(cqops
@@ -131,6 +176,22 @@ target_include_directories(cqops
 )
 
 target_link_libraries(cqops PRIVATE cqops_build_flags)
+
+## libm, for M21's round and fabs (and fmod/fma in test_angle_oracles.inc).
+## M22 needs none of it: rotate.c does no float arithmetic — it passes theta
+## through and hands one constant to sink.rz.
+##
+## NOT a new dependency — <math.h> is part of the C standard library, and PRD §14's
+## "nothing beyond libc" is intact. It is a LINK detail that differs by platform: on
+## macOS libm is folded into libSystem and the link succeeds without it, which is
+## exactly why this is easy to omit here and discover on CI (bd kju) instead. glibc
+## ships libm separately and `round` would be an undefined symbol.
+##
+## PUBLIC, so it propagates to every test binary through cqops_test_support.
+find_library(CQOPS_LIBM m)
+if(CQOPS_LIBM)
+    target_link_libraries(cqops PUBLIC ${CQOPS_LIBM})
+endif()
 
 add_library(cqops::cqops ALIAS cqops)
 

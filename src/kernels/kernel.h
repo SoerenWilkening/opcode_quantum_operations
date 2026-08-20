@@ -56,7 +56,12 @@ typedef void (*cq_kernel_fn)(cq_ctx *ctx, cq_bit *dst,
  * "a kernel is always handed whole-register base pointers, never sub-arrays,
  * so partial overlap is unrepresentable". It is not: `cq_scratch_span`
  * (src/scratch.h) exists precisely so a kernel can carve one region into named
- * sub-arrays, and bitwise.h says K9 and K12 will call these kernels that way.
+ * sub-arrays. *(That clause used to cite bitwise.h's prediction that "K9 and
+ * K12 will call these kernels that way"; the prediction is falsified — neither
+ * does — but the premise it supported is stronger than ever. K12 hands M16's
+ * and M14's exported step blocks a view of its remainder that deliberately
+ * ALIASES the previous iteration's output, K12.md §2.1a and plan §0.4
+ * obligation 3.)*
  * MEASURED in both configurations before the fix: one 8-bit all-classical
  * register `r`, then `cq_kernel_xor(ctx, &r[0], &r[2], b, 4)` — `dst != a` as
  * pointers, so the guard passed, and lanes 2-3 of `dst` were lanes 0-1 of `a`.

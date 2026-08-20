@@ -280,11 +280,13 @@ CQ_TEST(the_last_gate_is_a_no_op_that_is_emitted_anyway)
  * clear x, and the library really can see it.
  *
  * WHAT THIS DOES NOT CLAIM. The scope is the predicate's name: rotation-free.
- * Once M22 lands, a rotation anywhere upstream poisons the rail and this free
- * starts hard-erroring on a rail that is genuinely clean — which is bd ckd.18's
- * shape, and is why the proof lives in tests/ and must never move into src/.
- * So K08.md §4 is not wrong in general; it is wrong for Steps 10-17, which is
- * where M15 ships. */
+ * NARROWED AT STEP 19 BY PRD §15 D12 — it is not "any rotation upstream" but a
+ * GENERAL Ry: every Rz is diagonal, and so is the `Z` of the θ≡π row, so a rail
+ * that met only those keeps a determinate shadow and stays freeable. What does
+ * hard-error on a genuinely clean rail is a rail a general Ry has touched, which
+ * is bd ckd.18's shape and is why the proof lives in tests/ and must never move
+ * into src/. So K08.md §4 is not wrong in general; it is wrong for Steps 10-17,
+ * which is where M15 ships, and it stays wrong for any caller that only folds. */
 CQ_TEST(the_ancilla_can_be_freed_after_a_bare_call)
 {
     static const int WS[] = { 2, 3, 4, 8, 16 };

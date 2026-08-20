@@ -107,7 +107,17 @@ cq_counter *cq_sink_counter_register(void);
 uint64_t cq_count_total(const cq_counter *c);
 
 /* T-count for fault-tolerant synthesis: 7 per Toffoli, NOT and CNOT being
- * Clifford. Verbatim from Bennett's `t_count` (diagnostics.jl:122). */
+ * Clifford. Verbatim from Bennett's `t_count` (diagnostics.jl:122).
+ *
+ * A LOWER BOUND SINCE STEP 19, and unlike cq_count_total's exclusion of ry/rz/mz
+ * this one is NOT a deliberate Bennett-comparability choice — it is the honest
+ * limit of a formula ported from a gate set that has no rotations. `Ry(θ)` at a
+ * general θ is not Clifford and costs O(log 1/ε) T gates under synthesis, and
+ * this returns 7·Toffoli regardless. It stays exact for everything Bennett can
+ * express, which is every kernel; it under-reports the moment §7's general rows
+ * fire. Making it exact needs a synthesis model and a target ε, which is the QEC
+ * sink's business (§7: the `Ry` entry stays `double` all the way down), not
+ * this counter's. Do not "fix" it by folding ry/rz into the Toffoli term. */
 uint64_t cq_count_t(const cq_counter *c);
 
 #endif /* CQOPS_SINK_COUNT_H */

@@ -78,8 +78,10 @@ cq_ref_w cq_pc_value_w(const cq_ctx *ctx, int32_t h)
             if (sh.unknown) {
                 cq_h_fail(__FILE__, __LINE__,
                           "cq_pc_value: h%d bit %u is on qubit q%u with an "
-                          "UNKNOWN shadow — nothing on the rotation-free "
-                          "surface can poison, so this is a real finding",
+                          "UNKNOWN shadow — only a GENERAL Ry poisons "
+                          "(PRD D12) and no kernel performs one, so this is a "
+                          "real finding; a suite that rotates wants "
+                          "test_rotate_table.inc's rt_value instead",
                           (int)h, i, q);
                 one = 0;
             } else {

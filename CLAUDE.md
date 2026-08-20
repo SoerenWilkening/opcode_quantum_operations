@@ -26,13 +26,52 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), the M01–M28 module map, 28 steps (Steps 0 and 1 stand alone; Steps 2–27 form phases A–E), the R1–R7 risk register |
 > | `bd` | The tracker. All 28 steps (0–27) are filed, plus **sixteen** Step 0 sub-tasks: the plan's 0.1–0.6, then 0.7–0.16 for contradictions and scope gaps found after the plan was written. `bd ready` |
 >
-> **Steps 1–16 have landed (2026-08-16): Layer 0, the emitter, the handle table,
-> the sandwich, both v1 sinks, and thirteen kernels (K1–K11) — K6/K7 being the
-> FIRST SANDWICH USERS, K9 the first kernel whose `dst` is not `W` bits wide,
-> K10 the first with THREE sources, K8 the first that is NOT A RULE 7 KERNEL AT
-> ALL, and K11 the FIRST COMPOSITE WHOSE INNER CONSTRUCTION IS ANOTHER MODULE'S
-> WHOLE KERNEL. PRD increments 1 and 5 are complete.**
-> On disk and passing under **both** configurations, **130 ctest tests**:
+> **STEP 19 LANDED 2026-08-17: M22 `rotate` — 96 lines against a 150 budget — AND WITH IT
+> THE ROTATION-FREE SURFACE ENDS.** `src/rotate.c` is the first and only caller of
+> `cq_shadow_rotate` in `src/`, and it makes that call on exactly **two** of PRD §7's
+> twelve cells — the general-`Ry` row, both columns, which is the only row that can move a
+> computational-basis value off a basis state. 19 cases + 12 deaths green in both configurations, **175 ctest tests**;
+> **35/35 real mutants killed across three rounds in both configurations, with 4
+> deliberately-equivalent controls alive** — the last seven of those were found by an
+> adversarial review AFTER the first battery reported 28/28, and every one was a
+> genuine hole in the suite rather than in the module.
+>
+> **Its three blockers were resolved in the documents first, and two of them turned out
+> not to be Step 19's at all.** `lk0` is **PRD §7**: the `Z` is `sink.rz(q, π)`, because
+> `Rz(π) = −i·Z` — two existing vtable entries, no seventh slot. `pf4` is **PRD §15 D11**
+> and is Step 20's to build, with v1 refusing rather than emitting five hand-derived
+> phases. `ckd.18` **does not block Step 19 at all** (verified: `cq_shadow_rotate` had zero
+> `src/` callers and M22's code is byte-identical under every candidate), is **25** frees
+> rather than 37, and folds into `ckd.17b` at Step 23.
+>
+> **The step's own result is PRD §15 D12: only a general `Ry` poisons the shadow.** A
+> diagonal gate cannot move a computational-basis value, so every `Rz` and the `Z` of the
+> half-turn row leave the shadow **exact** rather than merely conservative. Measured
+> payoff: the corpus's twelve `rz`-rooted rails stay freeable — and the claim that made
+> them look safe before (that they were never materialised) was **measured FALSE**, in a
+> comment sitting in shipped source. Two further documentation defects were found and
+> fixed: "`Ry(π) = XZ`" is matrix order while "emit `X` then `Z`" is circuit order (they
+> differ by the global −1 the row already merges), and the `3.14` witness for D10's
+> tolerance cap is an **`rz`** angle, on the one column that has no half-turn row.
+>
+> **Step 18 landed 2026-08-17: M21 `angle`, the first module of Layer 4 that is not a
+> sink, and the first thing in the project whose subject is a REAL NUMBER rather than a
+> gate. It emits nothing — it decides which of PRD §7's rows an angle sits on, and M22
+> (Step 19) is what acts on the answer. The step's actual result is that §7's tolerance
+> sentence was UNSATISFIABLE AS WRITTEN and its natural reading is a miscompile; the
+> correction is PRD §15 D10 and it is written into the PRD, not worked around in code.
+> Two new blockers came out of it, `bd pf4` and `bd lk0`, and both bite Step 19/20.**
+>
+> **Steps 1–17 have landed (2026-08-16): Layer 0, the emitter, the handle table,
+> the sandwich, both v1 sinks, and ALL TWELVE KERNEL FAMILIES (K1–K12) — K6/K7
+> being the FIRST SANDWICH USERS, K9 the first kernel whose `dst` is not `W` bits
+> wide, K10 the first with THREE sources, K8 the first that is NOT A RULE 7
+> KERNEL AT ALL, K11 the first composite whose inner construction is another
+> module's whole kernel, and K12 the FIRST KERNEL THAT TRANSCRIBES NO GATE LIST
+> AT ALL — its entire loop body is M16's, M14's and M17's exported step blocks.
+> PRD increments 1, 5 and 6 are complete, and PHASE B IS DONE: every kernel in
+> the catalogue is on disk.**
+> On disk and passing under **both** configurations, **175 ctest tests**:
 >
 > | Step | Module | Files | LOC / budget |
 > |---|---|---|---|
@@ -55,9 +94,9 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 11 | **M11** | `src/kernels/shift_const.[ch]` — K4 constant shl/lshr/ashr, implementing **D8** | 63 / 90 |
 > | 11 | **M13** | `src/kernels/cast.[ch]` — K5 sext/zext/trunc; unary with **two widths** | 42 / 90 |
 > | 11 | — | `tests/support/kernelsweep.c` — the sweep shapes, split from `kerneldrv.c` on plan §2.2's recorded seam | 128 |
-> | 12 | **M14** | `src/kernels/add.[ch]` — K6 add, K7 sub. Ripple-carry, one gate per step, one `ripple` shared by both | 114 / 190 |
+> | 12 | **M14** | `src/kernels/add.[ch]` — K6 add, K7 sub. Ripple-carry, one gate per step, one `ripple` shared by both. **Step 17 added the `cq_sub_block` export** | 124 / 190 · 18 |
 > | 12 | — | `tests/test_kernel_add.c` + `test_kernel_add_upstream.inc` + `test_kernel_add_death.c` | 244 · 48 · 45 |
-> | 13 | **M16** | `src/kernels/cmp.[ch]` — K9 `icmp`, **all ten predicates**. Three ported primitives, seven derived by `lower_icmp!`'s own dispatch | 190 / 200 |
+> | 13 | **M16** | `src/kernels/cmp.[ch]` — K9 `icmp`, **all ten predicates**. Three ported primitives, seven derived by `lower_icmp!`'s own dispatch. **Step 17 added the `cq_ult_block` export and it landed at EXACTLY the budget** | **200 / 200** · 34 |
 > | 13 | — | `tests/test_kernel_cmp.c` + `test_kernel_cmp_derivation.inc` + `test_kernel_cmp_death.c`, and `cq_ref_icmp` in `refmodel` | 236 · 218 · 72 |
 > | 14 | **M17** | `src/kernels/mux.[ch]` — K10 select. **Three sources**, `cond` one bit; exports `cq_mux_step` so M12 calls the block rather than transcribing it | 65 / 90 |
 > | 14 | **M12** | `src/kernels/shift_var.[ch]` — the barrel over M17's block. Classical amount short-circuits to M11 | **138 / 130** |
@@ -66,6 +105,13 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 15 | — | `tests/test_kernel_addacc.c` + `_upstream.inc` + `_sandwich.inc`, `tests/test_kernel_addacc_death.c` | 205 · 149 · 100 · 108 |
 > | 16 | **M18** | `src/kernels/mul.[ch]` — K11 `mul`, shift-add over M15. Rule 7's canonical shape with **no departure at all**, the first since K6/K7; `W = 1` delegates to K2 | 102 / 160 · 8 |
 > | 16 | — | `tests/test_kernel_mul.c` + `_sweep.inc` + `_schedule.inc` + `_refmodel.inc`, `tests/test_kernel_mul_death.c`; `cq_ref_w_mul` in `refmodel` | 271 · 79 · 103 · 39 · 91 |
+> | 17 | **M19** | `src/kernels/divrem_u.[ch]` — K12 `udiv`/`urem`. FLAT scratch, ONE sandwich, and **no gate list of its own**: a step-index map, the contiguous remainder tape, and the L5 short-circuit | 202 / 220 · 27 |
+> | 17 | **M20** | `src/kernels/divrem_s.[ch]` — K12 `sdiv`/`srem`, sign-magnitude over M19. Carries `_cond_negate_inplace!`, the one construction K12 gets from no sibling | **158 / 110** · 11 |
+> | 17 | — | `tests/test_kernel_divrem.c` + `_common.inc` + `_sweep.inc` + `_schedule.inc` + `_refmodel.inc`, `tests/test_kernel_sdivrem.c` + `_sweep.inc`, `tests/test_kernel_divrem_death.c`; four `cq_ref_w_*div`/`*rem` in `refmodel` | 251 · 212 · 47 · 66 · 80 · 260 · 46 · 214 |
+> | 18 | **M21** | `src/angle.[ch]` — §7's row selection. **Emits nothing, allocates nothing, takes no `cq_ctx`**: the first module whose whole subject is a real number. Implements **PRD §15 D10**, which is what §7 left open | 69 / 80 |
+> | 18 | — | `tests/test_angle.c` + `_oracles.inc` (split on the **instrument ↔ assertion** seam when the `.c` crossed 300; the `.c` is back at **294** after the review's three new cases, and its SECOND seam is recorded in its own header — `bd w8j`), `tests/test_angle_death.c` | 294 · 94 · 60 |
+> | 19 | **M22** | `src/rotate.[ch]` — §7's twelve cells and the terminal measurement. **THE FIRST CALLER OF `cq_shadow_rotate` IN `src/`**, on the general-`Ry` row's two cells and no others (D12). Carries `lk0`'s `sink.rz(q, π)`, spells its constant flip `cq_emit_x` so D11's controlled form is correct for free at Step 20, and refuses to run inside a sandwich — the one guard it owns outright, and the only thing standing in for **both** I6 mechanisms, neither of which reaches a module that bypasses `cq_emit_*` to emit | 96 / 150 |
+> | 19 | — | `tests/test_rotate.c` + `_table.inc` + `_cells.inc` + `_measure.inc`, `tests/test_rotate_death.c`. **The first suite in the project to need TWO splits at once** — it reached 437 against the 300 limit — and both seams were taken as recorded rather than improvised. **No `.counts` golden, deliberately**: `cq_gold_row` is `{x, cx, ccx}` and every M22 count is `ry`/`rz`/`mz`, M22 has no upstream construction for the R3 commit check to guard, and the counts ARE the specification, so a regenerable file would let `CQOPS_UPDATE_GOLDENS=1` bless a row that stopped emitting a rotation | 257 · 93 · 163 · 78 · 187 |
 >
 > **The fold table has landed and is green at 159/159** (155 exhaustive + 4 distinctness
 > deaths), so the critical path is behind us. `cq_ctx` now exists: pool + shadow + a
@@ -127,7 +173,8 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > published totals, `x+3`, `x−1`, and the R8 mixed-mask witness. Those documents
 > were derived with Julia not installed and said so; they are now measured.
 > **M14 is 114 lines against a 190 budget, so plan §3's `add.c ↔ sub.c` seam is
-> unused and stays available.** Risk **R9**'s short-circuit is in and is
+> unused and stays available** — and Step 17 spends a little of that room on
+> D9(e)'s `cq_sub_step` export (plan §0.4), which is additive.** Risk **R9**'s short-circuit is in and is
 > bit-serial, not packed — add and sub ship at **i128** and i80 is explicitly
 > excluded from them (`opcode_table.yaml:184-185`, `:85`), so the suite sweeps the
 > ladder plus 128.
@@ -161,12 +208,18 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > recurrence minus the trailing `CNOT(carry[i], result[i])` that makes the sum
 > bit, with its own `axnb` array and four gates per stage rather than five — so
 > porting it is Rule 1 applied literally, not a second transcription. Nothing was
-> exported from M14 and no Layer 3 API changed. **The M19/M20 half stays open**:
-> K12 costs itself `C_sub(W) = 7W−1`, which *is* K7's compute half, so unlike K9
-> it does want the recurrence itself.
+> exported from M14 and no Layer 3 API changed **at Step 13**. **The M19/M20 half
+> is now CLOSED too (2026-08-16, plan §0.4 / PRD §15 D9(e)):** K12 costs itself
+> `C_sub(W) = 7W−1`, which *is* K7's compute half, so unlike K9 it does want the
+> recurrence itself — and the answer is that **M14 exports it** (`cq_sub_block` /
+> `cq_sub_steps` / `cq_sub_step`) rather than M19 re-transcribing it, with **M16
+> exporting its `ult` compute half the same way**. That is Rule 1 applied to the
+> call graph, as M17 and M15 already do for M12 and M18.
 >
 > **M16 is 190 lines against a 200 budget, so plan §3's `primitives ↔ predicate
-> derivation` seam is unused on the source side and stays available.** The *test*
+> derivation` seam is unused on the source side and stays available — and Step 17
+> is what will probably take it**, since D9(e) adds `cq_ult_block` /
+> `cq_ult_steps` / `cq_ult_step` to this module for M19 (plan §0.4).** The *test*
 > side split on exactly that seam: `test_kernel_cmp_derivation.inc` carries the
 > seven derived predicates and the fold formula, and the `.c` keeps the sweeps and
 > the goldens. **K9 is the only kernel that keeps Rule 7's single-`W` signature while
@@ -333,13 +386,145 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > of those facts are findings — see the callouts. The one that matters: **exactly one
 > mutant of the twenty-two left the entire L1/L2/L3/L5 sweep GREEN.**
 >
-> **Next is Step 17 — K12 `divrem` (M19/M20).** `ckd.13` is the one to read first:
-> its ancilla scheme is unchosen and quadratic, 32,960 qubits at W=64, which is ~2×
-> K11's and will need `bd mmv`'s sweep budget applied harder than K11 needed it.
-> Note `bd -4tt`'s open half lands here: K12 costs itself `C_sub(W) = 7W−1`, which
-> *is* K7's compute half, so unlike K9 it does want M14's recurrence itself.
-> Still a plan: no controlled axis (M06 is Step 20, not Step 8, despite its low
-> module number), and no rotation (M21/M22 are Steps 18–19).
+> **Step 17 LANDED, and K12 IS THE FIRST KERNEL THAT TRANSCRIBES NO GATE LIST AT ALL.**
+> M19 `divrem_u.c` is 202 lines and every gate in it belongs to somebody else: `W`
+> iterations of {shift-in CX, M16's `cq_ult_step`, M14's `cq_sub_step`, M17's
+> `cq_mux_step`, quotient CX}. What M19 *is* is a step-index map, a scratch layout and
+> the L5 short-circuit — so what its suite tests is the SLOT ARITHMETIC and the LAYOUT,
+> which is a different subject from every kernel before it. M20 adds the sign-magnitude
+> wrapper and the one construction K12 gets from no sibling, `_cond_negate_inplace!`.
+> **Every figure in `K12.md` §3 and §4 reproduced on the first run — all four opcodes,
+> ten widths, both configurations — INCLUDING THE FOUR SIGNED COLUMNS, which §6.1 listed
+> as the one thing the 2026-08-16 measurement pass had not reached.** `sdiv` is 71 at
+> i1, 2402 at i8 and 560,522 at i128; `srem` 65 / 2382 / 560,262. Not one number moved.
+>
+> **The two EXPORTS shipped with it and are additive** (plan §0.4, PRD §15 D9(e)): M14's
+> `cq_sub_block` / `cq_sub_steps` / `cq_sub_step` and M16's `cq_ult_block` /
+> `cq_ult_steps` / `cq_ult_step`, on the shape M15's `cq_addacc_step` and M17's
+> `cq_mux_step` already had. `cq_kernel_fn` was not widened, K6/K7 and all ten compares
+> emit the same gates in the same order, and their goldens did not move. **`cmp.c` now
+> sits at EXACTLY 200/200** — the recorded seam (`primitives ↔ predicate derivation`,
+> moving to `src/kernels/cmp_prim.c`) is unused and has zero headroom left.
+>
+> **The shape was settled BEFORE a line was written: `ckd.13` and the M19/M20 half of
+> `4tt` were resolved 2026-08-16 as PRD §15 `D9` + plan §0.4, by building prototypes of
+> three competing schemes and measuring them.** Five parts, and all five held in the
+> shipped kernel.
+> **(a) FLAT** scratch — chosen against two *measured* alternatives, not by default. The
+> bead's "nested is `O(W)`" is false (nesting alone is `W² + 10W`), **but a genuinely LINEAR
+> scheme does exist — `13W + 3` qubits, `90W² − 3W` gates — and is filed for v2.** The
+> tempting argument that it cannot ("reclaiming the remainder needs a controlled add, and M06
+> is Step 20") is **WRONG, and was written into this file for an hour before an adversarial
+> pass refuted it**: a single-qubit-controlled add of a register is already a *ported*
+> construction — `mul.c`'s Toffoli mask (`multiplier.jl:22-29`) plus an uncontrolled adder —
+> and `r_in[t] = rnext[t] + fits_t·b` exactly, so the remainder chain IS reclaimable. FLAT
+> wins on being the ported shape, 2.64× fewer gates, a four-phase decode against eleven, and
+> consistency with `mul.c`'s `pp` recycling and `bd b8g`, both measured and both deliberately
+> not taken in v1. What it costs is not softened: **131,583 qubits per i128 `udiv` against the
+> linear scheme's 1,667.** **(b)** `fits` is the comparator carry-out
+> `ucar[t][W]`, which is what **M16 already ships** — not `not1(ult(…))`. **(c)** the
+> quotient bit is one CX. **(d)** the initial remainder's upper bits are real scratch.
+> **(e)** M14 and M16 **export their compute halves** and M19 composes them with M17's, so
+> K12 transcribes **nothing** (plan §0.4). Pinned and **measured** in both configurations at
+> `W ∈ {1,2,3,4,8,16,32,64,128}`: `udiv` `34W²+5W` = **2216** at i8 over `8W²+4W−1` = **543**
+> qubits; L1 exhaustive over all `(a,b)` incl. `b = 0` at `W ≤ 4`, L2/L3 pool restored,
+> scratch clean, I6 green. **`divrem` ships at i128** (`opcode_table.yaml:187-190`, full
+> `qq` grid — K12.md said the opposite and was wrong), where one `udiv` is **557,696 gates
+> over 131,583 qubits**: the largest object in v1 and where D2's ceiling bites first.
+> `bd mmv`'s sweep budget applies harder here than anywhere — **its discipline was applied
+> up front rather than after measuring, and the SUITE was split in two on the M19/M20 seam
+> (option (a)) so `ctest -j` overlaps them.** Isolated in Debug the two halves are 73 s and
+> 78 s; the whole Debug run is bounded by `test_kernel_shift_var`, not by these.
+>
+> **A 39-MUTANT BATTERY OVER `divrem_u.c`, `divrem_s.c` AND THE TWO NEW EXPORTS KILLED ALL
+> 36 REAL MUTANTS BUT ONE, AND LEFT ALL 3 DELIBERATELY-EQUIVALENT CONTROLS ALIVE.** Both
+> configurations, `ctest` throughout. The two results that matter:
+>
+> **(i) K12's K11-shaped mutant IS caught, and by three durable assertions rather than
+> one.** `udiv`'s copy-out reads `q` and never the remainder, so the mux at the LAST
+> iteration computes a register nothing ever looks at; skipping it removes `4W` gates and
+> leaves every `udiv` VALUE correct. That is K12.md §6.0a's "narrow the blocks towards
+> `t + 2` bits" in its cheapest form. Measured: **the entire L1/L2/L3/L5 sweep stays GREEN**,
+> as do D3, R9 and the peak-qubit case — and the mutant is caught by the composition
+> identity, the phase-boundary scan, the palindrome and the golden. Three of those four read
+> no golden, so unlike K11's case this one does **not** rest on a number
+> `CQOPS_UPDATE_GOLDENS=1` could bless.
+>
+> **(ii) The one real survivor is understood and is genuinely equivalent: the remainder
+> tape's block STRIDE has slack.** `tape_off`'s `W + 1` can be `W` and everything still
+> works, because the blocks then overlap by exactly the dropped top bit — `rnext[t][W−1]` IS
+> `z[t+2]`, and §2.0 proves that bit is zero and unread. The property the layout must
+> satisfy, `r_in[t+1][j] = rnext[t][j−1]`, is preserved by ANY stride ≥ W, so the stride is
+> not independently testable; a stride ABOVE `W+1` is caught, but by `cq_scratch_span`'s
+> bounds check rather than by anything about division. Filed as `bd mri` — it would save
+> `W − 1` qubits out of `8W² + 4W − 1`, which is 127 of 131,583 at i128 and not worth taking.
+>
+> **STEP 18 LANDED, AND ITS RESULT IS THAT PRD §7's TOLERANCE SENTENCE WAS UNSATISFIABLE
+> AS WRITTEN.** M21 is 69 lines and does one thing — given a double, which of §7's rows is
+> this? — but §7 specified that classification as *"an exact-multiple test against a
+> tolerance, configurable, default `1e-12` **relative**"* and **never says relative to
+> what**. There are two readings and they are not close.
+>
+> **The natural reading, relative to `|θ|`, is a MISCOMPILE — and it was built, shipped
+> into a 16-case suite, and green.** The window `tol·|θ|` grows without bound while the
+> lattice spacing stays `π`, so above `|θ| ≈ 1e11` it swallows whole lattice cells.
+> Measured against a 60-digit π: at `θ = 1e12` the window is a **full radian**, and
+> `Ry(1e12)` — **0.657625 rad** from the nearest multiple of π — classified as
+> `CQ_ANGLE_IDENTITY`, so M22 would emit **nothing at all**. 63.6% of angles sampled near
+> `1e12` folded to some special row. **That is the forbidden direction**: every other §7
+> row costs at most a gate, and this one deletes a rotation.
+>
+> **It is now PRD §15 D10, resolved in the document rather than in code:** the window is
+> `tol·π` — **absolute**, a fraction of the lattice modulus — and one refusal,
+> `|θ|·1.6e-16 ≤ tol·π`, carries the whole error bound `|θ − k·π| ≤ 2·tol·π`. `tol` is
+> capped at `1e-3`, one bound doing three jobs (window far under `π/2`, `|k|` under `2^53`
+> so the cast is defined *and* exact, and "tolerance" still meaning "the same angle").
+> **The argument FOR the relative reading is false and measured false:** the residual
+> tested is `|θ − fl(k·π_double)|`, which for `θ` spelled `k*M_PI` is **exactly zero at
+> every k**, because both sides are the same rounded product — so large multiples are
+> recognised at any window down to and including nothing. And the sibling defect, from the
+> other side of the same term: `θ = 2^52·π_double` has a residual of exactly 0 and is
+> **0.551532 rad** from any true multiple of 4π, which an earlier draft of the suite
+> **asserted as correct**. Full statement in PRD §15 D10 and §7.
+>
+> **The corpus is untouched, and that was measured rather than assumed.** Across all 239
+> goldens: **410 rotation calls** (343 `ry`, 67 `rz`), **26 distinct angles**, and **not
+> one lands on any of §7's four special rows**. The closest approach is a literal `3.14`
+> in two fixtures — `1.59e-3` rad short of π, `5.1e8` times the default window, but
+> *inside* the window at the maximum legal tolerance, which is the fact that puts the cap
+> where it is. Pinned in the suite.
+>
+> **A 39-MUTANT BATTERY OVER `angle.[ch]` ACROSS TWO ROUNDS KILLED ALL 39 IN BOTH
+> CONFIGURATIONS AND LEFT 4 DELIBERATELY-EQUIVALENT CONTROLS ALIVE** — but two of those
+> kills exist only because the battery asked for them, and both are recorded below.
+>
+> **AND THE BATTERY WAS NOT ENOUGH: A 29-AGENT ADVERSARIAL REVIEW RAISED 25 FINDINGS, 9 OF
+> WHICH SURVIVED AN ATTEMPT TO REFUTE THEM, AND THREE OF THOSE MOVED CODE.** The suite went
+> from 16 cases to 19. (i) **Both `<=` in `cq_angle_lattice` had only a DEGENERATE witness**
+> — `residual == window == 0` at `θ = 0, tol = 0` — so nothing distinguished `<=` from `<`
+> at a real threshold; two exact non-degenerate ties are now pinned in hex and must not be
+> "tidied" into decimals. (ii) **`cq_angle_rz_row` ignoring the module tolerance survived
+> the whole suite**, because every other `CHECK_RZ` runs at the default and the Rz column
+> collapses `HALF_TURN` into `GENERAL`, which is the discriminator that kills the same
+> mutation on the Ry side; at `tol = 0` that mutant answers IDENTITY where the truth is
+> GENERAL, the forbidden direction. (iii) **The case named for D10's contract could falsify
+> only the RESIDUAL half of it**, never the drift half — see the probe-range callout below,
+> which is this step's own headline lesson arriving one level down. Two more findings
+> corrected prose that was wrong (`1.29 rad from any multiple of 4π` names the wrong
+> lattice; `1.50005e-16` is `1.500040e-16`) and one added `-ffp-contract=off` to the build.
+>
+> **Next is Step 20 — M06 `controlled`, the axis this project has been deferring
+> decisions into since Step 6.** Three of them come due at once and all three are now
+> written down rather than open: **PRD §15 D11** (what §7's five folding rows do under a
+> quantum control — v1 refuses, and M06 owns the refusal at one greppable site), **`bd
+> skh`** (does `cq_materialise`'s `X` get promoted? — D11's constant-column correctness is
+> *contingent* on the answer being **no**, so it can no longer be deferred), and the
+> `CQ_ANGLE_HALF_TURN` split by `k mod 4`, without which the constant-column phases cannot
+> be emitted at all and `cqrt_ry_<W>_controlled_inv` would disagree with its own forward.
+> Note `cq_ctx` still has **no `ctrl_depth`** — M22 deliberately takes no position — so
+> nothing has answered any of it by accident. Step 20's own gate is that **every Phase-B
+> kernel re-runs its L1–L4 suite under `cq_ctrl_push`**, which is why the axis is an
+> emitter mode: one parameter in the shared kernel driver, not twelve new suites.
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -637,9 +822,66 @@ classical: **flip the constant, 0 gates, 0 qubits**. On a bit that is already a 
 — possibly in superposition, possibly entangled — the sign is observable and must be
 emitted: `X` then `Z`. `Rz` on a constant is **nothing** at every φ (diagonal on a
 definite value is a global phase). Getting this asymmetry right is what makes
-classical-mode testing possible **without making it unsound** (PRD §7). Angle
-comparison is an exact-multiple test against a configurable tolerance, default
-`1e-12` relative; note `Ry` folds mod 4π and mod 2π on different rows.
+classical-mode testing possible **without making it unsound** (PRD §7). Note `Ry`
+folds mod 4π and mod 2π on different rows.
+
+**THE `Z` IS `sink.rz(q, π)` — `bd lk0`, RESOLVED at Step 19 and SHIPPED in M22.**
+`Rz(π) = diag(−i, i) = −i·Z`, so two existing vtable entries do it and the §8 vtable
+stays frozen at six. Two riders, both now in PRD §7. **"`Ry(π) = XZ`" is a MATRIX
+product; "emit `X` then `Z`" is a CIRCUIT** — and the circuit is the matrix `Z·X`,
+which is `Ry(3π) = −Ry(π)`. That is not a bug to fix: the row spans θ ≡ π (mod 2π),
+which contains both parities, so **no fixed two-gate spelling is sign-exact for the
+whole row** and the honest claim is "the half turn up to a global phase". And the
+residual `±i` is *unreachable* — `det Ry = det Rz = 1` while `det X = −1`, so any
+product of `x` and `rz` that is antidiagonal has determinant −1 and can only equal
+`±i·Ry(π)`. **Do not reorder to chase the phase.**
+
+**WHICH ROWS POISON IS PRD §15 D12, AND IT IS ONLY THE GENERAL `Ry`.** A diagonal gate
+maps `|v⟩ → e^{iα}|v⟩` and cannot move a computational-basis value, so every `Rz` and
+the `Z` of the half-turn row leave the shadow **determinate and correct** — not merely
+conservative. The half-turn row takes `X`'s shadow rule (`cq_shadow_x`), which is why
+M22 spells its flip `cq_emit_x` rather than `cq_bit_flip_const`: that one function IS
+§7's constant/qubit split for a bit flip, and it is also what makes D11's controlled
+form correct for free at Step 20. Measured payoff: the corpus's twelve `rz`-rooted
+rails stay freeable. `cq_shadow_rotate` itself is unchanged and still poisons
+unconditionally — D12 decides which rows *call* it.
+
+**The comparison is M21's, and "1e-12 relative" is NOT relative to θ (PRD §15 D10,
+Step 18).** The window is the absolute angle `tol · π`, one refusal
+(`|θ|·1.6e-16 ≤ tol·π`) carries the contract `|θ − k·π| ≤ 2·tol·π`, and `tol` is capped
+at `1e-3`. The θ-relative reading was built first and is a **miscompile**: at `θ = 1e12`
+that window is a full radian, and `Ry(1e12)` — 0.657625 rad from any multiple of π —
+folds to the identity, so the rotation is silently deleted. Never reintroduce it, and
+never widen the cap: at `tol = 1e-3` a `Ry(3.14)` becomes an `X`.
+
+> **THE CAP IS RIGHT AND ITS WITNESS WAS ON THE WRONG COLUMN, corrected at Step 19.**
+> This sentence used to read "the corpus's own `3.14` becomes an `X`". Both corpus
+> occurrences of `3.14` are **`cqrt_rz_i32`** (`spec_select_caller:12`,
+> `spec_twoarm_caller:30`), and the `Rz` column has no half-turn row — `cq_angle_rz_row`
+> collapses it into `GENERAL` — so the corpus's own `3.14` is a real rotation **at every
+> legal tolerance including the cap**, and never becomes an `X`. The hypothetical `Ry`
+> is what justifies the cap. `tests/test_angle.c` pinned the `Ry` column and had no
+> `CHECK_RZ(3.14, …)` at all; `test_rotate.c`'s
+> `the_corpus_rz_angle_is_a_real_rotation_at_every_legal_tolerance` is where the column
+> the corpus actually exercises is now tested, as an EMISSION rather than a
+> classification. PRD §15 D10 carries the same correction.
+
+**§7's table is stated for the UNCONTROLLED axis, and what it does under a control is
+now PRD §15 D11 (`bd pf4`, resolved at Step 19).** A **classical** control folds the
+region away (§9's new row 0: `ZERO` skips it, `ONE` emits it uncontrolled), so §7 and
+Rule 15's zero-cost claim apply verbatim and L5 is untouched. A **quantum** control makes
+every folding row wrong — the four zero-gate cells by exactly `Rz(α)` on the control wire,
+plus the half-turn's qubit cell, which emits but only up to a phase — `α = π` for the
+−I row, `π·b` / `π·(1−b)` for the constant half-turn, `∓π/2` for the qubit half-turn (the
+sign follows `k mod 4`, and an earlier draft of D11's table carried a single `π/2` and was
+wrong for half the row),
+`(2b−1)·φ/2` for the `Rz` constant column — **emitted PER BIT**, because a W-bit `Ry(2π)`
+contributes `(−1)^W` and one `Z` per register is a miscompile at every even width. The
+two general rows promote exactly by `R(θ/2); CX; R(−θ/2); CX`, inside the frozen six.
+**v1 REFUSES rather than emitting those five hand-derived signs**: this project has no
+instrument that can see a wrong phase, and the corpus emits zero controlled rotations, so
+M06 hard-errors at Step 20 at one greppable site. M22 takes no position and has no
+`ctrl_depth` to consult.
 
 **Rule 16 — Skepticism; verify, do not recall.** Check the actual document before
 citing it, and check the filesystem before naming a file — most paths in these docs
@@ -688,7 +930,7 @@ CQ_lang RAIL? Bites Step 23, presents at Step 24.** **`ckd.17a`, the scratch hal
 RESOLVED — see below.** What is left is the half no in-library theorem can reach: a
 sandwich certificate covers **none** of the corpus's 51,696 frees, because none of them
 is on a scratch region. Measured 2026-08-15 over the 239 goldens: only **25,138 (49%)**
-follow a `cq_template_*_unc`; **26,504 (51%)** are rails last written by a bare
+follow a `cq_template_*_unc`; **26,376 (51%)** are rails last written by a bare
 `cqrt_toffoli` (19,153) or `cqrt_cnot` (7,223) — Phase-4 control flags that CQ_lang
 uncomputes by **re-applying the same self-inverse gate**, with no `_unc` anywhere
 (`slice_control_select_compound.expected.log:15-18` is the worked case). Two witnesses
@@ -700,25 +942,39 @@ greppable site between `CQOPS_FREE_ABORT` (default) and `CQOPS_FREE_RETIRE` (tom
 the indices leave circulation forever so I3 holds absolutely). **There is no
 `CQOPS_FREE_TRUST` and one must never be added.**
 
-**`ckd.18` — the rotation-root free breaks the assert *and* I3 on fixtures CQ_lang
-ships as correct. Will abort Step 24.** `alloc_i32(5) → ry(θ) → ry(−θ) → cqrt_free`,
-with **no `_unc` anywhere**, so no uncompute certificate can exist. In our model
-`alloc(5)` is all-constant with zero qubits (I4); `ry` materialises all 32 bits with
-shadow *unknown*; poison is sticky so `ry(−θ)` does not clear it. At the free the rail
-is physically `|5⟩`. Suppressing the error is worse — it pushes `|1⟩` qubits onto the
-free list, breaking I3.
-**Scope measured 2026-08-15, and the bead was filed 25× too narrow in one direction and
-12× too wide in the other.** It is **25** frees across many fixtures, not one — and the
-partition is perfect: the 25 are exactly the `ry`-rooted ones, every one born from a
-**non-zero** `alloc` literal with an exact `(θ, −θ)` history. The other 12
-rotation-rooted frees are `rz`-only on rails born `0`, and `Rz` on a definite value is a
-**global phase** (Rule 15: "`Rz` on a constant is **nothing** at every φ") — those rails
-are genuinely `|0⟩` and freeable; they hard-error only because `cq_shadow_rotate`
-poisons unconditionally, which is **M21's** business (§7 angle classification), not this
-bead's. **The tempting wrong fix is wrong on all 25:** cancellation restores the *birth
-constant*, never zero. The discriminator is `birth-value == 0`, and the fix needs
-corrective `X`s driven from the mint record — which is **not** D6, since the value comes
-from the `alloc` literal, not from shadow precision. Decide **before Step 19**.
+**`ckd.18` — the rotation-root free. RE-SCOPED AND DEFERRED at Step 19: it is 25 frees,
+it has no disposition of its own, and it does NOT block Step 19. Decide with `ckd.17b`
+at Step 23; presents at Step 24.** `alloc_i32(5) → ry(θ) → ry(−θ) → cqrt_free`, with no
+`_unc` anywhere, so no uncompute certificate can exist. In our model `alloc(5)` is
+all-constant with zero qubits (I4); `ry` materialises all 32 bits with shadow *unknown*;
+poison is sticky so `ry(−θ)` does not clear it. At the free the rail is physically `|5⟩`.
+Suppressing the error is worse — it pushes `|1⟩` qubits onto the free list, breaking I3.
+
+**Four things were measured at Step 19 and three of them moved the bead.**
+(i) **The scope is 25, not 37.** Classifying all 51,696 frees by last write:
+25,138 `_unc`, 19,153 `cqrt_toffoli`, 7,223 `cqrt_cnot`, 91 `copy`, 40 `addc`,
+**25 `cqrt_ry`**, 15 `cswap`, 11 `qram_load_unc`, and **0 `cqrt_rz`**. The 25 align
+perfectly with non-zero birth literals, and the positive control is in the same corpus:
+of the **65** freed rails born from a non-zero literal, the other **40** are zeroed by an
+explicit `cqrt_addc_<W>(h, −L)` first, `sum(addc) == −L` in **40/40**.
+(ii) **The "12 `rz`-rooted rails are never materialised" claim was FALSE**, and it was
+sitting in shipped source (`src/angle.h`, now corrected). All twelve are
+`alloc(0); cswap(qflag,·,tmp); rz; cswap; free`, and the Fredkin's `CCX` — two `Q`
+controls, a constant target — **materialises `tmp` before the `rz` arrives**. §7's
+Rz-constant cell never applies to them. They are `ckd.17b` cases (physically `|0⟩`,
+unprovable) and under **D12** they free cleanly, which is that decision's measured payoff.
+(iii) **The blast radius makes any ckd.18-specific mechanism pointless.** Once M22 lands,
+**51,651 of 51,696 frees (99.91%)** are rotation-tainted — 239/239 fixtures contain a
+rotation — so fixing the 25 perfectly still leaves 51,626 hard-erroring. `ckd.17b` is the
+gating decision; ckd.18 is one of its counterexample sets, and the one that makes
+`CQOPS_FREE_TRUST` provably unsound rather than merely unwise.
+(iv) **Step 19 needed none of it**, verified rather than argued: `cq_shadow_rotate` had
+zero callers in `src/`, and M22's general-`Ry` cell is byte-identical under every
+candidate resolution. **The tempting wrong fix is still wrong on all 25:** cancellation
+restores the *birth constant*, never zero. **A second one is now recorded too** — reading
+the shadow's frozen `value` byte at free time and emitting corrective `X`s. It numerically
+works for these 25 and is fatal in general: that is publishing a stale byte as
+determinate, which `src/shadow.h` forbids by name.
 
 **`590` — Step 24's oracle is unspecified: NORTH_STAR says "link and run", the plan
 says "traces match", and the goldens belong to a stub we replace. Bites Step 24.**
@@ -740,11 +996,35 @@ Candidates in the bead. M23's default stays **stdout** — that is ordinary libr
 behaviour, not a concession — and `cq_sink_printf(FILE *)` lets any caller redirect in
 one line.
 
-**Smaller, filed** — `ckd.13` K12's quadratic ancilla scheme (32,960 qubits at W=64) is
-the only one of these three still open. `ckd.15` (K10's three sources vs Rule 7's two)
-was resolved at Step 14 — arity is not part of the contract, the semantics are; see
-Rule 7 and PRD §4. `ckd.16` (M11/M12 shift-out-of-range) was resolved at Step 11 as
-PRD §15 D8 and its cross-module obligation was discharged at Step 14.
+**Smaller, all now closed.** `ckd.13` (K12's ancilla scheme) and the M19/M20 half of `4tt`
+(who owns K12's inner gate lists) were resolved 2026-08-16 as **PRD §15 D9** and
+**plan §0.4** — see the Step 17 paragraph above and the two callouts below; the bead's
+"nested is `O(W)`" premise was **false** and both schemes are quadratic. `ckd.15` (K10's
+three sources vs Rule 7's two) was resolved at Step 14 — arity is not part of the contract,
+the semantics are; see Rule 7 and PRD §4. `ckd.16` (M11/M12 shift-out-of-range) was resolved
+at Step 11 as PRD §15 D8 and its cross-module obligation was discharged at Step 14.
+
+### Resolved 2026-08-17 at Step 19 — recorded so they are not re-litigated
+
+- **`lk0` — the `Z` is `sink.rz(q, π)`.** `Rz(π) = diag(−i, i) = −i·Z`, so two existing
+  vtable entries do it, the §8 vtable stays frozen at six, and Rule 4 is untouched. Now
+  PRD §7, shipped in M22. Two riders came with it: **"`Ry(π) = XZ`" is matrix order and
+  "emit `X` then `Z`" is circuit order**, and the circuit is `Z·X = Ry(3π)` — which is
+  the *same row*, since it spans θ ≡ π (mod 2π), so no fixed spelling is sign-exact and
+  the honest claim is "up to a global phase"; and the residual `±i` is **unreachable by
+  any product of `x` and `rz`** (determinant argument in §7). The `rz` goes **straight
+  to the sink**, following `cq_materialise`'s deliberate declination, not through a
+  `cq_emit_z` — there is nothing for M06 to promote it *to* inside a six-entry vtable.
+- **`pf4` — PRD §15 D11.** §7's four zero-gate cells are wrong under a *quantum* control
+  by exactly `Rz(α)` on the control wire, per bit; D11 gives every α, gives §9 a **row 0**
+  for a classical control (which is what keeps Rule 15's and L5's zero-cost claims true),
+  and gives the exact 2-CX promotion for the two general rows. **v1 refuses rather than
+  emitting**: five hand-derived signs against a project with no instrument that can see a
+  wrong phase, and zero controlled rotations in the corpus. M06 owns the refusal at
+  Step 20. Two obligations ride with it: M21 must split `CQ_ANGLE_HALF_TURN` by `k mod 4`
+  before the constant-column phases can be emitted (negating θ swaps `k ≡ 1 ↔ 3`, so
+  `_inv` would otherwise disagree with its forward), and D11's flip-half correctness is
+  **contingent on `bd skh`** resolving `cq_materialise`'s `X` as *unpromoted*.
 
 ### Resolved 2026-08-14 — recorded so they are not re-litigated
 
@@ -847,11 +1127,25 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 # Tests run under BOTH — the invariant checks are the point of Debug,
 # and Release is what gets its gate counts pinned (Rule 17).
 # -j is worth using: ctest is SERIAL by default, and no test binary shares
-# state with another. Measured 2026-08-16 after Step 16, 130 tests at -j12:
-# Debug 87 s, Release 21 s — and the Debug figure is BOUNDED BELOW BY ONE
-# BINARY, test_kernel_shift_var at 85 s, with test_kernel_cmp at 45 s and
-# test_kernel_mul at 25 s behind it. Adding kernels no longer moves the wall
-# clock; splitting the barrel would (bd mmv option (a), bd 97s).
+# state with another. THIS BOX HAS 6 PHYSICAL CORES, so -j12 oversubscribes
+# hyperthreads; -j6 is the honest figure. 175 tests at -j6 after Step 19: the
+# Debug run is BOUNDED BELOW BY ONE BINARY, test_kernel_shift_var, with
+# test_kernel_cmp next; K12's two halves follow and are NOT the pole. Step 17
+# applied bd mmv's printed-caps discipline up front AND took option (a) -- the
+# divrem suite is TWO binaries, split on the M19/M20 seam, so ctest -j overlaps
+# them. M21 adds under a second: its heaviest case is a few hundred thousand
+# points of pure double arithmetic and no gates at all.
+#
+# DO NOT QUOTE A NUMBER FROM THIS FILE. RE-MEASURE. The Step 18 session ran the
+# identical 162-test suite four times on an unchanged tree and got Debug
+# 51 s / 55 s / 122 s / 231 s and Release 4 s / 21 s / 31 s / 44 s. The spread
+# is a factor of FOUR AND A HALF and it is the box, not the code: shift_var
+# once reported 55.76 s inside a run whose whole wall clock was 51.23 s. The
+# pre-Step-17 figures (Debug 87 s, shift_var 85 s, cmp 45 s) and the
+# post-Step-17 ones (Debug 165 s) reproduce no better. Nothing Step 18 touched
+# is even reachable from shift_var. Treat every timing here as an ORDER OF
+# MAGNITUDE, and never conclude that a change made the suite slower or faster
+# from a single pair of runs (bd 97s).
 # `make test` passes -j for you.
 ctest --test-dir build-debug   -j 8 --output-on-failure
 ctest --test-dir build-release -j 8 --output-on-failure
@@ -895,6 +1189,15 @@ cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DCQOPS_SANITIZERS=ON -DCMAKE
 `CQOPS_SANITIZERS` is `AUTO` (default, use what runs), `ON` (require them — a hard
 configure error if a sanitizer does not run) or `OFF`. **Debug on the default
 toolchain is currently UBSan-only; say so when reporting what was verified.**
+
+**`libm` IS LINKED, AND ON THIS BOX IT DID NOT NEED TO BE — which is exactly why it is.**
+M21 is the first module to include `<math.h>` (`round`, `fabs`; the test side adds `fmod`
+and `fma`). macOS folds libm into libSystem, so the link succeeded without it and the
+omission would have surfaced only on a glibc CI runner as an undefined `round`. The root
+`CMakeLists.txt` now does `find_library(CQOPS_LIBM m)` and links it **PUBLIC** when found,
+so it propagates to every test binary through `cqops_test_support`. This is **not** a new
+dependency — `<math.h>` is part of the C standard library and PRD §14's "nothing beyond
+libc" is intact; it is a link detail that differs by platform.
 
 C11, `-Wall -Wextra -Werror -Wconversion`. One test binary per module via
 `add_cqops_test(name)` — plus an optional `WILL_FAIL`, used by
@@ -970,6 +1273,171 @@ issue; `make test` is the local stand-in (lint, then both configurations).
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
+- **`set_tests_properties` OVERWRITES A PROPERTY, IT DOES NOT ADD TO IT — SO A SECOND
+  BLOCK SILENTLY DISARMS THE FIRST, AND EVERY TEST STAYS GREEN.** Measured at Step 19.
+  `tests/CMakeLists.txt` briefly carried M22's per-case `FAIL_REGULAR_EXPRESSION` pins in
+  separate blocks; the later block re-listed one test that the earlier block had already
+  pinned, and the earlier regex was simply gone. The mutant it existed to catch — deleting
+  `cq_measure`'s sandwich refusal — went straight back to surviving, with **175/175 green
+  in both configurations and nothing to look at**. It was caught only because the fix was
+  re-verified by re-applying the mutant rather than assumed to work. Compose every regex a
+  test needs into **one** semicolon-separated list, repeat a shared tripwire in each list
+  rather than setting it once globally, and re-run the mutant after adding a pin. This is
+  the "which layer aborted" family arriving in the build system instead of in the code.
+
+- **AND THE BROADER FORM: A MUTATION BATTERY REPORTING 28/28 MEANT THE 28 MUTANTS I
+  THOUGHT OF, NOT THE SUITE'S COVERAGE.** An adversarial review afterwards found **seven
+  more that survived**, every one a real hole: the `mz` OPERAND was never pinned (only its
+  count), a poisoned qubit's `mz` was never asserted at all, the general-`Rz` column's
+  `(index, angle)` pair had no ordered check, `cq_measure`'s sandwich guard had no
+  discriminator, there was no `rz_of_a_measured_rail` to match `ry_of_a_measured_rail`,
+  and the case named for `ckd.18` passed `NULL` as its proof so it tested the NULL rather
+  than the poison. The pattern in six of the seven is the same: **an assertion that counts
+  is not an assertion that identifies**, and an operand that only ever appears on our side
+  of the vtable — a measurement value read from the shadow — hides a wrong operand
+  completely. Write the battery, then have something else look for what the battery did
+  not think to mutate.
+
+- **A TABLE OF HAND-DERIVED PHASES NEEDS ONE NON-DEGENERATE ROW TO PIN ITS CONVENTION, AND
+  THE DEGENERATE ROWS WILL NOT TELL YOU WHICH WAY IT READS.** PRD §15 D11 tabulates a
+  control-side phase `α` per §7 row. Four of its rows have `α ∈ {0, π}` — and `−π ≡ π
+  (mod 2π)` — so they read **identically** whether `α` means "the phase to EMIT" or "the
+  residual to cancel". Only the `Rz` constant row, `(2b−1)·φ/2`, depends on both `sign(φ)`
+  and `b`, and it is therefore the sole thing in the table that fixes the convention. The
+  one row that was *not* sign-degenerate and *not* the discriminator — the qubit half-turn
+  — was written as a bare `π/2` and was **wrong by π for half the row**: it credited the
+  residual entirely to `Rz(π) = −i·Z` and silently dropped the `−1` of `Z·X = −Ry(π)` that
+  §7's own callout states two pages up. Caught by an adversarial reviewer who recomputed
+  every row as an explicit 4×4 rather than checking the derivation prose. **Derive each row
+  of a phase table independently and state which row fixes the convention**, because this
+  project has no instrument that can see a wrong phase: the shadow models none, L1 compares
+  values, the palindrome is order-only, and `rz(ctrl, π/2)` is a plausible gate.
+
+- **A MATRIX PRODUCT AND A CIRCUIT READ IN OPPOSITE ORDERS, AND THREE DOCUMENTS CARRIED
+  BOTH SPELLINGS OF THE SAME ROW WITHOUT SAYING SO.** `Ry(π) = XZ` is true as a matrix
+  product. "Emit `X` then `Z`" is a *circuit*, and applying `X` first is the matrix `Z·X` —
+  and `XZ = −ZX`, so the emitted pair is `Ry(3π)`, not `Ry(π)`. PRD §7, `IMPLEMENTATION_
+  PLAN` §4's Step 19 row and Rule 15 all printed both sentences. **The fix is NOT to pick a
+  sign**, and that is the part worth carrying: the row is `θ ≡ π (mod 2π)`, which contains
+  both `k ≡ 1` and `k ≡ 3 (mod 4)`, whose operators differ by exactly that `−1` — so **no
+  fixed two-gate spelling is sign-exact for the whole row** and any "correction" mis-signs
+  the other half. The honest statement is "the half turn **up to a global phase**", and
+  recovering the parity is D11's job at Step 20. Whenever a document names a gate sequence,
+  check which order it means before "fixing" anything.
+
+- **A SHIPPED SOURCE COMMENT ASSERTED A CORPUS FACT THAT WAS NEVER MEASURED, AND IT WAS
+  FALSE.** `src/angle.h` said keeping M21 and `cq_shadow_rotate` apart "lets `bd ckd.18`'s
+  twelve `rz`-rooted frees stay clean: those bits are never materialised and never
+  poisoned". Measured at Step 19: all twelve are
+  `alloc(0); cswap(qflag,·,tmp); rz(tmp,φ); cswap; free`, and the Fredkin's `CCX` — two `Q`
+  controls, a **constant** target — materialises `tmp` *before* the `rz` arrives. §7's
+  Rz-constant cell never applies to them. What actually keeps them freeable is **D12**, a
+  decision that did not exist when the comment was written. The comment had survived a
+  39-mutant battery and a 29-agent review, because **no test in the project reads a
+  comment**. Rule 16 applies to prose in `src/` exactly as it applies to prose in the PRD.
+
+- **THE MUTANT THAT SURVIVES MAY BE A LOAD-BEARING CALL THAT IS BEHAVIOURALLY INERT AT ITS
+  CALL SITE.** `cq_rotate_rz_bit` asks `cq_angle_rz_row(phi)` and tests `== IDENTITY`.
+  Replacing that with `cq_angle_ry_row(phi)` **survives the whole suite**, and it is
+  genuinely equivalent: `cq_angle_rz_row` is `lattice(φ) == IDENTITY ? IDENTITY : GENERAL`,
+  so the two agree on exactly the predicate being tested. The collapse M21 performs is
+  load-bearing for a *reader* and for any future caller that switches on the class — and it
+  is tested, in M21's suite, where it belongs. **The paired mutation is what proved this
+  rather than leaving it "untested":** comparing against `!= IDENTITY` is killed, which
+  locates the work in the comparison. Do not "fix" an equivalent mutant by weakening the
+  call site to match it.
+
+- **A TOLERANCE-CONSULTING MUTANT SURVIVES UNLESS SOME CASE USES AN ANGLE WHOSE ROW
+  *MOVES* WITH THE TOLERANCE — AND THAT NOW HAS TO BE CHECKED PER COLUMN.** Step 18
+  recorded this for `cq_angle_rz_row`; Step 19 hit it again one layer up. M22's Ry side had
+  such a case (`3.14`, `GENERAL` at the default and `HALF_TURN` at the cap), so
+  `cq_angle_ry_row → cq_angle_lattice(θ, DEFAULT)` died — while the **Rz** side used only
+  angles classified identically at every tolerance, and the same mutation survived. The
+  discriminator has to be an angle whose IDENTITY classification is tolerance-dependent:
+  `4π + 2e-3` is inside `MAX·π` and 6.4e8 windows outside the default's. **One column
+  having the case does not cover the other.**
+
+- **AN ORACLE THAT SHARES A CONSTANT WITH THE CODE IS BLIND TO EXACTLY WHAT THAT CONSTANT
+  GETS WRONG — AND IT AGREES WITH THE BUG RATHER THAN FAILING, WHICH IS WORSE THAN HAVING
+  NO ORACLE.** Measured at Step 18. `test_angle.c`'s `ref_row` is a genuinely independent
+  reduction — `fmod` into `[0, 4π)` against §7's four named residues, where the module
+  rounds to the nearest multiple of π and reads `k mod 4` — and it *does* catch a parity
+  slip. But it used the module's π **and the module's window expression**, so when the
+  window was wrong it returned the same wrong answer at every angle: adding `θ = 1e12` to
+  its scan would not have turned the case red. The oracle that sees it is
+  `distance_to_true_multiple_of_pi`, which carries π to **double-double** (`PI_HI + PI_LO`)
+  and uses `fma(k, PI_HI, -p)` to recover the exact residual of the product — so it
+  measures the distance to a multiple of **true** π rather than of the double the module
+  rounds it to. That gap is `|θ|·3.9e-17` and is invisible to any oracle built from plain
+  doubles. **When choosing an oracle, ask which of the implementation's constants it
+  reuses; those are precisely the ones it cannot check.** Two riders. (i) The assertion it
+  enables is the contract itself — *"class ≠ GENERAL ⟹ θ is within `2·tol·π` of the
+  multiple its row names"* — which reads no golden and so cannot be blessed by
+  `CQOPS_UPDATE_GOLDENS=1`. (ii) An implication-shaped assertion passes **vacuously**
+  against a module that never folds, so it must be paired with cases that REQUIRE a fold;
+  `test_angle.c`'s header names both halves.
+
+- **AND THE SAME LESSON HAS A SECOND FORM THAT IS EASIER TO MISS: THE SHARED THING CAN BE
+  THE PROBE *RANGE* RATHER THAN THE COMPARISON.** Measured at Step 18 twice in one hour —
+  the second time while fixing the first. `angle.c` refuses `|θ|` above
+  `tol·π/CQ_ANGLE_PI_ERROR`, and the case asserting D10's bound has to sweep magnitudes to
+  reach where the drift term dominates. The obvious loop derives its ladder from
+  `tol·π/1.6e-16` — the module's own constant, copied into the test — and **it still misses
+  the mutant it was written for**, because a *loosened* constant makes the module accept a
+  larger `|θ|` than the test ever offers it. The violating region is exactly the region the
+  test's own range excludes. Two fixes, both needed: start the ladder far past any reach
+  the module could plausibly have (over-probing is free — whatever it refuses comes back as
+  the safe class and the check skips it), **and probe several neighbouring indices per
+  rung**, because at a lattice point the error is the drift plus however `k·π_double`
+  happened to round, which varies pseudo-randomly with `k`. One probe per rung caught
+  nothing; 24 caught it. **The honest limit is written into the case**: even fixed it
+  catches only a gross loosening, and the *cheap* magnitude pin is the guard with complete
+  coverage. Do not delete the cheap one because the expensive one "covers it".
+
+- **`-ffp-contract=off` IS IN `cqops_build_flags`, AND IT IS ABOUT REPRODUCIBILITY, NOT
+  SPEED. Do not remove it.** C compilers may contract `a*b + c` into one fused
+  multiply-add at their discretion (clang defaults to `on` for C, gcc to `fast`), and
+  `angle.c`'s residual `fabs(theta - k*CQ_ANGLE_PI)` is exactly that shape: contracted it
+  measures against the **exact** product, uncontracted against the **rounded** one, and
+  those differ by up to half an ulp of `|θ|` — the same order as the window. Measured: the
+  same source at `-O2` versus `-O2 -march=native` gives **1,429 different classifications
+  out of 250,000** near-lattice probes, first at `θ = 0x1.019c501fbacffp+9` (GENERAL
+  uncontracted, IDENTITY fused); `objdump` shows 0 versus 3 `vfnmadd`. **Both answers
+  satisfy D10** — the fused one is strictly more accurate — so this is not a soundness bug.
+  It matters because M22 turns these rows into emitted gates and this project pins gate
+  counts as L4 goldens (risk **R5**): a golden that moved with the host's `-march` would be
+  unpinnable, and would present as "the goldens are wrong on the CI box". Every module
+  below Layer 4 is integer-only, so the flag costs nothing anywhere else.
+
+- **THE SAME DEFECT ALSO SURVIVED A MAGNITUDE COVERAGE GAP, WHICH IS THE CHEAPEST BUG
+  CLASS IN THE PROJECT TO PREVENT.** The first `test_angle.c` exercised `|θ|` up to
+  ~`2.5e4` and again from `6.3e13` upward. The unsound band was `1e11 … 1.6e12` —
+  entirely inside the hole. A decade-by-decade scan (`for e in -6..15`, ten mantissas
+  each, checked against the exact oracle) costs microseconds and is now case 6. **A suite
+  that tests "small" and "enormous" has not tested the middle**, and for anything scaled
+  by its input the middle is where the cliff is.
+
+- **AN ABSOLUTE WINDOW EVENTUALLY BECOMES FINER THAN THE DOUBLE GRID, so a "just inside
+  the tolerance" probe stops probing the module.** `ulp(θ)` reaches `tol·π` at
+  `|θ| = tol·π·2^52 ≈ 1.4e4`; above that the only representable angle inside the window
+  is the lattice point itself. Step 18's `base ± 0.9·window` case went red at `k = 6001`
+  for exactly this reason — it was asserting something about IEEE spacing, not about
+  `angle.c`. The case was corrected and the reason written into it; the exact-match band
+  above `1.4e4` is covered separately by the reach case.
+
+- **`fabs(theta - k*CQ_ANGLE_PI)` IS NOT THE DISTANCE FROM θ TO A MULTIPLE OF π, AND THE
+  DIFFERENCE IS THE WHOLE OF D10.** It is the distance to `fl(k · π_double)`, so for `θ`
+  spelled `k*M_PI` it is **exactly zero at every k** — both sides are the same rounded
+  product. Two consequences that pull in opposite directions and are both load-bearing.
+  It means a *tiny* window still recognises arbitrarily large exact multiples, which is
+  why §7's "relative" bought nothing. And it means a zero residual is **not** a correct
+  answer: `θ = 2^52·π_double` has residual 0 and is **0.551532 rad** from any true
+  multiple of 4π. What the residual cannot see is `|θ|·1.5e-16` (half an ulp of the
+  product, `1.1103e-16`, plus the drift `(π − π_double)/π = 3.8982e-17`), and refusing
+  above `|θ|·1.6e-16 > tol·π` is the only thing standing between the module and that
+  error. An earlier draft of the suite asserted the `2^52` case as correct, with a comment
+  saying "the arithmetic is still meaningful". It is not.
+
 - **THE ONE K11 MUTANT L1 CANNOT SEE IS THE ONE THAT LOOKS LIKE AN OPTIMISATION, AND
   IT IS THE SHAPE EVERY REMAINING KERNEL WILL OFFER.** `pp[j][0..j−1]` is provably
   zero for the whole compute half — that is what encodes the shift — so shortening
@@ -986,8 +1454,102 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   `the_compute_half_is_the_skeleton_plus_w_measured_k8_accumulates`, which asks M15
   what an accumulate costs at this width instead of writing `6W−5` down, and the
   brute-force schedule scan. Second, K12 will offer the identical trade with a
-  quadratic scratch region behind it (`ckd.13`), so **build the composition check
-  before the kernel, not after.**
+  quadratic scratch region behind it (`ckd.13`, now resolved as PRD §15 D9(a) —
+  FLAT), so **build the composition check before the kernel, not after.**
+
+- **K12'S VERSION OF THAT MUTANT IS BIGGER, AND ITS COMPOSITION CHECK IS NOW IN THE SUITE —
+  IT WAS WRITTEN BEFORE M19, WHICH IS WHY IT READS NO GOLDEN.** After `t` iterations the
+  remainder satisfies `r_t < 2^t`, so on iteration `t` the high bits of `r_in[t]` are
+  *provably zero* and the comparator, subtractor and mux could be narrowed towards `t + 2`
+  bits — taking the kernel from `~17W²` towards `~8.5W²`. (Not a pure narrowing: `b` is full
+  width, so a shortened comparator still has to account for `b`'s high bits. That makes it a
+  re-derivation, not a peephole — Rule 1.) The durable assertion is
+  `compute = W · (2 + C_ult + C_sub + C_mux)` where each `C` is obtained by **asking M16,
+  M14 and M17 what they cost at this width**, never by writing `6W+1` / `7W−1` / `4W` down.
+  It lives in **two** cases, which is deliberate:
+  `the_three_inner_blocks_compose_to_k12s_per_iteration_tuple` runs NO KERNEL and pins the
+  three blocks against K12.md §3.1's tuples, and
+  `the_compute_half_is_w_measured_inner_iterations` pins the kernel against `W ×` whatever
+  those blocks just measured. A sibling's cost moving makes the first go red and NAME the
+  block; the second then goes red for a reason the reader already has. L4 alone is not a
+  detector: `CQOPS_UPDATE_GOLDENS=1` would bless the reduction.
+
+- **A `condneg`'s CONTROLLED half is `W+1` of its `3W+1` gates, not all of them — and the
+  first draft of M20's palindrome check got this wrong and was caught by execution.**
+  `_cond_negate_inplace!` is `W` conditional flips, a carry seed, then `W` `(Toffoli, CNOT)`
+  pairs; only the first `W+1` have `cond` as a control. The pairs' controls are `val[c]` and
+  `ncar[c]`, **both scratch and therefore both `CQ_BIT_Q` from step 0 under I6(b)**, so they
+  are emitted whatever the sign bit is and, with `cond = 0`, act on an all-`|0⟩` carry chain
+  and do nothing. This moves no pinned count — §3.4 pins the all-quantum mask — but it is
+  the difference between a mask-dependent head length that is right and one that is off by
+  `2W` per conditional negate. The general lesson is the one `mux.c` states at more length:
+  **the fold table sees each gate alone**, so "this gate is a no-op given that control" is
+  never something it can act on.
+
+- **AN ALL-CLASSICAL MASK PAIR IS NOT A PALINDROME CASE, IT IS AN L5 CASE**, and the same
+  first draft used one twice. Every kernel with an R9 short-circuit never enters
+  `cq_sandwich` on all-classical operands, so `cq_mock_count` is **0** and
+  `cq_mock_is_palindrome` is being asked about a stream that does not exist. A palindrome
+  case must leave at least one operand quantum; the mask that *does* belong there is the
+  asymmetric one — `a` all `Q`, `b` all `CQ_BIT_ZERO` — which is risk R8's named witness and
+  is not in any symmetric mask set.
+
+- **`CQ_REG_WIDTH_MAX` IS 128 AND M16's `ult` CARRY CHAIN IS `W+1` BITS, SO AT THE TOP
+  SHIPPED WIDTH IT CANNOT BE A REGISTER AT ALL.** Measured: a helper that built
+  `cq_ult_block`'s operands out of `cq_bk_reg_w` aborted in `refmodel` with "width out of
+  range for a 128-bit reference (W = 129)" the first time it reached `W = 128`. A consumer
+  hands a step block **scratch spans**, which is what K12 does and what plan §0.4 obligation
+  2 says ("the block allocates nothing"); a test that reaches for registers instead has a
+  ceiling the kernel does not. It is also the more faithful fixture — inside a sandwich a
+  block's operands are pre-materialised scratch, not rails.
+
+- **`divrem` SHIPS AT i128, AND K12.md SAID THE OPPOSITE UNTIL 2026-08-16.** The retired
+  sentence — *"the ABI's integer widths are 8/16/32/64 and `i128` never reaches a `divrem`
+  signature"* — is false: `third_party/cq_lang/opcode_table.yaml:187-190` gives all four of
+  `sdiv`/`udiv`/`srem`/`urem` as `widths: [i1,i8,i16,i32,i64,i128]` with the **full
+  15-variant grid, bare `qq` shape included**, and `docs/cqrt_census.txt:498-501` counts them
+  `6 × 15 = 90` each on that basis. The true fact it was probably remembering is a different
+  one: **i128 has no `cqrt_*` CORE symbol** (no `alloc`, `measure`, `copy`) and `__int128`
+  itself appears only in an `_hl` parameter list — but the *register* is 128 bits and **the
+  kernel runs at `W = 128`**, where one `udiv` is 557,696 gates over 131,583 qubits — both
+  now MEASURED, and pinned in `tests/goldens/divrem_u.counts`. **K12's L4 is pinned at
+  `W ∈ {1,2,3,4,5,8,16,32,64,128}`**; `i1` is a shipped width too. `i80` is **not** a
+  `divrem` width (yaml `:85`, `:133-135`) — that fence is the mirror image of `icmp`'s, which
+  *is* i80 and is *not* i128.
+
+- **A COMPOSITE KERNEL'S OPERAND VIEW MAY ALIAS A REGISTER AN EARLIER STEP WROTE, AND THAT IS
+  THE SANCTIONED SHAPE — GUARDS COMPARE RANGES, NOT BASE POINTERS.** K12 is the case that
+  forced it and it now SHIPS that way: to hand M14's and M16's step functions a
+  `const cq_bit *`, the shifted remainder `r_in[t]` has to be **contiguous**, which it is
+  exactly when the incoming dividend bit `z[t]` is laid immediately below `rnext[t−1]` — so
+  `r_in[t]` is a read-only *view over the previous iteration's output* (K12.md §2.1a). That
+  costs nothing (`W² + 2W − 1` either way) and is I6-sound because every use after the
+  shift-in is a **control**. Measured green under `CQOPS_DEBUG_INVARIANTS` at nine widths,
+  before M19 existed and again after. The reflex "assert the operands are disjoint objects"
+  would reject the correct layout.
+
+- **WHAT A K12-SHAPED KERNEL CAN GET WRONG IS THE SLOT ARITHMETIC, NOT THE GATES — SO TEST
+  THAT.** M19 emits nothing of its own but two CNOTs; the other `17W` slots per iteration are
+  M16's, M14's and M17's step functions, each already tested in its own suite. What is left
+  to get wrong is the four phase boundaries and the scratch layout. The instrument is
+  `the_phase_boundaries_match_an_independent_slot_scan`: it re-derives the op-KIND of every
+  one of the `17W²+2W` compute-half slots from the phases' own structure — `lower_ult!` is
+  `2W` alternating CX/X then one X then a 4-cycle; `lower_sub!` is the same prologue then a
+  5-cycle with a three-CNOT final stage; `lower_mux!` is a 4-cycle — and compares that
+  against the recorded stream at the all-quantum mask, where one slot is one gate. It records
+  only which of X/CX/CCX each slot emits, which is exactly what a boundary error moves and
+  what a gate-list error does not, so it is not a second transcription of anything.
+
+- **AND THE `-Werror` REJECTION KEEPS ARRIVING IN A NEW SHAPE — FOUR SO FAR, AND THE
+  FOURTH NEEDED BOTH OF THE FIRST TWO FIXES AT ONCE.** Step 19's "treat the half turn as
+  the identity" mutant was first written `if (was_qubit || !was_qubit) return;` and
+  rejected as tautological (Step 16's shape). Rewriting it as a plain early `return;`
+  then left `was_qubit` unreferenced and was rejected as unused (Step 14's shape). What
+  builds is `if (ctx->sandwich_depth == 0) { (void)was_qubit; return; }` — always true in
+  practice, because the guard at the top of the function has already established it, but
+  not provably so to the compiler, and with the variable kept referenced. **It was killed
+  by both configurations once it compiled**, so reporting the first attempt as NOCOMPILE
+  and moving on would have left a real mutant unmeasured.
 
 - **A MUTANT THAT `-Werror` REJECTS IS NOT A TESTED MUTANT, AND `-Wtautological-overlap-compare`
   IS A NEW WAY TO HIT THAT.** Step 14 recorded the `-Wunused` form of this. Step 16's
@@ -996,6 +1558,61 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   always evaluate to false". `if (W == 1 && dst == NULL)` compiles, runs, and is
   killed by three cases. A battery that reports `NOCOMPILE` and moves on has measured
   nothing about that line.
+
+- **A MUTATION BATTERY THAT BACKS UP ONE FILE CANNOT TEST THE CONSTANTS THAT LIVE IN THE
+  OTHER — the instrument's own instrument, for the fifth time.** Step 18's round 1 backed
+  up and restored `src/angle.c` only, then tried to mutate `CQ_ANGLE_TOLERANCE_DEFAULT`,
+  which is in `src/angle.h`. It was reported **NOOP**, not SURVIVED — which is the Step 17
+  no-op guard doing its job, because it compares the mutated file against **its own key's**
+  backup rather than against a shared variable. Round 2 backed up both and killed all four
+  header mutants. Five of round 1's expressions failed to land for two more reasons worth
+  knowing: `perl -0p` is **slurp** mode, so `^` does not match line starts without `/m`;
+  and matching text containing a UTF-8 character (the `θ` and `π` all over this repo's
+  comments) with `.` matches **one byte**, not one character. Match code, never comments.
+  A third `-Werror` shape joined Step 14's `-Wunused` and Step 16's
+  `-Wtautological-overlap-compare`: mutating a two-clause predicate to `return 1;` leaves
+  its parameter unreferenced and is rejected outright; `return tol >= 0.0 || tol < 0.0 ||
+  tol != tol;` is always true, uses the parameter, and was killed by all eight death cases.
+
+- **THE PAIRED MUTATION IS HOW AN "EQUIVALENT" MUTANT IS PROVED EQUIVALENT RATHER THAN
+  UNTESTED, and at Step 18 it caught a false comment in the test itself.** `angle.c` writes
+  both of its tests as `!(a <= b)` so that a non-finite operand falls through to
+  `CQ_ANGLE_GENERAL`. Mutating the **magnitude refusal** alone to `a > b` **survived** —
+  and the test comment claiming that form was what caught NaN was therefore wrong. Mutating
+  **both** it and the residual test was **killed**, which locates the work exactly: a NaN θ
+  falls one line down to `!(fabs(NaN − k·π) <= window)`, which is true, and returns GENERAL
+  anyway. So the single mutation is genuinely equivalent, neither line may be "tidied" into
+  `>`, and nothing ever reaches `(long long)round(NaN/π)`. Same shape as the Step 8 `0xAA`
+  poison finding: an equivalent mutant's value is established by the paired mutation, not
+  by argument.
+
+- **A `_Static_assert` IS THE ONLY DETECTOR FOR A LOAD-BEARING ENUM VALUE, and Step 18
+  shipped without one until a battery asked.** `angle.h` documents `CQ_ANGLE_GENERAL = 0`
+  as deliberate — a zero-initialised class must be the *safe* row, so a caller who forgets
+  to assign emits a rotation instead of deleting it. Renumbering it to 7 was **the one
+  mutant of thirty-eight that no test could see**, because nothing in the project
+  zero-initialises one yet. `bit.h` had already solved this for `CQ_BIT_ZERO == 0` and says
+  why: *"a renumbering must break a build, not just a comment."* The assert plus a
+  `memcmp`-based case now kill it. **If a comment says a numbering is load-bearing, the
+  numbering needs a static assert, not a comment.**
+
+- **A MUTATION BATTERY WROTE 33 OF ITS 35 MUTANTS INTO THE WRONG FILE AND REPORTED THEM
+  ALL AS SURVIVORS. THE INSTRUMENT NEEDS ITS OWN INSTRUMENT, FOR THE FOURTH TIME.**
+  Measured at Step 17. In `bash`, a variable assigned inside a function is GLOBAL unless
+  declared `local`, so a `restore()` whose loop variable was `f` silently rebound the
+  caller's `f`: `mutate()` computed the right target, called `restore`, and then applied
+  every `perl -pi` edit to whichever file the restore loop ended on. Only the two mutants
+  whose real target happened to BE that file were killed — which is the tell, and the only
+  reason the run was recognisable as broken rather than as a catastrophic result.
+  **Two things generalise.** (i) The failure direction was *false SURVIVORS*, which is
+  loud; the same bug with the files swapped would have produced *false KILLS*, which is
+  silent and is the Step 9 `mv`-mtime leak all over again. (ii) **The NO-OP guard that
+  existed precisely to catch "the edit did not land" could not fire**, because it compared
+  `$f` — the clobbered path — against `$BAK/$key.bak`, the intended file's backup. A guard
+  that takes one of its two operands from the thing it is checking is not a guard. Both
+  operands must come from the key, and every variable in every shell function must be
+  `local`. Verify a battery by hand-applying ONE mutant that must obviously die and
+  watching it die, before trusting thirty-four others.
 
 - **A MUTATION BATTERY MUST DRIVE A DEATH SUITE THROUGH `ctest`, NEVER THE BARE
   BINARY.** A death binary run with no argument LISTS ITS CASES and exits non-zero
@@ -1093,18 +1710,25 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   M08 owns the `cq_bit` array and its dispose asserts every bit is back to `CQ_BIT_ZERO`
   — a **kind** check, never a shadow read. That is what plan §3's "assert clean on
   release" actually becomes, and unlike a shadow reading it is implementable.
-- **Layers 0–2 exist, plus two of Layer 4's sinks and TWELVE kernels — K1–K10
-  and the barrel.** `src/bit.h`, `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`,
+- **Layers 0–3 exist IN FULL, plus two of Layer 4's sinks.** `src/bit.h`,
+  `src/shadow.[ch]`, `src/qubits.[ch]`, `src/sink.[ch]`,
   `src/ctx.[ch]`, `src/emit.[ch]`, `src/reg.[ch]`, `src/scratch.[ch]`,
   `src/sandwich.[ch]`, `src/sink_printf.[ch]`, `src/sink_count.[ch]`,
   `src/kernels/kernel.h`, `src/kernels/bitwise.[ch]`, `src/kernels/shift_const.[ch]`,
   `src/kernels/cast.[ch]`, `src/kernels/add.[ch]`, `src/kernels/cmp.[ch]`,
   `src/kernels/mux.[ch]`, `src/kernels/shift_var.[ch]`,
-  `src/kernels/addacc.[ch]` and `src/kernels/mul.[ch]` are real as of Step 16 — but
-  **M19 and M20 are still
-  Phase B**, there is no `sink_qec` (M25 is Step 26), no angle or rotation module
-  (M21/M22), and **no controlled axis** (M06 is Step 20, despite its low module
-  number). Check before you cite — and read `third_party/bennett/COMMIT` rather than
+  `src/kernels/addacc.[ch]`, `src/kernels/mul.[ch]`, `src/kernels/divrem_u.[ch]` and
+  `src/kernels/divrem_s.[ch]` are real as of Step 17 — **Phase B is done** — and
+  `src/angle.[ch]` (M21) as of Step 18, `src/rotate.[ch]` (M22) as of Step 19.
+  **THE ROTATION-FREE SURFACE HAS ENDED**: `src/rotate.c` is the first and only caller
+  of `cq_shadow_rotate` in `src/`, on exactly two of §7's twelve cells (PRD §15 **D12**
+  — general `Ry` only), so `cq_pc_zero_proof_rotation_free` is still exact for every
+  rail that never met that cell and refuses on every rail that did. What is still
+  absent: there is no `sink_qec` (M25 is Step 26), **no controlled axis** (M06 is
+  Step 20, despite its low module number — there is no `ctrl_depth` in `cq_ctx` at
+  all), and nothing of Layer 5 — no `cq_runtime_impl.c`, no shim generator,
+  no generated `*.gen.c`, so **nothing in this project links against CQ_lang yet**.
+  Check before you cite — and read `third_party/bennett/COMMIT` rather than
   running `git log` inside it, which reports the *parent* repo's HEAD because the
   snapshot has no `.git`. **That COMMIT file is a document, not a bare SHA**: the hash
   is on its `commit:` line, and reading its first line gets you a title that would not
@@ -1569,8 +2193,8 @@ check, do not assume, and update this table when a step lands):
 | 0 — primitives | **M01 `bit.h`** · **M02 `shadow`** · **M03 `qubits`** · **M04 `sink`** |
 | 1 — emission | **M05 `emit`** (the fold table — Rule 11) · M06 `controlled` |
 | 2 — registers, sandwich | **M07 `reg`** · **M08 `scratch`** · **M09 `sandwich`** |
-| 3 — kernels | **M10 `bitwise`** (+ **`kernels/kernel.h`**, Rule 7's typedef) · **M11 `shift_const`** · **M12 `shift_var`** · **M13 `cast`** · **M14 `add`** · **M15 `addacc`** · **M16 `cmp`** · **M17 `mux`** · **M18 `mul`** · M19 `divrem_u` · M20 `divrem_s` |
-| 4 — analog, sinks | M21 `angle` · M22 `rotate` · **M23 `sink_printf`** · **M24 `sink_count`** · M25 `sink_qec` |
+| 3 — kernels | **COMPLETE.** **M10 `bitwise`** (+ **`kernels/kernel.h`**, Rule 7's typedef) · **M11 `shift_const`** · **M12 `shift_var`** · **M13 `cast`** · **M14 `add`** · **M15 `addacc`** · **M16 `cmp`** · **M17 `mux`** · **M18 `mul`** · **M19 `divrem_u`** · **M20 `divrem_s`** |
+| 4 — analog, sinks | **M21 `angle`** · **M22 `rotate`** · **M23 `sink_printf`** · **M24 `sink_count`** · M25 `sink_qec` |
 | 5 — shim | M26 `cq_runtime_impl.c` · M27 `gen_shim.py` · M28 generated `*.gen.c` (LOC-exempt) |
 
 Hand-written total ≈ **3,400 LOC** across 27 modules. Kernels M10–M20 are independent

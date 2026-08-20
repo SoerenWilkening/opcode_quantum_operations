@@ -54,11 +54,16 @@ int cq_pc_indices_are_free(const cq_ctx *ctx, const uint32_t *idx, uint32_t n);
  * kind, qubit-carrying bits their shadow value.
  *
  * A qubit whose shadow reads `unknown` records a harness failure and
- * contributes 0. That is not a fudge — on the rotation-free surface (Steps
- * 10-17) it cannot happen, because cq_shadow_rotate is the ONLY producer of
- * `unknown` in the library and M22 does not exist yet. If it ever fires, the
- * suite has found something real, and failing loudly beats returning a number
- * that quietly means nothing. */
+ * contributes 0. That is not a fudge — cq_shadow_rotate is the ONLY producer of
+ * `unknown` in the library, and since Step 19 exactly ONE caller reaches it:
+ * M22's general-Ry row (PRD §15 D12). So for every suite that does not perform
+ * a general Ry — which is every kernel suite, by construction — this still
+ * cannot fire, and if it does the suite has found something real.
+ *
+ * A SUITE THAT DOES ROTATE MUST NOT USE THIS READER. tests/test_rotate_table.inc
+ * carries `rt_value`, which is the same reduction with the unknown case
+ * returning 0 as PRD §7's measurement specifies rather than failing. Do not
+ * "fix" this one to match it: the loud failure is the whole value here. */
 uint64_t cq_pc_value(const cq_ctx *ctx, int32_t h);
 
 /* The same at any width up to 128 — and the one-word form is a WRAPPER for
@@ -83,9 +88,12 @@ cq_ref_w cq_pc_value_w(const cq_ctx *ctx, int32_t h);
  * index, so a red run says WHICH qubit. */
 int cq_pc_live_is_exactly(const cq_ctx *ctx, const int32_t *hs, uint32_t n);
 
-/* L3's evidence, and read the scope before reusing it. A cq_zero_proof valid
- * ONLY on the rotation-free surface — which is Steps 10 through 17, every
- * kernel and no rotation.
+/* L3's evidence, and read the scope before reusing it. A cq_zero_proof valid on
+ * any rail no GENERAL Ry has touched — which is every kernel (Steps 10-17, no
+ * rotation at all) and, since Step 19, also any rail that met only §7's folding
+ * rows (PRD §15 D12). It is NOT valid on a rail a general Ry has rotated, and
+ * refusing there is correct rather than a limitation. The name is kept because
+ * the rotation-free surface is still where it is unconditionally sound.
  *
  * Why it is sound there and nowhere else: `unknown` has exactly one producer,
  * cq_shadow_rotate (src/shadow.c:121), so in a program containing no rotation
@@ -94,10 +102,15 @@ int cq_pc_live_is_exactly(const cq_ctx *ctx, const int32_t *hs, uint32_t n);
  * permutation. On that surface cq_shadow_known_zero is not conservative, it is
  * exact, and it is a genuine proof.
  *
- * The moment M22 lands (Step 19), a rotation anywhere upstream poisons the
- * rail and this predicate starts refusing legitimate frees — bd ckd.17b and
- * ckd.18 are that problem, and they are OPEN. It is NOT the answer to them,
- * and it must never be promoted into src/: the library defines no proof at
+ * M22 LANDED AT STEP 19 AND THIS PREDICATE SURVIVED IT, which is narrower than
+ * the warning that used to stand here. PRD §15 D12 makes only the general-Ry
+ * row poison — every Rz is diagonal, and so is the `Z` of the half-turn row, and
+ * a diagonal gate cannot move a computational-basis value — so a rail that met
+ * only those rows keeps a determinate shadow and this stays an EXACT proof for
+ * it. What it does refuse is a rail a general Ry has touched, which is correct
+ * and is Rule 6 working: bd ckd.17b and ckd.18 are that problem, they are OPEN,
+ * and this is NOT the answer to them. It also must never be promoted into src/:
+ * the library defines no proof at
  * all, and NULL meaning "no evidence, fail loud" is the correct posture for an
  * unresolved P0 (src/reg.h). Its predecessor lives as a static in
  * tests/test_reg.c under a name saying it was valid only while no kernel

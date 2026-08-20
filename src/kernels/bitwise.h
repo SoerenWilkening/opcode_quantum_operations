@@ -25,8 +25,25 @@
  *
  * SAFE TO CALL FROM INSIDE ANOTHER KERNEL'S SANDWICH COMPUTE HALF with
  * `dst = scratch`: every gate target is a bit of `dst`, so I6(a) is satisfied
- * for the caller automatically. K9 (cmp) and K12 (divrem) will use exactly
- * that.
+ * for the caller automatically.
+ *
+ * THE PREDICTION THAT USED TO STAND HERE — "K9 (cmp) and K12 (divrem) will use
+ * exactly that" — IS FALSIFIED, TWICE OVER, AND IT WAS LOAD-BEARING SOMEWHERE
+ * ELSE [2026-08-16]. K9 shipped at Step 13 calling no bitwise kernel at all
+ * (it ports `lower_eq!`/`lower_ult!`/`lower_slt!` directly), and K12's settled
+ * construction (PRD §15 D9) has no AND/OR/XOR phase either — its per-iteration
+ * phases are `ult`, `sub` and `mux`. The one in-tree caller is `mul.c`'s W==1
+ * delegation to K2. The property above is still TRUE and still worth having;
+ * only the named consumers were wrong.
+ *
+ * WHAT DID NOT DEPEND ON THE PREDICTION, and must not be unwound with it:
+ * `kernels/kernel.h`'s guard compares operand RANGES rather than base pointers,
+ * and cited this sentence as its justification. The justification survives with
+ * a better example — K12 hands M16's and M14's exported step blocks a view of
+ * its remainder that deliberately ALIASES the previous iteration's mux output
+ * (K12.md §2.1a, plan §0.4 obligation 3). Sub-array operands are the sanctioned
+ * calling shape; that was always the point, and the tests/test_kernel_bitwise
+ * death case that provoked it is still the measured witness.
  */
 #ifndef CQOPS_KERNELS_BITWISE_H
 #define CQOPS_KERNELS_BITWISE_H

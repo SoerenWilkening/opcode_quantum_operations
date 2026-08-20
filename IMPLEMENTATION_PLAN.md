@@ -15,7 +15,7 @@ Three rules govern everything below.
 
 ## 0. Design decisions this plan adds to the PRD
 
-The PRD leaves three mechanisms underspecified in ways that decide whether kernels fit
+The PRD leaves four mechanisms underspecified in ways that decide whether kernels fit
 in 300 lines. Settling them up front is the difference between a dozen small kernels and
 a dozen 600-line ones.
 
@@ -182,6 +182,69 @@ void cq_ctrl_pop (cq_cxt*);                      /* releases it, asserted |0> */
 no kernel is aware the axis exists. Nested control ANDs the flags into a single wire on
 the second push, so the promotion never sees more than one control (PRD §9).
 
+### 0.4 A composite kernel calls another kernel's STEP FUNCTION — the Layer-3 export rule
+
+**Decided 2026-08-16; resolves the open (M19/M20) half of `bd 4tt`.** Three of the twelve
+kernels are built out of another kernel's construction, and the rule they follow was set by
+precedent at Steps 14 and 16 rather than by this plan. It is written down now, because K12
+is the case where getting it wrong costs the most.
+
+> **A kernel that needs another kernel's construction inside its own compute half calls that
+> module's exported, indexed STEP function — never the kernel, and never a second
+> transcription of the upstream gate list.**
+
+**Why not the kernel.** `cq_kernel_*` is a whole sandwich, and `cq_sandwich` refuses nesting
+in both configurations (`ctx->sandwich_depth != 0`), so calling one from inside another
+compute half aborts before allocating anything. That refusal is right and stays: an inner
+region's release would break the outer palindrome, which is what `CQ_ZERO_BY_PALINDROME`
+rests on (PRD §10).
+
+**Why not a second transcription.** Rule 1 says port once. Every re-typing of `lower_mux!`
+or `lower_sub!` is a fresh chance to put the Toffoli before the two CNOTs that build its
+control — the exact ordering hazard `ckd.14(a)` is about, and one that L1 cannot see.
+
+**The shape, already shipped twice.** A block struct naming the operands, a `_steps(W)` count,
+and a one-gate `_step(ctx, block, u)`:
+
+| exporter | export | consumer | since |
+|---|---|---|---|
+| **M17** `mux` | `cq_mux_block`, `CQ_MUX_STEPS_PER_BIT`, `cq_mux_step` | M12's barrel (`L` copies) | Step 14 |
+| **M15** `addacc` | `cq_addacc_block`, `cq_addacc_steps`, `cq_addacc_step`, `cq_addacc_check` | M18's multiplier (`W` copies) | Step 15 |
+| **M14** `add` | `cq_sub_block`, `cq_sub_steps`, `cq_sub_step` — `k7_compute` and `adder_env`, today file-static | **M19** (`W` copies) | **Step 17** |
+| **M16** `cmp` | `cq_ult_block`, `cq_ult_steps`, `cq_ult_step` — `ult_compute` and the `ult` half of `cmp_env`, today file-static | **M19** (`W` copies) | **Step 17** |
+
+The consumer maps a contiguous run of *its own* step indices onto the block's index, exactly
+as M12 and M18 already do. The exporter keeps its own `cq_kernel_*` entry point unchanged;
+the export is additive, and `cq_kernel_fn` is **not** touched (Rule 7 — it stays arity-2).
+
+**Four obligations on the exporter**, all of which M15's and M17's headers already discharge
+and which M14's and M16's must:
+
+1. **One gate per step.** Non-negotiable (`ckd.14(a)`): the driver replays indices, so a step
+   must be an involution.
+2. **Every target is a bit the CALLER owns**, inside the caller's one contiguous scratch
+   region. The block struct carries pointers; it allocates nothing. (M15 states this as
+   "the ancilla is supplied by the caller, not allocated here", and the reason is I6(b) —
+   an allocation mid-compute-half is a bit step 0 did not pre-materialise.)
+3. **Sub-array operands are the sanctioned calling shape.** A consumer hands the block
+   `cq_scratch_span` views of its own region, and may hand it a view that *overlaps* a
+   register an earlier step wrote, provided the overlap is read-only. K12 does exactly this:
+   its `r_in[t]` view aliases `rnext[t−1]` (K12.md §2.1a). Guards therefore compare **ranges**,
+   never base pointers (`kernels/kernel.h`).
+4. **The block's operand bindings are the consumer's business.** M16's `ult` block compares
+   `ua` against `ub`; K12 binds `ua` to a scratch view rather than to a source operand, which
+   is legal precisely because a block never materialises a control.
+
+**The cross-check this buys, and it is the real reason for the rule.** A consumer's L4 golden
+can be asserted as `W × (measured cost of each block at this width)` rather than against a
+written-down closed form — the assertion that survives `CQOPS_UPDATE_GOLDENS=1` and the only
+durable detector for the "shorten the inner loop" mutant that left K11's entire L1/L2/L3/L5
+sweep green. K12.md §3.0 carries the worked identity. **Build it before the kernel.**
+
+**What is NOT permitted:** widening `cq_kernel_fn`; an `_unc` or `_controlled` variant of a
+step function (Rules 7 and 9); an exporter that allocates; or a consumer that copies the
+exporter's gate list "to avoid the dependency".
+
 ---
 
 ## 1. Step 0 — ground the references *(no C written)*
@@ -248,10 +311,19 @@ Those formulas become the L4 goldens; without them L4 has nothing to assert agai
 >
 > Goldens at W=8, all at the **all-quantum mask**: K06 `11W−4` = **84** (was 80),
 > K07 `15W−2` = **118** (was 116), K09 `ult` `12W+4` = **100** (was 98) and `slt`
-> `16W+8` = **136**, K12 `udiv` `34W²+13W` = **2280** (was 2166), K11 `13W²−8W` = **768**.
-> Qubits: K06 `2W`, K07 `3W`, K09 `ult` `3W+1`, K11 `W²+2W`,
-> K12 `8W²+6W−1` (**559** at W=8; **not** `8W²+5W` — killing K12's third fold costs a
-> further `W−1` qubits, and the gate/qubit pair must move together).
+> `16W+8` = **136**, K12 `udiv` `34W²+5W` = **2216**, K11 `13W²−8W` = **768**.
+> Qubits: K06 `2W`, K07 `3W`, K09 `ult` `3W+1`, K11 `W²+2W`, K12 `8W²+4W−1` (**543** at W=8).
+>
+> > **⚠ GAP 1's K12 PAIR WAS INCONSISTENT AND IS NOW CORRECTED [2026-08-16, PRD §15 D9].**
+> > This row used to record `34W²+13W` (2280) with `8W²+5W` (552) — the gate count of one
+> > layout and the qubit count of another. They could not both hold: keeping K12's `r_0` upper
+> > bits as real scratch is exactly what costs those `W−1` qubits, and the gate/qubit pair has
+> > to move together. Both halves are now the **measured** pair for the decided design
+> > (D9(b)+(d)): `34W²+5W` and `8W²+4W−1`, confirmed by running the construction through the
+> > real emitter in both configurations at `W ∈ {1,2,3,4,8,16,32,64,128}`. The intermediate
+> > `34W²+13W` / `8W²+6W−1` pair — which this line carried the first half of — is consistent
+> > with itself and also reproduces exactly; it is what D9(b) retired. `K12.md` §3 carries all
+> > three generations so a golden diff stays attributable.
 >
 > **The decision fixed a latent bug in K12, it did not merely re-price it.** K12's own
 > re-issue initially claimed its halves already mirrored correctly under the old rules.
@@ -882,20 +954,20 @@ it grows.
 | M11 | `kernels/shift_const.[ch]` | K4 constant shl/lshr/ashr, **D8** | **63 / 90** | — |
 | M12 | `kernels/shift_var.[ch]` | variable shifts (barrel over K10) | ~~130~~ **138 landed** | `mux block ↔ barrel schedule` — **taken**: the four-gate block is M17's `cq_mux_step`, called, not transcribed |
 | M13 | `kernels/cast.[ch]` | K5 sext/zext/trunc; unary, **two widths** | **42 / 90** | — |
-| M14 | `kernels/add.c` | K6 add, K7 sub | 190 | `add.c` ↔ `sub.c` |
+| M14 | `kernels/add.[ch]` | K6 add, K7 sub. **LANDED 2026-08-16 at 114 against 190**, so the seam is unused. **Step 17's export SHIPPED, at 124 body + 18 header** (plan §0.4, PRD §15 D9(e)): `k7_compute` and the sub half of `adder_env` are now `cq_sub_block` / `cq_sub_steps` / `cq_sub_step`, on M15's and M17's shape — additive, `cq_kernel_fn` untouched, and K6/K7 emit the same gates in the same order | 190 | `add.c` ↔ `sub.c` |
 | M15 | `kernels/addacc.[ch]` | K8 Cuccaro in-place accumulator. **LANDED 2026-08-16 at 108 (93 body + 15 header) against 120, so no seam is owed.** Ships a `.h` because M18 consumes its block and step function, exactly as M17 does for M12 | 120 | — |
-| M16 | `kernels/cmp.c` | K9 eq/ult/slt + 7 derived predicates | 200 | primitives ↔ predicate derivation |
+| M16 | `kernels/cmp.[ch]` | K9 eq/ult/slt + 7 derived predicates. **LANDED at 190/200 — the tightest module in the tree. Step 17's export SHIPPED and it lands at EXACTLY 200/200**: `ult_compute` and the `ult` half of `cmp_env` are now `cq_ult_block` / `cq_ult_steps` / `cq_ult_step`. **The seam was NOT taken** — the export cost 10 lines, not 30, because `cq_ult_step` replaced `ult_compute` rather than being added beside it. The next line added to this module takes it; `src/kernels/cmp_prim.c` is where the three primitives go | 200 | primitives ↔ predicate derivation — **still available, and now at zero headroom** |
 | M17 | `kernels/mux.[ch]` | K10 select — **three sources**, `cond` is 1 bit (`ckd.15`) | **65 / 90** | — (unused; `cq_mux_step` is already exported for M12) |
 | M18 | `kernels/mul.[ch]` | K11 shift-add over K8. **LANDED 2026-08-16 at 110 (102 body + 8 header) against 160, so no seam is owed** — the module is small because the accumulator is M15's and the reversal is M09's, which is Rule 8 and Rule 1 paying off in the same file. Ships a `.h` for `cq_mul_steps`, which the suite needs as the palindrome's head length | 160 | — |
-| M19 | `kernels/divrem_u.c` | K12 unsigned restoring division | 220 | loop body ↔ driver |
-| M20 | `kernels/divrem_s.c` | signed wrappers, D3 div-by-zero | 110 | — |
+| M19 | `kernels/divrem_u.[ch]` | K12 unsigned restoring division, **PRD §15 D9**: FLAT scratch, one sandwich, `W` iterations of {shift-in CX, M16's `cq_ult_step`, M14's `cq_sub_step`, M17's `cq_mux_step`, quotient CX}. **LANDED 2026-08-16 at 229 (202 body + 27 header) against 220**, and it **transcribes no gate list at all** — it is a step-index map plus a scratch layout (the contiguous remainder tape, K12.md §2.1a) plus the L5 short-circuit. `34W²+5W` gates over `8W²+4W−1` qubits, measured. Ships a `.h` because M20 composes its block, the way M15 does for M18 | 220 | loop body ↔ driver — **unused; the body is 202** |
+| M20 | `kernels/divrem_s.[ch]` | signed wrappers, D3 div-by-zero. **LANDED 2026-08-16 at 169 (158 body + 11 header) against 110 — 44% over**, on M12's and M07's precedent. The overshoot is three things the 110 did not anticipate: `condneg` is the ONE gate list K12 does not get from a sibling and needs its own step decode; the wrapper has four sub-regions to lay out above M19's; and the classical fold is a second, signed one. The recorded seam is `condneg ↔ the wrapper's step decode`, and it is available if this ever passes 240 | 110 | **`condneg` ↔ wrapper decode** (recorded here at Step 17; §3 had none) |
 
 ### Layer 4 — analog and sinks
 
 | ID | Module | LOC | Notes |
 |---|---|---|---|
-| M21 | `angle.[ch]` | 80 | Pure classification of θ against §7's rows, tolerance configurable. Exhaustively testable, zero dependencies |
-| M22 | `rotate.[ch]` | 150 | §7 Ry/Rz per bit, the θ≡π asymmetry, measurement |
+| M21 | `angle.[ch]` | 80 | **DONE, Step 18 — 69/80, split 19 + 50 since Step 19 moved `CQ_ANGLE_PI` into the header so M22 has one home for it (18 + 51 before that).** Pure classification of θ against §7's rows, tolerance configurable. Exhaustively testable, zero dependencies. What §7 left open is now **PRD §15 D10**: the window is `tol·π` (ABSOLUTE), one refusal `\|θ\|·1.6e-16 ≤ tol·π` carries the error bound `\|θ − k·π\| ≤ 2·tol·π`, and `tol` is capped at `1e-3`. The θ-relative reading was built first and is a miscompile |
+| M22 | `rotate.[ch]` | 150 | §7 Ry/Rz per bit, the θ≡π asymmetry, measurement. **DONE, Step 19 — 96/150 (85 + 11 at the step's close; 83 + 11 after the adversarial review trimmed a guard).** THE FIRST CALLER OF `cq_shadow_rotate` IN `src/`, on exactly two of §7's twelve cells — the general-`Ry` row, both columns (**PRD §15 D12**). Carries `bd lk0`'s resolution — the `Z` is `sink.rz(q, π)`, no seventh vtable entry — and refuses to run inside a sandwich compute half, which is the only guard it owns outright. Split seam recorded: **`§7's rotation table ↔ measurement`**, `cq_measure` moving to `src/measure.c` if `rotate.c` passes 240 |
 | M23 | `sink_printf.c` | 70 | Default; CQ_lang's golden-trace **convention**, not its lines — the goldens are handle-level and a sink sees only qubit indices. `x`/`cx`/`ccx`/`ry`/`rz`/`mz`, operands `q<N>`, `%a` angles, flush per line. See the PRD §8 correction |
 | M24 | `sink_count.c` | 100 | Per-kind totals, T-count = 7×Toffoli. **NOT peak qubits** — Bennett's `peak_live_wires` is a simulator (Rule 13) and `cq_qubits_peak()` in M03 already has the number exactly. `total` = x+cx+ccx only. See the PRD §8 correction |
 | M25 | `sink_qec.c` | 100 | Conditional on `C_quantum_error_correction`; Ry/Rz stubbed per §7 |
@@ -1003,7 +1075,7 @@ Random masks are sampled on top.
 | 14 | K10 mux, then variable shifts as a barrel over it | M17, M12 | 5 |
 | 15 | K8 Cuccaro accumulator — in-place, self-cleaning, 1 **caller-supplied** ancilla. L4 golden `6W−5` **for `W ≥ 2` only** — at `W = 1` the closed form's components are `(0, 2, −1)` and the correct pin is `(0, 1, 0)`, re-derived rather than ported (K08.md §5 D1). **NOT a Rule 7 kernel and NOT drivable by the shared Phase-B gate** — `acc += b` is destructive and its inverse is the reverse circuit, so `test_kernel_addacc.c` restates L1/L2/L3/L4 by hand and **L5 does not apply** (K08.md §5 D7) | M15 | 5 |
 | 16 | K11 mul — shift-add over K8. **`W = 1` is a DELEGATION TO K2, not the closed form** — `lower_add_cuccaro!` is out of domain at `W ≤ 1` (adder.jl:66), and `13W² − 8W` evaluates to the right TOTAL (5) with the wrong split twice over: the formula says `(0,5,0)`, the uniform path emits `(0,3,2)`, and `a·b mod 2 = a ∧ b` is `(0,0,1)` (K11.md §3, §5 note 9). **The accumulate is `6W−5` STEPS, never one** — M18 calls `cq_addacc_step`, and a whole `cq_kernel_addacc` as one step would make the reverse half re-accumulate with `dst` already copied out (bd rhp). **Its L4 golden is SELF-PINNED**: shift-add over Cuccaro exists in no Bennett source, so Step 12's against-upstream gate has no analogue here and what replaces it is a decomposition check binding M18's per-accumulate cost to M15's *measured* one | M18 | 5 |
-| 17 | K12 divrem — unrolled restoring division over K7/K9/K10. Unsigned first, then signed + D3 | M19, M20 | 6 |
+| 17 | K12 divrem — unrolled restoring division. **PRD §15 D9 settles the shape before a line is written**: FLAT scratch (`8W²+4W−1` qubits, `34W²+5W` gates — 2216/543 at i8, and **i128 is a shipped `divrem` width**, 557 696/131 583); `fits` read straight off the comparator carry-out, not `not1(ult(…))`; quotient bit one CX; `r_0`'s upper bits real scratch. **M19 composes M16's, M14's and M17's EXPORTED step blocks and transcribes nothing** (plan §0.4). Every unsigned figure is already MEASURED through the real emitter in both configurations at nine widths; **the signed wrapper is not** — mark it in the test file. **Pin L4 at `W ∈ {1,8,16,32,64,128}`** — not 8/16/32/64, which K12.md said until 2026-08-16. Build the §3.0 composition check BEFORE the kernel: it is the only L4 assertion that survives `CQOPS_UPDATE_GOLDENS=1`, and K12's "narrow the blocks to `t+2` bits" mutant is K11's, three times bigger. **LANDED 2026-08-16, 153/153 in both configurations, and NOT ONE PINNED NUMBER MOVED — including all four signed columns, which had never been executed.** The suite is split in two on the M19/M20 seam (bd `mmv` option (a), taken up front) and the goldens with it | M19, M20 | 6 |
 
 **Step 12's extra gate:** the first sandwich kernel must pin `x+1` at `i8` against
 Bennett's published baseline (PRD §11 L4) and document any deliberate delta. This is the
@@ -1016,8 +1088,8 @@ documented, and never traps. Assert it does not trap; pin whatever it returns.
 
 | Step | Red | Green | Gate | PRD |
 |---|---|---|---|---|
-| 18 | `test_angle.c` — every row of §7's table incl. mod-4π vs mod-2π boundaries and tolerance edges | M21 | Table green | 7 |
-| 19 | `test_rotate.c` — **the θ≡π asymmetry**: `Ry(π)` on a constant bit flips it with **0 gates and 0 qubits**; on a qubit it emits `X` then `Z`. `Rz` on a constant is a no-op at every φ. Measurement returns shadow, 0 for unknown, emits `mz`, is terminal | M22 | Classical mode works end to end | 7 |
+| 18 | `test_angle.c` — every row of §7's table incl. mod-4π vs mod-2π boundaries and tolerance edges. **The gate as written is not achievable in M21 and is corrected:** §7's table is six rows × TWO columns, and the constant/qubit split is Rule 15's whole point — choosing a column needs a `cq_bit`, so M21 pins the **ROW** and M22 owns the cells at Step 19 | M21 | **DONE** — 19 cases + 8 deaths green in both configurations, 39/39 real mutants killed with 4 deliberately-equivalent controls alive, then a 29-agent adversarial review whose 9 surviving findings added 3 cases and `-ffp-contract=off` | 7 |
+| 19 | `test_rotate.c` — **the θ≡π asymmetry**: `Ry(π)` on a constant bit flips it with **0 gates and 0 qubits**; on a qubit it emits `X` then `Z`. `Rz` on a constant is a no-op at every φ. Measurement returns shadow, 0 for unknown, emits `mz`, is terminal. **Two clarifications the step forced.** The `Z` had no vtable entry and no `cq_emit_*`; it is `sink.rz(q, π)` (**PRD §7**, `bd lk0`) — and note "`Ry(π) = XZ`" is a MATRIX product while "emit `X` then `Z`" is a CIRCUIT, so the emitted pair is `Z·X = Ry(3π)`, which is the same row up to a global −1 that no fixed spelling can remove. **Which rows poison is a decision, not a detail** — PRD §15 **D12**: only `Ry` off the lattice | M22 | **DONE** — 19 cases + 12 deaths green in both configurations at 94/150 LOC (83 + 11), 35/35 real mutants killed across three rounds | 7 |
 | 20 | `test_controlled.c` — promotion table verbatim from `controlled.jl`; ancilla shared across the region and returned |0⟩; nested control uses **one** control wire; **every Phase-B kernel re-runs its L1–L4 suite under `cq_ctrl_push`** | M06 | L1–L4 green under control for all kernels | 7 |
 | 21 | `test_unc.c` — `_unc` across every kernel; the PRD §10 asymmetry is **expected**, so forward and `_unc` counts are pinned **separately**. `_inv` for compare flags. `cqrt_free` of a dirty rail is a hard error | (thin, in M26) | **L3 green across all kernels** | 7 |
 

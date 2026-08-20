@@ -1,0 +1,67 @@
+# M20 kernels/divrem_s.c — K12 sdiv/srem (sign-magnitude over M19, sandwiched, all-quantum operands). SELF-PINNED and FIRST EXECUTED AT STEP 17: K12.md §6.1 listed the whole signed path as derived-but-not-run
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+sdiv      forward    1     8    51       12
+sdiv      unc        1     8    51       12
+srem      forward    1     8    45       12
+srem      unc        1     8    45       12
+sdiv      forward    2    24   132       44
+sdiv      unc        2    24   132       44
+srem      forward    2    24   124       44
+srem      unc        2    24   124       44
+sdiv      forward    3    48   253       96
+sdiv      unc        3    48   253       96
+srem      forward    3    48   243       96
+srem      unc        3    48   243       96
+sdiv      forward    4    80   414      168
+sdiv      unc        4    80   414      168
+srem      forward    4    80   402      168
+srem      unc        4    80   402      168
+sdiv      forward    5   120   615      260
+sdiv      unc        5   120   615      260
+srem      forward    5   120   601      260
+srem      unc        5   120   601      260
+sdiv      forward    8   288  1458      656
+sdiv      unc        8   288  1458      656
+srem      forward    8   288  1438      656
+srem      unc        8   288  1438      656
+sdiv      forward   16  1088  5466     2592
+sdiv      unc       16  1088  5466     2592
+srem      forward   16  1088  5430     2592
+srem      unc       16  1088  5430     2592
+sdiv      forward   32  4224 21162    10304
+sdiv      unc       32  4224 21162    10304
+srem      forward   32  4224 21094    10304
+srem      unc       32  4224 21094    10304
+sdiv      forward   64 16640 83274    41088
+sdiv      unc       64 16640 83274    41088
+srem      forward   64 16640 83142    41088
+srem      unc       64 16640 83142    41088
+sdiv      forward  128 66048 330378   164096
+sdiv      unc      128 66048 330378   164096
+srem      forward  128 66048 330118   164096
+srem      unc      128 66048 330118   164096

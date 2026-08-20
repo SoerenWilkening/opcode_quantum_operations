@@ -54,16 +54,25 @@
 void cq_kernel_mux(cq_ctx *ctx, cq_bit *dst, const cq_bit *cond,
                    const cq_bit *t, const cq_bit *f, int W);
 
-/* --- The block, shared with M12's barrel shifter. ------------------------ */
+/* --- The block, shared with M12's barrel and (from Step 17) M19's divider. -- */
 
 /* THE BARREL IS L COPIES OF THIS BLOCK, AND UPSTREAM SAYS SO LITERALLY:
  * `lower_var_shl!`/`lshr!`/`ashr!` each end their stage loop with
  * `result = lower_mux!(g, wa, [b[k+1]], shifted, result, W)` (arith.jl:361,
  * :377, :397). So M12 reusing this step function is Rule 1 applied to the call
  * graph as well as to the gates — the alternative is transcribing `lower_mux!`
- * a second time, which is the mistake bd -4tt was filed about in the other
+ * a second time, which is the mistake bd 4tt was filed about in the other
  * direction (there the premise was false and K9 genuinely had its own upstream
  * function; here it is true).
+ *
+ * THAT BEAD IS CLOSED AND THIS BLOCK IS ITS TEMPLATE. Plan §0.4 / PRD §15 D9(e)
+ * generalise the pattern: a kernel needing another's construction inside its own
+ * compute half calls that module's exported STEP function. M19 is this block's
+ * SECOND CONSUMER as of Step 17 — K12's per-iteration `rnext = fits ? diff :
+ * r_in` is `cq_mux_step` with `cond = &ucar[t][W]`, `W` copies of it — and M14
+ * and M16 now ship exports of the same shape (`cq_sub_step`, `cq_ult_step`).
+ * Note K12 binds `f` to a scratch VIEW that overlaps the previous iteration's
+ * `r` (K12.md §2.1a): legal, because `cond`, `t` and `f` are only ever controls.
  *
  * `r` and `d` are the two scratch vectors — Bennett's `r` and `diff`. `r` is
  * the block's OUTPUT, and for M12 it is the next stage's `f`; `d` is pure

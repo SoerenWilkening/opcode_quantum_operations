@@ -1,0 +1,67 @@
+# M19 kernels/divrem_u.c — K12 udiv/urem (flat restoring division over M16/M14/M17's exported step blocks, sandwiched, all-quantum operands). SELF-PINNED: upstream publishes no division gate count and could not be compared to anyway — it widens to 64 bits
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+udiv      forward    1     8    25        6
+udiv      unc        1     8    25        6
+urem      forward    1     8    23        6
+urem      unc        1     8    23        6
+udiv      forward    2    24    90       32
+udiv      unc        2    24    90       32
+urem      forward    2    24    86       32
+urem      unc        2    24    86       32
+udiv      forward    3    48   195       78
+udiv      unc        3    48   195       78
+urem      forward    3    48   189       78
+urem      unc        3    48   189       78
+udiv      forward    4    80   340      144
+udiv      unc        4    80   340      144
+urem      forward    4    80   332      144
+urem      unc        4    80   332      144
+udiv      forward    5   120   525      230
+udiv      unc        5   120   525      230
+urem      forward    5   120   515      230
+urem      unc        5   120   515      230
+udiv      forward    8   288  1320      608
+udiv      unc        8   288  1320      608
+urem      forward    8   288  1304      608
+urem      unc        8   288  1304      608
+udiv      forward   16  1088  5200     2496
+udiv      unc       16  1088  5200     2496
+urem      forward   16  1088  5168     2496
+urem      unc       16  1088  5168     2496
+udiv      forward   32  4224 20640    10112
+udiv      unc       32  4224 20640    10112
+urem      forward   32  4224 20576    10112
+urem      unc       32  4224 20576    10112
+udiv      forward   64 16640 82240    40704
+udiv      unc       64 16640 82240    40704
+urem      forward   64 16640 82112    40704
+urem      unc       64 16640 82112    40704
+udiv      forward  128 66048 328320   163328
+udiv      unc      128 66048 328320   163328
+urem      forward  128 66048 328064   163328
+urem      unc      128 66048 328064   163328

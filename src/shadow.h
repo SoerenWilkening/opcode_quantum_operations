@@ -85,9 +85,14 @@ void cq_shadow_x     (cq_shadow_table *sh, uint32_t t);
 void cq_shadow_cx    (cq_shadow_table *sh, uint32_t c, uint32_t t);
 void cq_shadow_ccx   (cq_shadow_table *sh, uint32_t a, uint32_t b, uint32_t t);
 
-/* The Ry/Rz row. Poisons, full stop: deciding whether θ is in the classical
- * set (§7) is M21's job, and a rotation that IS classical never reaches
- * here. One-way, like every other rule. */
+/* The rotation row. Poisons, full stop — and WHICH §7 rows call it is the
+ * caller's decision, not this function's. Classifying θ is M21's job and acting
+ * on the class is M22's; PRD §15 D12 settles the acting part: ONLY `Ry` at an
+ * angle off the π-lattice poisons, because every `Rz` and the `Z` of the
+ * half-turn row are DIAGONAL and a diagonal gate cannot move a
+ * computational-basis value. So a rotation that is classical never reaches here,
+ * and neither does one that is merely phase-only. One-way, like every other
+ * rule: nothing un-poisons a live qubit. */
 void cq_shadow_rotate(cq_shadow_table *sh, uint32_t q);
 
 /* RETIREMENT — the ckd.17a certificate, which is an ACT and not a thing.
@@ -107,7 +112,9 @@ void cq_shadow_rotate(cq_shadow_table *sh, uint32_t q);
  * demonstrably not |0⟩ and something upstream just certified it anyway. PRD
  * §10 records the exact reach: a complete detector of a non-cancelling
  * sandwich across the whole rotation-free kernel surface (Steps 10-17),
- * because Ry/Rz are the only producers of `unknown` — and INERT on the L6
+ * because cq_shadow_rotate is the only producer of `unknown` and, since Step 19,
+ * its only caller is M22's general-Ry row (D12 — an Rz never reaches here) — and
+ * INERT on the L6
  * corpus, where nearly every rail is rotation-tainted. Never report an L6 run
  * as evidence that the certificate held. */
 void cq_shadow_retire(cq_shadow_table *sh, uint32_t q);

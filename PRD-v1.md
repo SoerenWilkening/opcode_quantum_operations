@@ -229,7 +229,9 @@ typedef struct {
 /* Per-qubit classical shadow — the whole of our "simulation". */
 typedef struct {
     uint8_t value;    /* 0 or 1, meaningful iff !unknown */
-    uint8_t unknown;  /* set by Ry/Rz, or by a gate with an unknown control */
+    uint8_t unknown;  /* set by a general Ry (§15 D12), or by a gate with an
+                       * unknown control. NOT by Rz, and not by the θ≡π row:
+                       * a diagonal gate moves no basis value */
 } cq_shadow;
 ```
 
@@ -364,10 +366,22 @@ is correct: two constant bits are genuinely independent channels.
 | `X(t)` | `t.unknown ? nop : t.value ^= 1` |
 | `CX(c,t)` | `t.unknown \|= c.unknown; if (!t.unknown) t.value ^= c.value` |
 | `CCX(a,b,t)` | `t.unknown \|= a.unknown \| b.unknown; if (!t.unknown) t.value ^= a.value & b.value` |
-| `Ry/Rz(q,θ)` | `q.unknown = 1` (unless θ is in the classical set, §7) |
+| `Ry(q,θ)`, θ off the π-lattice | `q.unknown = 1` |
+| `Ry(q,θ)`, θ ≡ π (mod 2π) | `X`'s rule — the row emits `X` then a diagonal, **no poison** |
+| `Rz(q,φ)`, any φ | **nothing** — `Rz` is diagonal and moves no basis value |
 
 Conservative in the safe direction only: the shadow may say *unknown* when the truth is
 determinate (it forgets correlations), but never the reverse.
+
+> **The last two rows are D12, resolved at Step 19, and they are the reason the rule is
+> stated per §7 ROW rather than per emitted gate.** The old single row read
+> `q.unknown = 1` "unless θ is in the classical set, §7", which is ambiguous exactly where
+> it matters: the θ ≡ π row *does* emit a rotation (the `Z`, as `sink.rz(q, π)`) while
+> being a basis permutation, and general `Rz` emits a rotation while changing no basis
+> value at all. A diagonal gate cannot move a computational-basis value, so a determinate
+> entry stays determinate and the shadow remains **exact** rather than becoming
+> conservative. `cq_shadow_rotate` itself is unchanged and still poisons unconditionally —
+> what D12 fixes is which rows *call* it.
 
 ---
 
@@ -537,7 +551,7 @@ anything, since the gate sequence is a deterministic function of `(W, operand bi
 | K9 | `eq/ult/slt(dst,a,b)` | `lower_eq!/ult!/slt!` | sandwich | 1-bit result; other 7 predicates derive |
 | K10 | `mux(dst,c,t,f)` | `lower_mux!` | sandwich | **three sources, `c` is 1 bit** — see §4; also gives variable shifts |
 | K11 | `mul(dst,a,b)` | `lower_mul_wide!` | sandwich | shift-add over K8, copy-out, reverse. **`W = 1` DELEGATES TO K2** — `lower_add_cuccaro!` is out of domain at `W ≤ 1` and the closed form's total is accidentally right there with the wrong split (K11.md §3). Rule 7's canonical shape, unchanged: the first kernel since K6/K7 that needs no departure from the parameter list |
-| K12 | `divrem(dst,a,b)` | `_soft_udiv_compile` | sandwich | restoring division: W × (K7, K9, K10) |
+| K12 | `divrem(dst,a,b)` | `_soft_udiv_compile` | sandwich | restoring division: W × (K9's `ult` **step block**, K7's `sub` **step block**, K10's `mux` **step block**) + 2 CX. **D9** |
 
 Two notes on the catalogue:
 
@@ -546,7 +560,11 @@ Two notes on the catalogue:
   trio by flipping sign bits before `ult` (`lower_slt!`).
 - **K12 is not a circuit.** Bennett implements division as a *branchless Julia kernel*
   compiled by its own pipeline (`src/divider.jl`). We do the same: an unrolled restoring
-  division built from K7/K9/K10. Nothing new to port.
+  division built from K7/K9/K10. Nothing new to port — and as of **D9(e)** that is literal:
+  M19 calls M16's, M14's and M17's **exported step functions** and transcribes no gate list
+  of its own (plan §0.4). Its scratch scheme and the three kernel-shape choices that ride
+  with it are **D9**; its cost is `udiv` `34W²+5W` over `8W²+4W−1` qubits, and it ships at
+  **i128**, where that is 557,696 gates over 131,583 qubits.
 - **K11 uses Cuccaro, and this is a deliberate delta from upstream** (decided 2026-08-14).
   Bennett's `multiplier.jl:29` calls `lower_add!` — *ripple*, not Cuccaro — so "shift-add
   over K8" is our choice, not a port. It is the right one: scratch drops from `3W²+W` to
@@ -569,16 +587,34 @@ void cqrt_ry_i<W>(int32_t h, double theta);   /* Ry(θ) on every qubit of the re
 void cqrt_rz_i<W>(int32_t h, double phi);
 ```
 
-`Ry(θ) = [[cos θ/2, −sin θ/2], [sin θ/2, cos θ/2]]`. The special cases, per bit:
+**Both matrices are stated, because both sign conventions are load-bearing.**
 
-| Angle | Bit is constant | Bit is a qubit |
-|---|---|---|
-| `Ry`, θ ≡ 0 (mod 4π) | nothing | nothing |
-| `Ry`, θ ≡ 2π (mod 4π) | nothing (global −1) | nothing (global −1) |
-| `Ry`, θ ≡ π (mod 2π) | **flip the constant, 0 gates, 0 qubits** | emit `X` then `Z` |
-| `Ry`, otherwise | materialise, then `sink.ry` | `sink.ry` |
-| `Rz`, φ ≡ 0 (mod 4π) | nothing | nothing |
-| `Rz`, otherwise | **nothing** — diagonal on a definite value is a global phase | `sink.rz` |
+```
+Ry(θ) = [[cos θ/2, −sin θ/2], [sin θ/2, cos θ/2]]      = exp(−iθY/2)
+Rz(φ) = diag(e^{−iφ/2}, e^{+iφ/2})                     = exp(−iφZ/2)
+```
+
+The `Rz` line was unwritten until Step 19 and is **not** free to choose: the `Rz, φ ≡ 0
+(mod 4π)` row below has period **4π**, which is the half-angle form above and not the
+phase-gate `diag(1, e^{iφ})`, whose identity row would be mod 2π. M21 already encodes the
+same convention (`src/angle.h` — "`Rz: ∓iZ`" for the half turn, i.e. `Rz(π) = diag(−i, i)`),
+and every control-side angle in **D11** is read straight off these two lines. Neither
+matrix has an upstream: Bennett is purely classical-reversible and
+`third_party/bennett/src/controlled.jl` contains no rotation and no phase at all, so §7
+and §9's rotation rows are **stated here** rather than ported (Rule 1 has nothing to
+supply).
+
+The special cases, per bit. **`kind` is read, never the shadow** (D6), and the shadow
+column is the rule this row imposes on M02 — see **D12**:
+
+| Angle | Bit is constant | Bit is a qubit | Shadow |
+|---|---|---|---|
+| `Ry`, θ ≡ 0 (mod 4π) | nothing | nothing | untouched |
+| `Ry`, θ ≡ 2π (mod 4π) | nothing (global −1) | nothing (global −1) | untouched |
+| `Ry`, θ ≡ π (mod 2π) | **flip the constant, 0 gates, 0 qubits** | emit `X`, then `Z` as `sink.rz(q, π)` | `cq_shadow_x` — **no poison** |
+| `Ry`, otherwise | materialise, then `sink.ry` | `sink.ry` | **`cq_shadow_rotate` — poison** |
+| `Rz`, φ ≡ 0 (mod 4π) | nothing | nothing | untouched |
+| `Rz`, otherwise | **nothing** — diagonal on a definite value is a global phase | `sink.rz` | **no poison** (D12) |
 
 The θ ≡ π row is the important one. `Ry(π) = XZ`, i.e. `X` up to a **relative** sign on
 |1⟩. On a bit that is already a definite classical constant that sign is *global* and
@@ -587,8 +623,80 @@ qubit — possibly in superposition, possibly entangled — the sign is observab
 be emitted. Getting this asymmetry right is what makes classical-mode testing possible
 (§11) without making it unsound.
 
+> **`Ry(π) = XZ` IS A MATRIX PRODUCT AND "emit `X` then `Z`" IS A CIRCUIT, AND THE TWO
+> READ IN OPPOSITE ORDERS.** Applying `X` first and `Z` second is the matrix product
+> `Z·X`, and `XZ = −ZX` — so the emitted circuit realises `Ry(3π) = −Ry(π)`, not `Ry(π)`.
+> Neither sentence is wrong; they are the same two symbols in the two conventions, and
+> earlier drafts of this section, `IMPLEMENTATION_PLAN` §4's Step 19 row and CLAUDE.md's
+> Rule 15 all carried both without saying so.
+>
+> **There is no sign to "fix", because the row spans both parities.** `θ ≡ π (mod 2π)`
+> contains `k ≡ 1` and `k ≡ 3 (mod 4)`, whose operators differ by exactly that global −1,
+> so **no fixed two-gate spelling is sign-exact for the whole row**. What §7 states is
+> therefore the honest claim: the emitted pair realises the half turn **up to a global
+> phase**, which is unobservable on the uncontrolled axis this table is written for. The
+> parity is recoverable — M21 computes `k mod 4` and discards it — and recovering it is
+> **D11**'s obligation at Step 20, not this row's.
+
+> ### `bd lk0` — the `Z` is `sink.rz(q, π)`, and the vtable stays frozen at six
+>
+> §7 named a `Z` that has no §8 vtable entry, no `cq_emit_*` and no Bennett source, and
+> Rule 4 forbids reaching for a new gate on the classical path. It needs none:
+>
+> ```
+> Rz(π) = diag(e^{−iπ/2}, e^{+iπ/2}) = diag(−i, +i) = −i·Z        so   Z = i·Rz(π)
+> ```
+>
+> The qubit cell is therefore `sink.x(q)` then `sink.rz(q, π)` — **two existing entries**,
+> no seventh slot, no fork from a frozen ABI. Its exact operator is
+> `Rz(π)·X = −i·(Z·X) = +i·Ry(π) = −i·Ry(3π)`, i.e. the Pauli `Y`.
+>
+> **The residual `±i` is unreachable, not a spelling accident, and no reordering removes
+> it.** `det Ry(θ) = det Rz(φ) = 1` at every angle while `det X = −1`; any product of `x`
+> and `rz` gates needs an odd number of `x` to be antidiagonal like `Ry(π)`, so its
+> determinant is `−1`, so if it equals `c·Ry(π)` then `c² = −1` and `c = ±i`. All four
+> orderings of `{x, rz(±π)}` land on `±i` and nothing does better. Do not "tidy" the order
+> to chase the phase; do reorder only for the reason **D11** gives.
+>
+> **The angle handed to `sink.rz` is `CQ_ANGLE_PI`, the nearest double to π**, so the
+> emitted `Z` is off by ~1.2e-16 rad. That is forced by the `double` sink ABI below and is
+> 10⁴ times inside D10's own `2·tol·π` bound. It is not a defect and must not be "fixed"
+> with a long double.
+>
+> **Why not simply `sink.ry(q, π)`, which is one gate and phase-exact?** Because the two
+> named entries are what a QEC backend can act on: `x` is exactly Clifford and `rz` takes
+> an exact rational `(p, q_denom, precision)` in which π is `1/1`, while **there is no
+> `qec_ry` at all** (see the QEC note below). Recorded because the one-gate spelling is
+> otherwise strictly better on paper, and someone will propose it.
+
 Angle comparison uses an exact-multiple test against a tolerance, configurable, default
-`1e-12` relative.
+`1e-12`. **What "relative" is relative to was unstated here until Step 18, and the
+obvious reading is a miscompile — see §15 D10, which fixes it.** The window is the
+absolute angle `tol · π`; the classification is refused above the magnitude at which the
+representation error alone exceeds it; and the contract M21 satisfies is
+
+> a fold names a multiple of π that θ really is within `2·tol·π` radians of,
+
+so a rotation is never silently discarded by more than `6.3e-12` radians at the default.
+`src/angle.h` states it, `tests/test_angle.c` measures it against a double-double π.
+
+**The table above is stated for the UNCONTROLLED axis, and what it does inside a §9
+controlled region is now settled — see D11 and §9.** In one line: a **classical** control
+folds the region away or unrolls it uncontrolled, so this table applies verbatim and
+Rule 15's "0 gates, 0 qubits" survives untouched; a **quantum** control makes every §7 row
+that FOLDS wrong — the four cells that act by emitting nothing, because
+`controlled-(e^{iα}·I)` is `Rz(α)` on the control wire, **plus the half-turn's qubit
+cell**, which does emit gates but only realises the row up to the `+i` of
+`Rz(π)·X = Y`. §9's promotion table states the operative scope in one line — *a §7 fold
+row → HARD ERROR in v1* — and it is deliberately broader than "the zero-gate rows": an
+M06 that refused only those would let the one row carrying a `∓π/2` residual through.
+D11 gives the exact correction for each and **v1 refuses rather than emitting it**.
+`cqrt_ry_<W>_controlled_inv` and `cqrt_rz_<W>_controlled[_inv]` are both in the frozen ABI
+(`docs/cqrt_census.txt:251-255, 280-293`), so this is not hypothetical — but measured
+2026-08-17 over all 239 goldens, **not one controlled rotation is emitted today**: all
+4,933 `cqrt_*_controlled*` calls are `copy` (4,918), `tape_write` (5) and `qram_store`
+(10), and `CQ_lang/runtime/cq_runtime.h:159-160` says the pass *begins* emitting the
+controlled `rz` in WP3.
 
 **The `Ry` sink entry stays `double` all the way down.** `qec_rz` currently takes an
 exact rational `(p, q_denom, precision)` and there is no `qec_ry` at all; converting
@@ -744,6 +852,33 @@ promotion never needs more than one control wire.
 > when the control is 0. **Only the copy-out CNOTs need controlling.** That turns a
 > controlled adder from ~3× into ~1× plus W Toffolis. Not in v1, by instruction.
 
+### The three rows Bennett does not supply — §7, and row 0
+
+The block above covers the three classical gates and it is all `controlled.jl` has:
+`third_party/bennett/src/controlled.jl` is 207 lines containing **no rotation and no
+phase**, and its contract is `(ctrl, x, 0) → (ctrl, x, ctrl ? f(x) : 0)`, purely classical.
+**Rule 1 has nothing to port here**, which is why the rows below are *stated* — and why
+**D11** records their arithmetic in full rather than leaving Step 20 to re-derive it.
+
+```
+row 0.  ctrl is CQ_BIT_ZERO  → the whole region is skipped: 0 gates, 0 qubits
+        ctrl is CQ_BIT_ONE   → the region is emitted UNCONTROLLED, verbatim
+        ctrl is CQ_BIT_Q     → promote, per the rows above and D11
+
+Ry(θ) on qubit t →  Ry(θ/2)ₜ ; CX(ctrl,t) ; Ry(−θ/2)ₜ ; CX(ctrl,t)      (exact)
+Rz(φ) on qubit t →  Rz(φ/2)ₜ ; CX(ctrl,t) ; Rz(−φ/2)ₜ ; CX(ctrl,t)      (exact)
+a §7 fold row    →  HARD ERROR in v1 — see D11
+```
+
+**Row 0 is what keeps every zero-cost claim in this document true**, and it is the §3 fold
+table's own posture one level up: a classical control is a *decision*, not a circuit. §11's
+L5 shapes, §7's "0 gates, 0 qubits" constant flip and §12's classical mode all survive the
+existence of this axis untouched; only a genuinely quantum control costs anything.
+
+The two rotation rows are exact rather than up-to-phase — at `ctrl = 0` the half-rotations
+cancel and at `ctrl = 1` the identity `X·R(α)·X = R(−α)` makes them add — and they stay
+inside §8's frozen six entries, so **the controlled axis needs no seventh entry either**.
+
 ---
 
 ## 10. The uncompute axis
@@ -889,6 +1024,39 @@ promotion never needs more than one control wire.
   > already-blessed safe leak, applied at the free instead of at a withheld one).
   > **There is no `CQOPS_FREE_TRUST` and one must never be added:** releasing unproven
   > indices to the pool is laundering under another name.
+  >
+  > **AND THAT PROHIBITION NOW RESTS ON 25 NAMED FREES RATHER THAN ON AN ARGUMENT
+  > (`ckd.18`, re-measured at Step 19).** Classifying all **51,696** frees by how the rail
+  > was *last written*: 25,138 `cq_template_*_unc`, 19,153 `cqrt_toffoli`, 7,223
+  > `cqrt_cnot`, 91 `cqrt_copy`, 40 `cqrt_addc`, **25 `cqrt_ry`**, 15 `cqrt_cswap`, 11
+  > `cqrt_qram_load_unc`, and **0 `cqrt_rz`**. The 25 are exactly the rails born from a
+  > **non-zero** `cqrt_alloc` literal whose only writes are a cancelling `(θ, −θ)` `ry`
+  > pair, and they are physically `|birth-literal⟩` at the free — so `TRUST` would push
+  > `|1⟩` qubits onto the free list on all 25 and break **I3** outright. The positive
+  > control is in the same corpus: of the **65** freed rails born from a non-zero literal,
+  > the other **40** are returned to `|0⟩` by an explicit `cqrt_addc_<W>(h, −L)` first, and
+  > `sum(addc) == −L` in **40/40**.
+  >
+  > **`ckd.18` therefore has no disposition of its own and folds into this bullet.** No
+  > in-library evidence can reconstruct those 25 — cancellation restores the *birth
+  > constant*, never zero — and no mechanism is worth building for 25 frees out of the
+  > **51,651 of 51,696 (99.91%)** that are rotation-tainted once M22 lands. Fixing the 25
+  > perfectly would still leave 51,626 frees hard-erroring, so `ckd.17b`'s disposition is
+  > the gating decision and `ckd.18` is one of its counterexample sets. Measured cost of
+  > `CQOPS_FREE_RETIRE` as an upper bound: **93,593** permanently-retired qubits across the
+  > whole corpus (worst fixture 31,334), **3,028** across the 56 integer-only fixtures — set
+  > against 131,583 for a single i128 `udiv`, and D2's pool is unbounded by default.
+  >
+  > **Two traps recorded with it.** (i) The bead's older "37 rotation-rooted frees, of which
+  > 12 are `rz`-rooted on rails born 0 and therefore stay classical" is **false**: those 12
+  > are `alloc(0); cswap(qflag,·,tmp); rz; cswap; free`, and the Fredkin **materialises**
+  > `tmp` before the `rz` arrives, so §7's `Rz`-constant cell never applies to them. They
+  > are physically `|0⟩` at the free and are `ckd.17b` cases, not `ckd.18` ones — and under
+  > **D12** they free cleanly, which is that decision's measured payoff. (ii)
+  > `CQOPS_FREE_RETIRE` must **not** go through `cq_ctx_release_qubit`: `cq_shadow_retire`
+  > does not fire on a poisoned entry, so it would silently clear poison on a **still-live**
+  > qubit — the one write the shadow's discipline forbids structurally. The name collision
+  > with `cq_shadow_retire` is an active trap and the two mean opposite things.
 
   > **What "provably clean" reads is NOT settled by this bullet, and it is not obvious.** It
   > cannot be the two-bit shadow **on a tainted rail**: §3's `CX` rule propagates `unknown`,
@@ -1077,7 +1245,7 @@ v1 is accepted when:
 | 3 | K6–K7 (add, sub) with carry uncompute | L1–L4 green; `x+1` @ i8 count pinned |
 | 4 | K9 (compares, all 10 predicates) | L1–L4 green |
 | 5 | K10 (mux) + variable shifts; K8 (Cuccaro accumulator); K11 (mul) | L1–L4 green — **COMPLETE 2026-08-16** (Steps 14, 15, 16). K8 is the exception the criterion did not anticipate: it is not a Rule 7 kernel, so its levels are restated by hand and **L5 does not apply to it at all** (K08.md §5 D7) |
-| 6 | K12 (div/rem) | L1–L4 green |
+| 6 | K12 (div/rem) — **COMPLETE 2026-08-16 (M19, M20)** | L1–L4 green, **plus L5** (the all-classical short-circuit is not optional here — pre-materialisation would otherwise take `8W²+4W−1` qubits for an operation with no quantum input; risk R9) **and D3** (`sdiv`/`srem` by zero never traps and whatever it returns is pinned). L4 at `W ∈ {1,8,16,32,64,128}` — **i128 is a shipped `divrem` width**. All four opcodes green in both configurations; every figure in `K12.md` §3 and §4 reproduced on the first run, **including the four signed columns that had never been executed** |
 | 7 | `_unc` / `_inv` / `_controlled` axes; rotations + θ special cases; measurement | L3 green across all kernels; classical mode works |
 | 8 | Generated shim over the full integer grid (**1595**, or **1455** if i80 is ruled out of scope — §1); CQ_lang link; Grover | L6, L7 green — **v1 done** |
 | 9 | *(stretch)* QRAM — port Bennett's QROM (`src/qrom.jl`, self-cleaning AND tree, 2(L−1) Toffoli) and Shadow (`src/softmem.jl`) behind `cqrt_qram_*` | load/store round-trip |
@@ -1121,8 +1289,91 @@ and diffs.
 | D6 | Shadow-driven demotion | A qubit whose shadow is *known* could be X'd to \|0⟩, freed, and folded back to a constant bit. Sound, and a real saving. Deliberately **not** in v1 — it makes the qubit count depend on shadow precision, which would make L4 goldens fragile. But see §10: it is also what would make forward and `_unc` gate counts agree, so revisit if that asymmetry becomes painful |
 | **D7a** | **Result aliases a source** — `_unc(out, out, b)` | **Measured 2026-08-14 at Step 7 over all 239 goldens: 0 occurrences in 25,147 `_unc` calls.** It also breaks §4's `dst ^= f(a,b)` outright. **Hard error, in BOTH configurations** — R2's whole value is firing during the L6 fixture run at Step 24, which Rule 17 pins under Release |
 | **D8** | **Shift amount out of range** — `x << k` with `k ≥ W` | **Resolved 2026-08-15 at Step 11 (bd `ckd.16`). MASK, THEN SATURATE — one formula for both paths:** `dst ^= sat_shift(a, k mod 2^⌈log₂W⌉)`, where `sat_shift` zero-fills (`shl`/`lshr`) or sign-fills (`ashr`) and so yields 0 / all-sign once the effective amount reaches `W`. **Deterministic, documented, never traps** — D3's posture, and for D3's reason: `k` is decoded from `W` classical bits, so its domain is `[0, 2^W)` and ordinary C reaches M11 with `k = 40` at i32. See the note below for why this is the *cheap* side |
+| **D9** | **K12's scratch scheme, and the three kernel-shape choices that ride with it** | **Resolved 2026-08-16 at Step 0 (bd `ckd.13`, and the M19/M20 half of bd `4tt`) and SHIPPED as M19/M20 the same day. Five parts, all measured — see the note below.** **(a) FLAT** scratch: one sandwich for the whole kernel, fresh per-iteration scratch, no per-iteration uncompute. **(b)** `fits` is read straight off the comparator carry-out `ucar[t][W]`, not materialised as `not1(ult(…))` — which is what **M16 already ships**. **(c)** the quotient bit is one `CX(fits → q[i])`, not Bennett's `or`+`mux`. **(d)** the initial remainder's upper `W−1` bits are a **pre-materialised scratch register**, so every iteration costs the same. **(e)** M14 and M16 **export their compute halves** as indexed step blocks and M19 composes them with M17's — K12 re-transcribes nothing (plan §0.4). Pinned: `udiv` `34W²+5W` gates over `8W²+4W−1` qubits — **2216 / 543 at i8, 557 696 / 131 583 at i128** |
+| **D10** | **What §7's angle tolerance is relative TO** | **Resolved 2026-08-17 at Step 18 (bd `dl7`) and SHIPPED as M21 the same day. The window is `tol · π` — ABSOLUTE, a fraction of the lattice modulus, not of θ — plus one refusal, `\|θ\| · 1.6e-16 ≤ tol·π`, and a cap `0 ≤ tol ≤ 1e-3`. §7 said only "1e-12 relative" and left the scale unstated; the natural reading, relative to `\|θ\|`, was built first and is a MISCOMPILE. See the note below** |
 | **D7b** | **Two sources alias each other** — `mul(h, h)` | **Measured the same way: 599 occurrences, of which 10 are on v1's integer surface.** CQ_lang ships a fixture named for it — `tests/e2e/slice_select_rail_alias_cond.expected.log:4` is `cq_template_icmp_slt_i32(h0, h0) -> h1`, and `:31` is `cq_template_mul_i32(h10, h10) -> h11`; also `spec_newcand_qsq_caller:13,16`, `spec_replan_qpow_caller:13,18`, `slice_i128_mulhi:4`. **This is LEGAL and must NOT abort.** The remedy is now required rather than contingent: a defensive `cqrt_copy` of one aliased source at the **M26 handle boundary** (Step 23), *before* Step 24 runs — one place, not twelve. M07 exposes the predicate; M26 acts on it |
+| **D11** | **What §7's zero-gate and global-phase rows do inside a §9 controlled region** | **Resolved 2026-08-17 at Step 19 (bd `pf4`). A CONSTANT control folds the region away (§9 row 0), so §7 applies verbatim and Rule 15's zero-cost claim is untouched. A QUANTUM control makes every folding row wrong — the four zero-gate cells by exactly `Rz(α)` on the control wire, and the half-turn's qubit cell, which emits but realises the row only up to a phase — per-bit, with α given below — and `v1 REFUSES rather than emitting it`: M06 hard-errors at Step 20 when a §7 fold row is reached under a quantum control. The arithmetic is recorded here so Step 20 implements rather than re-derives. See the note below** |
+| **D12** | **Which §7 rows poison the shadow** | **Resolved 2026-08-17 at Step 19 and SHIPPED as M22 the same day. ONLY `Ry` at an angle off the π-lattice poisons. A diagonal gate — every `Rz`, and the `Z` of the θ ≡ π row — cannot move a computational-basis value, so a determinate entry stays determinate and `cq_shadow_known_zero` remains EXACT rather than becoming conservative. `cq_shadow_rotate` is unchanged; what this decides is which rows call it. See the note below** |
 
+> ### D10 — the window is absolute, and the relative reading was built and measured first
+>
+> §7 says "an exact-multiple test against a tolerance, configurable, default `1e-12`
+> relative" and never says relative to what. There are two readings and they are not
+> close.
+>
+> **Relative to |θ| — the natural one, and a miscompile.** The window `tol·|θ|` grows
+> without bound while the lattice spacing stays `π`, so above `|θ| ≈ 1e11` it starts
+> swallowing whole lattice cells. Built, shipped into a 16-case suite, and green.
+> Measured against a 60-digit π, and the figure after each θ is the true distance from θ to
+> the multiple of π that the returned row **named**: at `θ = 1e12` the window is a **full
+> radian**, and `Ry(1e12)` classifies as `CQ_ANGLE_IDENTITY` while sitting **0.657625 rad**
+> away — so M22 would emit **nothing at all**. `Ry(1.570673279e12)` reports `−I` at
+> **1.292108 rad**. **It is not a cliff, it is graded**, because the window is linear in
+> `|θ|`: `4999995.504637527` folds to `IDENTITY` at `2.0e-6 rad`, `999999993.1398191` at
+> `4.0e-4`, `99999999992.56593` at `4.0e-2`. 63.6% of angles sampled near `1e12` fold to
+> some special row. **This is the forbidden direction** (§7's other rows all cost a gate;
+> this one deletes a rotation), and it was invisible to the suite for two independent
+> reasons worth carrying: the magnitude band `2.5e4 … 6.3e13` was untested, and the suite's
+> "independent" reference shared the same window, so it **agreed with the bug**.
+>
+> **Relative to the modulus π — pinned.** `window = tol · π`, so a fold discards a bounded
+> angle at every magnitude. The apparent argument against it is that a caller spelling
+> `k*M_PI` accumulates error proportional to `k`, so the window must grow to keep
+> recognising large multiples. **That argument is false, and measured false:** the
+> residual tested is `|θ − fl(k·π_double)|`, and for θ spelled `k*M_PI` that is **exactly
+> zero at every k**, because both sides are the same rounded product. The relative reading
+> bought nothing for what it cost.
+>
+> **One refusal carries the whole error bound.** What the residual cannot see is
+> proportional to `|θ|`: half an ulp from rounding the product (`2^-53 = 1.1103e-16`) plus
+> the drift of the double π from π (`(π − π_double)/π = 0.389817e-16`), summing to
+> `1.500040e-16`, rounded up to `1.6e-16`. So `|θ|·1.6e-16 ≤ tol·π` is refused, giving the
+> contract **`|θ − k·π| ≤ 2·tol·π`** and a reach of `|k| ≤ 6250` at the default. Without
+> it, `θ = 2^52·π_double` has a residual of **exactly 0** and is **0.551532 rad** from any
+> true multiple of 4π — the same defect from the other side, and one that an earlier draft
+> of the test suite *asserted as correct*.
+>
+> **And a cap, `CQ_ANGLE_TOLERANCE_MAX = 1e-3`,** which is one bound doing three jobs: it
+> keeps the window 500× under the `π/2` at which two lattice points could match at once,
+> keeps `|k|` under `2^53` so `(long long)round(θ/π)` is both defined and exact, and keeps
+> "tolerance" meaning "these are the same angle". A tolerance outside `[0, 1e-3]` is a hard
+> error in both configurations. `tol = 0` is legal and admits **exactly one angle**: π is
+> irrational, so zero is the only double that is exactly a multiple of it.
+>
+> **Nothing in the corpus is affected**, which is why the cheap side is again the right
+> side. Measured 2026-08-17 over all 239 goldens: **410 rotation calls** (343 `ry`, 67
+> `rz`), **26 distinct angles**, and **not one lands on any of §7's four special rows**.
+> Every one is a small decimal — `0.5` alone accounts for 256 calls. The rows are
+> exercised by §12's Grover (`M_PI/2 → M_PI`, where the residual is 0) and by M21's own
+> suite, and by nothing else in v1.
+>
+> **The corpus's closest approach is `3.14`, and it is the reason the cap sits where it
+> does.** Two fixtures pass a literal `3.14` (`0x1.91eb851eb851fp+1`), which is `1.5927e-3`
+> radians short of π — `5.1e8` times the default window, so the default has enormous
+> headroom. But it is *inside* `CQ_ANGLE_TOLERANCE_MAX·π = 3.1416e-3`: at the loosest legal
+> tolerance a `Ry(3.14)` folds to a half turn and becomes an `X`. That is the cap doing
+> exactly what a cap should — `1e-3` is the order at which "tolerance" stops meaning "the
+> same angle" and starts meaning "near enough", and a caller who sets it there is asking
+> for that. It is also why the cap must not be raised. Pinned in `tests/test_angle.c`.
+>
+> > **CORRECTED AT STEP 19: THE CAP'S WITNESS IS ON THE WRONG COLUMN, THOUGH THE CAP IS
+> > RIGHT.** Both corpus occurrences of `3.14` are **`cqrt_rz_i32`** calls —
+> > `spec_select_caller.expected.log:12` and `spec_twoarm_caller.expected.log:30` — and the
+> > `Rz` column has no half-turn row at all: `cq_angle_rz_row` collapses `HALF_TURN` into
+> > `GENERAL`, so the corpus's own `3.14` classifies as `GENERAL` **at every legal
+> > tolerance, including the cap**, and never becomes an `X`. The sentence above (and
+> > CLAUDE.md's Rule 15, which repeats it) states the cap's justification against a
+> > *hypothetical* `Ry(3.14)`; that hypothetical is real enough — a caller may pass 3.14 to
+> > `cqrt_ry_i32` — but it is not something the corpus does. `tests/test_angle.c` pins
+> > `CHECK_RY(3.14, GENERAL)` and `CHECK_LATTICE(3.14, MAX, HALF_TURN)` and had **no**
+> > `CHECK_RZ(3.14, …)` at all, i.e. the one column the corpus actually exercises was the
+> > untested one. Covered at Step 19 by
+> > `tests/test_rotate.c:the_corpus_rz_angle_is_a_real_rotation_at_every_legal_tolerance`,
+> > which sweeps `tol ∈ {0, default, 1e-6, MAX}` and asserts the EMISSION — one `sink.rz`,
+> > no `X` — rather than only the classification. It is placed in M22's suite rather than
+> > M21's on purpose: the claim that matters is what gets emitted, and `tests/test_angle.c`
+> > is at 294 of 300 with its own second seam already recorded (`bd w8j`).
+>
 > **D7 used to be one row reading "v1: assert loud and find out empirically whether the
 > pass ever does it".** Step 7 did the measurement, and the two halves came out in
 > opposite directions — so the single row is now two. A blanket pairwise-distinctness
@@ -1185,3 +1436,209 @@ and diffs.
 > `s >= W && break` guard in all three `lower_var_*` functions is **unreachable** given
 > `_shift_stages`'s own bound (checked for every `W` in `[1,4096]`) — porting it as live
 > logic would be porting a branch upstream never takes.
+
+> ### D9 — why FLAT, with the alternative measured rather than dismissed
+>
+> `bd ckd.13` was filed as *"flat is quadratic (33,151 qubits at W=64), nested is `O(W)`, and
+> a quadratic-ancilla divrem may simply not fit on hardware"*. **Three schemes were built and
+> run** — not argued about — at `W ∈ {1,2,3,4,8,16,32,64,128}` in both configurations, each
+> L1-exhaustive green at `W ≤ 4` over every `(a,b)` including `b = 0`, pool restored and
+> I6-clean (`K12.md` §4.1, §6.0a):
+>
+> | scheme | qubits | gates | i8 | i64 | i128 |
+> |---|---|---|---|---|---|
+> | **FLAT — pinned** | `8W²+4W−1` | `34W²+5W` | 543 / 2 216 | 33 023 / 139 584 | 131 583 / 557 696 |
+> | nested | `W²+10W` | `64W²+5W` | 144 / 4 136 | 4 736 / 262 464 | 17 664 / 1 049 216 |
+> | linear | `13W+3` | `90W²−3W` | 107 / 5 736 | 835 / 368 448 | 1 667 / 1 474 176 |
+>
+> - **The bead's "nested is `O(W)`" is false** — per-iteration uncompute reclaims the
+>   comparator, subtractor and mux scratch (`7W+1` bits) but not the `W`-per-iteration
+>   remainder chain, so nesting alone is `W² + 10W`.
+> - **A genuinely linear scheme nonetheless exists**, and it is worth stating precisely
+>   because the plausible argument that it *cannot* (— "reclaiming the remainder needs a
+>   controlled add, and the controlled axis is M06 at Step 20") **is wrong**: a
+>   single-qubit-controlled add of a register is already a *ported* libcqops construction —
+>   `mul.c`'s own shape, `multiplier.jl:22-29` — mask the addend with `W` Toffolis, then run
+>   an uncontrolled adder. Since `r_in[t] = rnext[t] + fits_t·b` exactly, that reclaims the
+>   remainder and the tape collapses to two alternating blocks.
+> - **FLAT is still the v1 answer**, for reasons that are about consistency rather than
+>   possibility: it is the *ported* shape (Bennett's divider allocates per iteration and frees
+>   nothing, cleaned by one global wrap — PRD §5 verbatim), whereas the linear schedule is an
+>   in-repo scheduling invention; it is 2.64× cheaper in gates; its step decode is four
+>   phases against eleven, in the module R4 already names as the likeliest 300-line breach;
+>   and **this repo has taken the same call twice already** — `mul.c` records `pp` recycling
+>   (`W²+2W → 2W+1`) and `bd b8g` records the barrel's `sh_k` region, both measured and both
+>   deliberately not taken in v1. **What it costs is stated plainly: 131,583 qubits per i128
+>   `udiv` against the linear scheme's 1,667.** If the QEC target ever makes that binding,
+>   the linear design is filed, measured and confined to M19's step decode and its goldens.
+> - **None of the three needs a depth-aware `cq_sandwich`** (`bd 4tt` item (b)). Per-iteration
+>   uncompute is *scheduled as extra step indices inside the one flat step space*; it is not
+>   an inner sandwich. Both alternatives run through the **unmodified** driver. M09 needs no
+>   change under any option considered.
+>
+> **(b), (c) and (d) are not savings looked for; they are consistency with what already
+> ships.** (b) K12 composes *libcqops kernels*, not Bennett's IR shape — and libcqops's `uge`
+> is M16's, which reads the carry-out and folds Bennett's double negation into the copy-out
+> (`K09.md` §5 delta 2). Keeping `not1(ult(…))` inside K12 would have put two different
+> `uge`s in one library, with the more expensive one in the only kernel that invokes it `W`
+> times per call. (c) `q[i]` is provably zero and written exactly once, so `^=` *is* `:=`;
+> the alternative costs `7W²` extra gates for the same permutation. (d) with the remainder's
+> upper bits as real scratch, iteration `t = 0` costs what every other iteration costs, the
+> step decode stays a pure function of `s` (Rule 8), and **the composition identity holds** —
+> `compute = W · (2 + C_ult + C_sub + C_mux)`, with each `C` obtained by asking M16, M14 and
+> M17 what they cost at this width. That identity is K12's only L4 assertion that survives
+> `CQOPS_UPDATE_GOLDENS=1`, and K12 offers a bigger version of the "shorten the inner loop"
+> mutant that left K11's entire L1/L2/L3/L5 sweep green. Build it before M19.
+>
+> **What D9 costs, stated plainly.** `divrem` ships at **i128** (`opcode_table.yaml:187-190`,
+> full 15-variant grid including the bare `qq` shape — so this is not an `_hl`-only surface),
+> and one i128 `udiv` is **557,696 gates over 131,583 scratch qubits**: the largest object in
+> the v1 catalogue by 8×, and where D2's ceiling bites first. That failure is already loud —
+> `cq_qubits_acquire` fails hard on the ceiling — and M19 owes nothing beyond not swallowing
+> it. The nested schedule stays available as a v2 change that touches M19's step decode and
+> its goldens and nothing else.
+>
+> **SHIPPED 2026-08-16, and all five parts held.** `src/kernels/divrem_u.c` (202 lines) and
+> `src/kernels/divrem_s.c` (158) are on disk and green in both configurations. (a) FLAT: one
+> `cq_sandwich`, peak `8W²+4W−1` measured at nine widths. (b) `fits` is `ucar[t][W]`, read by
+> P3 and P4 directly; no `ult` wire exists in the kernel. (c) the quotient bit is one CX.
+> (d) `r0_hi` is a real scratch register and iteration `t = 0` costs what every other
+> iteration costs. (e) M19 contains no gate list: `cq_ult_step`, `cq_sub_step` and
+> `cq_mux_step` do all the emitting, and the composition identity
+> `compute = W·(2 + C_ult + C_sub + C_mux)` is asserted against what those three MEASURE at
+> each width, which is the one L4 claim that survives `CQOPS_UPDATE_GOLDENS=1`.
+
+> ### D11 — a global phase is only global until something controls it
+>
+> Four CELLS of §7's table act by emitting nothing — `Ry` at θ ≡ 2π on both columns, the
+> half-turn's constant column, and the `Rz` constant column — and a FIFTH row folds while
+> still emitting: the half-turn's qubit cell, whose `x` + `rz(π)` spelling realises the row
+> only up to a global phase. (The two identity rows also emit nothing and are exempt:
+> `controlled-I` is `I`.) Uncontrolled all of this is exactly right and it is what makes
+> classical-mode testing possible (Rule 15). Under §9 **all five** are wrong. The four
+> zero-gate cells are wrong in the same way and for the same reason:
+> **`controlled-(e^{iα}·I)` is `Rz(α)` on the control
+> wire**, because `Rz(α) = e^{−iα/2}·diag(1, e^{iα})` and the residue `e^{−iα/2}` is
+> unconditional, hence genuinely global — including under nesting, since §9 ANDs nested
+> controls into **one** wire before the region runs.
+>
+> **The corrections, per bit, with `b` the bit's value BEFORE the row acts and
+> `k = round(θ/π)`:**
+>
+> | §7 row | column | phase `α` on the control wire |
+> |---|---|---|
+> | `Ry`, θ ≡ 2π (mod 4π) | either | `π` |
+> | `Ry`, θ ≡ π (mod 4π), i.e. `k mod 4 == 1` | constant | `π·b` |
+> | `Ry`, θ ≡ 3π (mod 4π), i.e. `k mod 4 == 3` | constant | `π·(1−b)` |
+> | `Ry`, θ ≡ π (mod 4π), `k mod 4 == 1` | qubit | `−π/2` |
+> | `Ry`, θ ≡ 3π (mod 4π), `k mod 4 == 3` | qubit | `+π/2` |
+> | `Rz`, otherwise | constant | `(2b−1)·φ/2` |
+>
+> **THE QUBIT HALF-TURN SPLITS BY PARITY TOO, and an earlier draft of this table got it
+> wrong in the one direction that matters.** It carried a single `π/2` "the `−i` of
+> `Rz(π) = −i·Z`", which credits the residual entirely to `Rz(π)` and silently drops the
+> `−1` of `Z·X = −Ry(π)` that §7's own callout states. Worked through: the emitted pair is
+> `Rz(π)·X = Y = i·Ry(π)`, so promoting gate by gate gives `controlled-(i·Ry(π))`, which
+> **overshoots** the wanted `controlled-Ry(π)` by `+i` — and `α` in this table is what is
+> **EMITTED**, not the residual, so the control owes the negative. Hence `−π/2` at `k ≡ 1`,
+> and `+π/2` at `k ≡ 3`, where the wanted operator is `Ry(3π) = −Ry(π)` and the sign flips.
+>
+> **The `Rz` constant row is what fixes that convention, and it is the only row that can.**
+> Rows 1-3 are sign-degenerate — every `α` is `0` or `π`, and `−π ≡ π (mod 2π)` — so they
+> read the same under either reading. `(2b−1)·φ/2` depends on both `sign(φ)` and `b`, so it
+> is the sole non-degenerate discriminator. Verified numerically, all five rows, as 4×4
+> matrices in §7's stated conventions.
+>
+> The two **general** rows need no phase at all: they promote exactly, with no residual,
+> by the standard identity — which stays inside §8's frozen six entries, so the controlled
+> axis needs no seventh either.
+>
+> ```
+> controlled-Ry(θ) on (c,t) = Ry(θ/2)ₜ ; CX(c,t) ; Ry(−θ/2)ₜ ; CX(c,t)
+> controlled-Rz(φ) on (c,t) = Rz(φ/2)ₜ ; CX(c,t) ; Rz(−φ/2)ₜ ; CX(c,t)
+> ```
+>
+> **THE PHASE IS PER BIT, AND THAT IS NOT A STYLE CHOICE.** `cqrt_ry_i<W>` applies `Ry(θ)`
+> to *every* qubit of the register, so a `W`-bit `Ry(2π)` contributes `(−1)^W` and the
+> control-side operator is `Z^W` — a `Z` at i1 and **nothing** at i8/i16/i32/i64. `W`
+> per-bit phases compose to `Rz(Wπ)` and get that right for free; **one `Z` per register is
+> a miscompile at every even width.** Collapsing the `W` gates is a v2 peephole, excluded
+> with every other gate-level optimisation.
+>
+> **§9 also grows a row 0, and it is what keeps every zero-cost claim in this document
+> true.** A `CQ_BIT_ZERO` control skips the region entirely (0 gates, 0 qubits); a
+> `CQ_BIT_ONE` control emits it **uncontrolled, verbatim**; only a `CQ_BIT_Q` control
+> promotes. A classical control is a decision, not a circuit — the §3 fold table's own
+> posture. So §11's L5 shapes, §7's "0 gates, 0 qubits" flip and §12's classical mode are
+> all untouched by the existence of the controlled axis.
+>
+> **V1 REFUSES THE QUANTUM-CONTROL CASE RATHER THAN EMITTING IT, and that is the decision,
+> not a gap.** The five phase terms above are hand-derived, and **this project has no
+> instrument that can see a wrong phase**: the shadow models no phases at all, L1 compares
+> values, `cq_mock_is_palindrome` is order-only, and a wrong angle inside an `rz` on a
+> control is a *plausible* gate rather than a malformed one. Measured demand is **zero** —
+> no controlled rotation appears anywhere in the 239 goldens. So M06 hard-errors at Step 20
+> when a §7 fold row is reached under a `CQ_BIT_Q` control, at one greppable site, naming
+> the row — the same loud-v1-boundary pattern the 884 floating-point aborts already use.
+> The arithmetic is recorded here so that enabling it later is an implementation rather
+> than a re-derivation, and so that a wrong sign cannot arrive silently in the meantime.
+>
+> **Three things Step 20 must carry with it.** (i) M21 discards `k mod 4`, so
+> `CQ_ANGLE_HALF_TURN` cannot today distinguish `Ry(π)` from `Ry(3π)`; the split is owed
+> before the `π·b` / `π·(1−b)` constant rows **or the `∓π/2` qubit rows** can be emitted, and
+> it also matters for the `_inv` axis,
+> since negating θ swaps `k ≡ 1 ↔ 3` while fixing `0` and `2`. (ii) The constant column's
+> *flip* needs no new mechanism at all: `cq_emit_x` on a constant target is already the
+> zero-gate flip and `cq_emit_cx` with a quantum control and a constant target already
+> materialises and emits the `CX`, so the moment M06 promotes `cq_emit_x` that half is
+> correct — **provided M22 spelled the flip `cq_emit_x` and not `cq_bit_flip_const`**, which
+> it does. (iii) That last correctness is contingent on `bd skh` resolving `cq_materialise`'s
+> own `X` as **unpromoted**; if it resolves the other way the chain breaks silently, so D11
+> does **not** settle `skh` by implication.
+>
+> **What was rejected, and why.** *Refusing to fold inside a controlled region* — always
+> taking §7's general row — is sound and needs no phase arithmetic, and it is the
+> conservative direction M21 argues for everywhere else. It loses on two counts. It cannot
+> be expressed without M22 knowing it is inside a controlled region, which is the one thing
+> plan §0.3 keeps out of every module above the emitter; and on the `Ry` side it
+> *materialises* a rail the pass expects to stay classical, so a controlled `Ry` on an
+> all-classical i64 rail would take 64 qubits and 64 poisoned shadow entries where the
+> correct answer is one gate on the control — and a poisoned rail is `ckd.18`'s hard error
+> at `cqrt_free`. A **seventh vtable entry** (`sink.z` / `sink.phase`) was rejected outright:
+> it forks a frozen ABI for something `Rz(π)` already expresses (`lk0`).
+
+> ### D12 — a diagonal rotation does not poison, and that keeps the shadow exact
+>
+> `cq_shadow_rotate` poisons unconditionally and is the **only** producer of `unknown`
+> (§10), so through Step 18 every shadow entry is determinate and `cq_shadow_known_zero` is
+> exact rather than conservative. M22 ends that — but only for the rows that genuinely
+> earn it.
+>
+> **The rule: a row poisons iff it can move a computational-basis value off a basis state.**
+> Only `Ry` at an angle off the π-lattice can. Every `Rz` is diagonal, and the `Z` of the
+> θ ≡ π row is diagonal, and a diagonal gate maps `|v⟩ → e^{iα}|v⟩`: the basis value is
+> unchanged. If the shadow says an entry is determinate then — by its own one-way
+> discipline — the qubit really is in a definite basis state, hence unentangled, so that
+> `e^{iα}` factors out of the whole state and the entry stays **correct**. The θ ≡ π row is
+> `X` followed by a diagonal, so it takes `X`'s rule: `cq_shadow_x`, which flips a known
+> value and is already a no-op under existing poison.
+>
+> **This is not D6 and does not reopen it.** D6 is the fold table *reading* a shadow to
+> decide which gate to emit; D12 is which shadow update a given gate *implies*, which is
+> §3's rule table and has always been per-gate. No gate count depends on it, no L4 golden
+> moves, and "kind, never shadow" is untouched.
+>
+> **Measured payoff, and it is why the exact side is the right side.** The corpus's twelve
+> `rz`-rooted rails are `alloc(0); cswap(qflag,·,tmp); rz(tmp,φ); cswap; free` — the Fredkin
+> materialises `tmp` *before* the `rz` arrives (a `CCX` with two `Q` controls and a constant
+> target materialises), so under a poisoning rule all twelve become unfreeable, and under
+> D12 the `cswap` involution restores their shadow to zero and they free cleanly. `Ry(π)` on
+> a qubit likewise keeps its rail freeable. The alternative costs `ckd.18` twelve extra
+> frees and buys nothing.
+>
+> **The honest limit.** The argument is *derived* from "a determinate `value` means a
+> definite computational-basis value", which holds today because every gate below Layer 4 is
+> a basis permutation; it is not measured, and Rule 13 forbids the simulator that would
+> measure it. What bounds the risk is that §9's controlled axis cannot break it either — a
+> controlled diagonal puts a *relative* phase on the **control**, whose own basis value is
+> likewise unmoved — and that D11 refuses the quantum-controlled fold rows outright.

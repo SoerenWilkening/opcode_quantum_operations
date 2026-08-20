@@ -33,8 +33,11 @@
 uint64_t cq_ref_mask(int W);
 
 /* `v` reduced to W bits, and its two's-complement sign extension to 64 bits.
- * cq_ref_sext is what the signed kernels (K9's slt, K20's sdiv) will compare
- * against; it lands now so the arithmetic exists in one place from the start. */
+ * cq_ref_sext is what the signed kernels (K9's slt, K12's sdiv/srem — module
+ * M20, which is what "K20" here used to say and there is no such kernel) will
+ * compare against; it lands now so the arithmetic exists in one place from the
+ * start. Step 17 adds the divrem references beside it, including D3's
+ * b == 0 rows (udiv -> 2^W - 1, urem -> a; K12.md §5 D3). */
 uint64_t cq_ref_trunc(uint64_t v, int W);
 int64_t  cq_ref_sext (uint64_t v, int W);
 
@@ -135,6 +138,39 @@ typedef enum {
 } cq_icmp_pred;
 
 int cq_ref_icmp(cq_icmp_pred p, cq_ref_w a, cq_ref_w b, int W);
+
+/* K12, width-generic to 128 — `divrem` ships at i128 (opcode_table.yaml:187-190,
+ * all four opcodes, the full 15-variant grid).
+ *
+ * SHIFT-SUBTRACT OVER cq_ref_w_sub, WHICH DOES SHARE THE KERNEL'S RECURRENCE,
+ * AND THAT IS SAID OUT LOUD RATHER THAN GLOSSED. Every other reference in this
+ * file is deliberately a different algorithm from the circuit it checks; this
+ * one is not, because a second, genuinely different 128-bit division algorithm
+ * (Knuth D on 32-bit limbs) is a large piece of error-prone arithmetic whose
+ * own correctness would then need a third model. What replaces the
+ * independence is a cross-check with real teeth: at every width up to 64 these
+ * four are compared against the HARDWARE `/` and `%` — and, for the signed
+ * pair, against C's `int64_t` division — over the full value cross product at
+ * small widths and thousands of samples above it
+ * (tests/test_kernel_divrem_refmodel.inc). Everything that changes above 64 is
+ * the 64-bit word seam inside cq_ref_w_sub and w_ult, which have their own
+ * coverage. So the recurrence is verified independently even though it is
+ * shared.
+ *
+ * D3 IS BUILT IN AND INHERITED, NOT CHOSEN: `udiv(a, 0)` is `2^W - 1` and
+ * `urem(a, 0)` is `a`, straight out of divider.jl:15-18 and :44-46 — they fall
+ * out of the loop, since `r >= 0` always succeeds. The signed pair inherits
+ * that through the sign-magnitude wrapper.
+ *
+ * SIGNED IS SIGN-MAGNITUDE, which IS the kernel's shape (aggregate.jl:69-117)
+ * and is also exactly C's truncating division — so the cross-check against
+ * `int64_t` is a genuinely independent derivation wherever C defines the
+ * answer. It is not defined for `typemin / -1`, which the kernel computes as
+ * `typemin` (wrap, not poison); the suite pins that case separately. */
+cq_ref_w cq_ref_w_udiv(cq_ref_w a, cq_ref_w b, int W);
+cq_ref_w cq_ref_w_urem(cq_ref_w a, cq_ref_w b, int W);
+cq_ref_w cq_ref_w_sdiv(cq_ref_w a, cq_ref_w b, int W);
+cq_ref_w cq_ref_w_srem(cq_ref_w a, cq_ref_w b, int W);
 
 /* K5, width-generic to 128. `F` is the source width, `T` the destination. */
 cq_ref_w cq_ref_w_zext (cq_ref_w a, int F, int T);

@@ -371,3 +371,86 @@ cq_ref_w cq_ref_w_mul(cq_ref_w a, cq_ref_w b, int W)
     mul64(a.lo, b.lo, &lo, &hi);
     return cq_ref_w_make(lo, hi + a.lo * b.hi + a.hi * b.lo, W);
 }
+
+/* --- K12 at any width up to 128. See refmodel.h on the shared recurrence. -- */
+
+/* Restoring division, W iterations at width W. §2.0's derivation is what makes
+ * that legal: after k iterations the remainder is below 2^k, so its top bit is
+ * always 0 when the shift discards it and the shifted value always fits. That
+ * derivation is no longer only a derivation — an exhaustive L1 sweep over every
+ * (a,b) including b = 0 reproduces plain C at W <= 5 for both opcodes.
+ *
+ * `b == 0` needs no branch: `r >= 0` is always true, so every quotient bit is
+ * set and every trial subtract is a no-op, which is D3's `2^W - 1` and `a`
+ * exactly (divider.jl:15-18, :44-46). */
+static void w_divrem(cq_ref_w a, cq_ref_w b, int W, cq_ref_w *q, cq_ref_w *r)
+{
+    cq_ref_w qq = cq_ref_w_zero(), rr = cq_ref_w_zero();
+
+    cq_ref_w_bounds(W);
+
+    for (int t = 0; t < W; t++) {
+        int i = W - 1 - t;
+
+        rr = cq_ref_w_shl(rr, 1, W);
+        if (cq_ref_w_bit(a, i)) rr = cq_ref_w_or(rr, cq_ref_w_setbit(0));
+
+        if (!w_ult(rr, b)) {                        /* rr >=u b, i.e. `fits` */
+            rr = cq_ref_w_sub(rr, b, W);
+            qq = cq_ref_w_or(qq, cq_ref_w_setbit(i));
+        }
+    }
+
+    *q = qq;
+    *r = rr;
+}
+
+/* Two's complement negate at width W. `0 - v` rather than `~v + 1` so the
+ * masking is cq_ref_w_sub's and lives in one place; the two agree, including at
+ * v == typemin, where both give typemin back. */
+static cq_ref_w w_neg(cq_ref_w v, int W)
+{
+    return cq_ref_w_sub(cq_ref_w_zero(), v, W);
+}
+
+/* Sign-magnitude, which is aggregate.jl:69-117's shape AND C's truncating
+ * division: quotient sign is the XOR of the operand signs, remainder sign
+ * follows the dividend. */
+static void w_sdivrem(cq_ref_w a, cq_ref_w b, int W, cq_ref_w *q, cq_ref_w *r)
+{
+    int sa = cq_ref_w_bit(a, W - 1), sb = cq_ref_w_bit(b, W - 1);
+    cq_ref_w qq, rr;
+
+    w_divrem(sa ? w_neg(a, W) : a, sb ? w_neg(b, W) : b, W, &qq, &rr);
+
+    *q = (sa ^ sb) ? w_neg(qq, W) : qq;
+    *r = sa        ? w_neg(rr, W) : rr;
+}
+
+cq_ref_w cq_ref_w_udiv(cq_ref_w a, cq_ref_w b, int W)
+{
+    cq_ref_w q, r;
+    w_divrem(a, b, W, &q, &r);
+    return q;
+}
+
+cq_ref_w cq_ref_w_urem(cq_ref_w a, cq_ref_w b, int W)
+{
+    cq_ref_w q, r;
+    w_divrem(a, b, W, &q, &r);
+    return r;
+}
+
+cq_ref_w cq_ref_w_sdiv(cq_ref_w a, cq_ref_w b, int W)
+{
+    cq_ref_w q, r;
+    w_sdivrem(a, b, W, &q, &r);
+    return q;
+}
+
+cq_ref_w cq_ref_w_srem(cq_ref_w a, cq_ref_w b, int W)
+{
+    cq_ref_w q, r;
+    w_sdivrem(a, b, W, &q, &r);
+    return r;
+}

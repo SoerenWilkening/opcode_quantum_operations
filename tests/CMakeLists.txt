@@ -83,13 +83,49 @@ add_cqops_test(test_kernel_mul)       # M18, Step 16 — K11 mul. THE FIRST
                                       # are printed, in
                                       # tests/test_kernel_mul_sweep.inc
 
+## M19 and M20, Step 17 — K12 divrem. SPLIT IN TWO ON THE MODULE SEAM, up
+## front rather than after measuring, which is bd mmv's option (a): the bead
+## records the barrel becoming the longest pole at a TENTH of K12's size and
+## says K11 and K12 would need the split more. One udiv case is 2(34W^2+5W)
+## gate emissions over 2(8W^2+4W-1) qubit acquisitions — 2.6x a mul case on 8x
+## the region — and there are four opcodes. Two binaries let ctest -j overlap
+## them, and the goldens are split the same way because cq_gold_close requires
+## every row in a file to have been visited.
+add_cqops_test(test_kernel_divrem)    # M19 — K12 udiv/urem. THE FIRST KERNEL
+                                      # WHOSE WHOLE LOOP BODY BELONGS TO OTHER
+                                      # MODULES: M16's cq_ult_step, M14's
+                                      # cq_sub_step, M17's cq_mux_step. So what
+                                      # is tested here is the SLOT ARITHMETIC
+                                      # and the LAYOUT, not the gates
+add_cqops_test(test_kernel_sdivrem)   # M20 — K12 sdiv/srem. The signed path was
+                                      # the ONE thing K12.md's 2026-08-16
+                                      # measurement pass did not reach; this is
+                                      # where §3.4 stopped being arithmetic
+
 ## The driver's own assertions, made falsifiable — test_harness_negative's
 ## argument one level up. A mutation battery found five of the Phase-B pool
 ## assertions surviving mutation to always-true: correct, load-bearing, and
 ## never once observed to fire. This provokes each one.
 add_cqops_test(test_kerneldrv)        # Step 10 — the infrastructure's gate
 
-## Layer 4 — sinks. M25 sink_qec is Step 26, against C_quantum_error_correction.
+## Layer 4 — the analog surface and the sinks. M25 sink_qec is Step 26, against
+## C_quantum_error_correction.
+add_cqops_test(test_rotate)       # M22, Step 19 — §7's twelve cells, the θ≡π
+                                  # asymmetry, D12's poison rule, and the
+                                  # terminal measurement. NO GOLDEN FILE, and
+                                  # deliberately: cq_gold_row carries
+                                  # {x, cx, ccx} and every count that
+                                  # distinguishes an M22 row is ry/rz/mz, M22
+                                  # has no upstream construction for the R3
+                                  # commit check to guard, and the counts ARE
+                                  # the specification — so a regenerable file
+                                  # would let CQOPS_UPDATE_GOLDENS=1 bless a
+                                  # row that stopped emitting a rotation
+add_cqops_test(test_angle)        # M21, Step 18 — PRD §7's four rows, the
+                                  # mod-4π against mod-2π boundary, and the
+                                  # tolerance edges. Every sweep is checked
+                                  # against an INDEPENDENT reduction rather
+                                  # than against a hand-written table
 add_cqops_test(test_sink_printf)  # M23, Step 9 — the §8 format, %a, the flush
 add_cqops_test(test_sink_count)   # M24, Step 9 — per-kind totals, T-count
 
@@ -472,6 +508,206 @@ set_tests_properties(test_kernel_mul_death.mul_a_width_of_zero
 set_tests_properties(test_kernel_mul_death.mul_steps_called_directly_with_a_zero_width
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "destination width is not positive")
+
+## M19 and M20, Step 17 — plus the two EXPORTS plan §0.4 required of M14 and
+## M16. The exports are the interesting half: cq_sub_step and cq_ult_step are
+## the first step functions whose caller is a DIFFERENT MODULE mapping its own
+## index space onto theirs, and an off-by-one there emits a real, plausible gate
+## from the wrong stage rather than failing.
+##
+## Same argument as M14's, M16's and M18's for the alias cases: every one uses
+## ALL-CLASSICAL rails, so the kernel takes the R9 short-circuit, never
+## allocates scratch, never enters cq_sandwich, never reaches the step guards,
+## and emits only cq_emit_x on a constant — which carries no distinctness check.
+## Nothing beneath M19/M20 speaks for any of them in either configuration.
+add_cqops_death_test(test_kernel_divrem_death CASES
+    udiv_dst_aliases_a_classical_source
+    urem_dst_aliases_the_second_source
+    sdiv_dst_aliases_a_classical_source
+    srem_dst_aliases_a_classical_source
+    udiv_dst_overlaps_a_source_without_sharing_a_base
+    the_two_sources_are_the_same_register
+    udiv_a_width_of_zero
+    sdiv_a_negative_width
+    divrem_steps_called_directly_with_a_zero_width
+    divrem_region_called_directly_with_a_zero_width
+    sdivrem_steps_called_directly_with_a_zero_width
+    sdivrem_region_called_directly_with_a_zero_width
+    sub_steps_called_directly_with_a_zero_width
+    sub_step_index_past_the_end
+    sub_step_index_is_negative
+    ult_steps_called_directly_with_a_zero_width
+    ult_step_index_past_the_end
+    ult_step_index_is_negative
+    divrem_step_index_past_the_end
+    the_quotient_of_a_remainder_only_block
+    the_classical_fold_above_the_register_cap
+)
+
+## WHICH LAYER ABORTED — the Step-15 shape, where the masking copy of the guard
+## is EARLIER in the call chain, and now in FOUR modules at once. Every entry
+## point calls cq_kernel_check_dst before it reaches M19's, M20's, M14's or
+## M16's own width guard, so each of those would survive mutation to always-true
+## without a message pin. The five messages are disjoint; delete any one guard
+## and exactly one case goes red.
+set_tests_properties(test_kernel_divrem_death.udiv_a_width_of_zero
+                     test_kernel_divrem_death.sdiv_a_negative_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "divrem: width is not positive|sdivrem: width is not positive")
+
+set_tests_properties(test_kernel_divrem_death.divrem_steps_called_directly_with_a_zero_width
+                     test_kernel_divrem_death.divrem_region_called_directly_with_a_zero_width
+                     test_kernel_divrem_death.sdivrem_steps_called_directly_with_a_zero_width
+                     test_kernel_divrem_death.sdivrem_region_called_directly_with_a_zero_width
+                     test_kernel_divrem_death.sub_steps_called_directly_with_a_zero_width
+                     test_kernel_divrem_death.ult_steps_called_directly_with_a_zero_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "destination width is not positive")
+
+## AND WHICH OF THE TWO GUARDS INSIDE ONE STEP FUNCTION. cq_sub_step and
+## cq_ult_step both call their _steps() width guard before their own index
+## check, so an index case must NOT be allowed to pass on the width message —
+## otherwise the range check, which is the guard the whole export exists to
+## have, would survive mutation to always-true.
+set_tests_properties(test_kernel_divrem_death.sub_step_index_past_the_end
+                     test_kernel_divrem_death.sub_step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "sub: width is not positive")
+
+set_tests_properties(test_kernel_divrem_death.ult_step_index_past_the_end
+                     test_kernel_divrem_death.ult_step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "ult: width is not positive")
+
+set_tests_properties(test_kernel_divrem_death.divrem_step_index_past_the_end
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "divrem: width is not positive|span is outside")
+
+## M21, Step 18. Both configurations — nothing here is an invariant check, and
+## a tolerance is configuration rather than a gate.
+##
+## THE TWO HALVES ARE NOT THE SAME KIND OF GUARD, which is why both are
+## registered. A tolerance below the range (negative, NaN) is a LOUDNESS matter:
+## it would degrade cq_angle_lattice to CQ_ANGLE_GENERAL, which is the sound
+## answer, so the circuit stays right and only §7's folds are lost. A tolerance
+## above CQ_ANGLE_TOLERANCE_MAX is a CORRECTNESS matter: the cap is what bounds
+## |k| for the (long long) cast in cq_angle_lattice.
+##
+## NO FAIL_REGULAR_EXPRESSION IS OWED, and that was checked rather than assumed:
+## the two guards sit on disjoint call paths (the setter never enters the
+## lattice; a direct lattice call never enters the setter), so neither can mask
+## the other. Delete either and exactly its own four cases report "survived",
+## and the two clauses of the shared predicate have disjoint witnesses.
+add_cqops_death_test(test_angle_death CASES
+    a_negative_tolerance
+    a_nan_tolerance
+    an_infinite_tolerance
+    a_tolerance_above_the_cap
+    the_lattice_called_directly_with_a_negative_tolerance
+    the_lattice_called_directly_with_a_nan_tolerance
+    the_lattice_called_directly_with_an_infinite_tolerance
+    the_lattice_called_directly_with_a_tolerance_above_the_cap
+)
+
+## M22, Step 19. Four families, and read tests/test_rotate_death.c's header for
+## why they are not the same kind of thing. The sandwich refusal is M22's own
+## and stands in for BOTH I6 mechanisms, neither of which reaches a module that
+## bypasses cq_emit_* to emit; ckd18_* pins an OPEN P0's CURRENT behaviour and
+## is EXPECTED to go red when Step 23 selects CQOPS_FREE_RETIRE.
+add_cqops_death_test(test_rotate_death CASES
+    ry_inside_a_sandwich_compute_half
+    rz_inside_a_sandwich_compute_half
+    measure_inside_a_sandwich_compute_half
+    ckd18_a_general_ry_rail_cannot_be_freed
+    a_null_proof_still_refuses_a_materialised_rail
+    ry_of_a_freed_handle
+    rz_of_a_freed_handle
+    ry_of_a_measured_rail
+    rz_of_a_measured_rail
+    measure_of_a_measured_rail
+    measure_of_a_freed_handle
+    free_after_measure
+)
+
+## WHICH LAYER ABORTED, as a NEGATIVE pin. These two abort at the same site with
+## the same message — cq_reg_clean's `!proof ||` short-circuits at the first
+## qubit-carrying bit exactly as a failing proof does — so no regex separates
+## them from each other, and that is recorded rather than dressed up. What the
+## property DOES pin is the Step 7 discriminator: the refusal comes from M07's
+## two-pass check, which releases NOTHING, and not from M03's per-qubit release
+## guard one layer down. If M03's message ever appears here, cq_reg_free has
+## started releasing before verifying and a dirty rail is half-returned.
+set_tests_properties(test_rotate_death.ckd18_a_general_ry_rail_cannot_be_freed
+                     test_rotate_death.a_null_proof_still_refuses_a_materialised_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "release of a qubit not proven")
+
+## "ABORTS HAVING EMITTED ZERO GATES" IS A PROMISE, SO IT NEEDS A DETECTOR.
+## cq_measure marks the rail MEASURED before it reads a single bit, so a second
+## measure aborts before touching the sink. Nothing about that ordering was
+## observable until this pin: the case's rail is materialised, its sink reports
+## any `mz` emitted after the first legitimate measure, and this turns that
+## report into a failure. A refactor that moves the mark below the loop — the
+## natural thing to do while taking the recorded `rotation table / measurement`
+## seam — passes every other assertion in the project.
+## FAIL_REGULAR_EXPRESSION IS SET ONCE PER TEST, AND A SECOND set_tests_properties
+## OVERWRITES THE FIRST RATHER THAN ADDING TO IT. That is not a style note: this
+## file briefly carried the per-case pins in separate blocks, and the later block
+## silently disarmed the earlier one — the mutant it existed to catch went back to
+## surviving, with every test still green. So every regex a test needs is composed
+## into ONE semicolon-separated list here, and the shared PREFLIGHT- tripwire is
+## repeated in each list rather than set once globally.
+##
+## PREFLIGHT- catches the setup tripwires in tests/test_rotate_death.c: a fold row
+## that allocated a qubit, or a general Ry that failed to materialise. Without it
+## those fprintf calls print and the case still passes.
+set_tests_properties(test_rotate_death.ry_inside_a_sandwich_compute_half
+                     test_rotate_death.rz_inside_a_sandwich_compute_half
+                     test_rotate_death.ry_of_a_freed_handle
+                     test_rotate_death.rz_of_a_freed_handle
+                     test_rotate_death.ry_of_a_measured_rail
+                     test_rotate_death.rz_of_a_measured_rail
+                     test_rotate_death.measure_of_a_freed_handle
+                     test_rotate_death.free_after_measure
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "PREFLIGHT-")
+
+## WHICH GUARD SPOKE, for the measurement sandwich case. Without this pin,
+## disabling cq_measure's OWN refusal still leaves the case green: rotating_step
+## measures the same handle on the forward pass and again on cq_sandwich's reverse
+## replay, so M07's cq_reg_mark_measured aborts INSIDE the armed window and the
+## case cannot tell that from M22's guard. Measured — the mutant survived the whole
+## 174-test suite in both configurations. The ry/rz siblings need no such pin:
+## without their guard the sandwich RETURNS and cq_death_survived fires.
+set_tests_properties(test_rotate_death.measure_inside_a_sandwich_compute_half
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "PREFLIGHT-;measure of a rail that is not live")
+
+## WHICH LAYER REFUSED THE FREE. These two abort at the same site with the same
+## message — cq_reg_clean's `!proof ||` short-circuits at the first qubit-carrying
+## bit exactly as a failing proof does — so no regex separates them from each
+## other, and that is recorded rather than dressed up. What this DOES pin is the
+## Step 7 discriminator: the refusal comes from M07's two-pass check, which
+## releases NOTHING, and not from M03's per-qubit release guard one layer down.
+## Note ckd18_* passes cq_pc_zero_proof_rotation_free rather than NULL, so it is
+## the POISON that refuses it — which is ckd.18's actual claim, and is what makes
+## disabling cq_shadow_rotate turn this case red.
+set_tests_properties(test_rotate_death.ckd18_a_general_ry_rail_cannot_be_freed
+                     test_rotate_death.a_null_proof_still_refuses_a_materialised_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "PREFLIGHT-;release of a qubit not proven")
+
+## "ABORTS HAVING EMITTED ZERO GATES" IS A PROMISE, SO IT NEEDS A DETECTOR.
+## cq_measure marks the rail MEASURED before it reads a single bit, so a second
+## measure aborts before touching the sink. Nothing about that ordering was
+## observable until this pin: the case's rail is materialised, its sink reports any
+## `mz` emitted after the first legitimate measure, and this turns that report into
+## a failure. A refactor moving the mark below the loop — the natural thing to do
+## while taking the recorded `rotation table / measurement` seam — passes every
+## other assertion in the project.
+set_tests_properties(test_rotate_death.measure_of_a_measured_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "PREFLIGHT-;MZ-EMITTED-PAST-THE-ABORT-POINT")
 
 add_cqops_death_test(test_qubits_death CASES
     ceiling_exceeded

@@ -39,6 +39,18 @@ typedef struct cq_ctx cq_ctx;
  * resolved i80 decision, and a whitelist would reject every i80 rail. */
 #define CQ_REG_WIDTH_MAX  128u
 
+/* TWO uint64_t WORDS CARRY A WHOLE REGISTER, IN AND OUT, and both directions
+ * index by `i >> 6` into a two-element array: cq_reg_alloc_const /
+ * cq_bits_from_words take (lo, hi), and M22's cq_measure returns them. Asserted
+ * rather than commented so the two cannot drift — the src/kernels/divrem_u.c
+ * idiom. `<=` and not `==`: the packing is correct at any cap at or below 128,
+ * so an equality would be a false tripwire on a narrowing. Raising the cap
+ * above 128 is a one-line edit here (the width is validated as a RANGE), and
+ * without this line it would be a silent out-of-bounds write in cq_measure that
+ * no test, no warning and no lint could see. */
+_Static_assert(CQ_REG_WIDTH_MAX <= 128u,
+               "two 64-bit words carry a whole register (lo, hi)");
+
 /* Three states, NONE NUMBERED 0, so an all-zero slot is not a valid state and
  * neither is the 0xAA grow poison. This widens PRD §2.2's `uint8_t live`,
  * which cannot tell a tombstone from a measured rail from a realloc'd tail. */
