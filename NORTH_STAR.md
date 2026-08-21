@@ -107,8 +107,9 @@ Every classical opcode compiles to `X`/`CX`/`CCX` only. Those three gates are
 
 Run any CQ program with rotation angles restricted to the classical set (θ ∈ {0, π}),
 and `cq_measure` returns the **real answer**. Every adder, comparator, multiplier and
-divider can therefore be differential-tested against plain C semantics, exhaustively at
-small widths, without ever simulating a quantum state.
+divider can therefore be differential-tested against plain C semantics — in practice over
+a small constant number of seeded random samples per width — without ever simulating a
+quantum state.
 
 That is not a testing convenience bolted on afterwards. It is the reason this design is
 buildable at all.
@@ -133,9 +134,10 @@ buildable at all.
 
 1. **Link.** `libcq_templates`'s printf placeholders are gone; CQ_lang's existing
    end-to-end fixtures link against `libcqops` and run.
-2. **Correct.** Every integer opcode is differential-tested against C semantics,
-   exhaustively at W ≤ 8 and randomly at W ∈ {16, 32, 64}, across every mixture of
-   classical and quantum operand bits.
+2. **Correct.** Every integer opcode is differential-tested against C semantics at every
+   width on its shipped ladder, over a small constant number of seeded random
+   `(bit-kind mask, value)` samples per width — with the all-classical mask (which is
+   also the zero-cost claim) and the all-quantum mask forced into every draw.
 3. **Clean.** After every template call the qubit pool contains exactly the result
    rail's qubits — asserted, not assumed. After `_unc` the rail's **value** is zero but
    its qubits are still held: `_unc` reclaims nothing, and `cqrt_free` is the sole

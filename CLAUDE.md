@@ -384,11 +384,15 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > the kernel through the `call` adapter. Written into CLAUDE.md Rule 7 and PRD §4.
 >
 > **Two Step-14 findings that generalise.** First, **`cq_kd_case2` fills `values[2]`
-> with ZERO, so the shared sweep cannot drive a three-source kernel** — a mux swept
-> the ordinary way runs every exhaustive-width case with one arm pinned at 0 (or with
-> `cond` pinned at 0, depending on operand order), stays green, and prints a
-> six-figure case count for half a kernel. The masks are fine; the VALUES are not.
-> `tests/test_kernel_mux.c` drives `cq_kd_case` directly for this reason. Second,
+> with ZERO, so the shared sweep could not drive a three-source kernel** — a mux swept
+> the ordinary way ran every exhaustive-width case with one arm pinned at 0 (or with
+> `cond` pinned at 0, depending on operand order), stayed green, and printed a
+> six-figure case count for half a kernel. The masks were fine; the VALUES were not.
+> `tests/test_kernel_mux.c` drove `cq_kd_case` directly for this reason until
+> **2026-08-21, when `cq_kd_sample_at` removed the hazard at its root** by generating a
+> value per operand at its own width; the mux now goes through the shared budget like
+> everything else, and the trap is recorded in the callouts because it is one edit away
+> from returning. Second,
 > **the arm swap is invisible to everything but L1** — `mux(c,t,f)` and `mux(c,f,t)`
 > emit the identical tuple at every width and mask, keep the palindrome and leave
 > scratch clean, which is the K09 `uge`-meaning-`ule` finding in its K10 form.
@@ -410,11 +414,14 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > case at the same width — and the fixed mask set grows linearly in W. Measured in Debug,
 > isolated: `test_kernel_shift_var` **76.6 s uncapped, 45.8 s capped**, against
 > `test_kernel_cmp` at **22.2 s**. The whole Debug run went **25.4 s → 46.0 s** at `-j12`.
-> **No named mask pair was dropped** — the caps thin only the one-bit sweep's stride, the
-> random tail's depth and the number of distinct shift amounts, all three printed by the
-> run — and the one-bit rows for the L bits the barrel actually READS as stage controls
-> are exempt from the stride, because a plain stride drops half the stages and the loss
-> is invisible. The L4 goldens and the D8 cross-check are uncapped at every shipped
+> **SUPERSEDED 2026-08-21: all four of the barrel's local caps are gone**, along with
+> the mask stride, its keep-the-first-`L`-stages clause, the `512/W` sample count and
+> the amount stride. `cq_kd_sample_at` gives every width the same constant budget, and
+> the measured result is `test_kernel_shift_var` **63.8 s → 5.6 s** in Debug — the
+> barrel is no longer the longest pole in the project, K12 is. What that gave up is the
+> enumeration of the whole reduced amount range `[0, 2^S)`, which is the set of distinct
+> barrel circuits; **the D8 cross-check still enumerates amounts at every shipped width**
+> and is not an L1 sweep. The L4 goldens are likewise uncapped at every shipped
 > width. The structural fix is one binary per direction so `ctest -j` overlaps them;
 > filed rather than improvised, because K11 and K12 will need it more.
 >
@@ -537,7 +544,9 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > **(e)** M14 and M16 **export their compute halves** and M19 composes them with M17's, so
 > K12 transcribes **nothing** (plan §0.4). Pinned and **measured** in both configurations at
 > `W ∈ {1,2,3,4,8,16,32,64,128}`: `udiv` `34W²+5W` = **2216** at i8 over `8W²+4W−1` = **543**
-> qubits; L1 exhaustive over all `(a,b)` incl. `b = 0` at `W ≤ 4`, L2/L3 pool restored,
+> qubits; L1 was exhaustive over all `(a,b)` incl. `b = 0` at `W ≤ 4` **when Step 17
+> landed and is a constant sample as of 2026-08-21** (`b = 0` is now an ordinary drawn
+> value, reached by the all-zero corner at every width), L2/L3 pool restored,
 > scratch clean, I6 green. **`divrem` ships at i128** (`opcode_table.yaml:187-190`, full
 > `qq` grid — K12.md said the opposite and was wrong), where one `udiv` is **557,696 gates
 > over 131,583 qubits**: the largest object in v1 and where D2's ceiling bites first.
@@ -908,7 +917,7 @@ The levels, and what each one is actually for:
 | | Asserts | Notes |
 |---|---|---|
 | **L0** | The §3 fold table, exhaustively | **159** = 5 X + 25 CX + 125 CCX = **155** exhaustive over the 5 operand kinds, plus **4** distinctness death-tests (`c==t`; `c1==c2`, `c1==t`, `c2==t`). Each case pins gates emitted, qubits allocated, resulting bit-kind, **and** shadow — four *assertions* per case, not four cases. The table branches on **kind only, never shadow** (that is D6 no-demotion): only `3+9+27 = 39` gate-behaviour classes exist, and the 155 split is there to pin the shadow |
-| **L1** | `value(dst) == refmodel(a,b)` | The **full cross product** — every `(a,b)` × every bit-kind mask **pair** — at `W ∈ {1,2,3,4,5}`; **structured corners + seeded sampling × every mask pair** from `W = 8` up. **NOT value-exhaustive at W = 8**, and that was measured, not conceded: at the all-quantum mask the emitted circuit is identical for all 65,536 pairs (the fold table reads *kind*, never value — D6), so it ran one gate sequence 65,536 times. **Not "the shadow"** either — a constant bit has none, and under the all-classical mask every bit of `dst` is one |
+| **L1** | `value(dst) == refmodel(a,b)` | **A SMALL CONSTANT NUMBER OF RANDOM SAMPLES** — `cq_kd_samples()`, default **32**, per `(kernel, width)`, with nothing scaling in `W`. Each case draws a bit-kind mask **pair** *and* a value tuple **jointly** from one seeded RNG. Four anchors sit **inside** the budget, never on top of it: the **all-classical** pair (that row *is* L5), the **all-quantum** pair (what L4 pins), and the four value corners. Widths are **enumerated, never sampled**. Seeded `FNV-1a(kernel name) ^ W` and printed with the count and the pool, so a red case reproduces from a bare re-run; `CQOPS_L1_SAMPLES` overrides the constant. **Not "the shadow"** — a constant bit has none, and under the all-classical mask every bit of `dst` is one |
 | **L2** | **No index is live that no named register owns**, and every owned index is live | Automatic on every L1 case. "Exactly `dst`'s qubits" is false whenever an operand is quantum; a **count** is strictly weaker than the set |
 | **L3** | forward → `_unc` → all-zero, then free → **`live` restored and every index `dst` held back on the free list** | Values and pool state only — see Rule 14. **Never compare `minted` or the free-list length**: both are monotone, so they cannot return |
 | **L4** | `(NOT, CNOT, Toffoli)` per kernel per `W` | Pinned goldens, cross-checked against the Bennett gate-count formula |
@@ -918,6 +927,43 @@ The levels, and what each one is actually for:
 
 L1 and L5 are the two that actually catch bugs. L4 is what stops a "harmless"
 refactor from silently doubling the T-count.
+
+> **L1 IS A SAMPLE, NOT A PRODUCT (2026-08-21), AND THE CONSTANT IS ONE NUMBER.**
+> This row used to read "the full cross product at `W ∈ {1,2,3,4,5}`, structured
+> corners + seeded sampling from `W = 8` up". Both factors grew: the value factor
+> was `span²` below `W = 6`, and the **mask** factor is `cq_bk_fixed_pairs`, which
+> is 12 named rows **plus a one-bit-quantum sweep across all `W` positions** — so
+> `O(W)`. Measured across the suite: **~2.1 million L1 cases** (cmp 522,080, shift
+> 372,660, bitwise 363,204), Debug **63.8 s**.
+>
+> Every L1 case runs a real circuit and reads `dst` back through the shadow, so the
+> case count **is** the wall clock. It is now `cq_kd_samples()` per `(kernel, width)`
+> — **~28,400 cases, Debug 22.6 s, Release 2.4 s**, 195/195 green in both
+> configurations.
+>
+> **WHAT THIS GAVE UP, AND IT WAS DELIBERATE.** The named mask rows other than
+> all-classical and all-quantum — alternating, lsb-only, msb-only and **risk R8's six
+> asymmetric pairs** — and the one-bit-quantum lane sweep are no longer *enumerated*
+> at every width; they are rows in the pool the draw samples from. Across the ladder
+> and §9's four regions each is still drawn many times, but **no single run guarantees
+> any one of them**. Do not "restore" the enumeration without asking: the shrink was
+> an explicit instruction, not an accident.
+>
+> **WIDTHS ARE ENUMERATED, NEVER SAMPLED, and that asymmetry is the point.** Every
+> kernel is width-generic over `reg->width` with no width switch (I5, Rule 3), so what
+> a wide width exercises that a narrow one does not is a loop bound, an MSB boundary
+> or a carry that only exists above some length — precisely the faults a sweep exists
+> to catch. Sampling widths would leave those to the draw.
+>
+> **The old argument for dropping value exhaustion still holds and is why 32 is
+> enough:** the §3 fold table dispatches on a bit's **kind**, never on a qubit's value
+> (D6, no demotion), so at the all-quantum mask the emitted circuit is byte-for-byte
+> identical across all 65,536 value pairs at `W = 8` — the suite ran one fixed gate
+> sequence 65,536 times through the classical shadow. Values reach the circuit only
+> through classical lanes, one bit per lane.
+>
+> **Verified rather than argued:** the suite is also green at `CQOPS_L1_SAMPLES=256`,
+> eight times the default depth, so 32 is not masking a failure.
 
 **Two things about L4 that are counter-intuitive and cost real work to establish:**
 
@@ -1333,19 +1379,20 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 # and Release is what gets its gate counts pinned (Rule 17).
 # -j is worth using: ctest is SERIAL by default, and no test binary shares
 # state with another. THIS BOX HAS 6 PHYSICAL CORES, so -j12 oversubscribes
-# hyperthreads; -j6 is the honest figure. 195 tests at -j6 after Step 20, which
-# added M06's two binaries -- 18 cases in one ctest entry, 19 deaths in 19 --
-# and re-ran every Rule-7 kernel under four control regions: Debug
-# 66 s -> 138 s, Release 22 s -> 40 s, and per-binary kernel CPU in Debug
-# 171 s -> 279 s (+63%), against the ~3.8x a naive full re-run would have cost.
-# The pole is unchanged: test_kernel_shift_var. 175 tests at -j6 after Step 19:
-# the
-# Debug run is BOUNDED BELOW BY ONE BINARY, test_kernel_shift_var, with
-# test_kernel_cmp next; K12's two halves follow and are NOT the pole. Step 17
-# applied bd mmv's printed-caps discipline up front AND took option (a) -- the
-# divrem suite is TWO binaries, split on the M19/M20 seam, so ctest -j overlaps
-# them. M21 adds under a second: its heaviest case is a few hundred thousand
-# points of pure double arithmetic and no gates at all.
+# hyperthreads; -j6 is the honest figure. 195 tests at -j6 as of 2026-08-21,
+# after L1 became a constant sample budget rather than a product: Debug
+# 63.8 s -> 22.6 s (three runs: 22.34 / 22.55 / 23.02), Release 4.1 s -> 2.4 s
+# (2.17 / 2.43 / 2.64). `make test` -- lint, a build check and both
+# configurations -- is about 36 s end to end.
+#
+# THE POLE MOVED, and this is the one figure worth carrying: it is no longer
+# test_kernel_shift_var. Debug is now bounded by test_kernel_sdivrem (23.0 s)
+# and test_kernel_divrem (22.4 s), which run concurrently under -j6 and so ARE
+# the wall clock. Everything else collapsed -- mul 41.1 -> 11.0, shift_var
+# 63.8 -> 5.6, cmp 44.0 -> 0.8. Of divrem's ~22 s only ~9 s is the L1 sweep;
+# the rest is per-width structural work at i128 (the L4 goldens, the
+# phase-boundary scan, the palindrome, D3, R9) which the sample budget does
+# not touch and which is where any further reduction has to come from.
 #
 # DO NOT QUOTE A NUMBER FROM THIS FILE. RE-MEASURE. The Step 18 session ran the
 # identical 162-test suite four times on an unchanged tree and got Debug
@@ -1954,18 +2001,21 @@ issue; `make test` is the local stand-in (lint, then both configurations).
   alternative — transcribing `lower_mux!`'s four gates a second time — is a second
   chance to put the Toffoli before the two CNOTs that build `d`.
 
-- **`cq_kd_case2` FILLS `values[2]` WITH ZERO, so the shared sweep silently tests half
-  of a three-source kernel.** Every sweep at `W <= 8` — `sweep_full_cross` and
-  `sweep_values`, i.e. the exhaustive widths where L1 has its real power — goes through
-  `cq_kd_case2(k, W, va, vb, m)`, which sets `v[0]=va`, `v[1]=vb`, `v[2]=0`. Order the
-  mux `(cond, t, f)` and every exhaustive case runs with `f = 0`; order it `(t, f, cond)`
-  and every one runs with `cond = 0`, so the `t` arm is never selected. Either way the
-  run is green and prints a six-figure case count. **The masks are not the problem** —
-  those still vary, and `cond`'s KIND varies with `q[0]` bit 0, which is what puts both
-  the classical-cond dispatch and the sandwich under test. The VALUES are. A
-  three-source kernel drives `cq_kd_case` directly with its own value array; see
-  `tests/test_kernel_mux.c`. `sweep_sampled` (W >= 16) does vary `v[2]`, which makes the
-  hole *width-dependent* and therefore easy to miss.
+- **`cq_kd_case2` FILLS `values[2]` WITH ZERO — A HAZARD THAT WAS REAL FOR SIX STEPS AND
+  IS NOW REMOVED AT ITS ROOT (2026-08-21). Keep reading it anyway.** `cq_kd_case2(k, W,
+  va, vb, m)` sets `v[0]=va`, `v[1]=vb`, `v[2]=0`, and every sweep at `W <= 8` used to go
+  through it. Order the mux `(cond, t, f)` and every exhaustive case ran with `f = 0`;
+  order it `(t, f, cond)` and every one ran with `cond = 0`, so the `t` arm was never
+  selected. Either way green, with a six-figure case count, for half a kernel. **The
+  masks were never the problem** — those still varied, and `cond`'s KIND varies with
+  `q[0]` bit 0. The VALUES were.
+  **`cq_kd_sample_at` generates a value PER OPERAND AT ITS OWN WIDTH from the spec's
+  shape**, so `cond` gets its one bit and both arms get `W`, and `cq_kd_case2` is not on
+  the sweep path at all. `tests/test_kernel_mux.c` no longer needs its bespoke driver.
+  **The trap is recorded rather than deleted because it is one edit away from returning:**
+  anything that routes a three-source kernel back through `cq_kd_case2`, or any shared
+  hook that imposes its own sweep shape instead of taking the suite's, re-acquires it —
+  and it re-acquires it *silently*, which is the whole reason this entry exists.
 
 - **THE MUX'S ARM SWAP IS INVISIBLE TO EVERY STRUCTURAL CHECK.** `mux(c,t,f)` and
   `mux(c,f,t)` emit the identical `(X, CX, CCX)` tuple at every width and every mask,

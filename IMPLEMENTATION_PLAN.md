@@ -848,13 +848,15 @@ and PRD §11, and the substance is:
 4. **A mask is a PAIR.** Every normative sentence said "masks" in the singular, but R8's own
    mandated witness — `a` all `Q`, `b` all `ZERO` — is inexpressible that way.
 
-**The W=8 sweep is capped, and the cap is printed by every run.** The full product is 20
-mask pairs × 65,536 value pairs × 3 kernels = 3.9M cases, measured at 43 s in Debug against
-a 0.8 s suite. So W ≤ 5 runs the **full cross product**, W=8 runs **every value pair** with
-the mask rotating (~3,300 values per mask) plus the four corners against every mask, and
-W ∈ {16,32,64} is deterministically sampled from a width-seeded xorshift. Total: **3.9 s
-Debug, 0.9 s Release.** Coverage was moved, not lost — but it was moved, and a run that says
-so in its own output is the only kind of cap this project allows.
+**The sweep is a constant sample at every width, and the budget is printed by every run
+(2026-08-21).** This paragraph used to describe a per-width cap schedule — full cross
+product at `W ≤ 5`, every value pair with a rotating mask at `W = 8`, width-seeded sampling
+above. All of it is replaced by `cq_kd_samples()` cases per `(kernel, width)`, drawn jointly
+over masks and values, with the all-classical row (which *is* L5), the all-quantum row
+(which L4 pins) and the four value corners forced inside the budget. Coverage was **moved
+and, on the named mask rows, genuinely reduced** — those are now sampled rather than
+enumerated — and a run that says so in its own output, naming its count, its pool and its
+seed, is the only kind of cap this project allows.
 
 **L4's goldens are DATA, and risk R3 now has teeth.** `tests/goldens/bitwise.counts` carries
 the Bennett SHA on a `# bennett:` line, and `cq_gold_open` compares it against
@@ -929,8 +931,9 @@ claims to keep in Bennett's order "so L6 trace diffs stay attributable".
    says so.
 5. **The W=8 mask rotation aliased.** `p = (p+1) % np` with `np=20` and `span=256` has
    `gcd = 4`, so each mask only ever met value pairs with `vb ≡ p (mod 4)` — the
-   all-quantum mask saw only odd `vb`. Now the all-quantum mask gets the full cross
-   product outright and the rest draw from a seeded xorshift.
+   all-quantum mask saw only odd `vb`. The fix at the time gave the all-quantum mask the
+   full cross product outright; since 2026-08-21 there is no rotation at all — mask and
+   value are drawn **jointly** from one seeded xorshift, which cannot alias this way.
 6. **The R3 remedy could not be executed.** The commit-mismatch abort fired before the
    writer on the update path, so a checking run and an update run failed identically and
    the only way to follow the instruction the message printed was to hand-edit the
@@ -1049,7 +1052,7 @@ kernel driver rather than written per kernel:
 
 | Level | Assertion | Mechanism |
 |---|---|---|
-| **L1** | `value(dst) == refmodel(a, b)`: the **full cross product** — every `(a,b)` × every bit-kind mask **pair** — at `W ∈ {1,2,3,4,5}`; **structured corners + seeded sampling × every mask pair** at `W ∈ {8}` and above | `bitkinds` + `refmodel` |
+| **L1** | `value(dst) == refmodel(a, b)`, over **a small constant number of random samples**: `cq_kd_samples()`, default **32**, per `(kernel, width)`, nothing scaling in `W`. Each case draws a mask **pair** and a value tuple **jointly**; the all-classical pair (which *is* L5), the all-quantum pair (which L4 pins) and the four value corners are taken first, **inside** the budget. Widths enumerated, never sampled | `bitkinds` + `refmodel` |
 | **L2** | After the call, **no index is live that no named register owns**, and every index a named register owns is live | `poolcheck`, automatic on every L1 case |
 | **L3** | forward → `_unc` → `dst`'s **values** all-zero; then an explicit free → **`live` restored and every index `dst` held back on the free list**. Asserted on **values and pool state only, never bit-kinds** (PRD §10). Note `_unc` alone does **not** restore the pool — it reclaims nothing, so the free is a required third step, not a tidy-up | `poolcheck`, automatic |
 | **L4** | `(NOT, CNOT, Toffoli)` at each `W` matches the golden, cross-checked against the Step 0.2 formula | `sink_count` + `tests/goldens/`, `CQOPS_UPDATE_GOLDENS=1` to regenerate |
@@ -1060,6 +1063,22 @@ all-quantum, alternating, LSB-only, MSB-only, a one-bit-quantum sweep across all
 positions, **and the asymmetric pairs risk R8 names, which no symmetric set can express**.
 Random masks are sampled on top.
 
+> **SUPERSEDED 2026-08-21: L1 IS NOW A SAMPLE, NOT A PRODUCT.** The 2026-08-16 correction
+> below dropped value *exhaustion* at `W = 8`; this one drops the **product** entirely.
+> Both of its factors grew — the value factor was `span²` below `W = 6` and ~`5W+14` at
+> `W = 8`, and the **mask** factor is `cq_bk_fixed_pairs`, 12 named rows **plus a
+> one-bit-quantum sweep over all `W` positions**, so `O(W)`. Measured across the suite:
+> **~2,100,000 L1 cases**, Debug **63.8 s**. It is now `cq_kd_samples()` per
+> `(kernel, width)` — default 32, `CQOPS_L1_SAMPLES` to override — giving **~28,400 cases,
+> Debug 22.6 s, Release 2.4 s**, 195/195 green in both configurations, and also green at
+> `CQOPS_L1_SAMPLES=256`. The **all-classical** pair (which *is* L5), the **all-quantum**
+> pair (which L4 pins) and the four value corners are forced **inside** the budget. What
+> was given up: the other named mask rows — alternating, lsb, msb, **R8's six asymmetric
+> pairs** — and the lane sweep are sampled rather than enumerated, so no single run
+> guarantees any one of them. **Widths are still enumerated, never sampled**, because a
+> width-generic kernel's remaining faults are loop bounds and MSB boundaries. The
+> paragraph below is kept because its argument is *why* a small constant suffices.
+>
 > **CORRECTED 2026-08-16: L1's row said "all `(a,b)` at `W ∈ {1,2,4,8}`", and the `8` was
 > 63% of the compare suite and about half the add suite for almost no coverage.** The
 > exhaustion at `W = 8` — 65,536 value pairs at the all-quantum mask, then 65,536 again at
@@ -1069,21 +1088,8 @@ Random masks are sampled on top.
 > demotion), and every kernel is width-generic over `reg->width` with **no width switch**
 > (I5, Rule 3). So **at the all-quantum mask the emitted circuit is identical for all
 > 65,536 pairs** — one fixed gate sequence, run 65,536 times through the classical shadow.
-> A fault that survives the `W ≤ 5` full cross product must be *width*-dependent, and
-> widths are covered by covering widths and by the structural checks (closed-form gate
-> counts, the palindrome, the peak), not by more values at one width. Values reach the
-> circuit only through classical lanes, and only as one bit per lane — a classical `ZERO`
-> folds its gate away, a classical `ONE` rewrites it and removes none — which named
-> corners exercise directly.
->
-> **The replacement is broader as well as ~55× cheaper.** Exhaustion spent its whole
-> budget on **two** masks; the structured set (0, max, MSB, equal pairs, `v`/`v±1` both
-> orders, `2^i` and `2^i − 1` for every `i`, alternating) plus seeded sampling is crossed
-> with **every** mask pair, so the arithmetic corners now meet the asymmetric masks R8
-> names, which no value pair previously did. **Verified, not asserted:** the 20-mutant
-> battery over `src/kernels/cmp.c` was re-run against the reduced sweep and kills the same
-> set. `tests/support/kernelsweep.c:structured_pairs` carries the argument in place, and
-> every run still prints its own case counts — the no-silent-caps property is unchanged.
+> Values reach the circuit only through classical lanes, and only as one bit per lane — a
+> classical `ZERO` folds its gate away, a classical `ONE` rewrites it and removes none.
 
 > **Four corrections landed in this table at Step 10**, when the first kernel forced each
 > from prose into code. **L1 does not read "the shadow"** — `shadow(dst)` is undefined for a
@@ -1142,7 +1148,7 @@ is a sweep body and a `CQ_CASE`.
 **The controlled sweep is deliberately THINNER than the uncontrolled one, and it says so in
 its own output** (`bd mmv`). The promotion is a property of the emitter — per gate, and
 width-independent — so what the axis adds is its interaction with the §3 fold table, which
-is exhausted where the value cross product is: the four regions run the full cross at
+is exercised where the sample budget runs: the four regions run the sweep at
 `W ≤ 5` (`W ≤ 4` for the barrel and `W ≤ 3` for K12, the two poles), and every shipped width
 is still covered by `cq_kd_check_promotion` at two kernel calls apiece. Measured on this box
 in Debug, kernel CPU across the eleven binaries went **171 s → 279 s (+63%)**, against the
@@ -1220,7 +1226,7 @@ v1 ships when NORTH_STAR's five conditions hold, each traced to a step:
 | # | NORTH_STAR condition | Step |
 |---|---|---|
 | 1 | **Link** — CQ_lang's fixtures link against `libcqops` and run | 24 |
-| 2 | **Correct** — every integer opcode differential-tested against C semantics, exhaustive at `W ≤ 8`, random at `W ∈ {16,32,64}`, across every mixture of classical and quantum operand bits | 10–17 (L1) |
+| 2 | **Correct** — every integer opcode differential-tested against C semantics at every width on its shipped ladder, over a small constant number of seeded random `(bit-kind mask, value)` samples per width, with the all-classical and all-quantum masks and the value corners forced into every draw | 10–17 (L1) |
 | 3 | **Clean** — after every template call the pool holds exactly the result rail's qubits; after `_unc`, nothing | 10–17 (L2), 21 (L3) |
 | 4 | **Grover** — ordinary C compiles through `cqc`, links, emits a gate stream whose oracle arithmetic is verified exactly in classical mode | 25 |
 | 5 | **Hardware** — one flag routes the same stream into `qec_*` | 26 |

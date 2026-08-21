@@ -1168,7 +1168,7 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 | Level | What | How |
 |---|---|---|
 | L0 | Fold table | Unit tests over all operand-state combinations in §3 |
-| L1 | **Kernel differential** | For each kernel, compare the result register's **value** against the C operator: the **full cross product** — every `(a,b)` × every bit-kind mask **pair** — at W ∈ {1,2,3,4,5}; **structured corners + seeded sampling, crossed with every mask pair**, at W = 8 and above. **Not value-exhaustive at W = 8** — see the note below |
+| L1 | **Kernel differential** | For each kernel, compare the result register's **value** against the C operator, over **a small constant number of random samples**: `cq_kd_samples()`, default **32**, per `(kernel, width)`, nothing scaling in `W`. Each case draws a bit-kind mask **pair** *and* a value tuple **jointly** from one seeded RNG, with the **all-classical** pair (which *is* L5), the **all-quantum** pair (which is what L4 pins) and the four value corners taken first — **inside** the budget, not on top of it. Widths are enumerated, never sampled. **A sample, not a product** — see the note below |
 | L2 | Ancilla-clean | After every kernel call, assert **no index is live that no named register owns**, and that every index a named register owns is live |
 | L3 | Uncompute round-trip | forward → `_unc` → assert `dst`'s **values** are all-zero. The pool is **not** restored yet — `_unc` reclaims nothing (§10). The harness then frees `dst` explicitly and asserts **`live` is back to its pre-call value and every index `dst` held is back on the free list** |
 | L4 | Gate-count goldens | Pin per-kernel `(NOT, CNOT, Toffoli)` at each W. Cross-check against Bennett's published baselines where the construction matches, and document every deliberate delta. See the arity and staleness notes below — both bit an earlier draft |
@@ -1179,31 +1179,57 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 L1 and L5 are the two that actually catch bugs. L4 is what stops a "harmless" refactor
 from silently doubling the T-count.
 
-> **L1 IS NOT VALUE-EXHAUSTIVE AT W = 8, corrected 2026-08-16, and the reason is
-> structural rather than a concession to runtime.** This row read "all `(a,b)` at
-> W ∈ {1,2,4,8}", and the `8` cost 131,152 cases per kernel — 63% of the compare suite and
-> about half the add suite. It bought nothing the rest of the sweep did not already have.
-> The §3 fold table dispatches on a bit's **kind**, never on a qubit's value (§15 D6, no
-> demotion), and every kernel is width-generic over `reg->width` with **no width switch**
-> (I5). So **at the all-quantum mask the emitted circuit is byte-for-byte identical across
-> all 65,536 value pairs** — the suite ran one fixed gate sequence 65,536 times through the
-> classical shadow. Any fault surviving the W ≤ 5 full cross product, which is exhaustive
-> over the *product* of values and masks, must be **width**-dependent — a loop bound, an
-> MSB boundary, a carry that only exists above some length — and those are caught by
-> covering widths and by L4's closed forms, the sandwich palindrome and the qubit peak.
+> **L1 IS A SAMPLE, NOT A PRODUCT (2026-08-21). ONE CONSTANT, AND NOTHING IN IT SCALES
+> WITH `W`.** This row read "the full cross product at W ∈ {1,2,3,4,5}; structured corners
+> + seeded sampling, crossed with every mask pair, at W = 8 and above". **Both** factors of
+> that product grew. The value factor was `span²` below W = 6 — 1,024 pairs at W = 5 — and
+> a structured set of ~`5W+14` at W = 8. The **mask** factor is `cq_bk_fixed_pairs`, which
+> is 12 named rows **plus a one-bit-quantum sweep across all `W` positions**, so it is
+> `O(W)`. Measured across the suite before the change: **~2,100,000 L1 cases** — 522,080 in
+> the compare suite alone, 372,660 in shift, 363,204 in bitwise — for a Debug run of
+> **63.8 s** against a Release run of 4.1 s.
 >
-> **Values reach the circuit only through classical lanes, and only as one bit per lane:**
-> a classical `ZERO` control folds its gate away, a classical `ONE` rewrites it (`CX`→`X`,
-> `CCX`→`CX`) and removes none. Named corners — 0, max, MSB, equal pairs, `v`/`v±1` in both
-> orders, `2^i` and `2^i − 1` for every `i`, alternating — exercise that directly.
+> Every L1 case runs a real circuit and reads `dst`'s value back through the shadow, so the
+> case count **is** the suite's wall clock. The budget is now `cq_kd_samples()` per
+> `(kernel, width)`: **~28,400 cases, Debug 22.6 s, Release 2.4 s**, 195/195 green in both
+> configurations. `CQOPS_L1_SAMPLES` overrides the constant in the **environment** — never
+> in a test's CMake `ENVIRONMENT` property, which would win over the shell, the same trap
+> `CQOPS_UPDATE_GOLDENS` has.
 >
-> **The replacement is broader, not just cheaper.** Exhaustion spent its entire budget on
-> **two** masks (all-quantum, plus one random draw per pair); the structured set plus seeded
-> sampling is crossed with **every** mask pair, so the arithmetic corners now meet the
-> asymmetric masks risk R8 names — which no value pair ever did. **Verified rather than
-> argued:** the 20-mutant battery over `src/kernels/cmp.c` was re-run against the reduced
-> sweep and kills the same set, and every run still prints its own case counts, so the
-> no-silent-caps property is unchanged.
+> **FOUR ANCHORS SIT INSIDE THE BUDGET, NOT ON TOP OF IT**, each supplying something a draw
+> cannot. **Case 0** is the all-classical mask pair: that row *is* L5, and the driver
+> asserts zero gates and zero qubits on it, so leaving it to a 1-in-`(W+12)` draw would make
+> L5 run only sometimes. **Case 1** is the all-quantum pair — the mask every L4 golden is
+> pinned at, and the fixed point of §15 D6's no-demotion rule. **Cases 2–5** are the four
+> value corners: a masking bug lives at 0 and all-ones, and a uniform draw reaches them with
+> probability ~0 at W = 64.
+>
+> **WHAT THIS GAVE UP, DELIBERATELY.** The named mask rows other than all-classical and
+> all-quantum — alternating, lsb-only, msb-only and **risk R8's six asymmetric pairs** — and
+> the one-bit-quantum lane sweep are no longer *enumerated* at every width; they are rows in
+> the pool the draw samples from. Across the width ladder and §9's four control regions each
+> is still drawn many times, but **no single run guarantees any one of them.** This was an
+> explicit instruction, not drift; do not restore the enumeration without asking.
+>
+> **WIDTHS ARE ENUMERATED, NEVER SAMPLED.** Every kernel is width-generic over `reg->width`
+> with no width switch (I5), so what a wide width exercises that a narrow one does not is a
+> loop bound, an MSB boundary or a carry that only exists above some length — exactly the
+> faults a sweep exists to catch. Sampling widths would leave those to the draw. Every
+> suite's ladder is preserved, i80, i128 and the cast width **pairs** included.
+>
+> **WHY A SMALL CONSTANT IS ENOUGH — the 2026-08-16 argument, which still holds.** The §3
+> fold table dispatches on a bit's **kind**, never on a qubit's value (§15 D6), and kernels
+> are width-generic, so **at the all-quantum mask the emitted circuit is byte-for-byte
+> identical across all 65,536 value pairs at W = 8** — the old suite ran one fixed gate
+> sequence 65,536 times through the classical shadow. **Values reach the circuit only
+> through classical lanes, and only as one bit per lane:** a classical `ZERO` control folds
+> its gate away, a classical `ONE` rewrites it (`CX`→`X`, `CCX`→`CX`) and removes none.
+>
+> **VERIFIED RATHER THAN ARGUED:** the suite is green at `CQOPS_L1_SAMPLES=256`, eight times
+> the default depth, so 32 is not masking a failure. Seeds are `FNV-1a(kernel name) ^ W`, so
+> a red case reproduces from a bare re-run and no two kernels or widths share a sequence, and
+> every width prints its case count, its mask-pool size and its seed — the no-silent-caps
+> property is unchanged.
 
 > **Three corrections made at Step 10, when the first kernel forced each of them from
 > prose into code. All three rows above are the corrected wording.**
@@ -1518,7 +1544,9 @@ and diffs.
 > `bd ckd.13` was filed as *"flat is quadratic (33,151 qubits at W=64), nested is `O(W)`, and
 > a quadratic-ancilla divrem may simply not fit on hardware"*. **Three schemes were built and
 > run** — not argued about — at `W ∈ {1,2,3,4,8,16,32,64,128}` in both configurations, each
-> L1-exhaustive green at `W ≤ 4` over every `(a,b)` including `b = 0`, pool restored and
+> L1 green (exhaustive at `W ≤ 4` over every `(a,b)` including `b = 0` when Step 17 landed;
+> a constant sample as of 2026-08-21, where `b = 0` is an ordinary drawn value reached by
+> the all-zero corner at every width), pool restored and
 > I6-clean (`K12.md` §4.1, §6.0a):
 >
 > | scheme | qubits | gates | i8 | i64 | i128 |
