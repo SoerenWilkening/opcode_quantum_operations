@@ -742,27 +742,6 @@ add_cqops_death_test(test_rotate_death CASES
     free_after_measure
 )
 
-## WHICH LAYER ABORTED, as a NEGATIVE pin. These two abort at the same site with
-## the same message — cq_reg_clean's `!proof ||` short-circuits at the first
-## qubit-carrying bit exactly as a failing proof does — so no regex separates
-## them from each other, and that is recorded rather than dressed up. What the
-## property DOES pin is the Step 7 discriminator: the refusal comes from M07's
-## two-pass check, which releases NOTHING, and not from M03's per-qubit release
-## guard one layer down. If M03's message ever appears here, cq_reg_free has
-## started releasing before verifying and a dirty rail is half-returned.
-set_tests_properties(test_rotate_death.ckd18_a_general_ry_rail_cannot_be_freed
-                     test_rotate_death.a_null_proof_still_refuses_a_materialised_rail
-                     PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "release of a qubit not proven")
-
-## "ABORTS HAVING EMITTED ZERO GATES" IS A PROMISE, SO IT NEEDS A DETECTOR.
-## cq_measure marks the rail MEASURED before it reads a single bit, so a second
-## measure aborts before touching the sink. Nothing about that ordering was
-## observable until this pin: the case's rail is materialised, its sink reports
-## any `mz` emitted after the first legitimate measure, and this turns that
-## report into a failure. A refactor that moves the mark below the loop — the
-## natural thing to do while taking the recorded `rotation table / measurement`
-## seam — passes every other assertion in the project.
 ## FAIL_REGULAR_EXPRESSION IS SET ONCE PER TEST, AND A SECOND set_tests_properties
 ## OVERWRITES THE FIRST RATHER THAN ADDING TO IT. That is not a style note: this
 ## file briefly carried the per-case pins in separate blocks, and the later block
@@ -802,6 +781,8 @@ set_tests_properties(test_rotate_death.measure_inside_a_sandwich_compute_half
 ## other, and that is recorded rather than dressed up. What this DOES pin is the
 ## Step 7 discriminator: the refusal comes from M07's two-pass check, which
 ## releases NOTHING, and not from M03's per-qubit release guard one layer down.
+## If M03's message ever appears here, cq_reg_free has started releasing before
+## verifying and a dirty rail is half-returned.
 ## Note ckd18_* passes cq_pc_zero_proof_rotation_free rather than NULL, so it is
 ## the POISON that refuses it — which is ckd.18's actual claim, and is what makes
 ## disabling cq_shadow_rotate turn this case red.
