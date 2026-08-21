@@ -71,6 +71,7 @@
 #include "support/bitkinds.h"
 #include "support/goldens.h"
 #include "support/harness.h"
+#include "support/kerneldrv.h"   /* cq_kd_samples — the shared L1 budget */
 #include "support/mock_sink.h"
 #include "support/poolcheck.h"
 #include "support/refmodel.h"
@@ -184,60 +185,68 @@ static void k8_case(int W, cq_ref_w va, cq_ref_w vb)
     k8_close(&f);
 }
 
-/* ---- The sweeps. -------------------------------------------------------- */
+/* ---- The sweeps: the shared constant sample budget. --------------------- */
 
-CQ_TEST(k8_exhaustive_widths)
-{
-    for (int W = 1; W <= 5; W++) {
-        uint64_t span = cq_ref_mask(W) + 1u;
-        uint64_t cases = 0;
+/* K8 HAS EXACTLY ONE LEGAL MASK, so unlike every other kernel its sample is
+ * over VALUES ALONE. A classical operand is REFUSED, not folded (K08.md §5 D7):
+ * K8 writes its own addend, so a classical b[i] would be materialised
+ * mid-construction and the reverse replay would stop cancelling while L1 stayed
+ * green. cq_addacc_check enforces that in both configurations, and
+ * tests/test_kernel_addacc_death.c IS K8's L5. There is therefore no
+ * all-classical anchor to force here — forcing one would drive a case the
+ * kernel hard-errors on.
+ *
+ * THE BUDGET IS cq_kd_samples(), THE SAME CONSTANT THE SHARED DRIVER USES
+ * (2026-08-20), even though K8 cannot go through that driver: it is acc += b,
+ * in place and destructive, so cq_kd_case's contract (a fresh zero dst, sources
+ * unchanged, L3 as a second call giving acc + 2b) does not hold and this file
+ * restates every level by hand with a descending-index replay for L3. Sharing
+ * the CONSTANT rather than the driver is the most this kernel can share.
+ *
+ * THE CORNERS ARE THE CARRY CASES and they are forced first, inside the budget:
+ * all-ones plus one is the full-length carry ripple, and it is exactly the case
+ * a dropped §3.5 Toffoli gets wrong while every low-weight value stays right.
+ * This used to be the full value cross product at W <= 5 and 25 corner pairs
+ * plus a 1024/W tail above; the ripple is preserved, the enumeration is not. */
 
-        for (uint64_t a = 0; a < span; a++)
-            for (uint64_t b = 0; b < span; b++) {
-                k8_case(W, cq_ref_w_make(a, 0u, W), cq_ref_w_make(b, 0u, W));
-                cases++;
-            }
+enum { K8_CORNERS = 6 };
 
-        printf("# addacc W=%d FULL CROSS: %llu (acc,b) pairs at the one legal "
-               "mask (all-quantum)\n", W, (unsigned long long)cases);
-        fflush(stdout);
-    }
-}
-
-/* Corners plus a seeded tail. THE CORNERS ARE THE CARRY CASES: all-ones plus
- * one is the full-length carry ripple, and it is the case a dropped §3.5
- * Toffoli gets wrong while every low-weight value stays right. */
 static void k8_sampled(int W)
 {
-    cq_ref_w corner[5];
+    cq_ref_w ones = cq_ref_w_ones(W);
+    cq_ref_w one  = cq_ref_w_setbit(0);
+    cq_ref_w msb  = cq_ref_w_setbit(W - 1);
+    cq_ref_w zero = cq_ref_w_zero();
+    const cq_ref_w ca[K8_CORNERS] = { zero, ones, ones, one,  msb,  ones };
+    const cq_ref_w cb[K8_CORNERS] = { zero, ones, one,  ones, msb,  zero };
+    int n = cq_kd_samples();
     cq_bk_rng rng;
-    int n = 1024 / W;
-
-    corner[0] = cq_ref_w_zero();
-    corner[1] = cq_ref_w_ones(W);
-    corner[2] = cq_ref_w_setbit(W - 1);
-    corner[3] = cq_ref_w_setbit(0);
-    corner[4] = cq_ref_w_make(cq_ref_mask(W < 64 ? W : 64) / 3u, 0u, W);
-
-    if (n > 48) n = 48;
-    if (n < 8)  n = 8;
 
     cq_bk_rng_init(&rng, 0xC0CCA20ull ^ (uint64_t)W);
 
-    for (int i = 0; i < 5; i++)
-        for (int j = 0; j < 5; j++)
-            k8_case(W, corner[i], corner[j]);
-
     for (int s = 0; s < n; s++) {
-        cq_ref_w va = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
-        cq_ref_w vb = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
+        cq_ref_w va, vb;
 
+        if (s < K8_CORNERS) {
+            va = ca[s];
+            vb = cb[s];
+        } else {
+            va = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
+            vb = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
+        }
         k8_case(W, va, vb);
     }
 
-    printf("# addacc W=%3d sampled: 25 corner pairs + %d seeded pairs "
-           "(seed 0xC0CCA20^W)\n", W, n);
+    printf("# addacc W=%3d SAMPLED: %d cases (%d carry corners forced, %d drawn) "
+           "at the one legal mask (all-quantum), seed 0xC0CCA20^W — a CONSTANT "
+           "budget; see tests/support/kernelsweep.c\n",
+           W, n, K8_CORNERS, n > K8_CORNERS ? n - K8_CORNERS : 0);
     fflush(stdout);
+}
+
+CQ_TEST(k8_exhaustive_widths)
+{
+    for (int W = 1; W <= 5; W++) k8_sampled(W);
 }
 
 /* i128 IS IN SCOPE AND IT IS NOT A COURTESY: `mul` ships at i128
@@ -246,11 +255,9 @@ static void k8_sampled(int W)
  * VALUES are two-word cq_ref_w on the reference side only (refmodel.h). */
 CQ_TEST(k8_wide_widths)
 {
-    k8_sampled(8);
-    k8_sampled(16);
-    k8_sampled(32);
-    k8_sampled(64);
-    k8_sampled(128);
+    static const int WS[] = { 8, 16, 32, 64, 128 };
+
+    for (size_t i = 0; i < sizeof WS / sizeof WS[0]; i++) k8_sampled(WS[i]);
 }
 
 /* ---- L4: the goldens. --------------------------------------------------- */

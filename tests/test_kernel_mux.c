@@ -81,119 +81,50 @@ static cq_ref_w ref_mux(const cq_ref_w *s, const cq_kd_shape *sh)
 
 static const cq_kd_spec MUX = { "mux", NULL, NULL, mux_shape, call_mux, ref_mux };
 
-/* ---- L1 + L2 + L3 + L5: the sweep, with `cond` driven explicitly. -------- */
+/* ---- L1 + L2 + L3 + L5: the shared constant sample budget. -------------- */
 
-enum { MUX_MAX_PAIRS = 128 + 12 };
-
-/* The same 1024/W law kernelsweep.c uses, and for its reason: the fixed mask
- * set grows linearly in W and a case costs O(W), so a flat sample count makes
- * the sweep quadratic. Duplicated rather than exported because samples_for is
- * kernelsweep.c's private tuning knob and this file's ladder is not its ladder. */
-static int mux_samples(int W)
-{
-    int n = 1024 / W;
-
-    if (n > 64) n = 64;
-    if (n < 8)  n = 8;
-    return n;
-}
-
-static void mux_case(int W, int cond, cq_ref_w vt, cq_ref_w vf,
-                     const cq_bk_pair *m)
-{
-    cq_ref_w v[CQ_KD_MAX_SRC];
-
-    v[0] = cq_ref_w_make((uint64_t)cond, 0u, 1);
-    v[1] = cq_ref_w_make(vt.lo, vt.hi, W);
-    v[2] = cq_ref_w_make(vf.lo, vf.hi, W);
-    cq_kd_case(&MUX, W, v, m);
-}
-
-static void mux_full_cross(int W)
-{
-    cq_bk_pair pairs[MUX_MAX_PAIRS];
-    uint32_t np = cq_bk_fixed_pairs((uint32_t)W, pairs, MUX_MAX_PAIRS);
-    uint64_t span = cq_ref_mask(W) + 1u;      /* W <= 5 here, cannot wrap */
-    uint64_t cases = 0;
-
-    for (uint32_t p = 0; p < np; p++)
-        for (int c = 0; c < 2; c++)
-            for (uint64_t vt = 0; vt < span; vt++)
-                for (uint64_t vf = 0; vf < span; vf++) {
-                    mux_case(W, c, cq_ref_w_make(vt, 0u, W),
-                             cq_ref_w_make(vf, 0u, W), &pairs[p]);
-                    cases++;
-                }
-
-    printf("# mux W=%2d FULL CROSS: %u mask pairs x 2 conds x %llu arm pairs = "
-           "%llu cases\n", W, np, (unsigned long long)(span * span),
-           (unsigned long long)cases);
-    fflush(stdout);
-}
-
-/* Corners plus a seeded tail, at both values of `cond`, crossed with every
- * fixed mask pair. Two-word throughout so the ladder can reach i128 without a
- * second code path at the 64-bit seam. */
-static void mux_sampled(int W)
-{
-    cq_bk_pair pairs[MUX_MAX_PAIRS];
-    uint32_t np = cq_bk_fixed_pairs((uint32_t)W, pairs, MUX_MAX_PAIRS);
-    cq_ref_w corner[4];
-    cq_bk_rng rng;
-    uint64_t cases = 0;
-
-    corner[0] = cq_ref_w_zero();
-    corner[1] = cq_ref_w_ones(W);
-    corner[2] = cq_ref_w_setbit(W - 1);       /* the sign lane */
-    corner[3] = cq_ref_w_setbit(0);
-
-    cq_bk_rng_init(&rng, 0x1D10Full ^ (uint64_t)W);
-
-    for (uint32_t p = 0; p < np; p++)
-        for (int c = 0; c < 2; c++) {
-            /* Every ordered corner pair: t and f must differ for the selection
-             * to be observable at all, and (ones, zero) is the pair where a
-             * swapped arm is loudest. */
-            for (int i = 0; i < 4; i++)
-                for (int j = 0; j < 4; j++) {
-                    mux_case(W, c, corner[i], corner[j], &pairs[p]);
-                    cases++;
-                }
-
-            for (int s = 0; s < mux_samples(W); s++) {
-                cq_ref_w vt = cq_ref_w_make(cq_bk_rng_next(&rng),
-                                            cq_bk_rng_next(&rng), W);
-                cq_ref_w vf = cq_ref_w_make(cq_bk_rng_next(&rng),
-                                            cq_bk_rng_next(&rng), W);
-                mux_case(W, c, vt, vf, &pairs[p]);
-                cases++;
-            }
-        }
-
-    printf("# mux W=%3d sampled: %u mask pairs x 2 conds x (16 corner pairs + "
-           "%d sampled) = %llu cases (seed 0x1D10F^W)\n",
-           W, np, mux_samples(W), (unsigned long long)cases);
-    fflush(stdout);
-}
+/* THE THIRD OPERAND NO LONGER NEEDS A BESPOKE DRIVER, and that is a structural
+ * change rather than a shortcut (2026-08-20).
+ *
+ * This file used to drive cq_kd_case directly, for the reason its header still
+ * states at length: cq_kd_case2 fills `values[2]` with ZERO, so a mux swept
+ * through it ran every exhaustive-width case with one arm pinned at 0 — green,
+ * a six-figure case count, and half a kernel tested. THAT HAZARD IS GONE AT ITS
+ * ROOT. cq_kd_sample_at generates a value PER OPERAND AT ITS OWN WIDTH from the
+ * spec's shape, so `cond` gets its one bit and both arms get W, and cq_kd_case2
+ * is not on the path at all. Verified by reading tests/support/kernelsweep.c,
+ * not assumed.
+ *
+ * The old header paragraph is kept deliberately: the trap was real, it was
+ * measured, and a future reader restoring a case2-based sweep here would
+ * re-acquire it. What changed is the driver, not the danger.
+ *
+ * The budget is now cq_kd_samples() cases per width — a small constant, default
+ * 32 — each drawing a mask pair and a value triple jointly from one seeded RNG,
+ * with the all-classical pair (which IS L5), the all-quantum pair (which is what
+ * L4 pins) and the four value corners taken first, inside the budget rather than
+ * on top of it. Every width prints its count, its pool and its seed.
+ *
+ * WHAT THAT GAVE UP HERE: `cond` is no longer iterated explicitly over {0, 1} at
+ * every mask — it is one drawn bit per case, so roughly half the cases select
+ * each arm. Over 32 cases a width the probability that either arm is never
+ * selected is ~5e-10, and the ARM SWAP the header calls the fault no count can
+ * see is caught by any case that selects the arm the kernel wired wrong. */
 
 CQ_TEST(k10_sweep_exhaustive_widths)
 {
-    for (int W = 1; W <= 5; W++) mux_full_cross(W);
+    for (int W = 1; W <= 5; W++) cq_kd_sample_at(&MUX, W);
 }
 
 /* Step 20 — the same four levels under PRD §9's four regions, plus §9's
  * gate-tuple transform at every shipped width. The sweep body is this suite's
  * OWN, at its cheap widths only: the promotion is per gate and width-
- * independent, so what the axis adds is its interaction with the §3 fold table,
- * which is exhausted where the value cross product is. Every shipped width is
- * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+ * independent, so what the axis adds is its interaction with the §3 fold table.
+ * Every shipped width is still covered by cq_kd_check_promotion, at two kernel
+ * calls apiece. */
 static void mux_narrow(void)
 {
-    /* mux_full_cross, NOT cq_kd_sweep_at: cq_kd_case2 fills values[2] with
-     * ZERO, so the ordinary sweep would run every exhaustive case with one arm
-     * pinned at 0 — green, and half a kernel. The region hook takes this
-     * suite's own body for exactly that reason. */
-    for (int W = 1; W <= 4; W++) mux_full_cross(W);
+    for (int W = 1; W <= 4; W++) cq_kd_sample_at(&MUX, W);
 }
 
 CQ_TEST(controlled)
@@ -218,19 +149,19 @@ CQ_TEST(controlled)
     CHECK(reached > 0u);
 }
 
-/* THE LADDER STOPS AT 64 FOR THE SWEEP AND THE CAP IS DELIBERATE, so it is
- * printed rather than implied. i80 is excluded on purpose — opcode_table.yaml
- * :88 says i80 "is NEVER a control-merged data value", which is precisely what
- * a select's arms are — and i128 is swept here but at the same reduced sample
- * depth every wide width gets, because a mux case at W=128 emits 2304 gates
- * and takes 256 scratch qubits. The L4 goldens below DO pin 128. */
+/* i80 IS EXCLUDED ON PURPOSE and i128 is not: opcode_table.yaml:88 says i80 "is
+ * NEVER a control-merged data value", which is precisely what a select's arms
+ * are, while i128 is a shipped mux width and is swept here. Every width on this
+ * ladder gets the same constant budget the narrow ones do — cq_kd_samples()
+ * cases, printed with its seed — even though a mux case at W=128 emits 2304
+ * gates over 256 scratch qubits, because the budget is a count and not a
+ * product. The L4 goldens below pin 128 as a single measurement. */
 CQ_TEST(k10_sweep_wide_widths)
 {
-    mux_sampled(8);
-    mux_sampled(16);
-    mux_sampled(32);
-    mux_sampled(64);
-    mux_sampled(128);
+    static const int WS[] = { 8, 16, 32, 64, 128 };
+
+    for (size_t i = 0; i < sizeof WS / sizeof WS[0]; i++)
+        cq_kd_sample_at(&MUX, WS[i]);
 }
 
 /* ---- L4: the goldens, at the all-quantum mask. -------------------------- */

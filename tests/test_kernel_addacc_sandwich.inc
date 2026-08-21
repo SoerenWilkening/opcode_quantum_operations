@@ -163,27 +163,40 @@ CQ_TEST(a_sandwiched_k8_computes_the_sum_of_two_real_operands)
 
     cq_mock_init(&m);
 
+    /* THE SHARED CONSTANT BUDGET (2026-08-20): sw_run builds the region, runs
+     * the sandwiched accumulator and reads dst back, so each iteration is a full
+     * circuit execution. This used to enumerate every (a, b) pair below the
+     * 4-bit span at six widths. The carry corners are forced first — all-ones
+     * plus one is the full-length ripple, which is what a dropped §3.5 Toffoli
+     * gets wrong while low-weight values stay right — and the rest is drawn. */
     for (size_t j = 0; j < sizeof WS / sizeof WS[0]; j++) {
         int W = WS[j];
-        uint64_t span = cq_ref_mask(W < 5 ? W : 4) + 1u;
+        uint64_t vmask = cq_ref_mask(W);
+        const uint64_t ca[4] = { 0u, vmask, vmask, 1u };
+        const uint64_t cb[4] = { 0u, vmask, 1u,    vmask };
+        cq_bk_rng rng;
+        int n = cq_kd_samples();
 
-        for (uint64_t a = 0; a < span; a++)
-            for (uint64_t b = 0; b < span; b++) {
-                cq_ref_w va = cq_ref_w_make(a, 0u, W);
-                cq_ref_w vb = cq_ref_w_make(b, 0u, W);
-                cq_ref_w got;
-                cq_pc_snap before, after;
-                int only_new = 0;
+        cq_bk_rng_init(&rng, 0x5A9D31C8ull ^ (uint64_t)W);
 
-                sw_run(&m, W, va, vb, &got, &before, &after, &only_new);
+        for (int s = 0; s < n; s++) {
+            uint64_t a = (s < 4) ? ca[s] : (cq_bk_rng_next(&rng) & vmask);
+            uint64_t b = (s < 4) ? cb[s] : (cq_bk_rng_next(&rng) & vmask);
+            cq_ref_w va = cq_ref_w_make(a, 0u, W);
+            cq_ref_w vb = cq_ref_w_make(b, 0u, W);
+            cq_ref_w got;
+            cq_pc_snap before, after;
+            int only_new = 0;
 
-                if (!cq_ref_w_eq(got, cq_ref_w_add(va, vb, W)))
-                    cq_h_fail(__FILE__, __LINE__,
-                              "sandwiched addacc W=%d: dst != a+b "
-                              "(a=%llu b=%llu got=%llu)", W,
-                              (unsigned long long)a, (unsigned long long)b,
-                              (unsigned long long)got.lo);
-            }
+            sw_run(&m, W, va, vb, &got, &before, &after, &only_new);
+
+            if (!cq_ref_w_eq(got, cq_ref_w_add(va, vb, W)))
+                cq_h_fail(__FILE__, __LINE__,
+                          "sandwiched addacc W=%d: dst != a+b "
+                          "(a=%llu b=%llu got=%llu)", W,
+                          (unsigned long long)a, (unsigned long long)b,
+                          (unsigned long long)got.lo);
+        }
     }
 
     cq_mock_dispose(&m);

@@ -1,10 +1,63 @@
-/* tests/support/kernelsweep.c — which widths, which values, which masks.
+/* tests/support/kernelsweep.c — which widths, which masks, which values.
  *
  * SPLIT FROM kerneldrv.c AT STEP 11 on plan §2.2's recorded seam. The four
- * LEVELS live next door; this file decides only what gets fed to them. The cut
- * pays off immediately: a cast's widths are a PAIR, so M13's suite drives
- * cq_kd_sweep_at directly rather than the standard ladder, and it needed no
- * change to a single assertion to do it.
+ * LEVELS live next door; this file decides only what gets fed to them.
+ *
+ * ================================================================
+ * ONE BUDGET, AND IT IS A SMALL CONSTANT (2026-08-20).
+ * ================================================================
+ *
+ * Every L1 case runs a real circuit and reads dst's value back through the
+ * shadow, so the sweep's case count IS the suite's wall clock. It used to be a
+ * PRODUCT — (mask pairs) x (value pairs) — and both factors grew:
+ *
+ *   - the value factor was the full cross product at W <= 5 (span^2, so 1,024
+ *     pairs at W = 5), a structured set of ~5W+14 at W = 8, and a 1024/W
+ *     random tail above that;
+ *   - the mask factor is cq_bk_fixed_pairs, which is 12 named rows PLUS a
+ *     one-bit-quantum sweep across all W positions, so it is O(W).
+ *
+ * Measured 2026-08-20 before this rewrite: ~2.1 MILLION L1 cases across the
+ * suite — 522k in the compare suite alone, 373k in shift, 363k in bitwise —
+ * for a Debug run of 63.8 s against a Release run of 4.1 s.
+ *
+ * THE BUDGET IS NOW A SMALL CONSTANT NUMBER OF RANDOM SAMPLES PER (KERNEL,
+ * WIDTH), and nothing about it scales with W. cq_kd_samples() is that constant.
+ * Each case draws a mask pair AND a value pair from one seeded RNG, so the
+ * (mask, value) space is sampled jointly rather than enumerated on either axis.
+ *
+ * WHAT IS STILL FORCED, INSIDE THE BUDGET RATHER THAN ON TOP OF IT — these
+ * cost nothing extra, because they are the first few of the N cases, not
+ * additions to N:
+ *
+ *   case 0      the ALL-CLASSICAL mask pair. That row IS L5: cq_kd_case
+ *               asserts zero gates and zero qubits on it, so leaving it to a
+ *               1-in-(W+12) draw would make L5 run only sometimes.
+ *   case 1      the ALL-QUANTUM mask pair. It is the mask every L4 golden is
+ *               pinned at and the fixed point of the no-demotion rule (D6).
+ *   cases 2-5   the four value corners (0, all-ones on each of two operands)
+ *               at the all-quantum mask. A masking bug lives at the corners
+ *               and a uniform draw reaches 0 or all-ones with probability ~0
+ *               at W = 64, so these four are the one place the value axis is
+ *               not left to chance.
+ *
+ * WHAT WAS GIVEN UP, STATED PLAINLY BECAUSE A CAP NOBODY CAN SEE READS AS
+ * COVERAGE. The 12 named mask rows other than all-classical and all-quantum —
+ * alternating, lsb-only, msb-only and risk R8's six asymmetric pairs — are no
+ * longer enumerated at every width; they are now rows in the pool the random
+ * draw samples from. Likewise the one-bit-quantum sweep. Across the whole
+ * ladder and the four control regions a given named row is still drawn many
+ * times, but no single run guarantees it. That is the trade this budget is,
+ * and it was made deliberately.
+ *
+ * REPRODUCIBILITY IS NOT GIVEN UP. The seed is a pure function of the kernel's
+ * name and the width, so a red case is reproducible by re-running the binary,
+ * and two kernels never draw the same sequence. Every run prints its seed.
+ *
+ * TO GET THE OLD DEPTH BACK for a mutation battery or a bisect, set
+ * CQOPS_L1_SAMPLES in the ENVIRONMENT — never in a test's CMake ENVIRONMENT
+ * property, which would win over the shell (the same trap CQOPS_UPDATE_GOLDENS
+ * has, recorded in CLAUDE.md's Build & Test section).
  */
 
 #include "support/kerneldrv.h"
@@ -13,66 +66,49 @@
 #include "support/refmodel.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
-/* FULL CROSS PRODUCT — every value pair against every mask pair. Plan §4 asks
- * for {1,2,4,8}; 3 and 5 are added because risk R8's measured witnesses are at
- * W=3 and W=5 ("{ZERO,Q}-only masks first fail at W=5"), and the plan's own R8
- * row says to put the witnesses in the fixed set rather than let a regression
- * depend on a random mask to be caught. */
-static const int FULL_CROSS_W[] = { 1, 2, 3, 4, 5 };
+/* The standard ladder. Widths are NOT sampled — they are the axis that
+ * actually catches faults here, because every kernel is width-generic over
+ * reg->width with no width switch (I5, Rule 3), so what a wide width exercises
+ * that a narrow one does not is a loop bound, an MSB boundary or a carry that
+ * only exists above some length. A suite that sampled widths would leave those
+ * to the draw. Suites whose ladder is not this one (casts, i80, i128) drive
+ * cq_kd_sweep_at per width. */
+static const int LADDER_W[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64 };
 
-/* W=8 IS EXHAUSTIVE OVER VALUES BUT NOT OVER THE PRODUCT, and this is the one
- * place the sweep is capped — stated here, and printed by every run, because a
- * cap nobody can see reads as coverage.
- *
- * The full product is 20 mask pairs x 65,536 value pairs x 3 kernels = 3.9M
- * cases, which measured 43 s in Debug against a 0.8 s suite. So at W=8: the
- * ALL-QUANTUM mask gets the full cross product on its own (it is the mask L4
- * pins and the one where no operand fold can hide a lane); every value pair
- * runs a SECOND time at a seeded-random mask, so plan §4's "all (a,b)" is met
- * literally, twice; and the four corners are crossed with every mask. Full
- * mask x value coverage is not lost, only moved: it is complete at W <= 5. */
-static const int VALUE_EXHAUSTIVE_W[] = { 8 };
+enum {
+    CQ_KD_SAMPLES_DEFAULT = 32,
+    MAX_PAIRS             = 128 + 12,
+    N_ANCHORS             = 6      /* 2 mask anchors + 4 value corners */
+};
 
-/* Sampled, because 2^32 value pairs at W=16 is already out of reach. */
-static const int SAMPLED_W[] = { 16, 32, 64 };
-
-enum { SAMPLES_PER_MASK = 64, MAX_PAIRS = 128 + 12 };
-
-/* SAMPLING DEPTH IS MEASURED IN WORK, NOT IN CASES — added 2026-08-16 after
- * the sweep was timed per width rather than counted.
- *
- * THE OLD SHAPE WAS QUADRATIC IN W AND NOBODY HAD NOTICED. The fixed mask set
- * grows LINEARLY with the width — it contains a one-bit-quantum sweep across
- * all W positions, so `np` is W + 12 — while the samples per mask were a flat
- * 64 and the cost of a single case is itself linear in W, since the kernel
- * emits O(W) gates and the harness builds O(W) bits per operand. Product:
- * O(W^2). Measured on the compare suite in Debug, seconds per width block:
- *
- *      W=16  1.70    W=32  5.21    W=64 17.19    W=80 25.86
- *
- * — 75% of the whole sweep in the top two widths, against 3.5% for everything
- * at W <= 8. The wide widths were quietly eating the suite.
- *
- * THE FIX KEEPS EVERY MASK AND SHORTENS THE RANDOM TAIL. Nothing named is
- * dropped: all-classical, all-quantum, alternating, LSB-only, MSB-only, the
- * full one-bit-quantum sweep and R8's asymmetric pairs are all still crossed
- * with the four corners at every width. What scales is only the DEPTH of the
- * random sampling on top, as 1024/W, so each width gets a comparable share of
- * the budget instead of a share proportional to W. 64 samples at W=16, 32 at
- * W=32, 16 at W=64, 12 at W=80, 8 at W=128.
- *
- * WHY 1024, AND WHY A FLOOR OF 8: the constant is chosen so the widths at and
- * below 16 are UNCHANGED — this must not weaken anything that was already
- * cheap — and the floor keeps a real random tail at i128, which is reachable
- * only through casts and is where the reference's 64-bit word seam lives. */
-static int samples_for(int W)
+int cq_kd_samples(void)
 {
-    int n = 1024 / (W > 0 ? W : 1);
+    static int n = -1;
 
-    if (n > SAMPLES_PER_MASK) n = SAMPLES_PER_MASK;
-    if (n < 8) n = 8;
+    if (n < 0) {
+        const char *e = getenv("CQOPS_L1_SAMPLES");
+        long v = (e && *e) ? strtol(e, NULL, 10) : 0;
+
+        n = (v > 0 && v <= 1000000) ? (int)v : CQ_KD_SAMPLES_DEFAULT;
+    }
     return n;
+}
+
+/* FNV-1a over the kernel's name, mixed with the width. A pure function of
+ * both, so a failure reproduces from a bare re-run and no two kernels or
+ * widths share a sequence — a time-seeded PRNG would make a red run
+ * unrepeatable, which is the one thing a random test must never be. */
+static uint64_t seed_for(const char *name, int W)
+{
+    uint64_t h = 1469598103934665603ull;
+
+    for (const unsigned char *p = (const unsigned char *)name; *p; p++) {
+        h ^= (uint64_t)*p;
+        h *= 1099511628211ull;
+    }
+    return h ^ (0x5EEDC0DEull * (uint64_t)(W + 1));
 }
 
 static uint32_t pairs_for(const cq_kd_spec *k, int W, cq_bk_pair *out,
@@ -96,217 +132,93 @@ static uint32_t pairs_for(const cq_kd_spec *k, int W, cq_bk_pair *out,
     return np;
 }
 
-static void sweep_full_cross(const cq_kd_spec *k, int W)
+/* One kernel at one width: cq_kd_samples() cases, drawn jointly over the mask
+ * pairs and the value space, with the six anchors above taken first.
+ *
+ * THE VALUES ARE GENERATED PER OPERAND AT ITS OWN WIDTH, which is what makes
+ * this one function serve the whole catalogue with no per-kernel policy: K10's
+ * mux gets a 1-bit `cond` and two W-bit arms because its shape says so, K4's
+ * amount gets a full random operand whose MASK pairs_for has already forced
+ * classical, and K5's casts get their width pair. The old sweep had to route
+ * three-source kernels around cq_kd_case2, which fills values[2] with ZERO and
+ * so ran every exhaustive mux case with one arm pinned at 0. */
+void cq_kd_sample_at(const cq_kd_spec *k, int W)
 {
     cq_bk_pair pairs[MAX_PAIRS];
+    cq_kd_shape sh;
     uint32_t np = pairs_for(k, W, pairs, MAX_PAIRS);
-    uint64_t span = cq_ref_mask(W) + 1u;   /* W <= 5 here, so this cannot wrap */
-    uint64_t cases = 0;
-
-    for (uint32_t p = 0; p < np; p++)
-        for (uint64_t va = 0; va < span; va++)
-            for (uint64_t vb = 0; vb < span; vb++) {
-                cq_kd_case2(k, W, va, vb, &pairs[p]);
-                cases++;
-            }
-
-    printf("# %s W=%2d FULL CROSS: %u mask pairs x %llu value pairs = %llu "
-           "cases\n", k->name, W, np, (unsigned long long)(span * span),
-           (unsigned long long)cases);
-    fflush(stdout);
-}
-
-/* THE STRUCTURED VALUE SET, and it REPLACED VALUE EXHAUSTION AT W=8 on
- * 2026-08-16. Read this before restoring the old loop.
- *
- * WHAT WAS THERE: every one of the 2^(2W) value pairs at the all-quantum mask,
- * then every one of them AGAIN at a seeded-random mask, then the four corners
- * at each mask — 131,152 cases per kernel at W=8, which was 63% of the entire
- * compare suite and about half of the add suite.
- *
- * WHY IT BOUGHT ALMOST NOTHING HERE, and the argument is specific to this
- * codebase rather than general test-design taste. The §3 fold table dispatches
- * on a bit's KIND and never on a qubit's value (D6, no demotion), and every
- * kernel is width-generic over `reg->width` with no width switch (I5, Rule 3).
- * So **under the all-quantum mask the emitted circuit is identical for every
- * one of those 65,536 pairs** — the first loop ran one fixed gate sequence
- * 65,536 times through the classical shadow. A fault that survives W<=5, where
- * the FULL cross product (every value pair x every mask pair) still runs, has
- * to be width-dependent: a loop bound, an MSB boundary, a carry that only
- * exists above some length. Those are found by covering WIDTHS and by the
- * structural checks — the closed-form gate counts, the palindrome, the peak —
- * not by more values at one width.
- *
- * WHERE VALUES DO REACH THE CIRCUIT: through classical lanes only, and only as
- * one bit of information per lane. A classical ZERO control folds its gate
- * away; a classical ONE rewrites it (CX->X, CCX->CX) and removes none. That is
- * the K09.md §3.3.1 rule, and it is exercised by all-zeros, all-ones, single
- * bits and alternating patterns — which are exactly what this set contains —
- * far more directly than by enumeration.
- *
- * SO THIS IS NOT ONLY CHEAPER, IT IS BROADER. Exhaustion spent its budget on
- * TWO masks (all-quantum, plus one random draw per pair). The structured set
- * is crossed with EVERY fixed mask pair, so the arithmetic corners now meet the
- * asymmetric masks risk R8 names, which no value pair ever did before.
- *
- * The classes, and why each is here:
- *   0 / max / msb            the masking and sign boundaries
- *   v, v         (equal)     the comparator's tie, the adder's doubling
- *   v, v+1 / v+1, v          the top-differing-bit boundary, both orders
- *   2^i and 2^i - 1          one lane hot; and a carry/borrow that propagates
- *                            exactly i positions, for every i
- *   0x55.. / 0xAA..          alternating, the mask-vs-value interaction
- * plus samples_for(W) seeded-random pairs, which is what covers the
- * combinations nobody thought to name. */
-static uint32_t structured_pairs(int W, uint64_t *va, uint64_t *vb, uint32_t cap)
-{
-    uint64_t m = cq_ref_mask(W);
-    uint64_t msb = (uint64_t)1 << (W - 1);
-    uint32_t n = 0;
-
-#define PUSH(x, y) do { if (n < cap) { va[n] = (x) & m; vb[n] = (y) & m; n++; } } while (0)
-    PUSH(0u, 0u);       PUSH(0u, m);        PUSH(m, 0u);        PUSH(m, m);
-    PUSH(msb, msb);     PUSH(msb, msb - 1); PUSH(msb - 1, msb); PUSH(msb, 0u);
-    PUSH(m, 1u);        PUSH(1u, m);        PUSH(1u, 1u);       PUSH(0u, 1u);
-    PUSH(0x5555555555555555ull, 0xAAAAAAAAAAAAAAAAull);
-    PUSH(0xAAAAAAAAAAAAAAAAull, 0x5555555555555555ull);
-
-    for (int i = 0; i < W; i++) {
-        uint64_t bit = (uint64_t)1 << i;
-
-        PUSH(bit, 0u);              /* one lane hot on a only            */
-        PUSH(0u, bit);              /* and on b only                     */
-        PUSH(bit, bit);             /* the same lane on both             */
-        PUSH(bit - 1u, 1u);         /* carry/borrow propagating i places  */
-        PUSH(bit, bit - 1u);        /* the ordering boundary at lane i    */
-    }
-#undef PUSH
-    return n;
-}
-
-/* Structured + sampled, crossed with EVERY mask pair. Replaces the value
- * exhaustion described above; see structured_pairs for the argument, and
- * IMPLEMENTATION_PLAN §4 / PRD §11, which were corrected to match. */
-static void sweep_values(const cq_kd_spec *k, int W)
-{
-    cq_bk_pair pairs[MAX_PAIRS];
-    uint32_t np = pairs_for(k, W, pairs, MAX_PAIRS);
-    uint64_t sa[8 * 64 + 32], sb[8 * 64 + 32];
-    uint32_t ns = structured_pairs(W, sa, sb, (uint32_t)(sizeof sa / sizeof sa[0]));
-    uint64_t mask = cq_ref_mask(W);
-    uint64_t cases = 0;
+    int n = cq_kd_samples();
+    uint64_t seed = seed_for(k->name, W);
     cq_bk_rng rng;
 
-    cq_bk_rng_init(&rng, 0x5EEDC0DEull ^ (uint64_t)W);
+    cq_kd_default_shape(W, &sh);
+    if (k->shape) k->shape(W, &sh);
 
     /* The all-quantum row is index 1 by construction. Asserted rather than
-     * assumed: it is the mask L4 pins and the one where no operand fold can
-     * hide a lane, so a reordering of cq_bk_fixed_pairs must not move it
-     * silently.
+     * assumed, and BEFORE it is used: it is the mask L4 pins and the one where
+     * no operand fold can hide a lane, so a reordering of cq_bk_fixed_pairs
+     * must not move it silently.
      *
-     * CHECKED ON OPERAND 0 ONLY, AND NOT SKIPPED FOR SHAPED KERNELS. An
-     * earlier draft skipped the whole check whenever a spec set a shape, on
-     * the premise that "for those kernels no mask is all-quantum" — which is
-     * false for every Step-11 spec: a cast constrains nothing at all, and a
-     * shift constrains only operand 1, so q[0] is untouched in both cases and
-     * the check would have passed verbatim. The skip disabled the guard for
-     * six specs and protected none of them. */
-    if (!cq_ref_w_eq(pairs[1].q[0], cq_ref_w_ones(W)))
+     * CHECKED ON OPERAND 0 ONLY, AND NOT SKIPPED FOR SHAPED KERNELS. An earlier
+     * draft skipped the whole check whenever a spec set a shape, on the premise
+     * that "for those kernels no mask is all-quantum" — which is false for every
+     * Step-11 spec: a cast constrains nothing at all, and a shift constrains
+     * only operand 1, so q[0] is untouched in both cases. The skip disabled the
+     * guard for six specs and protected none of them. */
+    if (np < 2u || !cq_ref_w_eq(pairs[1].q[0], cq_ref_w_ones(W)))
         cq_h_fail(__FILE__, __LINE__,
-                  "cq_kd_sweep: fixed pair 1 is [%s], not all-quantum",
-                  pairs[1].name);
+                  "cq_kd_sample_at: fixed pair 1 is [%s], not all-quantum",
+                  np < 2u ? "<none>" : pairs[1].name);
 
-    for (uint32_t p = 0; p < np; p++) {
-        for (uint32_t s = 0; s < ns; s++) {
-            cq_kd_case2(k, W, sa[s], sb[s], &pairs[p]);
-            cases++;
-        }
+    cq_bk_rng_init(&rng, seed);
 
-        /* Seeded, so a red run reproduces from the printed seed. Per mask
-         * rather than per value pair: the old code drew a mask at random FOR
-         * each pair, which left every mask meeting an unpredictable slice of
-         * the value space. Every mask now meets the same named corners plus
-         * its own random draw. */
-        for (int s = 0; s < samples_for(W); s++) {
-            cq_kd_case2(k, W, cq_bk_rng_next(&rng) & mask,
-                        cq_bk_rng_next(&rng) & mask, &pairs[p]);
-            cases++;
-        }
-    }
-
-    printf("# %s W=%2d STRUCTURED (%u named pairs + %d sampled) x %u mask "
-           "pairs = %llu cases — NOT value-exhaustive; see kernelsweep.c on "
-           "why exhaustion at this width bought nothing the W<=5 full cross "
-           "does not already have\n",
-           k->name, W, ns, samples_for(W), np, (unsigned long long)cases);
-    fflush(stdout);
-}
-
-/* Two random words masked to W. Above 64 bits this is the only sweep there is
- * — a cast from i128 has 2^128 values and the ladder's wide pairs are exactly
- * where the 64-bit seam falls inside a register. */
-static cq_ref_w rnd_w(cq_bk_rng *r, int W)
-{
-    return cq_ref_w_make(cq_bk_rng_next(r), cq_bk_rng_next(r), W);
-}
-
-static void sweep_sampled(const cq_kd_spec *k, int W)
-{
-    cq_bk_pair pairs[MAX_PAIRS];
-    uint32_t np = pairs_for(k, W, pairs, MAX_PAIRS);
-    cq_bk_rng rng;
-    cq_ref_w ones = cq_ref_w_ones(W);
-    cq_ref_w zero = cq_ref_w_zero();
-    uint64_t cases = 0;
-
-    /* Seeded from the width so a failure at W=32 is reproducible and does not
-     * depend on what ran before it. */
-    cq_bk_rng_init(&rng, 0xC0FFEEull ^ (uint64_t)W);
-
-    for (uint32_t p = 0; p < np; p++) {
+    for (int s = 0; s < n; s++) {
         cq_ref_w v[CQ_KD_MAX_SRC];
+        uint32_t p;
 
-        /* The corners first: they are where a masking bug lives, and a uniform
-         * sample reaches 0 and all-ones with probability ~0 at W=64. */
-        for (int c = 0; c < 4; c++) {
-            v[0] = (c & 1) ? ones : zero;
-            v[1] = (c & 2) ? ones : zero;
-            v[2] = zero;
-            cq_kd_case(k, W, v, &pairs[p]);
-            cases++;
-        }
+        /* Anchors first, then a joint draw. See the header for why each anchor
+         * is inside the budget rather than added to it. */
+        if (s == 0)                 p = 0u;   /* all-classical — this IS L5 */
+        else if (s < N_ANCHORS)     p = 1u;   /* all-quantum  — what L4 pins */
+        else                        p = (uint32_t)cq_bk_rng_below(&rng, np);
 
-        for (int s = 0; s < samples_for(W); s++) {
-            v[0] = rnd_w(&rng, W);
-            v[1] = rnd_w(&rng, W);
-            v[2] = rnd_w(&rng, W);
-            cq_kd_case(k, W, v, &pairs[p]);
-            cases++;
+        for (int i = 0; i < sh.n_src; i++) {
+            if (s >= 2 && s < N_ANCHORS && i < 2) {
+                /* The four corners: (0,0), (ones,0), (0,ones), (ones,ones). */
+                int hot = ((s - 2) >> i) & 1;
+
+                v[i] = hot ? cq_ref_w_ones(sh.w[i]) : cq_ref_w_zero();
+            } else {
+                v[i] = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng),
+                                     sh.w[i]);
+            }
         }
+        cq_kd_case(k, W, v, &pairs[p]);
     }
 
-    printf("# %s W=%2d sampled: %u mask pairs x (4 corners + %d sampled) = "
-           "%llu cases (seed 0xC0FFEE^W; sampling depth is 1024/W, see "
-           "samples_for)\n", k->name, W, np, samples_for(W),
-           (unsigned long long)cases);
+    printf("# %s W=%3d SAMPLED: %d cases (all-classical + all-quantum + 4 value "
+           "corners forced, %d drawn jointly) from %u mask pairs, seed 0x%llx — "
+           "a CONSTANT budget, not a product; see kernelsweep.c for what the "
+           "draw replaced\n",
+           k->name, W, n, n > N_ANCHORS ? n - N_ANCHORS : 0, np,
+           (unsigned long long)seed);
     fflush(stdout);
 }
 
 void cq_kd_sweep_at(const cq_kd_spec *k, int W, int exhaustive)
 {
-    if (exhaustive && W <= 5)      sweep_full_cross(k, W);
-    else if (exhaustive && W <= 8) sweep_values(k, W);
-    else                           sweep_sampled(k, W);
+    /* KEPT IN THE SIGNATURE, DELIBERATELY IGNORED. There is no longer an
+     * exhaustive mode to select — the budget is the same constant at every
+     * width — and 71 call sites across twelve .c files and eight .inc files
+     * pass it. Removing the parameter would touch every one of them for no
+     * behavioural gain, and a caller that still asks for exhaustion is asking
+     * for something this file deliberately no longer offers. */
+    (void)exhaustive;
+    cq_kd_sample_at(k, W);
 }
 
 void cq_kd_sweep(const cq_kd_spec *k)
 {
-    for (size_t i = 0; i < sizeof FULL_CROSS_W / sizeof FULL_CROSS_W[0]; i++)
-        sweep_full_cross(k, FULL_CROSS_W[i]);
-
-    for (size_t i = 0; i < sizeof VALUE_EXHAUSTIVE_W / sizeof VALUE_EXHAUSTIVE_W[0]; i++)
-        sweep_values(k, VALUE_EXHAUSTIVE_W[i]);
-
-    for (size_t i = 0; i < sizeof SAMPLED_W / sizeof SAMPLED_W[0]; i++)
-        sweep_sampled(k, SAMPLED_W[i]);
+    for (size_t i = 0; i < sizeof LADDER_W / sizeof LADDER_W[0]; i++)
+        cq_kd_sample_at(k, LADDER_W[i]);
 }

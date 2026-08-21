@@ -156,16 +156,38 @@ void cq_kd_case(const cq_kd_spec *k, int W,
 void cq_kd_case2(const cq_kd_spec *k, int W,
                  uint64_t va, uint64_t vb, const cq_bk_pair *m);
 
-/* The full L1-L3 sweep for one kernel: every (a,b) pair crossed with every
- * fixed mask pair at the exhaustive widths, then deterministic sampling at the
- * widths where exhaustion is out of reach.
+/* THE L1 SAMPLE BUDGET: how many cases one kernel gets at one width. A SMALL
+ * CONSTANT, independent of W and of the kernel — the sweep is a sample, never a
+ * product. Default 32; override with CQOPS_L1_SAMPLES in the environment for a
+ * mutation battery or a bisect, and never from a test's CMake ENVIRONMENT
+ * property, which would win over the shell. See kernelsweep.c for what the
+ * constant replaced and what it gave up. */
+int cq_kd_samples(void);
+
+/* One kernel at one width: cq_kd_samples() cases, each drawing a mask pair AND
+ * a value pair from one seeded RNG. The all-classical pair (which IS L5), the
+ * all-quantum pair (which is what L4 pins) and the four value corners are taken
+ * first, INSIDE the budget rather than on top of it.
  *
- * NO SILENT CAPS: cq_kd_sweep prints the exact case count it ran per width, so
- * a run that covered less than it looks like says so in its own output. */
+ * Serves every arity and every operand width from the spec's own shape, so a
+ * three-source kernel needs no bespoke driver: the old cq_kd_case2 path filled
+ * values[2] with ZERO and ran every mux case with one arm pinned at 0. */
+void cq_kd_sample_at(const cq_kd_spec *k, int W);
+
+/* The whole L1-L3 sweep for one kernel: cq_kd_sample_at over the standard
+ * width ladder {1,2,3,4,5,8,16,32,64}. Widths are enumerated, not sampled —
+ * see kernelsweep.c.
+ *
+ * NO SILENT CAPS: every width prints the case count, the mask-pair pool it drew
+ * from and its seed, so a run that covered less than it looks like says so in
+ * its own output. */
 void cq_kd_sweep(const cq_kd_spec *k);
 
-/* The same, at one explicit width — for a kernel whose widths are not the
- * standard ladder (a cast is a PAIR of widths, so its suite drives this). */
+/* The same at one explicit width, for a kernel whose widths are not the
+ * standard ladder (a cast is a PAIR of widths, so its suite drives this).
+ *
+ * `exhaustive` IS IGNORED and kept only so the 71 existing call sites compile:
+ * there is no exhaustive mode any more, at any width. */
 void cq_kd_sweep_at(const cq_kd_spec *k, int W, int exhaustive);
 
 /* L4's measurement. Runs the kernel once at the ALL-QUANTUM operand mask —

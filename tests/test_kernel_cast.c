@@ -276,11 +276,27 @@ CQ_TEST(sext_against_an_independently_derived_oracle)
 {
     static const int FS[] = { 1, 8, 16, 32 };
 
+    /* THE SAME SMALL CONSTANT BUDGET AS EVERY OTHER CIRCUIT-EXECUTING LOOP
+     * (2026-08-20). run_cast builds a register, runs the kernel and reads the
+     * value back, so each iteration here is a full L1 case; this used to
+     * enumerate min(2^F, 512) values per width. The sign boundary is what this
+     * oracle exists to check, so the four values that ARE that boundary are
+     * forced first — 0, all-ones, the sign bit alone, and the sign bit minus
+     * one — and the rest of the budget is drawn. */
     for (size_t i = 0; i < sizeof FS / sizeof FS[0]; i++) {
         int F = FS[i];
         uint64_t hi_val = cq_ref_mask(F);
+        uint64_t msb = (uint64_t)1 << (F - 1);
+        const uint64_t corner[4] = { 0u, hi_val, msb, (msb - 1u) & hi_val };
+        cq_bk_rng rng;
+        int n = cq_kd_samples();
 
-        for (uint64_t v = 0; v <= hi_val && v < 512u; v++) {
+        cq_bk_rng_init(&rng, 0x5E37C0DEull ^ (uint64_t)F);
+
+        for (int s = 0; s < n; s++) {
+            uint64_t v = (s < 4) ? corner[s]
+                                 : (cq_bk_rng_next(&rng) & hi_val);
+
             /* Sign-extend F -> 64 two ways: the kernel, and the identity. */
             cq_ref_w got = run_cast(&SEXT, F, 64,
                                     cq_ref_w_make(v, 0u, F), NULL);

@@ -197,129 +197,59 @@ static int dr_zero_bit(cq_ref_w v, cq_ref_w q, int i)
     return !cq_ref_w_bit(q, i) && !cq_ref_w_bit(v, i);
 }
 
-/* ---- The budgeted sweep. ------------------------------------------------ */
+/* ---- The sweep: the shared constant budget. ----------------------------- */
 
-enum { DR_MAX_PAIRS = 128 + 12, DR_NAMED_PAIRS = 12, DR_WIDE_SAMPLES = 4 };
-
-/* How many cases the budget buys, never fewer than the named mask pairs. */
-static int dr_cases(uint64_t per_case, uint64_t budget)
-{
-    uint64_t n = budget / (per_case ? per_case : 1u);
-
-    return n < (uint64_t)DR_NAMED_PAIRS ? DR_NAMED_PAIRS : (int)n;
-}
-
-/* As many distinct mask pairs as the budget has cases for, named rows first.
- * NO NAMED PAIR IS EVER DROPPED: all-classical (which IS L5), all-quantum
- * (which is what L4 pins), alternating, lsb-only, msb-only and risk R8's six
- * asymmetric rows run at every width; only the one-bit-quantum sweep rows are
- * strided, and the top lane is kept whatever the stride landed on, because an
- * off-by-one at the MSB is one of the two faults a sweep exists to catch. */
-static uint32_t dr_pairs(int W, cq_bk_pair *out, int keep_n)
-{
-    uint32_t np = cq_bk_fixed_pairs((uint32_t)W, out, DR_MAX_PAIRS);
-    uint32_t keep = (uint32_t)keep_n, swept, stride, n;
-
-    if (np <= keep) return np;
-
-    swept  = keep - DR_NAMED_PAIRS;
-    stride = (np - DR_NAMED_PAIRS + swept) / (swept ? swept : 1u);
-    n = DR_NAMED_PAIRS;
-    for (uint32_t i = 0; i + 1u < np - DR_NAMED_PAIRS && n + 1u < keep; i += stride)
-        out[n++] = out[DR_NAMED_PAIRS + i];
-
-    out[n++] = out[np - 1u];
-    return n;
-}
-
-/* Above the widths the shared driver can afford. The four value corners come
- * first — 0 and all-ones are where a masking bug lives, and uniform sampling
- * reaches them with probability ~0 at W = 64 — ROTATED BY PAIR INDEX so that
- * when the budget allows fewer than four cases per mask the corners are still
- * spread across the mask set instead of every pair seeing the same one.
+/* THE BUDGET IS cq_kd_samples(), AND IT IS NO LONGER A GATE BUDGET (2026-08-20).
  *
- * `b = 0` IS ONE OF THOSE CORNERS AND THAT IS DELIBERATE: D3 says division by
- * zero never traps and returns 2^W-1 / a, so it is an ordinary input here
- * rather than a special case, and the sweep drives it at every width. */
+ * K12 is the largest object in v1 — one i128 `udiv` is 557,696 gates over
+ * 131,583 qubits — so this file used to divide a gate-emission budget by the
+ * exact per-case cost to derive a case count, then stride the mask pool down to
+ * fit it, then add a handful of random pairs at all-quantum because the floor
+ * that kept every named mask left `cpp` at 1 and the budget bought only corners.
+ * Three interacting knobs, each with its own way of drifting.
+ *
+ * All three are gone. cq_kd_sample_at draws cq_kd_samples() cases per width,
+ * jointly over the mask pool and the value space, with the all-classical pair
+ * (which IS L5), the all-quantum pair (which is what L4 pins) and the four value
+ * corners taken first — inside the budget rather than on top of it. The
+ * pathology the DR_WIDE_SAMPLES tail existed to fix cannot recur: it came from a
+ * per-mask floor interacting with a gate budget, and there is no per-mask floor
+ * any more. Every width prints its count, its pool and its seed. See
+ * tests/support/kernelsweep.c.
+ *
+ * `b = 0` IS AN ORDINARY DRAWN VALUE HERE AND THAT IS DELIBERATE: D3 says
+ * division by zero never traps and returns 2^W-1 / a, so it is an input rather
+ * than a special case, and the all-zero value corner drives it at every width.
+ *
+ * DR_MAX_PAIRS SURVIVES because the two _sweep.inc files size their own
+ * cq_bk_fixed_pairs buffers with it. */
+
+enum { DR_MAX_PAIRS = 128 + 12 };
+
+/* THE SIGNATURE IS UNCHANGED AND THREE OF ITS PARAMETERS ARE NOW IGNORED, on
+ * cq_kd_sweep_at's precedent. `per_case`, `region` and `budget` were the inputs
+ * to a cost model that no longer exists; both callers compute them from
+ * udiv_per_case / sdiv_per_case / cq_divrem_region, which are real measurements
+ * used elsewhere in those files. Keeping the parameters costs one (void) each
+ * and touches neither caller. */
 static void dr_sweep(const cq_kd_spec *k, int W, uint64_t per_case, int region,
                      uint64_t budget)
 {
-    cq_bk_pair pairs[DR_MAX_PAIRS];
-    int n_cases = dr_cases(per_case, budget);
-    uint32_t np = dr_pairs(W, pairs, n_cases);
-    int cpp = n_cases / (int)np;
-    cq_ref_w ones = cq_ref_w_ones(W);
-    cq_ref_w zero = cq_ref_w_zero();
-    cq_bk_rng rng;
-    uint64_t cases = 0;
     clock_t t0 = clock();
 
-    if (cpp < 1) cpp = 1;
-    cq_bk_rng_init(&rng, 0xD1FDE13Aull ^ (uint64_t)W);
+    (void)per_case;
+    (void)region;
+    (void)budget;
 
-    for (uint32_t p = 0; p < np; p++)
-        for (int i = 0; i < cpp; i++) {
-            cq_ref_w v[CQ_KD_MAX_SRC];
-
-            if (i < 4) {
-                int c = (int)((p + (uint32_t)i) & 3u);
-
-                v[0] = (c & 1) ? ones : zero;
-                v[1] = (c & 2) ? ones : zero;
-            } else {
-                v[0] = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
-                v[1] = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
-            }
-            v[2] = cq_ref_w_zero();
-            cq_kd_case(k, W, v, &pairs[p]);
-            cases++;
-        }
-
-    /* THE FLOOR THAT KEEPS EVERY NAMED MASK CAN LEAVE `cpp` AT 1, AND THEN THE
-     * BUDGET BUYS ONLY CORNERS — measured at W = 32 and 64, where the loop above
-     * runs 13 masks x 1 case and every one of those cases is drawn from
-     * {0, all-ones} x {0, all-ones}. So at the two widest sweep widths NOTHING
-     * NON-TRIVIAL IS EVER DIVIDED: `0/0`, `-1/-1`, `0/-1` and `-1/0` are all D3
-     * or degenerate. The corners are worth keeping — a masking bug lives there —
-     * but they are not a division test.
-     *
-     * The fix is targeted rather than a bigger budget: a handful of seeded
-     * random pairs at the ALL-QUANTUM mask, which is the mask L4 pins and the
-     * one where every lane is live. Four cases at W = 64 is 1.1M gate emissions
-     * — cheap next to the corner block's 3.6M — and it is the only place the
-     * kernel is asked to divide a real number above W = 16. */
-    /* Pair 1 is all-quantum by construction in cq_bk_fixed_pairs. Asserted
-     * rather than assumed, and BEFORE it is used, for kernelsweep.c's reason:
-     * it is the mask L4 pins, so a reordering there must not move it silently. */
-    if (!cq_ref_w_eq(pairs[1].q[0], cq_ref_w_ones(W)))
-        cq_h_fail(__FILE__, __LINE__, "fixed pair 1 is [%s], not all-quantum",
-                  pairs[1].name);
-
-    for (int s = 0; s < DR_WIDE_SAMPLES; s++) {
-        cq_ref_w v[CQ_KD_MAX_SRC];
-
-        v[0] = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
-        v[1] = cq_ref_w_make(cq_bk_rng_next(&rng), cq_bk_rng_next(&rng), W);
-        v[2] = cq_ref_w_zero();
-        cq_kd_case(k, W, v, &pairs[1]);
-        cases++;
-    }
-
-    printf("# %s W=%3d sampled: %u of %u mask pairs (12 named ALWAYS + a strided "
-           "one-bit sweep) x %d cases each, plus %d random pairs at all-quantum "
-           "= %llu cases, %llu gate emissions against a %llu budget (seed "
-           "0xD1FDE13A^W) — %.1f s. One case is %llu gates over %d scratch "
-           "qubits\n",
-           k->name, W, np, (uint32_t)W + 12u, cpp, DR_WIDE_SAMPLES,
-           (unsigned long long)cases,
-           (unsigned long long)(cases * per_case), (unsigned long long)budget,
-           (double)(clock() - t0) / CLOCKS_PER_SEC,
-           (unsigned long long)per_case, region);
+    cq_kd_sample_at(k, W);
+    printf("#   ^ %s W=%d took %.1f s\n", k->name, W,
+           (double)(clock() - t0) / CLOCKS_PER_SEC);
     fflush(stdout);
 }
 
-/* The shared driver at the exhaustive widths, timed the same way, so the cheap
- * widths are on the record next to the capped ones. */
+/* The same at the narrow widths. Identical to dr_sweep now that the budget is
+ * one constant at every width; kept as a separate name because both callers use
+ * it and because the narrow/wide distinction still reads in their ladders. */
 static void dr_sweep_small(const cq_kd_spec *k, int W)
 {
     clock_t t0 = clock();
@@ -329,6 +259,7 @@ static void dr_sweep_small(const cq_kd_spec *k, int W)
            (double)(clock() - t0) / CLOCKS_PER_SEC);
     fflush(stdout);
 }
+
 
 /* ---- R9: the all-classical short-circuit. ------------------------------- */
 
