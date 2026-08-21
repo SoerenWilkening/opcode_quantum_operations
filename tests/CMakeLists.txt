@@ -242,6 +242,50 @@ add_cqops_test(test_angle)        # M21, Step 18 — PRD §7's four rows, the
 add_cqops_test(test_sink_printf)  # M23, Step 9 — the §8 format, %a, the flush
 add_cqops_test(test_sink_count)   # M24, Step 9 — per-kind totals, T-count
 
+## THE UNCOMPUTE AXIS, Step 21. NO MODULE — `_unc` IS the same kernel called
+## again (Rule 7), so plan §4's Green column reads "(thin, in M26)" and M26 is
+## Step 23. This suite owns the axis's own claims, NOT L3 per kernel: that is
+## cq_kd_case's, on every case of every kernel under each of §9's four regions.
+##
+## Its headline is the fixture where forward and `_unc` DIFFER. Every one of
+## the 399 pinned (kernel, W) golden pairs is equal and always will be — L4 is
+## measured at the all-quantum mask, the FIXED POINT of the drift — so until
+## this landed, risk R6 ("someone asserts unc == forward") had no detector
+## anywhere in the tree.
+add_cqops_test(test_unc)          # Step 21 — PRD §10, R6, and bd 2cf measured
+
+## WHICH LAYER ABORTED, the seventh instance. M07's cq_reg_free and M03's
+## cq_qubits_release both guard "this qubit is not provably |0>", and plan §0
+## records what confusing them costs: removing M07's cq_reg_clean call left all
+## 24 reg tests green, with the rail half-returned to the pool and only M03's
+## message to show for it. The same pattern as test_reg_death's block, repeated
+## here rather than shared — set_tests_properties OVERWRITES a property, so a
+## block naming a test another block already named would silently disarm one of
+## them and leave a green run with nothing to look at.
+##
+## THE SECOND CASE IS EXPECTED TO GO RED ONE DAY, ON PURPOSE. bd 2cf is OPEN:
+## the rail it frees is physically |0> and the abort is our certificate being
+## missing, not the rail being dirty. When bd ckd.17b gives cqrt_free evidence
+## other than the shadow at Step 23, this death stops happening — and that is
+## the signal to re-read the case, never to delete it.
+add_cqops_death_test(test_unc_death CASES
+    free_without_the_uncompute
+    free_of_a_rotation_tainted_uncomputed_rail
+)
+
+## THE NEGATIVE LIST HAS TO BE EXHAUSTIVE, AND M07's OWN OTHER MESSAGES ARE
+## THE EASY ONES TO FORGET. PASS_REGULAR_EXPRESSION cannot be used here — it
+## DISPLACES the exit-code check, trading the death test's own contract for a
+## substring — so "which layer aborted" has to be spelled as "which layers must
+## NOT have spoken". Excluding only M03/M22/M02 leaves a mutant that makes
+## cq_reg_free take its MEASURED or DOUBLE-FREE branch instead of the clean
+## check: both deaths still abort inside their armed window, neither regex
+## names the string, and the guard they exist to pin is bypassed entirely.
+set_tests_properties(test_unc_death.free_without_the_uncompute
+                     test_unc_death.free_of_a_rotation_tainted_uncomputed_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "release of a qubit not proven;rotate:;shadow:;double free;measurement is terminal;tombstone")
+
 ## Fail-loud paths. NOT WILL_FAIL — that inverts a non-zero exit code and does
 ## not invert a crash, so it cannot express "this abort()s" at all; see
 ## tests/support/death.h.

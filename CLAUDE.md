@@ -177,7 +177,7 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > AT ALL — its entire loop body is M16's, M14's and M17's exported step blocks.
 > PRD increments 1, 5 and 6 are complete, and PHASE B IS DONE: every kernel in
 > the catalogue is on disk.**
-> On disk and passing under **both** configurations, **195 ctest tests**:
+> On disk and passing under **both** configurations, **198 ctest tests**:
 >
 > | Step | Module | Files | LOC / budget |
 > |---|---|---|---|
@@ -222,6 +222,7 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | 20 | — | `src/emit.[ch]` grew the three-clause dispatch and the `_phys` tail M06 promotes through; `src/sandwich.c` grew row 0's short-circuit (without it a skipped region still pays its whole scratch region, since I6(b) pre-materialises before any gate); `src/rotate.c` grew row 0's skip, D11's three refusal sites and `cq_ctrl_ry`/`cq_ctrl_rz`; `src/angle.[ch]` split the half turn by `k mod 4` (`bd fna`) | 92 / 190 · 107 / 110 · 119 / 150 · 73 / 80 |
 > | 20 | — | `tests/test_controlled.c` + `_oracle.inc` + `_table.inc` + `_region.inc`, `tests/test_controlled_death.c`. **L0 FOR THE AXIS**: 5 control kinds × §3's own 5 / 25 / 125 operand combinations = 775 cases, each pinning the ordered stream, the qubits allocated, the target's kind AND its shadow. Row 0's two classical rows are asserted DIFFERENTIALLY against the same gate with no region, which is a stronger statement than any oracle | 271 · 160 · 108 · 756 · 275 |
 > | 20 | — | `tests/support/kernelctrl.[ch]` — the region mode, the one-bit control rail, `cq_kd_for_each_region` and §9's tuple transform. Split from `kerneldrv.c` when the axis took it to **345 of 300**; the seam is `the four LEVELS` against `the AXIS` | 77 · 9 |
+| 21 | — | **NO MODULE.** `tests/test_unc.c` + `test_unc_contract.inc` + `test_unc_asym.inc`, `tests/test_unc_death.c`. Two splits, both recorded in the `.inc` headers rather than improvised — `the CONTRACT` against `the CONSEQUENCES`, and `the AXIS's COST` as its own subject, taken when the `.c` reached **375 of 300** | 293 · 154 · 507 · 50 |
 >
 > **The fold table has landed and is green at 159/159** (155 exhaustive + 4 distinctness
 > deaths), so the critical path is behind us. `cq_ctx` now exists: pool + shadow + a
@@ -632,19 +633,86 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > corrected prose that was wrong (`1.29 rad from any multiple of 4π` names the wrong
 > lattice; `1.50005e-16` is `1.500040e-16`) and one added `-ffp-contract=off` to the build.
 >
-> **Next is Step 21 — the `_unc` axis across every kernel, and `_inv` for the compare
-> flags (plan §4, PRD §10).** It is the third and last of the three axes Rule 7's one
-> shape serves, and unlike the controlled axis it needs no module: `_unc` IS the same
-> kernel called again, so what Step 21 builds is a suite, in M26's thin shim. Two things
-> already recorded will bite it. **Rule 14 is its whole subject**: `_unc` legitimately
-> emits a LARGER gate sequence than the forward did, because we never demote (D6) and a
-> rotation on a source between the two calls materialises bits that were constants at
-> forward time — so forward and `_unc` counts are pinned SEPARATELY and `unc == forward`
-> is not an invariant (risk **R6** is someone "fixing" that asymmetry). And `bd 2cf` is
-> the same asymmetry biting `cqrt_free`. Note the axis is now genuinely orthogonal to
-> §9's: `cq_kd_case`'s L3 already runs its uncompute INSIDE the same region as its
-> forward, which is required — an uncontrolled uncompute after a controlled forward leaves
-> `dst` at `ctrl · f(a,b)` and L3 goes red for the wrong reason.
+> **STEP 21 LANDED 2026-08-21: THE UNCOMPUTE AXIS — NO MODULE, AND ITS HEADLINE IS THAT
+> RISK R6 HAD NO DETECTOR ANYWHERE IN THE TREE.** `_unc` IS the same kernel called again
+> (Rule 7), so what Step 21 builds is a suite: `tests/test_unc.c` + `_contract.inc` +
+> `_asym.inc` + `tests/test_unc_death.c`, **14 cases + 2 deaths green in both
+> configurations, 198 ctest tests.** Plan §6 asked for "the two counts pinned separately,
+> with the PRD §10 note quoted in the test file". Both were already true and **both were
+> vacuous**: a quotation is not a detector, and L4 measures at the ALL-QUANTUM mask, which
+> is the FIXED POINT of the drift — so all 399 pinned second-pass pairs carry identical
+> tuples and the `pass` column could never have gone red. The fixture where they differ is
+> new.
+>
+> **TWO CLAUSES OF THE STEP'S OWN GATE WERE NOT SATISFIABLE AS WRITTEN, and both are
+> corrected in the documents rather than worked around.** *"`_unc` across every kernel"* is
+> already discharged by `cq_kd_case`, whose L3 runs on every case of every kernel the shared
+> driver drives, under each of §9's four regions — a twelfth re-drive with hand-written call
+> adapters would detect nothing. And ***"`_inv` for compare flags" names a symbol CQ_lang no
+> longer emits***: `CompareLowering` emits the void in-place `_unc` twin (its bd `8txa`), and
+> **`_inv` appears on 0 lines of all 239 goldens** against 21,323 `cq_template_icmp_*_unc`.
+> That is now **PRD §15 D14**.
+>
+> **D14's FIRST DRAFT WAS ITSELF WRONG, IN THE WAY THIS PROJECT KEEPS RECORDING.** It said
+> the *rotation* sense of `_inv` was live and emitted. It is not: `ControlledSymbols.cpp:32`
+> hard-codes the stem `"cqrt_rz_"` and can never build a `cqrt_ry_*` name, and its one live
+> caller takes the defaulted `inverse = false`. **Neither family is emitted**, so liveness
+> cannot be the ground — the data-template `_controlled` grid has identical evidence and
+> Step 20 implemented it. **The ground is SPECIFIABILITY:** `_inv` is `f⁻¹`, not `f`
+> (`lowering_invert_add_i32.ll:25` pins `add %a, 2` as lowering to `add_i32_hl_inv(%a, 2)`,
+> i.e. *subtract*), and `f⁻¹` **does not exist** for `and`, `or`, `udiv`, `trunc` or any
+> `icmp`. A retired parenthetical — *"which for `dst ^= f` it numerically is"* — would have
+> licensed `and_i32_inv = and_i32`, a wrong **value**. The 603 integer `_inv` bodies get a
+> loud abort (`bd w1c`), and the gate is **Step 22, not Step 23**: an uncalled symbol
+> produces no undefined reference.
+>
+> **THE ASYMMETRY HAS EXACTLY ONE CAUSE AND FOUR DOCUMENTS NAMED THE WRONG SET.** PRD §10,
+> Rule 14 and K05/K06.md said "`cqrt_ry`/`cqrt_rz`"; K04.md said `cqrt_rz` outright, which is
+> flatly wrong. Of §7's twelve cells exactly one turns a constant into a wire — the general
+> `Ry` off the π-lattice — and it is the **same block that poisons**. So the act that makes
+> `_unc` emit more gates is the act that costs the free: **PRD §10's asymmetry and `bd 2cf`
+> are inseparable**, and 2cf is now REPRODUCED and pinned (its own deferral line, "nothing
+> can rotate anything before M22 lands at Step 19", has aged out).
+>
+> **WHICH FORCED A NEW INSTRUMENT, BECAUSE A POISONED RAIL IS UNREADABLE.** `cq_pc_value`
+> fails by design; `rt_value` and `cq_measure` return 0 for a poisoned bit exactly as §7's
+> *measurement* specifies, so an assertion built on either passes against a rail holding
+> anything; Rule 13 forbids the simulator. The instrument is a **DIFFERENTIAL**: a source
+> lane can also be materialised by `CX(p, lane)` twice, which drifts the representation
+> identically and does **not** poison. Measured over 18 kernels × `W ∈ {2..5}` × every lane:
+> the two routes emit the uncompute **gate for gate including operands**, and only the
+> un-poisoned one can be freed. Same circuit, same input state, therefore same output — and
+> that output is provably zero.
+>
+> **THE BATTERY KILLED 12 OF 12 AND WAS THE LESS USEFUL HALF.** Every library line these
+> cases read is already covered by `test_emit_fold`, `test_rotate`, `test_shadow` and
+> `test_reg_death`, so a mutation battery over `src/` can only ever report "killed,
+> alongside four other suites". **A 31-agent adversarial review found what it could not**,
+> and eight findings moved code — the §10 block quote in the header was the PRE-correction
+> text (Rule 14 points readers at it); the compare case computed the flag's intermediate
+> value and never asserted it, so a predicate that emitted nothing passed; `UX_K` carried
+> exactly the five NON-swapping predicates, so the one structural detector K9 has ever had
+> was built so it could not fire; the golden audit's floor was 300 against a true 399, and
+> dropping the largest file leaves **exactly** 300; and, sharpest, **nothing pinned that the
+> drift was an INVERSE pair** — writing `Ry(0.7)` twice leaves every kind, index and recorded
+> gate byte-identical while the source is not restored, and it survived the entire suite.
+> The `angle` field is the one field a route-vs-route stream comparison omits.
+>
+> **AND THE PROVOCATION BATTERY LEAKED, IN A NEW SHAPE OF A RECORDED BUG.** `cp -f` + `touch`
+> — CLAUDE.md's own prescribed restore — landed in the **same second** as the object the
+> previous mutant built, and `make` treats "not older" as up to date, so `cmake --build`
+> printed "Built target" without recompiling. Two of fifteen provocations reported the
+> **wrong case** red, and the only reason it was caught is that the runner compares WHICH
+> case went red rather than counting kills. **Delete the object; do not trust a timestamp you
+> wrote yourself.** Riders: a provocation that makes the binary `abort()` prints no TAP line,
+> so a `grep '^not ok'` reads it as SURVIVED — read the exit code; and mutating a test's
+> assertion away cannot fail a correct library, so the instrument for a test assertion is a
+> **provocation of the fixture**, paired with the deletion.
+>
+> **Next is Step 22 — M27, the shim generator (`bd 819`).** D14 lands on its gate: the
+> emitted symbol count must reconcile, and the integer abort set must be asserted to be
+> EXACTLY the 603 `_inv` names, so nothing else is swept into the bucket unobserved — the
+> corpus cannot notice, since it calls neither `_inv` nor `_controlled`.
 >
 > **Step 0 is substantially done, so the references DO now exist on disk:**
 >
@@ -1012,7 +1080,7 @@ enough to be obviously correct.
 
 **Rule 14 — Never assert bit-kinds across the uncompute axis.** `_unc` legitimately
 emits a **larger** gate sequence than the forward did: because we never demote (D6),
-an in-place `cqrt_ry`/`cqrt_rz` on a *source* between the forward call and the
+an in-place general `cqrt_ry` on a *source* between the forward call and the
 uncompute point materialises bits that were constants at forward time. CQ restores
 the source's **state**, not our **representation** of it. The XOR still cancels — the
 same `f(a,b)`, a different circuit realising it. Consequences (PRD §10): (i) the only
@@ -1020,6 +1088,31 @@ sound postcondition is on **values**, never on kinds; (ii) L4 pins forward and `
 counts **separately** — `unc == forward` is **not** an invariant. Risk **R6** is that
 someone "fixes" this asymmetry by asserting equality; the test file must quote the
 PRD §10 note so the next reader knows the inequality is deliberate.
+
+**MEASURED AT STEP 21, AND THE RULE IS NOW A PASSING WITNESS RATHER THAN A POLICY.**
+This paragraph said "`cqrt_ry`/`cqrt_rz`" until then; only the general `Ry` **off the
+π-lattice** can do it — §7's `Rz` constant cell does nothing at any φ, the identity
+rows return, and the half-turn rows flip the *constant* — so it is **one cell of §7's
+twelve**, and `K04.md` stated the `Rz` version outright and was flatly wrong.
+`tests/test_unc_asym.inc` pins the whole thing: 18 kernels × `W ∈ {1, 4, 8}`, the delta
+as a per-kind **tuple** (a total is not an identification — Rule 10), and it factors:
+`delta = R × P`, where `R` is how many times the kernel reads that lane as a CONTROL in
+one compute half and `P` is 1 flat / **2 sandwiched**, because Rule 8's driver replays
+the compute half. Two rows are lane-dependent — `mul` is `2(W−j)`, `add` is `2×2` only
+below the top lane — and are pinned as a profile. A classical **ONE** lane keeps the
+TOTAL and **promotes** each gate one control level (`X→CX`, `CX→CCX`), which is sharper
+than the "+0" the first draft asserted and is what a tuple sees and a total cannot. **No golden can ever show this**: L4 measures at the
+all-quantum mask, where nothing is left to materialise, so all 399 pinned
+`(kernel, W)` pairs are equal and consequence (ii)'s separate `pass` column had no
+red-able case anywhere in the tree before Step 21.
+
+**AND THE DURABLE FORM IS NOT THE INEQUALITY, IT IS AN EQUALITY AT THE RIGHT MASK.**
+`_unc` is not "the forward again"; it is the SAME KERNEL AT A DIFFERENT
+REPRESENTATION, and its cost is a function of the representation **at call time** and
+of nothing else — not of which pass it is, not of what the rail held on entry, not of
+history. So `count(unc) == count(a FRESH forward at the drifted mask)`, over 252
+fixtures, and whoever "fixes" R6 is asserting that identity at the wrong mask. It reads
+no golden, so `CQOPS_UPDATE_GOLDENS=1` cannot bless it away.
 
 **Rule 15 — The θ ≡ π asymmetry is load-bearing; get it exactly right.**
 `Ry(π) = XZ`, i.e. `X` up to a **relative** sign on `|1⟩`. On a bit that is already a
@@ -1379,7 +1472,7 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 # and Release is what gets its gate counts pinned (Rule 17).
 # -j is worth using: ctest is SERIAL by default, and no test binary shares
 # state with another. THIS BOX HAS 6 PHYSICAL CORES, so -j12 oversubscribes
-# hyperthreads; -j6 is the honest figure. 195 tests at -j6 as of 2026-08-21,
+# hyperthreads; -j6 is the honest figure. 198 tests at -j6 as of 2026-08-21,
 # after L1 became a constant sample budget rather than a product: Debug
 # 63.8 s -> 22.6 s (three runs: 22.34 / 22.55 / 23.02), Release 4.1 s -> 2.4 s
 # (2.17 / 2.43 / 2.64). `make test` -- lint, a build check and both

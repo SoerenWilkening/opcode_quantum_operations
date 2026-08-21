@@ -86,7 +86,7 @@ The **integer** half of CQ_lang's frozen ABI, at widths `i1, i8, i16, i32, i64, 
 | Compare | `icmp` × 10 predicates | Bennett `lower_eq!/ult!/slt!` |
 | Casts | `sext zext trunc` (int↔int) | Bennett `lower_cast!` |
 | Shapes | `qq`, `hl`, `lh` | free — a literal is an array of constant bits |
-| Axes | forward, `_unc`, `_inv`, `_controlled`, `_controlled_inv` | §9, §10 |
+| Axes | forward, `_unc`, `_controlled` — plus `_inv` / `_controlled_inv`, which are **generated and refused** rather than implemented (§15 **D14**: `_inv` is `f⁻¹`, and `f⁻¹` does not exist for the non-injective opcodes) | §9, §10, §15 |
 
 > **`cqrt_h` is struck from this row (Step 0.7 — resolved).** Earlier drafts listed
 > `cqrt_x/h/cnot/toffoli`, which contradicted three other places: constraint 1 below forbids
@@ -960,7 +960,7 @@ rather than a re-derivation — the same posture D11 takes for the phases.
   > Rule-6 safe leak, not a bug to fix.**
 
   > **Do not assert that `out`'s bit-kinds match what the forward produced — they often
-  > will not.** Because we never demote (D6), an in-place `cqrt_ry`/`cqrt_rz` applied to
+  > will not.** Because we never demote (D6), an in-place general `cqrt_ry` applied to
   > a *source* between the forward call and the uncompute point materialises bits that
   > were constants at forward time. CQ's reverse-program-order restores the source's
   > **state** before our `_unc` runs, but not our **representation** of it, so `_unc`
@@ -971,10 +971,52 @@ rather than a re-derivation — the same posture D11 takes for the phases.
   > (ii) L4 must pin forward and `_unc` counts **separately** — `unc == forward` is not
   > an invariant; (iii) this is the strongest argument for revisiting D6, since
   > shadow-driven demotion would restore representation stability as well as state.
-- **`_inv(srcs…)`** — CQ_lang's spine no longer emits `_inv` for data templates; only
-  `CompareLowering` emits it, for Phase-4 control flags. A compare's forward is
-  `flag ^= pred(a,b)`, which is its own inverse, so `_inv` allocates a fresh rail and
-  runs the forward. Low priority.
+  >
+  > **MEASURED AT STEP 21 (2026-08-21), AND TWO THINGS ABOUT IT ARE SHARPER THAN THIS
+  > NOTE USED TO BE.** *(1) It is `cqrt_ry` alone, and only off the π-lattice.* This
+  > paragraph said "`cqrt_ry`/`cqrt_rz`" until Step 21; against M22 as shipped, §7's `Rz`
+  > **constant** cell does nothing at any φ, the two identity rows return, and the two
+  > half-turn rows flip the *constant* through `cq_emit_x` — so the general `Ry` row is
+  > the **one cell of §7's twelve** that turns a constant into a wire. `K04.md` stated the
+  > `Rz` version outright and was flatly wrong; `K05.md`, `K06.md` and CLAUDE.md's Rule 14
+  > named the pair. All four are corrected, and the `Rz` half is now pinned *negatively*,
+  > in `tests/test_unc_asym.inc:no_rz_at_any_angle_can_cause_the_drift`.
+  >
+  > *(2) The one cell that causes the asymmetry is the same block that poisons, so the
+  > asymmetry and `bd 2cf` are inseparable.* `cq_shadow_cx/ccx` carry `unknown` from a
+  > control into its target with no clearing path — which is the direction a kernel's
+  > sources travel — so the `_unc` that emits the larger circuit also leaves `dst`
+  > poisoned, and the following `cqrt_free` hard-errors on a rail that is physically
+  > `|0⟩`. Nothing in this project can read that rail: `cq_pc_value` fails by design,
+  > `rt_value` and `cq_measure` return 0 for a poisoned bit exactly as §7's *measurement*
+  > specifies, and Rule 13 forbids the simulator. **The instrument that does exist is a
+  > DIFFERENTIAL**, and it is what makes the cancellation witnessable at all: a source
+  > lane can also be materialised by `CX(q, lane)` applied twice — the corpus's own
+  > pattern, 26,376 of 51,696 frees are on rails last written by a bare self-inverse gate
+  > — which drifts the representation identically and does **not** poison. Measured over
+  > 13 kernels × `W ∈ {2..5}` × every lane: the two routes emit the uncompute **gate for
+  > gate including operands**, and only the un-poisoned one can be freed. Same circuit,
+  > same input state, therefore same output — and that output is provably zero.
+  >
+  > *Why no golden can show any of this:* L4 measures at the all-quantum mask, where there
+  > is nothing left to materialise. All 399 pinned `(kernel, W)` pairs are equal and always
+  > will be, so consequence (ii)'s separate `pass` column had no passing witness until
+  > Step 21 built one.
+- **`_inv(srcs…)`** — **a declared-but-uncalled family on the data path. Both halves of
+  the sentence that used to stand here were stale, and the mechanism it prescribed is the
+  one CQ_lang deleted as a Rule-6 hazard — see §15 D14.** The retired text read: *"CQ_lang's
+  spine no longer emits `_inv` for data templates; only `CompareLowering` emits it, for
+  Phase-4 control flags. A compare's forward is `flag ^= pred(a,b)`, which is its own
+  inverse, so `_inv` allocates a fresh rail and runs the forward."* Measured 2026-08-21 at
+  Step 21: `CompareLowering` emits the **void in-place `_unc`** (`CompareLowering.cpp:204-236`,
+  CQ_lang's bd `8txa`), and **`_inv` appears on zero lines of all 239 pinned goldens** while
+  `cq_template_icmp_*_unc` appears on 21,323. The **premise** survives and is load-bearing —
+  `flag ^= pred(a,b)` really is self-inverse at *any* entry value, which is what makes a
+  recompute-and-XOR strip sound (`opcode_table.yaml:216-218`) — but the ABI consequence
+  drawn from it was the opposite of the right one: the strip must be an in-place
+  `_unc(rail, srcs…)` that **names the rail it restores**, not a fresh mint. The
+  self-inverse property is pinned in `tests/test_unc_contract.inc`; the 915 `_inv` symbols
+  still in the frozen grid are §15 D14's.
 - **`cqrt_free(h)`** — **the one and only operation that returns qubits to the pool.**
   Assert the rail is provably clean, return every qubit `h` still owns, and mark the handle
   dead (a tombstone, D5). A free of a rail that is not provably clean is a hard error, not a
@@ -1347,8 +1389,8 @@ v1 is accepted when:
 | 4 | K9 (compares, all 10 predicates) | L1–L4 green |
 | 5 | K10 (mux) + variable shifts; K8 (Cuccaro accumulator); K11 (mul) | L1–L4 green — **COMPLETE 2026-08-16** (Steps 14, 15, 16). K8 is the exception the criterion did not anticipate: it is not a Rule 7 kernel, so its levels are restated by hand and **L5 does not apply to it at all** (K08.md §5 D7) |
 | 6 | K12 (div/rem) — **COMPLETE 2026-08-16 (M19, M20)** | L1–L4 green, **plus L5** (the all-classical short-circuit is not optional here — pre-materialisation would otherwise take `8W²+4W−1` qubits for an operation with no quantum input; risk R9) **and D3** (`sdiv`/`srem` by zero never traps and whatever it returns is pinned). L4 at `W ∈ {1,8,16,32,64,128}` — **i128 is a shipped `divrem` width**. All four opcodes green in both configurations; every figure in `K12.md` §3 and §4 reproduced on the first run, **including the four signed columns that had never been executed** |
-| 7 | `_unc` / `_inv` / `_controlled` axes; rotations + θ special cases; measurement | L3 green across all kernels; classical mode works |
-| 8 | Generated shim over the full integer grid (**1595**, or **1455** if i80 is ruled out of scope — §1); CQ_lang link; Grover | L6, L7 green — **v1 done** |
+| 7 | `_unc` and `_controlled` axes; rotations + θ special cases; measurement. (`_inv` is **not** implemented — §15 D14) | L3 green across all kernels; classical mode works |
+| 8 | Generated shim over the full integer grid (**1595**, or **1455** if i80 is ruled out of scope — §1), of which **992 are wrappers and 603 are `_inv` abort bodies** (§15 D14); CQ_lang link; Grover | L6, L7 green — **v1 done** |
 | 9 | *(stretch)* QRAM — port Bennett's QROM (`src/qrom.jl`, self-cleaning AND tree, 2(L−1) Toffoli) and Shadow (`src/softmem.jl`) behind `cqrt_qram_*` | load/store round-trip |
 
 Increments 2–6 are independent after 1 and can be built in any order or in parallel.
@@ -1396,6 +1438,7 @@ and diffs.
 | **D11** | **What §7's zero-gate and global-phase rows do inside a §9 controlled region** | **Resolved 2026-08-17 at Step 19 (bd `pf4`) and BUILT at Step 20 in M06 — the refusal is one function, `cq_ctrl_refuse_fold_row`, and all five folding cells call it. A CONSTANT control folds the region away (§9 row 0), so §7 applies verbatim and Rule 15's zero-cost claim is untouched. A QUANTUM control makes every folding row wrong — the four zero-gate cells by exactly `Rz(α)` on the control wire, and the half-turn's qubit cell, which emits but realises the row only up to a phase — per-bit, with α given below — and `v1 REFUSES rather than emitting it`: M06 hard-errors at Step 20 when a §7 fold row is reached under a quantum control. The arithmetic is recorded here so Step 20 implements rather than re-derives. See the note below** |
 | **D12** | **Which §7 rows poison the shadow** | **Resolved 2026-08-17 at Step 19 and SHIPPED as M22 the same day. ONLY `Ry` at an angle off the π-lattice poisons. A diagonal gate — every `Rz`, and the `Z` of the θ ≡ π row — cannot move a computational-basis value, so a determinate entry stays determinate and `cq_shadow_known_zero` remains EXACT rather than becoming conservative. `cq_shadow_rotate` is unchanged; what this decides is which rows call it. See the note below** |
 | **D13** | **Whether `cq_materialise`'s `X` is promoted inside a §9 region** (`bd skh`, deferred at Step 6) | **Resolved 2026-08-20 at Step 20: NO — materialisation is UNPROMOTED, and it is forced rather than chosen. M06 hooks `cq_emit_x/cx/ccx` and nothing else, so `cq_materialise`'s deliberate bypass to the sink is already the correct behaviour and Step 20 changed no code — only the comment, from a deferral into the decision. D11's constant column is stated to be contingent on this answer. See the note below** |
+| **D14** | **What the `_inv` axis is, and what a v1 body does** | **Resolved 2026-08-21 at Step 21. `_inv` MEANS TWO DIFFERENT THINGS ON TWO FAMILIES and this project's documents used both senses without flagging it: on the controlled ROTATIONS it is θ-negation (16 `cqrt_*_controlled_inv` symbols, PRD §2.1's family, Step 23's to implement); on the DATA TEMPLATES it is a fresh-minting inverse OPERATION — 915 `cq_template_*_inv` symbols, 603 purely-integer. **NEITHER IS EMITTED BY ANYTHING at the pinned revision** — 0 `_inv` lines across all 239 goldens — so liveness does not distinguish them and is not the ground. **The ground is SPECIFIABILITY.** `_inv` is `f⁻¹`, not `f`: `ir-pass/test/lowering_invert_add_i32.ll:25` pins a bracketed `add %a, 2` as lowering to `cq_template_add_i32_hl_inv(%a, 2)` — i.e. SUBTRACT. And `f⁻¹` **does not exist** for `and`, `or`, `udiv`, `trunc` or any `icmp`: they are not injective. No uniform definition of the data family is possible in **any** version. **v1 gives it a loud abort naming the symbol**; the obligation lands on Step 22, not Step 23. See the note below** |
 
 > ### D10 — the window is absolute, and the relative reading was built and measured first
 >
@@ -1759,6 +1802,107 @@ and diffs.
 > agree. `tests/test_controlled_region.inc:materialisation_is_not_promoted` is that fixture,
 > and the driver's `CQ_KD_CTRL_Q0` row reaches the same cell through every kernel.
 >
+> ### D14 — `_inv` is `f⁻¹`, and `f⁻¹` does not exist
+
+> **Resolved 2026-08-21 at Step 21, against CQ_lang at the pinned revision and against all
+> 239 `tests/e2e/*.expected.log` goldens. An adversarial review of the first draft of this
+> decision found its stated ground false in three places; what survives is stronger, and the
+> answer did not change.**
+>
+> **THE SUFFIX NAMES TWO UNRELATED THINGS.** On the controlled **rotations**, `_inv` means
+> *negate θ*: `cqrt_ry_<W>_controlled_inv` (7 widths — the gap is real, `docs/cqrt_census.txt`
+> D2) and `cqrt_rz_<W>_controlled_inv` (9). That is the sense plan §4's M21 row and
+> CLAUDE.md's `bd fna` paragraph use. On the **data templates** it is a fresh-minting inverse
+> *operation*: expanding `opcode_table.yaml`'s own naming rules (`:39-44`) gives **915**
+> `cq_template_*_inv` symbols in six suffix shapes, **603** of them purely-integer.
+>
+> **NEITHER FAMILY IS EMITTED, AND THE FIRST DRAFT OF THIS ROW SAID THE ROTATION ONE WAS.**
+> It is not. `ir-pass/src/ControlledSymbols.cpp:32` hard-codes the stem `"cqrt_rz_"` and can
+> never produce a `cqrt_ry_*` name at all; its `inverse` parameter defaults to false and its
+> one live caller, `RotationLowering.cpp:158`, takes the default. Nothing in `ir-pass/`
+> constructs a `cqrt_ry_…_controlled` name (`grep '"cqrt_ry_'` → only `WidthDispatch.cpp:393`,
+> the uncontrolled forward). Measured: **0** `_inv` lines and **0** `cqrt_*_controlled*`
+> rotation calls in the corpus, against 21,323 `cq_template_icmp_*_unc`. §7 at `:694-699`
+> already recorded that no controlled rotation is emitted today; the first draft of this note
+> contradicted it, which is the `src/angle.h` failure mode — a corpus claim in shipped prose
+> that was never measured — reproduced inside the decision written to fix one.
+>
+> **SO LIVENESS CANNOT BE THE GROUND, and the same evidence proves it: the data-template
+> `_controlled` grid is also declared-and-uncalled** — 0 `cq_template_*_controlled*` calls in
+> the corpus, 214 purely-integer symbols — and Rule 9/M06 serves every one of them. "Declared
+> + 0 corpus calls ⇒ abort" applied consistently would abort the axis Step 20 just built.
+>
+> **THE GROUND IS SPECIFIABILITY, AND IT IS PERMANENT RATHER THAN A v1 CONVENIENCE.**
+> `_inv` is the inverse OPERATION. `runtime/cq_templates.h:49` declares
+> `int32_t cq_template_add_i32_hl_inv(int32_t a_handle, int32_t b_classical)` — it names no
+> rail and returns a fresh handle (`cq_templates.c:247-252` calls `cqrt_alloc_handle()`) — and
+> `ir-pass/test/lowering_invert_add_i32.ll:25` pins a bracketed `add %a, 2` as lowering to
+> `cq_template_add_i32_hl_inv(%a, 2)`, i.e. **subtract 2**. Three tiers follow, and only the
+> first is a v1 statement:
+>
+> 1. **Non-injective opcodes have no inverse at all.** `and` (28 `_inv` symbols), `or` (28),
+>    `udiv` (36), `trunc` (20) and every `icmp` predicate (12 each) are not injective, so
+>    `f⁻¹` does not exist. The yaml generates the symbols mechanically anyway.
+> 2. **Where an inverse exists it is `f⁻¹`, not `f`.** An earlier draft of this note said
+>    "defining `_inv` as the forward, which for `dst ^= f` it numerically is" — that is wrong
+>    at this ABI and is the sentence most likely to be quoted back as licence. It would ship
+>    `and_i32_inv = and_i32`, a wrong **value**, not merely a misleading name.
+> 3. **Where `f⁻¹ == f` — the compares, by exactly the self-inverse property
+>    `tests/test_unc_contract.inc` now pins — it is still a guaranteed rail leak**: a fresh
+>    flag rail holding `pred(a,b)`, never zero, never freeable. That is CQ_lang's bd `8txa`
+>    read from our side, and it is why "define it as the forward" is refused even where it is
+>    arithmetically exact.
+>
+> **THE DECISION: the 603 integer data-template `_inv` bodies get a loud abort naming the
+> symbol.** The link succeeds, the boundary is visible at runtime, and Step 24 cannot reach
+> it. `bd w1c` carries the mechanism.
+>
+> **AND THE `cqrt_h` PRECEDENT AT §1 CUTS THE OTHER WAY, so it has to be distinguished
+> rather than ignored.** §1 says of `cqrt_h`: *"if CQ_lang ever turns on emission, a link
+> error is the failure mode we want — it fires at build time, names the symbol, and cannot
+> produce a wrong circuit. Do not paper over it with a shim stub."* Two facts separate them.
+> `cqrt_h` is two hand-written M26 symbols **outside** the generated grid, so declining to
+> define it is a decision at one site; the 603 sit **inside** a grid M27 generates
+> mechanically, and carving an exception into the generator is the "never hand-write or fork
+> the shim" hazard. And CQ_lang ships `runtime/cq_link_smoke.c`, which *"takes the address of
+> every generated `cq_template_*` symbol so the linker MUST resolve each one"* — so for any
+> consumer that includes it the undefined-reference wall is real rather than hypothetical.
+>
+> **THE GATE IS STEP 22, NOT STEP 23.** An uncalled symbol produces no undefined reference,
+> and the corpus calls zero `_inv`, so plan §4's Step 23 row (*"`nm` shows no undefined
+> `cq_template_*` from the opcode grid"*) could not go red if the 603 were simply missing.
+> What would fail is Step 22's *"emitted symbol count reconciles with Step 0.5"*. Step 22's
+> other clause needs correcting too: the abort bucket is no longer 884 fp but **884 fp + 603
+> integer**, and the integer grid is **992 wrappers + 603 aborts**, not 1595 wrappers. Step 22
+> should assert that the integer abort set is **exactly** the `_inv` symbols, so nothing else
+> is swept into it unobserved — the corpus cannot notice, since it calls neither `_inv` nor
+> `_controlled`.
+>
+> **WHAT STEP 21 OWNS OF THIS.** The decision, and the one thing about `_inv` that is
+> *testable today*: the property the compare sub-family rests on. `flag ^= pred(a,b)` is a
+> self-inverse permutation of the flag rail **at any entry value**, which is why
+> recompute-and-XOR strips it (`opcode_table.yaml:216-218`) — and L3 only ever exercised it
+> from zero, because `cq_kd_case` mints `dst` with `cq_reg_alloc_zero`.
+> `tests/test_unc_contract.inc` runs all ten predicates from a flag that already holds 1, and
+> asserts the intermediate value rather than only the involution.
+>
+> **THE TRAP, AND IT IS UPSTREAM'S DESIGN-OF-RECORD RATHER THAN A FIXTURE COMMENT.**
+> `docs/backend.md:841-843` still reads *"the `_inv` symbols are generated but no longer
+> emitted by the spine … (the icmp/fcmp `_inv` strips are still emitted directly by
+> `CompareLowering` for Phase-4 control flags)"* — which is §10's retired sentence, nearly
+> verbatim, still shipped. `backend.md:836` is stale the same way. A fixture comment carries
+> the same claim (`ir-pass/test/control_swap_select_qqcond_ule.ll:106-116`, whose executable
+> `CHECK-NEXT` at `:155` says `_unc`), but citing the design-of-record is what makes "Rule 16
+> applies to upstream prose exactly as it applies to ours" land.
+>
+> **Reproducing the measurements.** `grep -c` prints a count PER FILE over 239 files and does
+> not answer the question; the forms that do are
+> `grep -h '_inv' tests/e2e/*.expected.log | wc -l` → **0** and
+> `grep -ho 'cq_template_icmp_[a-z0-9_]*_unc' tests/e2e/*.expected.log | wc -l` → **21,323**.
+> The grid expansion is PyYAML over `opcode_table.yaml` applying `:39-44`'s rules with the
+> `predicates` sets and the cast pair lists; it totals **2479 = 1595 int + 884 fp**, which is
+> the cross-check that it is faithful to §1's published partition.
+
 > ### D12 — a diagonal rotation does not poison, and that keeps the shadow exact
 >
 > `cq_shadow_rotate` poisons unconditionally and is the **only** producer of `unknown`
