@@ -1,0 +1,391 @@
+/* tests/test_shim_trace.c — `bd 76r`: M26's annotation layer, PRD §15 D21.
+ *
+ * REGISTERED ONLY WHEN THE BUILD FOUND THE QEC LIBRARY (-DCQOPS_QEC_DIR=), for
+ * test_sink_qec.c's reason and one more of its own. The annotation's ONE
+ * activation test is `cq_sink_qec_trace()` — the stream M25 opened and handed to
+ * `qec_set_trace` — which is NULL under every other sink and in a build without
+ * the library, so there is no configuration in which this layer emits a byte
+ * that a test could read without a real `libqec.a` behind it. That is the point
+ * rather than an inconvenience: it is what keeps M23's printf sink and the qec
+ * trace disjoint consumers of two streams, and the last case here is the
+ * assertion that it holds.
+ *
+ * THE ORACLE IS `tests/test_shim_trace_check.inc`, an INDEPENDENT reader of
+ * `qec/docs/HOST_LANGUAGE_HANDOFF.md` §§3-6 that includes no shim header. What
+ * it checks is the set of rules §9's table calls a FATAL PARSE ERROR — the
+ * pipeline aborts citing the line, no JSON, no HTML, no degraded render — so a
+ * green case here is "the viewer would not refuse this trace", not "the picture
+ * is the one we meant".
+ *
+ * AND THE PICTURE ITSELF IS PINNED SEPARATELY, by reading the `op begin`
+ * payloads back in order. Those two are different claims and the first does not
+ * imply the second: a producer that bracketed every operation under one name
+ * and omitted every `out=` would be perfectly conformant and would render a row
+ * of identical anonymous blocks.
+ *
+ * THE CONFIG IS `config_demo3.json` AND THE PRECISION IS 0, both for cost. The
+ * only route from an all-classical program into a quantum one is a general
+ * `Ry` (that is D17's corpus finding, not an accident of this suite: nothing
+ * else materialises a bit, because a CX from an untainted source folds), and an
+ * `Ry` is a gridsynth walk whose trace grows fast — measured on this box at
+ * n_logical = 3: 19,636 lines at precision 0, 390,964 at 1, and 55.9 MILLION at
+ * the default 20 against `config.json`. Precision is an accuracy knob for the
+ * SYNTHESIS and nothing here reads an angle, so 0 costs the suite nothing.
+ *
+ * n_logical = 3 IS THE POOL CEILING AND EVERY CASE IS WRITTEN AGAINST IT.
+ * Under this sink D2's ceiling is `qec_n_logical` and D21 (b) turns RECYCLING
+ * OFF, so the budget is three qubits for the whole case, not three at a time.
+ * A case that exceeds it does not fail quietly: `libcqops: FATAL: qubit pool:
+ * ceiling exceeded`.
+ */
+
+#include "cq_runtime_abi.h"
+#include "cq_shim.h"
+#include "cq_shim_ctx.h"
+#include "cq_shim_trace.h"
+
+#include "sink.h"
+#include "sink_qec.h"
+
+#include "support/harness.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "test_shim_trace_check.inc"
+
+/* setenv/unsetenv are POSIX rather than C11; fine in a test, which links
+ * against a real libc (tests/test_sink.c makes the same call). */
+
+/* THE ORDER OF THESE TWO IS LOAD-BEARING AND IS THE ONE THING A NEW CASE GETS
+ * WRONG. `cq_sink_qec_teardown` is what composes the header onto the body, and
+ * `cq_shim_ctx_reset` is what DROPS the register map the header is made of — so
+ * a reset before the teardown ships a trace with no `#REGISTER` line at all,
+ * which is not a wrong picture but a refusal. Compose first, then reset. */
+static void trace_begin(const char *path)
+{
+    cq_sink_qec_teardown();          /* drop any binding a previous case left */
+    cq_shim_ctx_reset();
+    setenv("CQOPS_SINK", "qec", 1);
+    setenv("CQOPS_QEC_CONFIG", CQOPS_QEC_TRACE_CONFIG, 1);
+    setenv("CQOPS_QEC_PRECISION", "0", 1);
+    setenv("CQOPS_QEC_TRACE", path, 1);
+    remove(path);
+}
+
+static void trace_finish(void)
+{
+    cq_sink_qec_teardown();
+    cq_shim_ctx_reset();
+    unsetenv("CQOPS_QEC_TRACE");
+    unsetenv("CQOPS_SINK");
+}
+
+/* The one materialisation route (see the header comment). Returns a one-bit
+ * rail that owns a qubit. */
+static int32_t a_quantum_bit(double theta)
+{
+    int32_t h = cqrt_alloc_i1(0);
+    cqrt_ry_i1(h, theta);
+    return h;
+}
+
+static int partial_exists(const char *path)
+{
+    char  buf[512];
+    FILE *f;
+
+    snprintf(buf, sizeof buf, "%s.partial", path);
+    f = fopen(buf, "r");
+    if (f) fclose(f);
+    return f != NULL;
+}
+
+/* -------------------------------------------------------------------------
+ * 1. A representative program, end to end.
+ * ------------------------------------------------------------------------- */
+
+/* EVERY LINE KIND THE CONTRACT DEFINES, AND EVERY RULE IT CALLS FATAL, on one
+ * program that exercises the rail surface, the gate surface and the template
+ * surface at once. The three claims are separate on purpose:
+ *
+ *   - conformance (the oracle), which is what stops the pipeline aborting;
+ *   - the HEADER, which is D21 (a) — three quantum rails get a line and the
+ *     all-constant i8 does not, which is I4 and therefore L5 made VISIBLE
+ *     rather than a gap in the picture;
+ *   - the op sequence, which is the picture itself, including the `_unc`
+ *     suffix that is the only thing separating an uncompute from its forward.
+ */
+CQ_TEST(a_representative_program_produces_a_conformant_annotated_trace)
+{
+    const char *path = "test_shim_trace_main.out";
+    cq_conf c;
+    int32_t a, b, s, k;
+
+    trace_begin(path);
+    a = a_quantum_bit(0.7);                       /* q0 */
+    b = cqrt_alloc_i1(1);
+    cqrt_cnot(a, b);                              /* materialises b -> q1 */
+    k = cqrt_alloc_i8(0x0f);                      /* stays classical: no line */
+    cqrt_xorc_i8(k, 0x33);
+    s = cq_shim_bin_qq(CQ_SHIM_OP_XOR, 1, a, b);  /* mints h3 -> q2 */
+    cq_shim_bin_qq_unc(CQ_SHIM_OP_XOR, 1, s, a, b);
+    cqrt_copy_i1(a, s);
+    (void)cqrt_measure_i1(s);
+    cqrt_free(k);
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the representative program");
+
+    /* D21 (a): the header names the rails that own qubits, and only those. */
+    CHECK_EQ(c.n_reg, 3);
+    CHECK(c.n_gates > 0);
+    CHECK(!partial_exists(path));       /* a shipped trace removes its body */
+
+    /* The picture. `out=` on a FORWARD names a handle the shim had not minted
+     * when the bracket opened — D7b's copy emits before the mint, so the
+     * bracket must open before it — and this is where that prediction is
+     * checked against the handle the call actually returned. */
+    CHECK_EQ(c.n_ops, 11);
+    CHECK_STR_EQ(c.op[0], "name=alloc, out=h0");
+    CHECK_STR_EQ(c.op[1], "name=ry, out=h0");
+    CHECK_STR_EQ(c.op[3], "name=cnot, in=h0, out=h1");
+    CHECK_STR_EQ(c.op[5], "name=xorc, in=h2, out=h2");
+    CHECK_STR_EQ(c.op[6], "name=xor, in=h0|h1, out=h3");
+    CHECK_STR_EQ(c.op[7], "name=xor_unc, in=h0|h1, out=h3");
+    CHECK_STR_EQ(c.op[8], "name=copy, in=h0, out=h3");
+    CHECK_STR_EQ(c.op[9], "name=measure, in=h3, out=h3");
+    CHECK_STR_EQ(c.op[10], "name=free, in=h2");
+    CHECK_EQ((long long)s, 3);
+}
+
+/* -------------------------------------------------------------------------
+ * 2. The refusal row.
+ * ------------------------------------------------------------------------- */
+
+/* AN ALL-CLASSICAL PROGRAM IS NOT SHIPPED, AND THAT IS THE PACKAGE RULE RATHER
+ * THAN A JUDGEMENT ABOUT VALUE. Handoff §6: the two annotation kinds are a
+ * package, and an op bracket with zero `#REGISTER` lines is a fatal parse
+ * error — so a trace with brackets and no register is one the viewer would
+ * REFUSE, and §1's posture is that such a trace must not be shipped at all.
+ * Nothing is withheld by it: a gate needs a materialised bit and a materialised
+ * bit is a register, so this trace has no gate lines either.
+ *
+ * THE `.partial` IS WHAT SURVIVES, deliberately — the body is still on disk for
+ * whoever is debugging, under a name no consumer reads. */
+CQ_TEST(a_program_whose_rails_all_stay_classical_is_not_shipped)
+{
+    const char *path = "test_shim_trace_classical.out";
+    cq_conf c;
+    int32_t a, b;
+
+    trace_begin(path);
+    a = cqrt_alloc_i8(5);
+    b = cqrt_alloc_i8(3);
+    cqrt_xorc_i8(a, 0x0f);
+    cqrt_addc_i8(b, 4);
+    (void)cq_shim_bin_qq(CQ_SHIM_OP_XOR, 8, a, b);
+    cqrt_free(a);
+    cq_h_mute(1);                       /* the refusal prints to stderr */
+    trace_finish();
+    cq_h_mute(0);
+
+    cq_conf_scan(path, &c);
+    CHECK(c.missing);                   /* the final name was never created */
+    CHECK(partial_exists(path));        /* and the body is still there */
+}
+
+/* -------------------------------------------------------------------------
+ * 3. The two shapes the header could get wrong.
+ * ------------------------------------------------------------------------- */
+
+/* `cqrt_cswap` WITH A CLASSICAL ONE FLAG EXCHANGES TWO RAILS' BIT ARRAYS FOR
+ * ZERO GATES, so rail `a`'s qubits become rail `b`'s — and a register map built
+ * by UNIONING each rail's index set over time would then have both handles
+ * claiming both indices. That is an overlapping `#REGISTER`, which handoff §9
+ * makes a fatal parse error rather than a merely wrong picture. The snapshot
+ * replaces rather than unions, so the recorded lanes follow the BITS; this case
+ * is what says so, and `dup_index` is the counter that would fire. */
+CQ_TEST(a_constant_flag_cswap_leaves_the_register_map_a_partition)
+{
+    const char *path = "test_shim_trace_cswap.out";
+    cq_conf c;
+    int32_t a, b, f;
+
+    trace_begin(path);
+    a = a_quantum_bit(0.4);                       /* q0 */
+    b = cqrt_alloc_i1(0);
+    cqrt_cnot(a, b);                              /* q1 */
+    f = cqrt_alloc_i1(1);                         /* a CLASSICAL ONE flag */
+    cqrt_cswap(f, a, b);
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the constant-flag cswap");
+    CHECK_EQ(c.n_reg, 2);
+    /* THE FLAG COMES FIRST IN `in=` BECAUSE IT COMES FIRST IN THE ABI —
+     * `cqrt_cswap(ctrl, a, b)` — and it is h2 because it is allocated third.
+     * The payload is the CALL, not a canonicalised operand set. */
+    CHECK_STR_EQ(c.op[c.n_ops - 1], "name=cswap, in=h2|h0|h1, out=h0|h1");
+}
+
+/* D7b — TWO SOURCES ALIASING EACH OTHER — IS THE ONE SHAPE WHERE THE PREDICTED
+ * OUTPUT HANDLE IS NOT `cq_reg_count`. The shim mints a defensive temporary
+ * FIRST and copies into it, so the result rail is one further along; and the
+ * copy is a loop of `cq_emit_cx` that runs BEFORE the mint, which is precisely
+ * why the bracket cannot wait for the handle to exist. Get the `+ 1` wrong and
+ * the trace names a rail that is workspace, or one that does not exist yet.
+ *
+ * THE TEMPORARY ITSELF STAYS UNREGISTERED (§6 rule 3), which is what "workspace
+ * qubits stay unregistered" means here: it is a handle CQ_lang never sees, it
+ * is hidden at the algorithm level, and it shows as an extra lane inside this
+ * one op. */
+CQ_TEST(an_aliased_template_call_names_the_handle_it_will_mint)
+{
+    const char *path = "test_shim_trace_alias.out";
+    cq_conf c;
+    int32_t a, r;
+
+    trace_begin(path);
+    a = a_quantum_bit(0.9);                       /* h0, q0 */
+    r = cq_shim_bin_qq(CQ_SHIM_OP_XOR, 1, a, a);  /* h1 is the temporary */
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the aliased template call");
+    CHECK_EQ((long long)r, 2);
+    CHECK_STR_EQ(c.op[c.n_ops - 1], "name=xor, in=h0|h0, out=h2");
+    /* h0 and the result; the temporary h1 is workspace and gets no line. */
+    CHECK_EQ(c.n_reg, 2);
+}
+
+/* A REGISTER WITH MORE THAN ONE LANE, which nothing above has: every rail in
+ * this suite is one bit, because n_logical = 3 is the whole program's budget
+ * and an `i8` under a general `Ry` wants eight. `sext i1 -> i2` is the cheapest
+ * two-lane rail there is — it replicates the sign bit, so both destination bits
+ * are physical copies (I2: copies are never aliases) and the rail costs two
+ * qubits against the one it reads.
+ *
+ * IT PINS TWO THINGS NO OTHER CASE CAN. The `qubits=` SEPARATOR — a one-lane
+ * list never writes one, and handoff §3's grammar is `\d+(,\d+)*` with a
+ * non-decimal token a fatal parse error. And the ORDER, which §3 says IS the
+ * top-to-bottom lane order in an expanded op (`a[0]` = first listed): the lanes
+ * are written LSB-first out of the rail's own bit array, so bit 0 renders
+ * above bit 1, and a reversed loop would be conformant and wrong. */
+CQ_TEST(a_multi_lane_register_lists_its_lanes_in_bit_order)
+{
+    const char *path = "test_shim_trace_lanes.out";
+    cq_conf c;
+    int32_t a, w;
+
+    trace_begin(path);
+    a = a_quantum_bit(0.2);                            /* h0 -> q0 */
+    w = cq_shim_cast(CQ_SHIM_CAST_SEXT, 1, 2, a);      /* h1 -> q1, q2 */
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the two-lane register");
+    CHECK_EQ((long long)w, 1);
+    CHECK_EQ(c.n_reg, 2);
+    CHECK_STR_EQ(c.op[c.n_ops - 1], "name=sext, in=h0, out=h1");
+    CHECK_STR_EQ(c.reg_line[0], "#REGISTER name=h0 type=i1 qubits=0");
+    CHECK_STR_EQ(c.reg_line[1], "#REGISTER name=h1 type=i2 qubits=1,2");
+}
+
+/* -------------------------------------------------------------------------
+ * 4. The oracle's own instrument, and the disjoint-stream claim.
+ * ------------------------------------------------------------------------- */
+
+/* AN ASSERTION NOBODY HAS SEEN FAIL IS AN ASSERTION NOBODY HAS TESTED, and
+ * every counter in `cq_conf` is one of those on a correct producer. So this
+ * case feeds the reader four deliberately broken traces — one per rule that a
+ * producer can break — and asserts it CATCHES them. Without it a reader whose
+ * `dup_name` search could never match (which is what the first draft shipped)
+ * would report every case above as conformant. */
+CQ_TEST(the_conformance_reader_catches_what_it_is_written_to_catch)
+{
+    static const struct { const char *body; const char *what; } BAD[] = {
+        { "#REGISTER name=h0 type=i1 qubits=0\nCX 0 1\n", "gate outside" },
+        { "#REGISTER name=h0 type=i1 qubits=0\n# STAGE: op begin (name=a)\n"
+          "# STAGE: op begin (name=b)\n# STAGE: op end\n# STAGE: op end\n", "nested" },
+        { "#REGISTER name=h0 type=i1 qubits=0\n"
+          "#REGISTER name=h0 type=i1 qubits=1\n", "duplicate name" },
+        { "#REGISTER name=h0 type=i1 qubits=0,1\n"
+          "#REGISTER name=h1 type=i1 qubits=1\n", "overlapping index" },
+    };
+    const char *path = "test_shim_trace_bad.out";
+    size_t i;
+
+    for (i = 0u; i < sizeof BAD / sizeof *BAD; i++) {
+        cq_conf c;
+        FILE *f = fopen(path, "w");
+        int  caught;
+
+        CHECK(f != NULL);
+        if (!f) return;
+        fputs(BAD[i].body, f);
+        fclose(f);
+
+        cq_conf_scan(path, &c);
+        cq_h_mute(1);
+        cq_conf_ok(&c, BAD[i].what);
+        caught = cq_h_take_failures();
+        cq_h_mute(0);
+        if (caught == 0)
+            cq_h_fail(__FILE__, __LINE__,
+                      "the reader accepted a trace with a %s", BAD[i].what);
+    }
+    remove(path);
+}
+
+/* UNDER ANY OTHER SINK THE LAYER IS INERT, AND THIS IS THE HAZARD D21 NAMES AS
+ * CONCRETE AND CHEAP TO HIT. M23's printf sink writes `cx q0 q1` — neither a
+ * conformant gate line (the library owns those, spelled `CX 0 17`) nor a
+ * conformant annotation — so the two sharing one stream would make every trace
+ * a fatal parse error. `cq_trace_ops()` counting ZERO after a program that
+ * opened a dozen brackets' worth of entry points is the assertion that they
+ * cannot: the bracket writer returns before it counts when the stream is NULL.
+ *
+ * IT IS AN L5-SHAPED ASSERTION AND SO IT IS PAIRED. "Zero brackets" passes just
+ * as well against a layer that was never reached at all, which is why the same
+ * program is run once under each sink and the qec run is required to be
+ * non-zero. */
+CQ_TEST(the_annotation_layer_is_inert_under_every_other_sink)
+{
+    const char *path = "test_shim_trace_inert.out";
+    uint32_t under_qec, under_printf;
+    int32_t a;
+
+    trace_begin(path);
+    a = cqrt_alloc_i8(3);
+    cqrt_xorc_i8(a, 1);
+    under_qec = cq_trace_ops();
+    cq_h_mute(1);                       /* all-classical: the refusal fires */
+    trace_finish();
+    cq_h_mute(0);
+    remove(path);
+
+    cq_shim_ctx_reset();
+    setenv("CQOPS_SINK", "counter", 1);
+    a = cqrt_alloc_i8(3);
+    cqrt_xorc_i8(a, 1);
+    under_printf = cq_trace_ops();
+    cq_shim_ctx_reset();
+    unsetenv("CQOPS_SINK");
+
+    CHECK_EQ(under_qec, 2);
+    CHECK_EQ(under_printf, 0);
+    CHECK_EQ(cq_trace_open(), 0);
+}
+
+CQ_TEST_MAIN(
+    CQ_CASE(a_representative_program_produces_a_conformant_annotated_trace),
+    CQ_CASE(a_program_whose_rails_all_stay_classical_is_not_shipped),
+    CQ_CASE(a_constant_flag_cswap_leaves_the_register_map_a_partition),
+    CQ_CASE(an_aliased_template_call_names_the_handle_it_will_mint),
+    CQ_CASE(a_multi_lane_register_lists_its_lanes_in_bit_order),
+    CQ_CASE(the_conformance_reader_catches_what_it_is_written_to_catch),
+    CQ_CASE(the_annotation_layer_is_inert_under_every_other_sink)
+)

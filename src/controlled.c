@@ -104,10 +104,15 @@ void cq_ctrl_push(cq_ctx *ctx, const cq_bit *ctrl)
      * NOT STYLE. push_slot reallocs the frame array when the stack grows, so a
      * `cq_ctrl_frame *prev` taken before it dangles from the fifth push onward
      * and every row-0 decision below would read freed memory. Nothing in the
-     * suite would see it: Debug on this box is UBSan-only (bd 6wg — the Apple
-     * clang ASan runtime SIGILLs before main), and CQ_lang cannot express depth
-     * 2 at all, let alone 5. Two scalars copied out is the whole fix, and it
-     * makes the hazard unrepresentable rather than merely absent. */
+     * suite would see it: Debug was UBSan-only when this was written (bd 6wg --
+     * the Apple clang ASan runtime SIGILLs before main), and CQ_lang cannot
+     * express depth 2 at all, let alone 5. Two scalars copied out is the whole
+     * fix, and it makes the hazard unrepresentable rather than merely absent.
+     *
+     * Debug now selects an ASan-capable compiler (bd 6wg, 2026-08-27) and
+     * re-applying the pointer form is reported as a heap-use-after-free -- but
+     * only because a case reaching depth 6 exists to run it. The sanitizer needs
+     * the test; the test came first. */
     const int    have_prev = ctx->ctrl.n > 0;
     const int    prev_mode = have_prev ? ctx->ctrl.f[ctx->ctrl.n - 1].mode
                                        : CQ_CTRL_OFF;

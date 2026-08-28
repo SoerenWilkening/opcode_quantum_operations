@@ -30,15 +30,33 @@ add_library(cqops_test_support STATIC
 target_compile_definitions(cqops_test_support PUBLIC
     CQOPS_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/goldens"
     CQOPS_BENNETT_COMMIT="${CMAKE_SOURCE_DIR}/third_party/bennett/COMMIT"
+    ## Step 23. The SOURCE directory, read at run time, for the same reason the
+    ## goldens are: `bd d6m`'s third arm is a claim about WHERE a symbol is
+    ## named, and no compiled artefact can answer that. Absolute, like the two
+    ## above, so it does not depend on ctest's working directory.
+    CQOPS_SHIM_DIR="${CMAKE_SOURCE_DIR}/shim"
+    ## Step 23.4. docs/cqrt_census.txt is the INDEPENDENT oracle for the vendored
+    ## ABI header's NAME set — it was produced from CQ_lang at Step 0.3 by a
+    ## different route, and it is the only thing in this repository that can see
+    ## a renamed declaration. Counting lines cannot: measured, three renamed
+    ## declarations kept all eight per-group counts exact and the whole suite
+    ## green while the definition they were supposed to type-check lost its
+    ## prototype entirely.
+    CQOPS_DOCS_DIR="${CMAKE_SOURCE_DIR}/docs"
 )
 
 ## src/ is PRIVATE on the cqops target, because none of it is public API. The
 ## suites need it anyway: plan §2.1 is one test binary per *module*, and the
 ## modules are internal — test_bit.c includes "bit.h" directly. Carrying the
 ## path here rather than widening cqops keeps the exception on the test side.
+##
+## shim/ is here for the same reason and needs its own line: the PRIVATE entry
+## on the cqops target reaches that target's own translation units and is
+## excluded from its INTERFACE, so it does not propagate here.
 target_include_directories(cqops_test_support PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/shim
 )
 
 target_link_libraries(cqops_test_support
@@ -242,6 +260,102 @@ add_cqops_test(test_angle)        # M21, Step 18 — PRD §7's four rows, the
 add_cqops_test(test_sink_printf)  # M23, Step 9 — the §8 format, %a, the flush
 add_cqops_test(test_sink_count)   # M24, Step 9 — per-kind totals, T-count
 
+## M25b, Step 26. THE HALF OF THE QEC SINK THAT RUNS ON EVERY BOX: the double →
+## (p, q_denom) conversion depends on <math.h> and nothing else, so it is built
+## and tested with or without the QEC library. That is half the reason plan §3
+## recorded the split seam here rather than letting the vtable and the numerics
+## share a module (Rule 12).
+add_cqops_test(test_sink_qec_angle)
+add_cqops_death_test(test_sink_qec_angle_death CASES
+    a_nan_angle
+    an_infinite_angle
+    a_cap_below_one
+    an_angle_too_large_for_a_long
+)
+
+## M25, Step 26 — the vtable half, which needs a real libqec.a and a real
+## config. OPT-IN for L6's reason: this repository neither pins nor can build the
+## QEC library, so a suite registered without it would be a green run claiming a
+## link it never made. CMake hands the config path down as a define rather than
+## letting the test hunt for one, so a red run names the exact file it ran
+## against (Rule 17).
+if(CQOPS_HAVE_QEC)
+    add_cqops_test(test_sink_qec)
+    add_cqops_death_test(test_sink_qec_death CASES
+        a_coincident_toffoli
+        a_gate_before_the_bind
+        a_bind_without_a_config
+        a_precision_above_the_conversions_floor
+    )
+    foreach(t test_sink_qec test_sink_qec_death)
+        target_compile_definitions(${t} PRIVATE
+            CQOPS_QEC_TEST_CONFIG="${CQOPS_QEC_DIR}/examples/config_ccx.json")
+    endforeach()
+
+    ## WHICH LAYER REFUSED. All four of M25's hard errors share one die and one
+    ## "qec sink:" prefix, so the exit code cannot tell them apart — and three of
+    ## the four are one edit away from being caught by a neighbouring guard.
+    ## Negative, so it composes with the exit-code check instead of displacing
+    ## it, and composed into ONE list per test because set_tests_properties
+    ## OVERWRITES (tests/CMakeLists.txt:193-195).
+    ##
+    ## The coincident Toffoli is the load-bearing one: it must die on the
+    ## LIBRARY's refusal reaching our check, not on a missing bind or a missing
+    ## config, and above all not on our own Debug-gated distinctness assert —
+    ## which is absent in Release and is the whole reason this case exists.
+    set_tests_properties(test_sink_qec_death.a_coincident_toffoli
+                         PROPERTIES FAIL_REGULAR_EXPRESSION
+                         "before it was bound;CQOPS_QEC_CONFIG;PRECISION;distinctness")
+    set_tests_properties(test_sink_qec_death.a_gate_before_the_bind
+                         PROPERTIES FAIL_REGULAR_EXPRESSION
+                         "refused a gate;CQOPS_QEC_CONFIG;PRECISION")
+    set_tests_properties(test_sink_qec_death.a_bind_without_a_config
+                         PROPERTIES FAIL_REGULAR_EXPRESSION
+                         "refused a gate;before it was bound;PRECISION;refused the config")
+    set_tests_properties(test_sink_qec_death.a_precision_above_the_conversions_floor
+                         PROPERTIES FAIL_REGULAR_EXPRESSION
+                         "refused a gate;before it was bound;needs CQOPS_QEC_CONFIG")
+
+    ## M26's ANNOTATION half, `bd 76r` / PRD §15 D21. Same opt-in and for a
+    ## sharper reason than M25's: the layer's ONE activation test is the FILE*
+    ## M25 handed to qec_set_trace, so without a real libqec.a there is no
+    ## configuration in which it emits a byte — which is the point, since it is
+    ## what keeps M23's printf sink and the qec trace disjoint consumers.
+    ##
+    ## A DIFFERENT CONFIG FROM THE VTABLE SUITE'S, AND THE REASON IS COST RATHER
+    ## THAN CAPABILITY. The only route from an all-classical program into a
+    ## quantum one is a general Ry (PRD §15 D17's corpus finding), and an Ry is a
+    ## gridsynth walk whose trace grows with the code distance: measured on this
+    ## box, the same six-op program is 19,636 lines against config_demo3 and 55.9
+    ## MILLION against config.json at the default precision. config_demo3's
+    ## n_logical = 3 is also the POOL CEILING for these cases, because under this
+    ## sink D2's ceiling is qec_n_logical and D21 (b) turns recycling off — so the
+    ## budget is three qubits for a whole case, not three at a time.
+    add_cqops_test(test_shim_trace)
+    add_cqops_death_test(test_shim_trace_death CASES
+        nested_bracket
+        unopened_bracket
+    )
+    foreach(t test_shim_trace test_shim_trace_death)
+        target_compile_definitions(${t} PRIVATE
+            CQOPS_QEC_TRACE_CONFIG="${CQOPS_QEC_DIR}/examples/config_demo3.json")
+    endforeach()
+
+    ## WHICH LAYER REFUSED, again negatively so it composes with the exit code.
+    ## Both cases bind a real qec context on their way to the assertion, so the
+    ## sink's own die, the pool ceiling and M07's handle guard are all reachable
+    ## from the setup and none of them is the abort under test. The two cases
+    ## must also not catch EACH OTHER's message: a guard that fires on the wrong
+    ## side of the bracket is the "which of three calls of the same guard fired"
+    ## trap in a two-call spelling.
+    set_tests_properties(test_shim_trace_death.nested_bracket
+                         PROPERTIES FAIL_REGULAR_EXPRESSION
+                         "UndefinedBehaviorSanitizer;never opened;qec sink:;qubit pool:")
+    set_tests_properties(test_shim_trace_death.unopened_bracket
+                         PROPERTIES FAIL_REGULAR_EXPRESSION
+                         "UndefinedBehaviorSanitizer;forbids nesting;qec sink:;qubit pool:")
+endif()
+
 ## THE UNCOMPUTE AXIS, Step 21. NO MODULE — `_unc` IS the same kernel called
 ## again (Rule 7), so plan §4's Green column reads "(thin, in M26)" and M26 is
 ## Step 23. This suite owns the axis's own claims, NOT L3 per kernel: that is
@@ -263,11 +377,17 @@ add_cqops_test(test_unc)          # Step 21 — PRD §10, R6, and bd 2cf measure
 ## block naming a test another block already named would silently disarm one of
 ## them and leave a green run with nothing to look at.
 ##
-## THE SECOND CASE IS EXPECTED TO GO RED ONE DAY, ON PURPOSE. bd 2cf is OPEN:
-## the rail it frees is physically |0> and the abort is our certificate being
-## missing, not the rail being dirty. When bd ckd.17b gives cqrt_free evidence
-## other than the shadow at Step 23, this death stops happening — and that is
-## the signal to re-read the case, never to delete it.
+## THE SECOND CASE WAS EXPECTED TO GO RED ONE DAY, ON PURPOSE, AND IT DID NOT.
+## This used to say "bd 2cf is OPEN" and to predict that deciding bd ckd.17b
+## would eventually give cqrt_free evidence other than the shadow. Both beads
+## closed 2026-08-22 as PRD §15 D15, which supplies exactly that evidence — and
+## the follow-on prediction, "this death stops happening once M26 carries the
+## certificate", was MEASURED FALSE at landing 2 (2026-08-27). The certificate
+## reads a call stream recorded at the M26 HANDLE boundary and this fixture
+## drives the register layer directly, so it has no history to read and answers
+## UNPROVEN. Both cases stand, both now run under CQOPS_FREE_ABORT, and the
+## shape was reproduced where the certificate can see it — tests/test_unc_death.c
+## names the sites. Re-read the case, never delete it.
 add_cqops_death_test(test_unc_death CASES
     free_without_the_uncompute
     free_of_a_rotation_tainted_uncomputed_rail
@@ -281,10 +401,19 @@ add_cqops_death_test(test_unc_death CASES
 ## cq_reg_free take its MEASURED or DOUBLE-FREE branch instead of the clean
 ## check: both deaths still abort inside their armed window, neither regex
 ## names the string, and the guard they exist to pin is bypassed entirely.
+## AND AT STEP 23 THEY SPLIT INTO SEPARATE BLOCKS, because the two cases stopped
+## being "the same guard by opposite routes" and became the two ROWS of PRD §15
+## D15 §3 — one PROVEN DIRTY, one UNPROVEN. Each now pins the message the other
+## row would have printed, on top of the layer list it already carried. Separate
+## blocks because set_tests_properties OVERWRITES rather than adds, so the
+## shared tripwires are repeated in each list rather than set once.
 set_tests_properties(test_unc_death.free_without_the_uncompute
-                     test_unc_death.free_of_a_rotation_tainted_uncomputed_rail
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "release of a qubit not proven;rotate:;shadow:;double free;measurement is terminal;tombstone")
+                     "release of a qubit not proven;rotate:;shadow:;double free;measurement is terminal;tombstone;free of a rail not provably;UndefinedBehaviorSanitizer")
+
+set_tests_properties(test_unc_death.free_of_a_rotation_tainted_uncomputed_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "release of a qubit not proven;rotate:;shadow:;double free;measurement is terminal;tombstone;PROVEN not to be;UndefinedBehaviorSanitizer")
 
 ## Fail-loud paths. NOT WILL_FAIL — that inverts a non-zero exit code and does
 ## not invert a crash, so it cannot express "this abort()s" at all; see
@@ -318,6 +447,11 @@ add_cqops_death_test(test_sink_death CASES
 add_cqops_death_test(test_reg_death CASES
     free_without_proof
     free_dirty_rail
+    free_unproven_rail
+    an_unrecognised_free_abort_spelling_is_a_hard_error
+    release_of_a_convicted_qubit_is_refused
+    swap_a_rail_with_itself
+    swap_between_mismatched_widths
     a_zeroed_slot_is_not_a_valid_state
     double_free
     free_of_a_measured_rail
@@ -350,10 +484,86 @@ add_cqops_death_test(test_reg_death CASES
 ## FAIL_REGULAR_EXPRESSION is the fix and it composes: unlike
 ## PASS_REGULAR_EXPRESSION it does NOT displace the exit-code check, so the
 ## case still has to abort inside an armed window AND has to abort in M07.
-set_tests_properties(test_reg_death.free_dirty_rail
-                     test_reg_death.free_without_proof
+## AND EVERY ONE OF THESE LISTS CARRIES `UndefinedBehaviorSanitizer` SINCE STEP
+## 23, WHICH IS A DIFFERENT KIND OF TRIPWIRE FROM THE REST OF THE LINE.
+## MEASURED: delete M07's NULL-proof guard and cq_reg_free calls through a NULL
+## function pointer. In RELEASE that is a raw SIGSEGV, which is not SIGABRT, so
+## the case fails and the mutant is killed. In DEBUG, UBSan intercepts the SEGV
+## and calls abort() ITSELF -- which lands inside CQ_EXPECT_ABORT's armed
+## window, so the case exits 0 and PASSES, having verified nothing. The battery
+## reported that mutant as "killed in Release only", which is the inverse of the
+## usual asymmetry and the second instance of it in this module.
+##
+## The general hazard is bigger than this guard: CQ_EXPECT_ABORT cannot tell
+## "our die() ran" from "a sanitizer aborted", so ANY death case whose setup
+## acquires undefined behaviour passes in Debug for free. Naming the sanitizer
+## in the negative list is the only thing that separates them, and it composes
+## with the exit-code check the way PASS_REGULAR_EXPRESSION would not.
+##
+## THE SWEEP LANDED (`bd u76`) AND IT IS STRUCTURAL, NOT PER CASE. Every one of
+## the 254 death cases now carries `UndefinedBehaviorSanitizer;AddressSanitizer`,
+## armed by add_cqops_death_test at registration and RE-ARMED by a
+## cmake_language(DEFER) call after this whole directory has been processed —
+## because set_tests_properties OVERWRITES, so each block below would otherwise
+## wipe the registration-time arm. See cmake/CqopsTest.cmake for the mechanism
+## and for the measurement. The consequence for a reader HERE: the tripwire is
+## present whether or not a block spells it, so a list that omits it is not a
+## gap, and a list that spells it (every one in this file that predates the
+## sweep, kept as written) is not the reason it is there. The composed property
+## is de-duplicated, so the two spellings cost nothing.
+##
+## VERIFIED THE WAY THE HOLE WAS FOUND, on a case that had NO
+## FAIL_REGULAR_EXPRESSION at all before the sweep. Mutate src/sink.c's
+## `if (!entry)` vtable guard to an always-false predicate and
+## test_sink_death.missing_entry_is_not_called calls through a NULL function
+## pointer. The BARE Debug binary exits 0 — "SUMMARY: UndefinedBehaviorSanitizer:
+## SEGV sink.c:40 in cq_sink_ccx", inside the armed window, mutant SURVIVES.
+## Under ctest with the tripwire it is `(Failed)` in Debug ("Error regular
+## expression found in output. Regex=[UndefinedBehaviorSanitizer]") and
+## `(SEGFAULT)` in Release. Note the two REASON strings differ, which is the
+## recorded trap for any mutation runner that greps ctest's summary for
+## `(Failed)` alone.
+set_tests_properties(test_reg_death.free_without_proof
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "release of a qubit not proven")
+                     "release of a qubit not proven;CQOPS_FREE_ABORT;UndefinedBehaviorSanitizer")
+
+## AND AT STEP 23 THE TWO NON-CLEAN ROWS BECAME SEPARABLE FOR THE FIRST TIME.
+## Before it, a dirty rail and an unproven one produced the IDENTICAL string —
+## "free of a rail that is not provably clean" — so no regex could have told
+## them apart, and cq_reg_clean had already thrown the distinction away one call
+## down. PRD §15 D15 §3's residue split is stated in exactly these two rows and
+## is `bd 06t`'s first obligation, so each case now pins the message the OTHER
+## row would have printed. That also kills a mutant no earlier pin could see: a
+## cq_reg_disposition whose fold returns at the first non-clean bit answers
+## UNPROVEN for free_dirty_rail, whose bad bit is LAST, and every exit code
+## stays identical.
+##
+## SEPARATE BLOCKS, ONE PER TEST, because set_tests_properties OVERWRITES a
+## property rather than adding to it — a second block naming a test an earlier
+## block already named silently disarms the earlier regex and leaves a green run
+## with nothing to look at (measured at Step 19). Each test below appears in
+## exactly one block, and each block composes every regex that test needs.
+set_tests_properties(test_reg_death.free_dirty_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "release of a qubit not proven;free of a rail not provably;UndefinedBehaviorSanitizer")
+
+set_tests_properties(test_reg_death.free_unproven_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "release of a qubit not proven;PROVEN not to be;UndefinedBehaviorSanitizer")
+
+## The flag's own fail-loud path must abort in the RESOLVER, not by wandering
+## into a free. Neither M07's free messages nor M03's may appear.
+set_tests_properties(test_reg_death.an_unrecognised_free_abort_spelling_is_a_hard_error
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "release of a qubit not proven;free of a rail;STRANDED;UndefinedBehaviorSanitizer")
+
+## THE ONE CASE WHERE M03's MESSAGE IS THE CORRECT ANSWER, and it is listed here
+## so that nobody adds it to the negative list above by symmetry. It calls
+## cq_qubits_release directly with a CONVICTION; M07 is not in the call stack at
+## all, and what must not appear is any sign that the strand path ran instead.
+set_tests_properties(test_reg_death.release_of_a_convicted_qubit_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "STRANDED;strand of;free of a rail;UndefinedBehaviorSanitizer")
 
 ## M08 and M09, Step 8. Everything M08 guards is a hard error in BOTH
 ## configurations — a region disposed with a live qubit in it is a leaked
@@ -769,8 +979,21 @@ add_cqops_death_test(test_angle_death CASES
 ## M22, Step 19. Four families, and read tests/test_rotate_death.c's header for
 ## why they are not the same kind of thing. The sandwich refusal is M22's own
 ## and stands in for BOTH I6 mechanisms, neither of which reaches a module that
-## bypasses cq_emit_* to emit; ckd18_* pins an OPEN P0's CURRENT behaviour and
-## is EXPECTED to go red when Step 23 selects CQOPS_FREE_RETIRE.
+## bypasses cq_emit_* to emit. ckd18_* pins the refusal under the evidence the
+## suite supplies — the shadow. This used to call bd ckd.18 an OPEN P0 and to
+## predict the case going red when Step 23 selected CQOPS_FREE_RETIRE; the bead
+## closed 2026-08-22 into PRD §15 D15 and D15 builds no such flag, so THAT
+## prediction is retired. BOTH OF THE REASONS THIS BLOCK LISTED AS STILL OPEN
+## ARE NOW SETTLED, and they settled in opposite directions. D15 §4's
+## abort-vs-strand clause was CONFIRMED 2026-08-22 as (b) STRAND, so the DEFAULT
+## act for this rail is not an abort at all; and the second reason was right —
+## this fixture supplies cq_pc_zero_proof_rotation_free, the SHADOW, which
+## reports `unknown` and can only ever say UNPROVEN, so the rail lands in that
+## row and never in the dirty one. The case is therefore kept as the
+## shadow-evidence refusal it actually is (bd 06t's option (a), taken
+## deliberately) and RUNS UNDER CQOPS_FREE_ABORT; its default disposition —
+## it strands, by index — is pinned in the ordinary suite as
+## tests/test_rotate.c:a_general_ry_rail_strands_rather_than_aborting.
 add_cqops_death_test(test_rotate_death CASES
     ry_inside_a_sandwich_compute_half
     rz_inside_a_sandwich_compute_half
@@ -828,12 +1051,13 @@ set_tests_properties(test_rotate_death.measure_inside_a_sandwich_compute_half
 ## If M03's message ever appears here, cq_reg_free has started releasing before
 ## verifying and a dirty rail is half-returned.
 ## Note ckd18_* passes cq_pc_zero_proof_rotation_free rather than NULL, so it is
-## the POISON that refuses it — which is ckd.18's actual claim, and is what makes
-## disabling cq_shadow_rotate turn this case red.
+## the POISON that refuses it — which is that case's actual claim (bd ckd.18,
+## closed; PRD §15 D15), and is what makes disabling cq_shadow_rotate turn this
+## case red.
 set_tests_properties(test_rotate_death.ckd18_a_general_ry_rail_cannot_be_freed
                      test_rotate_death.a_null_proof_still_refuses_a_materialised_rail
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "PREFLIGHT-;release of a qubit not proven")
+                     "PREFLIGHT-;release of a qubit not proven;UndefinedBehaviorSanitizer")
 
 ## "ABORTS HAVING EMITTED ZERO GATES" IS A PROMISE, SO IT NEEDS A DETECTOR.
 ## cq_measure marks the rail MEASURED before it reads a single bit, so a second
@@ -854,8 +1078,659 @@ add_cqops_death_test(test_qubits_death CASES
     release_of_a_qubit_left_at_one
     release_of_an_unminted_index
     double_release
+    double_strand
+    release_of_a_stranded_index
+    strand_of_an_unminted_index
+    strand_of_a_freed_index
+    release_of_a_retired_index
+    strand_of_a_retired_index
+    recycling_disabled_with_a_non_empty_free_list
+    ceiling_exceeded_because_nothing_is_recycled
 )
+
+## WHICH GUARD FIRED, for the four stranding deaths (PRD §15 D15 §3, Step 23).
+## All eight of M03's hard errors share one cq_pool_die and therefore one
+## "qubit pool:" prefix, so an exit code cannot tell them apart — and three of
+## the four new cases are one edit away from being caught by a NEIGHBOURING
+## guard instead of their own, which is this project's most-recorded failure
+## shape (the same guard called three times, Step 8).
+##
+## Expressed NEGATIVELY, and that is deliberate: PASS_REGULAR_EXPRESSION
+## DISPLACES the exit-code check while FAIL_REGULAR_EXPRESSION composes with
+## it, so naming the messages that must NOT appear keeps the death test's own
+## contract (tests/CMakeLists.txt:193-195). Each list is composed into ONE
+## semicolon-separated property, because set_tests_properties OVERWRITES.
+##
+## release_of_a_stranded_index is the load-bearing one: it must die on the
+## strand mark, NOT on "not proven |0>" — the case passes `1` precisely so that
+## a guard placed after the proven_zero test would let it through, and NOT on
+## "double release", which is the adjacent flag.
+set_tests_properties(test_qubits_death.release_of_a_stranded_index
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "not proven;double release;never minted")
+
+## The mirror: a double strand must not report as a double RELEASE, and must
+## not be silently accepted into the free-list guard.
+set_tests_properties(test_qubits_death.double_strand
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "double release;on the free list;never minted")
+
+## And a strand of a freed index must name the free list rather than the
+## strand map — the two flags are disjoint and this is what pins that.
+set_tests_properties(test_qubits_death.strand_of_a_freed_index
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "double strand;never minted;not proven")
+
+## Step 26's two retirement deaths, on the same argument, and both are load
+## bearing for the same reason as release_of_a_stranded_index: the RETIRE flag
+## is a THIRD disjoint state, so each case has two neighbouring guards that
+## would happily catch it and report the wrong cause. The release case must not
+## report as a double release (the free flag is 0 for a retired index) nor as
+## "not proven" (the caller passes a 1, and did prove it, once); the strand case
+## must not report as a double strand (the strand flag is 0) nor as a free-list
+## strand. Both would otherwise pass while testing nothing.
+set_tests_properties(test_qubits_death.release_of_a_retired_index
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "double release;not proven;STRANDED;never minted")
+
+set_tests_properties(test_qubits_death.strand_of_a_retired_index
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "double strand;on the free list;never minted")
+
+## And the ceiling reached through retirement must be the CEILING refusing, not
+## the retire path — the whole content of the case is that `live` never falls,
+## so a mutant that decremented it would make this case survive as a pass.
+set_tests_properties(test_qubits_death.ceiling_exceeded_because_nothing_is_recycled
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "RETIRED;double release;not proven")
 
 ## The harness's own negative self-test: expected to exit non-zero. It is what
 ## makes every other suite's green meaningful.
 add_cqops_test(test_harness_negative WILL_FAIL)
+
+## The same argument for LEAK DETECTION (`bd kfi`). detect_leaks=1 is not a
+## compile flag — it is a string in the ENVIRONMENT property that
+## cmake/CqopsTest.cmake writes onto every test — so losing it would change
+## nothing about any green run. This binary leaks on purpose and is the only
+## thing in the tree that goes red when that happens.
+##
+## REGISTERED ONLY WHEN THE BUILD CLAIMS LEAK DETECTION. Without it the binary
+## would exit 0 and WILL_FAIL would report a failure that is a correct
+## description of a configuration we deliberately support (Release, a host with
+## no LSan, CQOPS_LEAK_CHECK=OFF). The claim it makes is conditional, so its
+## registration is too — and test_skeleton is what makes the ABSENCE loud, by
+## checking the build's belief against the environment CTest handed it.
+if(CQOPS_LSAN_ENABLED)
+    add_cqops_test(test_lsan_negative WILL_FAIL)
+endif()
+
+## Layer 5 — M26's foundation (Step 23, landing 1). THE FIRST C SUITE OVER
+## shim/: everything Step 22 put there is generated or generating, and the only
+## thing that compiled any of it was a PyYAML-gated python subprocess.
+##
+## Four subjects, and each is here because something else would be green for
+## the wrong reason without it: the process-global context and the reset that
+## keeps a multi-case binary honest (cq_ctx_init borrows the sink ONCE, so case
+## 2's cqops_set_sink is otherwise ignored and its gates land in case 1's mock);
+## installation of the built-in sinks (bd utk — they had no caller, so any
+## process that had not called cqops_set_sink hard-errored inside cq_ctx_init);
+## the ONE §9 region bracket, with bd d6m fix (a)'s three arms; and PRD §1's
+## cq_shim_unsupported, whose message was until now pinned only against a stub
+## tests/test_gen_bodies.py writes for itself.
+add_cqops_test(test_shim_ctx)
+
+add_cqops_death_test(test_shim_ctx_death CASES
+    the_v1_boundary_terminates
+    a_control_flag_wider_than_one_bit
+    the_no_region_sentinel_is_not_a_control_flag
+    a_region_with_no_body
+    a_region_body_that_does_not_balance_its_own_pushes
+    a_region_body_that_pops_more_than_it_pushed
+    a_nested_region
+    a_tombstoned_control_flag
+    a_reset_with_a_region_still_open
+)
+
+## WHICH LAYER ABORTED, and the UBSan tripwire (bd u76), composed into ONE
+## semicolon-separated list per test because set_tests_properties OVERWRITES.
+##
+## `UndefinedBehaviorSanitizer` is not decoration: CQ_EXPECT_ABORT arms a
+## SIGABRT window and cannot tell whose abort it caught, and UBSan runs
+## -fno-sanitize-recover=all and calls abort() itself, so in Debug a case whose
+## setup acquires undefined behaviour passes having verified nothing. It is
+## FAIL_ and not PASS_ because PASS_REGULAR_EXPRESSION DISPLACES the exit-code
+## check, trading the death test's own contract for a substring.
+##
+## AND WHICH SHIM GUARD, NOT ONLY WHICH LAYER. All five shim-owned refusals
+## print the same `libcqops: FATAL: shim:` prefix, so an exit-code assertion
+## cannot tell them apart and swapping two of their strings would survive every
+## case in the file — CLAUDE.md's recorded Step 20 survivor (ii), "NO TEST READ
+## THE REFUSAL MESSAGE". Each list therefore names the strings the OTHER shim
+## refusals would have printed. (The positive half — that the right one really
+## is printed, on stderr — is tests/test_shim_ctx.c's
+## each_region_refusal_names_itself_on_stderr, which forks and reads the bytes;
+## PASS_REGULAR_EXPRESSION could not do it without displacing the exit code.)
+set_tests_properties(test_shim_ctx_death.a_control_flag_wider_than_one_bit
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;reg: handle out of range;with no body;never nests;unbalanced")
+
+set_tests_properties(test_shim_ctx_death.a_region_with_no_body
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;reg: handle out of range;one bit wide;never nests;unbalanced")
+
+set_tests_properties(test_shim_ctx_death.a_nested_region
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;reg: handle out of range;one bit wide;with no body;unbalanced")
+
+## The two balance cases are the SAME guard reached from opposite directions,
+## which is what pins `!= 1` rather than `> 1`. Both must be the shim's refusal:
+## the popping one would otherwise be caught by M06's empty-stack abort one
+## layer down, meaning the shim never looked.
+set_tests_properties(test_shim_ctx_death.a_region_body_that_does_not_balance_its_own_pushes
+                     test_shim_ctx_death.a_region_body_that_pops_more_than_it_pushed
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;reg: handle out of range;one bit wide;with no body;never nests;cq_ctrl_pop with no region open")
+
+## THE MIRROR IMAGE, TWICE: these two MUST be somebody else's refusal, so the
+## shim's own prefix is what must not appear. CQ_REG_NONE is the absence of the
+## _controlled symbol and must not become a fifth row 0; a tombstone is M07's
+## use-after-free diagnostic, and it is only M07's because the bracket resolves
+## through cq_reg_cbits BEFORE comparing the width.
+set_tests_properties(test_shim_ctx_death.the_no_region_sentinel_is_not_a_control_flag
+                     test_shim_ctx_death.a_tombstoned_control_flag
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")
+
+## And this one must be M06's, reached THROUGH cq_ctx_dispose: it is the only
+## detector for cq_shim_ctx_reset actually disposing rather than dropping the
+## latch, whose other half is the ordinary case reading the disposed object.
+set_tests_properties(test_shim_ctx_death.a_reset_with_a_region_still_open
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")
+
+## PRD §1's boundary prints `cqops: ... not implemented (...)` and NOT the house
+## `libcqops: FATAL: <layer>:` prefix, which is what lets this assert negatively
+## that no other layer spoke. The bytes themselves are pinned positively in
+## tests/test_shim_ctx.c, which forks to read the child's stderr — a
+## PASS_REGULAR_EXPRESSION here would have cost the exit-code check.
+set_tests_properties(test_shim_ctx_death.the_v1_boundary_terminates
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;libcqops: FATAL")
+
+## Layer 5 — M26's rail and gate surfaces (Step 23, landing 1, step 4). The
+## first `cqrt_*` DEFINITIONS in the project: 32 rail symbols and 30 gate
+## symbols, against `shim/cq_runtime_abi.h`'s verified copy of CQ_lang's 173
+## declarations.
+##
+## THE RAIL SUITE IS SPLIT ON THE SOURCE FILE'S OWN RECORDED SEAM,
+## `the rail's LIFETIME <-> the rail's CONTENTS`, and the .inc half carries the
+## subject where THE COST IS THE SPECIFICATION: PRD §2.1 prices `cqrt_cswap`
+## under a constant control at zero gates, and src/reg.h names three routes that
+## give the right VALUE and the wrong cost.
+add_cqops_test(test_runtime_rail)
+
+## D15's OBSERVED UNDO CERTIFICATE (Step 23 landing 2, bd 06t). The seam
+## `the ENGINE <-> the ENTRY CONDITIONS` was recorded in IMPLEMENTATION_PLAN §3
+## before this file's first case and taken with it.
+add_cqops_test(test_shim_cert)
+
+## The recorder's ONE hard error. A separate binary, not a seam: CQ_DEATH_MAIN
+## needs its own translation unit. It exists because a mutant survived — turning
+## cq_rec_push's refusal of an unmodelled opcode into a `return` left the whole
+## suite green, and a silently ignored call makes EVERY certificate rule wider,
+## which is the direction that discharges frees it should not.
+add_cqops_death_test(test_shim_cert_death CASES
+    an_unmodelled_opcode_is_a_hard_error
+    an_opcode_past_the_table_is_a_hard_error
+)
+## NEGATIVE ONLY, so it composes with the exit-code check rather than displacing
+## it (PASS_REGULAR_EXPRESSION would). It names the layers that must NOT have
+## spoken: the abort has to come from the RECORDER, not from a rail resolve, a
+## free, or a sanitizer.
+set_tests_properties(test_shim_cert_death.an_unmodelled_opcode_is_a_hard_error
+                     test_shim_cert_death.an_opcode_past_the_table_is_a_hard_error
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "reg:;rail:;qubit pool:;shadow:;rotate:;release of a qubit not proven;UndefinedBehaviorSanitizer")
+add_cqops_test(test_runtime_gate)
+
+## The V1 BOUNDARY (Step 23 landing 1 step 5). NOT a death suite, and the
+## reason is the whole design: with 109 macro-expanded abort bodies the
+## interesting failure is not a missing abort but one that NAMES THE WRONG
+## SYMBOL or carries the WRONG BUCKET, and a FAIL_REGULAR_EXPRESSION cannot see
+## either. Every one of the 109 is forked and its stderr compared byte for
+## byte, against an enumeration read out of shim/cq_runtime_abi.h.
+add_cqops_test(test_runtime_v2)
+
+add_cqops_death_test(test_runtime_rail_death CASES
+    measure_of_a_rail_wider_than_its_symbol
+    copy_between_rails_of_different_widths
+    copy_of_two_rails_of_the_same_wrong_width
+    addc_of_a_rail_wider_than_its_symbol
+    xorc_of_a_rail_wider_than_its_symbol
+    cswap_of_a_rail_with_itself
+    cswap_whose_control_aliases_a_rail_it_writes
+    cswap_whose_control_aliases_its_second_rail
+    cswap_with_a_control_flag_wider_than_one_bit
+    cswap_between_rails_of_different_widths
+    cswap_validates_its_operands_even_on_the_zero_row
+    double_free_is_m07s_refusal
+    free_of_a_measured_rail_is_m07s_refusal
+    a_second_measure_is_m07s_refusal
+    use_of_a_freed_rail_is_m07s_refusal
+    xorc_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free
+    xorc_of_a_measured_rail_is_a_write_refusal
+    measure_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free
+)
+
+## Step 23, landing 1, step 8 — THE LINK GATE. Two tables, both external-linkage
+## address tables read at a RUNTIME index, plus the set-difference arm the link
+## cannot make. See cmake/CqopsLinkWitness.cmake for the four measured ways the
+## obvious witness is green and vacuous, and cmake/CqopsSymbolSets.cmake for the
+## outward direction the witness is structurally blind to.
+include(${CMAKE_SOURCE_DIR}/cmake/CqopsLinkWitness.cmake)
+cqops_add_link_witness()
+
+## Layer 5 — M26's OPCODE surface (Step 23, landing 1, step 6). The FIFTEEN
+## `cq_shim_*` entry points all 992 generated integer wrappers call, split on
+## the seam IMPLEMENTATION_PLAN §3 recorded before either file existed:
+## `the OPCODE SURFACE <-> the HANDLE BOUNDARY`, with the boundary half in
+## tests/test_template_d7.inc.
+add_cqops_test(test_template)
+
+add_cqops_death_test(test_template_death CASES
+    d7a_out_aliases_the_first_source_of_a_qq_unc
+    d7a_out_aliases_the_second_source_of_a_qq_unc
+    d7a_out_aliases_the_only_handle_of_an_hl_unc
+    d7a_out_aliases_the_only_handle_of_an_lh_unc
+    d7a_out_aliases_a_source_of_an_icmp_qq_unc
+    d7a_out_aliases_the_source_of_an_icmp_hl_unc
+    d7a_out_aliases_the_source_of_a_cast_unc
+    a_source_rail_is_not_the_width_its_symbol_names
+    an_unc_destination_that_has_been_measured_is_a_write_refusal
+    an_unc_destination_is_not_the_width_its_symbol_names
+    an_icmp_unc_destination_wider_than_one_bit_is_refused
+    a_freed_source_of_the_wrong_width_is_a_use_after_free
+    an_opcode_outside_the_abis_enum_is_refused
+    a_predicate_outside_the_abis_enum_is_refused
+    a_cast_kind_outside_the_abis_enum_is_refused
+    a_width_outside_the_abis_range_is_refused
+    a_cast_to_a_width_above_the_abis_range_is_refused
+)
+
+## D7a IS M07'S REFUSAL AND MUST STAY M07'S. The shim resolves the handles and
+## hands them to `cq_reg_check_operands`; if it ever grew its own copy of the
+## check, the masking-layer trap this project has recorded five times would put
+## the shim's message here instead and nobody would notice. So the list bans
+## every string the SHIM could have printed — and bans M05's `distinctness`
+## too, because an unrefused D7a reaches a kernel with `dst == a` and aborts
+## there in DEBUG ONLY, seventeen steps from its cause (Rule 11's prediction).
+set_tests_properties(test_template_death.d7a_out_aliases_the_first_source_of_a_qq_unc
+                     test_template_death.d7a_out_aliases_the_second_source_of_a_qq_unc
+                     test_template_death.d7a_out_aliases_the_only_handle_of_an_hl_unc
+                     test_template_death.d7a_out_aliases_the_only_handle_of_an_lh_unc
+                     test_template_death.d7a_out_aliases_a_source_of_an_icmp_qq_unc
+                     test_template_death.d7a_out_aliases_the_source_of_an_icmp_hl_unc
+                     test_template_death.d7a_out_aliases_the_source_of_a_cast_unc
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:;distinctness;kernel:;not live")
+
+## THE WIDTH TOKEN IS THE SHIM'S OWN CLAIM and must NOT be answered by M07: a
+## LIVE rail of the wrong width is not a use-after-free, and the enum guards
+## must stay out of it — a table lookup that aborted for a legal opcode would
+## satisfy every one of these cases while breaking the whole grid.
+set_tests_properties(test_template_death.a_source_rail_is_not_the_width_its_symbol_names
+                     test_template_death.an_unc_destination_is_not_the_width_its_symbol_names
+                     test_template_death.an_icmp_unc_destination_wider_than_one_bit_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;outside the ABI;FATAL: reg:;kernel:;distinctness")
+
+## RESOLVE FIRST, COMPARE SECOND — the ORDER claim `bd pnu` found unpinned on
+## four sibling helpers. These two must be M07's message and NOT the shim's
+## width message, which is the whole difference the hoisted comparison makes.
+set_tests_properties(test_template_death.a_freed_source_of_the_wrong_width_is_a_use_after_free
+                     test_template_death.an_unc_destination_that_has_been_measured_is_a_write_refusal
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cq_template;outside the ABI;kernel:")
+
+## AND THE ENUM GUARDS MUST BE THE DISPATCH FILE'S, not a width check and not
+## M07's. Each names an ENUM, and `cq_template_dispatch.c`'s three strings are
+## deliberately disjoint from `cq_template_impl.c`'s, so swapping two of them
+## would be caught here rather than by a reviewer.
+set_tests_properties(test_template_death.an_opcode_outside_the_abis_enum_is_refused
+                     test_template_death.a_predicate_outside_the_abis_enum_is_refused
+                     test_template_death.a_cast_kind_outside_the_abis_enum_is_refused
+                     test_template_death.a_width_outside_the_abis_range_is_refused
+                     test_template_death.a_cast_to_a_width_above_the_abis_range_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cq_template;FATAL: reg:;kernel:;distinctness")
+
+add_cqops_death_test(test_runtime_gate_death CASES
+    x_on_a_rail_wider_than_one_bit
+    cnot_on_a_rail_wider_than_one_bit
+    toffoli_on_a_rail_wider_than_one_bit
+    x_controlled_on_a_rail_wider_than_one_bit
+    cnot_controlled_on_a_rail_wider_than_one_bit
+    rz_of_a_rail_wider_than_its_symbol
+    cnot_whose_control_is_its_target
+    toffoli_with_two_equal_controls
+    x_controlled_whose_flag_is_its_target
+    x_controlled_whose_zero_flag_is_its_target
+    toffoli_whose_first_control_is_its_target
+    toffoli_whose_second_control_is_its_target
+    cnot_controlled_whose_flag_is_its_inner_control
+    cnot_controlled_whose_flag_is_its_target
+    cnot_controlled_whose_inner_control_is_its_target
+    cnot_controlled_whose_zero_flag_is_its_inner_control
+    cnot_controlled_whose_zero_flag_is_its_target
+    x_of_a_measured_rail_is_a_write_refusal
+    x_of_a_freed_rail_wider_than_one_bit_is_a_use_after_free
+    cnot_whose_control_is_a_freed_wide_rail_is_a_use_after_free
+    ry_of_a_rail_wider_than_its_symbol
+    rz_of_a_rail_narrower_than_its_symbol
+    rz_controlled_of_a_rail_wider_than_its_symbol
+    rz_controlled_inv_of_a_rail_wider_than_its_symbol
+    ry_controlled_inv_of_a_rail_wider_than_its_symbol
+    ry_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free
+    ry_of_a_measured_rail_of_the_wrong_width_is_a_write_refusal
+    rz_controlled_on_a_constant_lane_is_m06s_refusal
+    ry_controlled_inv_at_a_half_turn_is_m06s_refusal
+)
+
+## WHICH SHIM GUARD, NOT ONLY WHICH LAYER, composed into ONE semicolon-separated
+## list per group because set_tests_properties OVERWRITES — a second block
+## silently disarms the first and everything stays green.
+##
+## All five rail-side refusals print the same `libcqops: FATAL: shim:` prefix,
+## so an exit-code assertion cannot tell them apart and swapping two of their
+## strings would survive every case in the file. Each list therefore names the
+## strings the OTHER refusals would have printed. `UndefinedBehaviorSanitizer`
+## leads every list (bd u76): CQ_EXPECT_ABORT cannot tell whose abort it caught,
+## and UBSan calls abort() itself under -fno-sanitize-recover=all.
+## The width token is a claim about the rail — and it must be OUR refusal,
+## not M07's: a live rail of the wrong width is not a use-after-free.
+## AND `width mismatch in a copy` IS IN THE LIST BECAUSE IT WAS MISSING AND THAT
+## COST THE CASE ITS TEETH. `copy_between_rails_of_different_widths` sets up two
+## rails of DIFFERENT widths, which is exactly what `cq_reg_xor_into` refuses on
+## its own — measured, with the shim's check disabled the case still exits 0 on
+## M07's message. The sibling cswap block already banned M07's swap string, so
+## this was an omission rather than a policy.
+##
+## `copy_of_two_rails_of_the_same_wrong_width` is the shape only the shim can
+## refuse, and it is why the fix is a new case and not just a longer regex: with
+## both rails the same width M07 finds nothing wrong, so the ABI's width TOKEN is
+## the only thing violated.
+set_tests_properties(test_runtime_rail_death.measure_of_a_rail_wider_than_its_symbol
+                     test_runtime_rail_death.copy_between_rails_of_different_widths
+                     test_runtime_rail_death.copy_of_two_rails_of_the_same_wrong_width
+                     test_runtime_rail_death.addc_of_a_rail_wider_than_its_symbol
+                     test_runtime_rail_death.xorc_of_a_rail_wider_than_its_symbol
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;cswap of a rail with itself;control aliases a rail it writes;cswap control flag rail is not one bit;cswap between rails of different widths;width mismatch in a copy;reg: handle out of range;not live")
+
+## cq_reg_swap_bits has its own `a == b` refusal and it must NOT be the one
+## that fires: it is reached only on the CQ_BIT_ONE row, so leaning on it would
+## leave the ZERO row a silent no-op and the quantum row a Release miscompile.
+##
+## THE LAYER PREFIX IS LOAD-BEARING IN THIS ONE and it went red before it went
+## green. M07's message is `swap of a rail with itself` and the shim's is
+## `cqrt_cswap of a rail with itself` — the first is a SUBSTRING of the second,
+## so the obvious negative pattern matched the very refusal the case wants and
+## reported a correct abort as a failure. `FATAL: reg:` is what tells the two
+## apart. Whenever a shim message is worded after the one it is meant to
+## displace, check the negative list against the positive case.
+set_tests_properties(test_runtime_rail_death.cswap_of_a_rail_with_itself
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cqrt;control aliases a rail it writes;cswap control flag rail is not one bit;cswap between rails of different widths;FATAL: reg: swap of a rail with itself")
+
+## AND IT MUST NOT BE M05's DISTINCTNESS ASSERT, which is Debug-gated: if
+## that is what fires, the Release build has no detector at all.
+set_tests_properties(test_runtime_rail_death.cswap_whose_control_aliases_a_rail_it_writes
+                     test_runtime_rail_death.cswap_whose_control_aliases_its_second_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cqrt;cswap of a rail with itself;cswap control flag rail is not one bit;cswap between rails of different widths;distinctness")
+
+## The flag guard, and the rail guard's string must be absent: they are
+## different claims about different operands.
+set_tests_properties(test_runtime_rail_death.cswap_with_a_control_flag_wider_than_one_bit
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cqrt;cswap of a rail with itself;control aliases a rail it writes;cswap between rails of different widths")
+
+## Both must be the SHIM's width refusal reached before the branch on the
+## flag's kind — cq_reg_swap_bits's own is on the ONE row only, so if that
+## string appears the zero-row case is passing for the wrong reason.
+set_tests_properties(test_runtime_rail_death.cswap_between_rails_of_different_widths
+                     test_runtime_rail_death.cswap_validates_its_operands_even_on_the_zero_row
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cqrt;cswap of a rail with itself;control aliases a rail it writes;cswap control flag rail is not one bit;width mismatch in a rail-to-rail swap")
+
+## THE MIRROR IMAGE: these four MUST be M07's, so the shim's own prefix is
+## what must not appear. A shim that re-implemented any of them would be the
+## masking layer this project has recorded four times — and would make M07's
+## own death cases untestable from here.
+set_tests_properties(test_runtime_rail_death.double_free_is_m07s_refusal
+                     test_runtime_rail_death.free_of_a_measured_rail_is_m07s_refusal
+                     test_runtime_rail_death.a_second_measure_is_m07s_refusal
+                     test_runtime_rail_death.use_of_a_freed_rail_is_m07s_refusal
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")
+
+## `rail_w`'s ORDER AND ITS ACCESSOR — two properties of one three-line
+## function, and each case below is the sole detector for one of them. Both
+## aborts are M07's, so the discriminator is the whole `FATAL: shim:` prefix:
+## under mutant rail-R03 (resolve and compare swapped) the freed case prints the
+## SHIM's width message instead of M07's tombstone one, and both orders still
+## abort, so the exit code alone cannot see it.
+##
+## THE WIDTHS DIFFER ON PURPOSE. The order case needs a WRONG width — the only
+## shape where the two orders disagree, which is exactly why the file's existing
+## `use_of_a_freed_rail_is_m07s_refusal` (a freed i32 handed to `cqrt_xorc_i32`)
+## could not see rail-R03. The accessor case needs a MATCHING one: with the
+## width wrong it would abort under mutant rail-R04 too, on the shim's width
+## message, and would be a weaker second copy of the order case rather than the
+## sole detector for terminality-on-write.
+set_tests_properties(test_runtime_rail_death.xorc_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free
+                     test_runtime_rail_death.xorc_of_a_measured_rail_is_a_write_refusal
+                     test_runtime_rail_death.measure_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")
+
+## The gate surface. The one-bit guard is a DIFFERENT string from the rail
+## surface's width guard, and both are listed against each other so a copy-paste
+## between the two files goes red.
+set_tests_properties(test_runtime_gate_death.x_on_a_rail_wider_than_one_bit
+                     test_runtime_gate_death.cnot_on_a_rail_wider_than_one_bit
+                     test_runtime_gate_death.toffoli_on_a_rail_wider_than_one_bit
+                     test_runtime_gate_death.x_controlled_on_a_rail_wider_than_one_bit
+                     test_runtime_gate_death.cnot_controlled_on_a_rail_wider_than_one_bit
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;the same rail twice;not the width its cqrt;D11;not live")
+
+## The rotation width guard is the RAIL surface's string, not the one-bit one:
+## a rotation is defined on a rail of any width, so what it refuses is a rail
+## that is not the width its own symbol names.
+set_tests_properties(test_runtime_gate_death.rz_of_a_rail_wider_than_its_symbol
+                     test_runtime_gate_death.ry_of_a_rail_wider_than_its_symbol
+                     test_runtime_gate_death.rz_of_a_rail_narrower_than_its_symbol
+                     test_runtime_gate_death.rz_controlled_of_a_rail_wider_than_its_symbol
+                     test_runtime_gate_death.rz_controlled_inv_of_a_rail_wider_than_its_symbol
+                     test_runtime_gate_death.ry_controlled_inv_of_a_rail_wider_than_its_symbol
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;wider than one bit;the same rail twice;D11")
+
+## THE ORDER, NOT THE REFUSAL. `gate_rot_width`'s `(void)cq_reg_bits` buys one
+## thing: M07's lifetime refusal lands BEFORE the width comparison, because
+## cq_reg_width goes through cq_reg_slot and a tombstone keeps its width on
+## purpose. The refusal itself is M22's one layer down (src/rotate.c), so the
+## discriminator has to be NEGATIVE and it is `not the width its cqrt` — with
+## the line deleted that is exactly what these two print instead, and they still
+## abort, so the exit code alone cannot see it. Measured: the deletion survives
+## all 256 tests in both configurations without these two. Keep them in EXACTLY
+## this one block — set_tests_properties OVERWRITES, and a second block naming
+## either case would silently delete the only thing with teeth here.
+set_tests_properties(test_runtime_gate_death.ry_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free
+                     test_runtime_gate_death.ry_of_a_measured_rail_of_the_wrong_width_is_a_write_refusal
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cqrt;wider than one bit;the same rail twice;D11")
+
+## AND NOT M05's DISTINCTNESS ASSERT, which is Debug-gated — if that is what
+## fires then Release has no detector and the measured malformed `cx q0 q0`
+## reaches the sink.
+## AND `FATAL: controlled:` JOINS THE LIST, added 2026-08-27 for `bd pnu`. M06's
+## check_one refuses PRD §9 row B one layer down, and once tests/test_runtime_
+## gate_death.c's `one_bit()` started minting a real CQ_BIT_Q wire it began
+## catching the three FLAG coincidences whenever the shim's `gate_distinct` was
+## deleted — with a message containing none of the four discriminators above, so
+## the cases kept exiting 0. Measured: gate-G13, gate-G15 and gate-G16b all
+## survived the whole 258-test suite in both configurations.
+##
+## IT DISARMS NOTHING, and that was checked case by case rather than assumed:
+## `gate_distinct` runs BEFORE `cq_shim_region` in both controlled entry points
+## and every one of these eight has a coincident pair, so in a correct tree the
+## shim's own message is the only one printed and M06 never speaks. The four
+## uncontrolled cases cannot reach M06 at all. Verified by running all eight
+## after the edit.
+##
+## THE SECOND ARM IS THE BLOCK BELOW, and it is the one with teeth: a
+## CQ_BIT_ZERO flag, where M06 CANNOT fire and the shim's guard is not merely
+## first but ALONE.
+set_tests_properties(test_runtime_gate_death.cnot_whose_control_is_its_target
+                     test_runtime_gate_death.toffoli_with_two_equal_controls
+                     test_runtime_gate_death.x_controlled_whose_flag_is_its_target
+                     test_runtime_gate_death.toffoli_whose_first_control_is_its_target
+                     test_runtime_gate_death.toffoli_whose_second_control_is_its_target
+                     test_runtime_gate_death.cnot_controlled_whose_flag_is_its_inner_control
+                     test_runtime_gate_death.cnot_controlled_whose_flag_is_its_target
+                     test_runtime_gate_death.cnot_controlled_whose_inner_control_is_its_target
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;wider than one bit;not the width its cqrt;distinctness;D11;FATAL: controlled:")
+
+## `gate_ctrl`'s AND `gate_target`'s ORDER — the same negative discriminator as
+## the rail surface's, and for the same reason: both fixtures are a FREED rail
+## whose width is ALSO wrong, which is the only shape where the two orders
+## disagree, and both orders still abort, so the exit code alone cannot see it.
+## Under mutants gate-G20 / gate-G21 (the comparison hoisted above the resolve)
+## these print the shim's `wider than one bit` instead of M07's `write access to
+## a rail that is not live` / `use of a freed handle`. Banning the whole
+## `FATAL: shim:` prefix is what makes them claims about WHO refuses.
+set_tests_properties(test_runtime_gate_death.x_of_a_freed_rail_wider_than_one_bit_is_a_use_after_free
+                     test_runtime_gate_death.cnot_whose_control_is_a_freed_wide_rail_is_a_use_after_free
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")
+
+## PRD §9 ROW 0, WHERE THE SHIM'S COINCIDENCE GUARD IS THE ONLY DETECTOR THERE
+## IS. The flag is a CQ_BIT_ZERO, so `cq_shim_region` opens a SKIP frame: M06
+## never promotes and so never compares a wire, and M05's `cq_bit_coincident`
+## fires only on two CQ_BIT_Q bits, of which this fixture has none. With
+## `gate_distinct` deleted these three do not abort AT ALL — the exit code
+## convicts, and the negative list below is what stops them passing on some
+## OTHER refusal. `distinctness` and `FATAL: controlled:` are in it although
+## both are structurally unreachable here: that is the CLAIM (nothing but the
+## shim may speak on row 0), not dead text, and it is what goes red the day a
+## guard migrates down a layer.
+##
+## `x_of_a_measured_rail_is_a_write_refusal` shares the list for one reason —
+## it must be M07's `write access to a rail that is not live`, so every shim
+## string has to be absent, `wider than one bit` most of all: its rail is ONE
+## bit wide precisely so the one-bit guard cannot be what fires.
+set_tests_properties(test_runtime_gate_death.x_controlled_whose_zero_flag_is_its_target
+                     test_runtime_gate_death.cnot_controlled_whose_zero_flag_is_its_inner_control
+                     test_runtime_gate_death.cnot_controlled_whose_zero_flag_is_its_target
+                     test_runtime_gate_death.x_of_a_measured_rail_is_a_write_refusal
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;wider than one bit;not the width its cqrt;distinctness;D11;FATAL: controlled:")
+
+## D11 IS M06's AND MUST STAY M06's. PRD §15 D11 places the refusal in the
+## rotation module; a shim-side copy would pre-empt it, make M22's own five
+## death cases unreachable from here, and be a second place to keep correct.
+set_tests_properties(test_runtime_gate_death.rz_controlled_on_a_constant_lane_is_m06s_refusal
+                     test_runtime_gate_death.ry_controlled_inv_at_a_half_turn_is_m06s_refusal
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")
+
+## Layer 5 — the shim generator (M27, Step 22).
+##
+## THE FIRST NON-C SUITES IN THE TREE, and the first raw add_test:
+## add_cqops_test resolves ${name}.c against a CMake TARGET, and a .py file is
+## neither. They are registered here rather than by widening CqopsTest.cmake,
+## because everything that function does for a C binary — linking
+## cqops_test_support, the sanitizer ENVIRONMENT — is meaningless for a
+## generator that emits text.
+##
+## The interpreter is PROBED (cmake/CqopsPython.cmake): PyYAML is what decides,
+## and on this box the two python3 on PATH disagree about having it. When none
+## qualifies these two are NOT registered and CMake warns — a suite that passes
+## without running would be worse than a test count that visibly drops.
+##
+## CQOPS_CC hands the suites the compiler THIS build configured, so the compile
+## check runs against the same toolchain everything else does. WORKING_DIRECTORY
+## is the source root because the generator's default paths are relative to it.
+cqops_select_python(CQOPS_PY)
+if(CQOPS_PY)
+    foreach(pysuite test_gen_shim test_gen_bodies)
+        add_test(NAME ${pysuite}
+                 COMMAND ${CQOPS_PY} "${CMAKE_CURRENT_SOURCE_DIR}/${pysuite}.py"
+                 WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+        ## `not ok` is NOT anchored, and that is a correction rather than a
+        ## looseness. CTest matches FAIL_REGULAR_EXPRESSION against the WHOLE
+        ## captured output as one string, so `^` anchors at the first byte of the
+        ## run — which is always "TAP version 13". The anchored form this line
+        ## carried could never match: a build-level detector nobody had seen fire,
+        ## next to a real one, which is the `set_tests_properties` family of trap
+        ## CLAUDE.md already records once. Today the exit code governs
+        ## (`sys.exit(sc.run(...))`), so this is the independent second detector —
+        ## it also catches a suite that reports failures and then exits 0.
+        set_tests_properties(${pysuite} PROPERTIES
+            ENVIRONMENT "CQOPS_CC=${CMAKE_C_COMPILER};PYTHONDONTWRITEBYTECODE=1"
+            FAIL_REGULAR_EXPRESSION "not ok")
+    endforeach()
+endif()
+
+## ---------------------------------------------------------------------------
+## L6 — Step 24. CQ_lang's own e2e fixtures, lowered by CQ_lang's own pass and
+## LINKED AGAINST libcqops instead of its trace-only runtime stub.
+##
+## THE GATE IS PRD §15 D18: THE FIXTURES LINK, RUN, AND DO NOT ABORT. There is
+## no diff, and adding one would reintroduce a retired criterion — read
+## `tools/l6/run_slice_cqops.sh`'s header for the two measured reasons the
+## goldens are not an oracle in any column.
+##
+## OPT-IN, AND THAT IS NOT A DODGE. libcqops is a standalone library and CQ_lang
+## is ONE CALLER of it (PRD §15 D18): this repo does not pin CQ_lang, does not
+## know where it lives on a given box, and cannot build it. A test registered
+## unconditionally would either be skipped — a green run claiming a link it never
+## made — or would make the default `make test` depend on a tree we do not
+## control. So it registers only when pointed at one, and CMake says so at
+## configure time either way, on `cqops_select_python`'s precedent below: a
+## suite that is silently absent is worse than a test count that visibly moves.
+##
+## `--min-ok` IS A FLOOR, NOT A PIN. CQ_lang's corpus grows (239 → 241 → 249
+## goldens over four days, measured), so an exact count would churn on every
+## upstream commit; a floor still catches an in-scope fixture regressing into
+## the casualty list, which is the regression that matters. RE-MEASURE IT when
+## the number moves rather than lowering it to make a run green.
+set(CQOPS_CQLANG_DIR "" CACHE PATH
+    "Path to a built CQ_lang checkout; enables the L6 (Step 24) fixture run")
+set(CQOPS_CQLANG_BUILD "build" CACHE STRING
+    "CQ_lang build directory, relative to CQOPS_CQLANG_DIR")
+set(CQOPS_L6_MIN_OK "43" CACHE STRING
+    "Floor on the number of L6 fixtures that run to completion")
+
+find_program(CQOPS_PY3 NAMES python3)
+if(CQOPS_CQLANG_DIR AND CQOPS_PY3 AND EXISTS
+   "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/runtime/libcq_templates.a")
+    add_test(NAME l6_cqlang_fixtures
+             COMMAND ${CQOPS_PY3} "${CMAKE_SOURCE_DIR}/tools/l6/l6_run.py"
+                     --cqlang "${CQOPS_CQLANG_DIR}"
+                     --cqbuild "${CQOPS_CQLANG_BUILD}"
+                     --archive "$<TARGET_FILE:cqops>"
+                     --out "${CMAKE_CURRENT_BINARY_DIR}/l6"
+                     --json "${CMAKE_CURRENT_BINARY_DIR}/l6.json"
+                     --gate --min-ok "${CQOPS_L6_MIN_OK}")
+    ## The whole corpus is minutes, not seconds — it is 250 four-stage compile /
+    ## lower / link / run pipelines, not a unit suite.
+    set_tests_properties(l6_cqlang_fixtures PROPERTIES TIMEOUT 3600)
+else()
+    message(STATUS "cqops: L6 (Step 24) not registered — "
+                   "configure with -DCQOPS_CQLANG_DIR=<a built CQ_lang> to run "
+                   "CQ_lang's e2e fixtures against this archive")
+endif()

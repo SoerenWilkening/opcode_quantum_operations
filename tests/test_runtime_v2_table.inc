@@ -1,0 +1,103 @@
+/* tests/test_runtime_v2_table.inc — one no-argument thunk per deferred symbol,
+ * and the table that drives the sweep. 109 rows.
+ *
+ * A LARGE STATIC TEST TABLE, which is exactly what Rule 12's `.inc` escape
+ * hatch is for (IMPLEMENTATION_PLAN §2.3). Included by tests/test_runtime_v2.c
+ * and inheriting its includes; out of check_loc.sh's reach by the EXTENSION
+ * rule.
+ *
+ * THE THUNK MACROS MIRROR shim/cq_runtime_v2.c's MACROS AND THAT IS NOT THE
+ * "ORACLE SHARES A CONSTANT WITH THE CODE" TRAP. What a thunk shares with the
+ * shim is the SYMBOL NAME as an identifier — and a wrong identifier here is a
+ * LINK ERROR, not a silent agreement. What the sweep compares the shim against
+ * is the string the shim PRINTS, and the oracle for that is
+ * shim/cq_runtime_abi.h, which neither file's macros can reach. So a macro that
+ * stringifies the wrong literal — `"cqrt_rz_f" #W` where the body is
+ * `_controlled` — makes one name appear twice and another never, and BOTH
+ * directions of the name-set check go red.
+ *
+ * NO ARGUMENT HERE IS MEANINGFUL. Every body aborts before reading anything, so
+ * the values exist only to satisfy the prototype; a fixture that looked
+ * plausible would invite the reader to think one of them mattered.
+ */
+
+#define CQ_V2_T_FP(W, VT)                                                     \
+    static void t_alloc_f##W(void)   { (void)cqrt_alloc_f##W((VT)0); }        \
+    static void t_measure_f##W(void) { (void)cqrt_measure_f##W(0); }          \
+    static void t_ry_f##W(void)      { cqrt_ry_f##W(0, 0.0); }                \
+    static void t_rz_f##W(void)      { cqrt_rz_f##W(0, 0.0); }                \
+    static void t_rzc_f##W(void)     { cqrt_rz_f##W##_controlled(0, 0, 0.0); }\
+    static void t_rzci_f##W(void)                                             \
+    { cqrt_rz_f##W##_controlled_inv(0, 0, 0.0); }                             \
+    static void t_copy_f##W(void)    { cqrt_copy_f##W(0, 0); }                \
+    static void t_copyc_f##W(void)   { cqrt_copy_f##W##_controlled(0, 0, 0); }
+
+CQ_V2_T_FP(16, _Float16)
+CQ_V2_T_FP(32, float)
+CQ_V2_T_FP(64, double)
+CQ_V2_T_FP(80, long double)
+
+static void t_ryci_f32(void) { cqrt_ry_f32_controlled_inv(0, 0, 0.0); }
+static void t_ryci_f64(void) { cqrt_ry_f64_controlled_inv(0, 0, 0.0); }
+
+#define CQ_V2_T_QRAM(W)                                                       \
+    static void t_qa_##W(void)   { (void)cqrt_qram_alloc_##W(0); }            \
+    static void t_ql_##W(void)   { (void)cqrt_qram_load_##W(0, 0); }          \
+    static void t_qlu_##W(void)  { cqrt_qram_load_##W##_unc(0, 0, 0); }       \
+    static void t_qs_##W(void)   { cqrt_qram_store_##W(0, 0, 0); }            \
+    static void t_qsu_##W(void)  { cqrt_qram_store_##W##_unc(0, 0, 0); }      \
+    static void t_qsc_##W(void)                                               \
+    { cqrt_qram_store_##W##_controlled(0, 0, 0, 0); }                         \
+    static void t_qscu_##W(void)                                              \
+    { cqrt_qram_store_##W##_controlled_unc(0, 0, 0, 0); }
+
+CQ_V2_T_QRAM(i1)
+CQ_V2_T_QRAM(i8)
+CQ_V2_T_QRAM(i16)
+CQ_V2_T_QRAM(i32)
+CQ_V2_T_QRAM(i64)
+CQ_V2_T_QRAM(f16)
+CQ_V2_T_QRAM(f32)
+CQ_V2_T_QRAM(f64)
+CQ_V2_T_QRAM(f80)
+
+static void t_tape_alloc(void) { (void)cqrt_tape_alloc(); }
+
+#define CQ_V2_T_TAPE(W)                                                       \
+    static void t_tw_##W(void)  { (void)cqrt_tape_write_##W(0, 0); }          \
+    static void t_twc_##W(void)                                               \
+    { (void)cqrt_tape_write_##W##_controlled(0, 0, 0); }
+
+CQ_V2_T_TAPE(i1)
+CQ_V2_T_TAPE(i8)
+CQ_V2_T_TAPE(i16)
+CQ_V2_T_TAPE(i32)
+CQ_V2_T_TAPE(i64)
+
+static void t_alloc_handle(void) { (void)cqrt_alloc_handle(); }
+
+#define CQ_V2_ROW_FP(W)                                                       \
+    t_alloc_f##W, t_measure_f##W, t_ry_f##W, t_rz_f##W,                       \
+    t_rzc_f##W, t_rzci_f##W, t_copy_f##W, t_copyc_f##W
+
+#define CQ_V2_ROW_QRAM(W)                                                     \
+    t_qa_##W, t_ql_##W, t_qlu_##W, t_qs_##W, t_qsu_##W, t_qsc_##W, t_qscu_##W
+
+#define CQ_V2_ROW_TAPE(W)  t_tw_##W, t_twc_##W
+
+static void (*const CQ_V2_THUNKS[])(void) = {
+    CQ_V2_ROW_FP(16), CQ_V2_ROW_FP(32), CQ_V2_ROW_FP(64), CQ_V2_ROW_FP(80),
+    t_ryci_f32, t_ryci_f64,
+
+    CQ_V2_ROW_QRAM(i1),  CQ_V2_ROW_QRAM(i8),  CQ_V2_ROW_QRAM(i16),
+    CQ_V2_ROW_QRAM(i32), CQ_V2_ROW_QRAM(i64), CQ_V2_ROW_QRAM(f16),
+    CQ_V2_ROW_QRAM(f32), CQ_V2_ROW_QRAM(f64), CQ_V2_ROW_QRAM(f80),
+
+    t_tape_alloc,
+    CQ_V2_ROW_TAPE(i1), CQ_V2_ROW_TAPE(i8), CQ_V2_ROW_TAPE(i16),
+    CQ_V2_ROW_TAPE(i32), CQ_V2_ROW_TAPE(i64),
+
+    t_alloc_handle
+};
+
+#define CQ_V2_N_THUNKS (sizeof CQ_V2_THUNKS / sizeof CQ_V2_THUNKS[0])

@@ -224,9 +224,13 @@ void cq_addacc_check(const cq_addacc_block *k)
      * scratch, green L1 — which is why this refuses rather than folds.
      *
      * THERE IS NO L5 SHORT-CIRCUIT HERE AND ADDING ONE WOULD BE A REGRESSION.
-     * L5 is about opcodes CQ_lang emits; K8 has no cqrt_* symbol, is never
-     * entered from the shim, and its only v1 caller hands it pre-materialised
-     * scratch. A classical operand is a caller bug, not a cheap case. */
+     * L5 is about opcodes CQ_lang emits, and K8's L5 lives in M26's WRAPPER
+     * rather than here (PRD §15 D17): `shim/cq_runtime_rail.c`'s `rail_addc` is
+     * reached from `cqrt_addc_i<W>`, folds an all-classical rail at zero cost,
+     * and materialises every operand before calling in. (This comment said K8
+     * "has no cqrt_* symbol, is never entered from the shim" until 2026-08-23,
+     * when that caller landed.) A classical operand arriving HERE is a caller
+     * bug, not a cheap case. */
     for (int i = 0; i < W; i++) {
         if (!cq_bit_is_qubit(k->acc[i]) || !cq_bit_is_qubit(k->b[i]))
             cq_kernel_die("addacc: every bit of acc and b must already be a "

@@ -235,7 +235,9 @@ CQ_TEST(the_compute_half_is_the_skeleton_plus_w_measured_k8_accumulates)
  * skeleton costs W(W+1)/2 and not W². A kernel that emitted all W² would need a
  * 2W-bit accumulator and would strand the high half dirty — Bennett's own
  * `:qcla_tree` comment at arith.jl:222-224 calls that "STRANDS the high W as
- * dirty ancillae", which here is a Rule 6 hard error. The difference is visible
+ * dirty ancillae" (upstream's sense of the word, not PRD §15 D15's), which
+ * here is what Rule 6 refuses — under D15 §3 those qubits strand rather than
+ * return. The difference is visible
  * in the Toffoli column alone, and this is the case that looks at it. */
 CQ_TEST(the_partial_products_are_truncated_and_the_high_half_never_exists)
 {

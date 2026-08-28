@@ -31,6 +31,17 @@ Headline numbers (all independently corroborated inside CQ_lang)
 
   Of the 2479: purely-integer 1595, fp-touching 884.
 
+  APPENDED 2026-08-22, AFTER THIS CENSUS WAS WRITTEN. Of the 1595 purely-integer:
+  992 thin wrappers + 603 `cq_template_*_inv` ABORT bodies (PRD §15 D14, resolved
+  2026-08-21 — `_inv` is f-inverse, and f-inverse does not exist for and / or /
+  udiv / trunc or any icmp). `cq_template_*_inv` totals 915 across both domains,
+  in exactly six suffix shapes: _inv 369, _hl_inv 218, _lh_inv 62,
+  _controlled_inv 102, _hl_controlled_inv 102, _lh_controlled_inv 62. So the v1
+  abort bucket is 884 fp + 603 integer = 1487, and Step 22 must assert the integer
+  half is EXACTLY those 603 NAMES — a count cannot see it (there are 20 same-size
+  variant transpositions that hold all three counts exact while swapping a live
+  family for an aborting one).
+
   NONE of 1455, 1474 or 1732 is the current total or the current integer count.
   Part F explains precisely where each came from.
 
@@ -283,14 +294,41 @@ D2. THE ONE IRREGULARITY — cqrt_ry_*_controlled_inv IS 7 WIDTHS, NOT 9
 
   This is deliberate, not an oversight. cq_runtime.h:191-193 states there is NO
   plain `cqrt_ry_<W>_controlled` twin at all ("the prep itself is unconditional,
-  only its inverse is controlled") and pins the family at "7 widths".
-  cq_runtime.h:5 independently describes the controlled surface as
-  "cqrt_rz_<W>_controlled[_inv] (7 widths x 2)".
+  only its inverse is controlled") and pins THIS family at "7 widths" — which is
+  correct, because :191-193 is the RY block.
 
-  ACTION FOR M27: the shim generator must NOT emit a uniform 9-width cross
-  product for the ry controlled axis. Emitting `cqrt_ry_f16_controlled_inv` or
-  `cqrt_ry_f80_controlled_inv` mints symbols the frozen ABI does not declare.
-  Likewise it must never emit `cqrt_ry_<W>_controlled` (no `_inv`) for any width.
+  CITATION CORRECTED 2026-08-22 (bd tso). This note used to add "cq_runtime.h:5
+  independently describes the controlled surface as 'cqrt_rz_<W>_controlled[_inv]
+  (7 widths x 2)'" as SUPPORTING evidence. It is not supporting evidence — it is a
+  stale line applying the RY figure to RZ, and following the citation gets you 7
+  for a family that has 9. Read the DECLARATIONS, which are what the ABI is:
+
+    cqrt_ry_<W>                  :125-133   9   i1 i8 i16 i32 i64 f32 f64 f16 f80
+    cqrt_ry_<W>_controlled       —          0   does not exist (:191 says so)
+    cqrt_ry_<W>_controlled_inv   :196-202   7   i1 i8 i16 i32 i64 f32 f64   <-- GAP
+    cqrt_rz_<W>                  :140-148   9   (all)
+    cqrt_rz_<W>_controlled       :162-170   9   (all)
+    cqrt_rz_<W>_controlled_inv   :172-180   9   (all)
+
+  Re-measured 2026-08-22 from the declarations by identifier extraction (NOT a
+  line-anchored grep — this header is column-aligned and the obvious regex drops
+  49 of its 173 declarations; see the trap at the end of this file), cross-checked
+  against the definitions in cq_runtime.c, which agree. Both :5 and :156 say
+  "7 widths" of the RZ controlled surface and both predate the f16 (Phase 7.1
+  Increment D) and f80 (bd 3c6m.4) increments that took it to 9; :30 and :33 carry
+  the same pre-increment enumeration for the uncontrolled rotations, though those
+  are scoped under :22's "The 33 base symbols:" and read as a frozen historical
+  list. cq_runtime.h is CQ_lang's and READ-ONLY (Rule 1) — the correction lives
+  here, on our side, and nothing downstream was wrong: the grid above always had
+  7/9/9, and PRD §15 D11 was written against the grid rather than the prose.
+
+  ACTION FOR M26, NOT M27 — the two surfaces are constantly confused, so name it.
+  `cqrt_*` is the 173-symbol CORE runtime ABI, hand-written in M26 at Step 23; it
+  appears nowhere in opcode_table.yaml and M27 never emits one. Whoever writes M26
+  must NOT emit a uniform 9-width cross product for the ry controlled axis:
+  `cqrt_ry_f16_controlled_inv` and `cqrt_ry_f80_controlled_inv` mint symbols the
+  frozen ABI does not declare, and `cqrt_ry_<W>_controlled` (no `_inv`) exists at
+  no width at all.
 
 D3. WIDTHS ABSENT FROM THE ENTIRE cqrt_* SURFACE: i128 and i80
 
@@ -414,6 +452,57 @@ E1. STEP 0.7 (`cqrt_h`) — RESOLVED. All three horns of the stated trilemma are
     right shape — it is dead ABI, and if it ever fires, an assumption broke).
     M04 can freeze the vtable shape in Step 5 without an `h` entry.
 
+    *** SUPERSEDED 2026-08-23 BY PRD §15 D16. THE SENTENCE ABOVE — "implement
+    *** cqrt_h/cqrt_h_controlled as defined-but-unreachable bodies" — IS THE
+    *** LOSER, AND THE REST OF THE PARAGRAPH STANDS. Read D16 before acting on
+    *** any of this.
+    ***
+    *** THE DISAGREEMENT WAS REAL AND WAS `bd vxk`. PRD-v1.md's struck-cqrt_h
+    *** callout omits the two symbols on the ground that "an unreferenced
+    *** declaration produces no undefined reference"; this paragraph said
+    *** implement them with a loud abort. D16 settles it for PRD §1, on a
+    *** ground NEITHER document states: the discriminator is CAPABILITY, not
+    *** liveness. libcqops defines every cqrt_* it COULD serve — implemented in
+    *** scope, a loud abort out of scope — and leaves undefined only what it
+    *** could not serve at any point in v1. That is cqrt_h and
+    *** cqrt_h_controlled and nothing else, because Rule 4 forbids H on the
+    *** classical path and §8's vtable is frozen at six with no h slot. For a
+    *** symbol whose EMISSION IS ITSELF THE BUG, a build-time failure dominates
+    *** a run-time one: it fires before anything runs and cannot produce a
+    *** wrong circuit.
+    ***
+    *** AND THE DISCRIMINATOR THIS FILE IMPLIED — "is it minted by the pass?" —
+    *** IS MEASURABLY WRONG, which is why the fix is not simply deleting one
+    *** sentence. It would also strike cqrt_x_controlled, cqrt_cnot_controlled
+    *** and the five integer cqrt_ry_<W>_controlled_inv, which have no minter
+    *** either and which libcqops serves correctly: cqrt_x/cnot/toffoli take a
+    *** rail HANDLE and not a raw wire, so the first two are literally a CX and
+    *** a CCX. Independently: only 65 of the 173 appear anywhere in the corpus,
+    *** and the 108 absentees include cqrt_alloc_i8 and cqrt_copy_i1. Corpus
+    *** absence is a property of the fixture set, not of the ABI.
+    ***
+    *** WHAT IS NOT SUPERSEDED: everything above the struck sentence. Do NOT add
+    *** an `h` entry to the sink vtable; do NOT treat cqrt_h as an
+    *** over-declaration whose DECLARATION should be dropped (it is declared,
+    *** verbatim, in shim/cq_runtime_abi.h — declaring it is free, defining it
+    *** is what D16 refuses); Grover-from-rotations stays forced.
+    ***
+    *** Two things measured 2026-08-22 that BOTH sides need and neither had.
+    *** (i) The PRD's premise is true for cqrt_h specifically — it is emitted
+    *** by nothing and called by nothing — and FALSE for the adjacent families
+    *** (qram 63, tape 11, the 34 fp-width core symbols), which the corpus does
+    *** call; those are decided separately as define-with-loud-abort, and the
+    *** cqrt_h argument does not reach them.
+    *** (ii) The PRD's CONCLUSION rests on a link model that does not hold
+    *** unconditionally: libcq_runtime.a is ONE translation unit holding all
+    *** 173 cqrt_*, so leaving any symbol undefined pulls the whole object and
+    *** produces a DUPLICATE-SYMBOL wall naming symbols we implement
+    *** correctly, with the omitted one named nowhere. "Omission is harmless"
+    *** therefore holds only under a link line that DROPS libcq_runtime.a —
+    *** which is `bd 590`'s open question, not a settled one. If 590 resolves
+    *** the other way, the PRD's position needs re-examining on a ground it
+    *** never stated.
+
 E2. `cqrt_free` IS LIVE — and CQ_lang's own header comment about it is STALE.
 
     runtime/cq_runtime.h:40-41 claims: "cqrt_free(handle): width-irrelevant
@@ -429,7 +518,9 @@ E2. `cqrt_free` IS LIVE — and CQ_lang's own header comment about it is STALE.
     lowering_uncompute_branch_botharms.ll, ...).
 
     WHY THIS MATTERS HERE: libcqops Rule 6 ("free only a provably-zero rail";
-    a dirty free is a HARD ERROR) is built entirely on cqrt_free being a live,
+    a rail it cannot prove clean never gets its qubits back -- this parenthesis
+    read "a dirty free is a HARD ERROR" until PRD section 15 D15 settled the ACT
+    as STRANDING on 2026-08-22) is built entirely on cqrt_free being a live,
     frequently-emitted symbol. It is. Rule 6 is well-founded. Had the census
     trusted the header prose instead of the emitter, Rule 6 would have looked
     like defensive work against a dead symbol.
@@ -649,7 +740,10 @@ F5. THE ANSWER, AND THE ONE SCOPE DECISION IT EXPOSES
     1474 : phantom, wrong at every revision — delete it
     1732 : correct for 2026-06-20; a stale comment in two files
 
-    NEW DECISION THE PRD DOES NOT YET RECORD — does v1 own i80?
+    NEW DECISION THE PRD DID NOT YET RECORD — does v1 own i80?
+    [DECIDED 2026-08-14: YES. i80 IS IN SCOPE and the shim grid is 1595, not 1455.
+     PRD-v1.md §1 records it under its own heading; CLAUDE.md's Resolved section
+     repeats it. The recommendation below was taken.]
     The PRD predates i80 entirely and never mentions it. Mechanically, all 140
     i80 symbols are pure classical permutations well inside v1's kernel set —
     `and`, `or`, `shl`, `lshr`, `icmp`, `trunc` from i80, `zext` to i80 — and
@@ -674,6 +768,16 @@ F6. SCOPE WARNING — opcode_table.yaml IS NOT THE WHOLE cq_template_* SURFACE
     the identical `cq_template_<op>_<W>` naming). The PRD's "2333 declarations in
     runtime/cq_templates.h" therefore describes ONE of three headers.
 
+    [SETTLED 2026-08-14 — option (a). M27 generates from opcode_table.yaml ONLY;
+     CQ_lang keeps linking its own archives for the other 401, and the two sibling
+     tables are NOT vendored. The consequence is that Step 23's gate must read "no
+     undefined cq_template_* FROM THE OPCODE GRID" — an unqualified version cannot
+     pass while 401 symbols come from elsewhere. Recorded in PRD-v1.md §1, in
+     CLAUDE.md's Resolved-2026-08-14 section, and in the plan's Step 22 and 23
+     rows. Do NOT re-open it from third_party/cq_lang/COMMIT, which still calls it
+     "an open scope question" and is under Rule 1, so it cannot be corrected there.
+     The paragraph below is kept as the statement of what was decided.]
+
     OPEN QUESTION FOR STEP 22 (M27), not settled here: if a CQ_lang program uses
     a reversible intrinsic or a direct-libm call, the shim must define those 401
     symbols too or the link fails. The libcqops PRD/plan never mention these two
@@ -681,13 +785,34 @@ F6. SCOPE WARNING — opcode_table.yaml IS NOT THE WHOLE cq_template_* SURFACE
     are still linked from CQ_lang, or (b) M27 must generate over all three yamls
     — in which case both siblings need vendoring into third_party/cq_lang at a
     pinned revision alongside opcode_table.yaml. FILE THIS AS A NEW BLOCKER.
+    [Discharged: (a) was chosen. See the bracket above.]
 
 F7. GRAND TOTAL OF THE LINK SURFACE
 
-    cq_template_*  2880   (2479 opcode + 389 intrinsic + 12 libm)
-    cqrt_*          173
-                   ----
-                   3053   symbols libcqops must ultimately resolve
+    [CORRECTED 2026-08-22 at Step 22. The 3053 below PREDATES the scope decision
+     recorded 34 lines above it in F6, and is the pattern CLAUDE.md records: every
+     stale figure found so far was the SECOND occurrence of a number whose first
+     occurrence had already been fixed. Option (a) was chosen, so the 401
+     intrinsic/libm symbols are CQ_lang's and are NOT ours to resolve.]
+
+    WHAT libcqops MUST RESOLVE (option (a), the decision):
+
+        cq_template_*  2479   the opcode grid, from opcode_table.yaml ONLY
+                              = 992 wrappers + 603 _inv aborts + 884 fp aborts
+        cqrt_*          173
+                       ----
+                       2652   symbols libcqops must resolve
+
+    WHAT CQ_LANG'S WHOLE LINK NAMESPACE IS (not our obligation):
+
+        cq_template_*  2880   (2479 opcode + 389 intrinsic + 12 libm)
+        cqrt_*          173
+                       ----
+                       3053   total symbols in play
+
+    This is exactly why Step 23's gate reads "no undefined cq_template_* FROM THE
+    OPCODE GRID" and not "nm shows no undefined cq_template_*": the unqualified
+    form cannot pass while 401 symbols come from CQ_lang's own archives.
 
 
 ================================================================================

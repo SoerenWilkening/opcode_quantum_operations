@@ -28,7 +28,8 @@
 
 /* Every release in this file goes through the shadow, which is how the pool
  * is actually wired at Step 7 — M03 itself takes the evidence as a parameter
- * and never reads a shadow (see qubits.h on bd ckd.17). */
+ * and never reads a shadow (see qubits.h on bd ckd.17 — closed, its
+ * unresolved half now PRD §15 D15). */
 static void release_clean(cq_qubit_pool *p, cq_shadow_table *sh, uint32_t q)
 {
     cq_qubits_release(p, q, cq_shadow_known_zero(sh, q));
@@ -338,6 +339,14 @@ CQ_TEST(a_provably_clean_qubit_releases_and_comes_back)
     cq_qubits_dispose(&p);
 }
 
+/* The stranding disposition (PRD §15 D15 §3) — split on the seam recorded in
+ * the .inc's own header: the POOL's arithmetic against the DISPOSITION at a
+ * free. Rule 12 forced the timing; the seam chose the place. */
+#include "test_qubits_strand.inc"
+
+/* And Step 26's disposition beside it, on the same seam. */
+#include "test_qubits_retire.inc"
+
 CQ_TEST(dispose_returns_the_pool_to_its_initial_state)
 {
     cq_qubit_pool p;
@@ -351,6 +360,9 @@ CQ_TEST(dispose_returns_the_pool_to_its_initial_state)
     CHECK_EQ(cq_qubits_minted(&p), 0u);
     CHECK_EQ(cq_qubits_peak(&p), 0u);
     CHECK_EQ(cq_qubits_ceiling(&p), 0u);
+    CHECK_EQ(cq_qubits_stranded(&p), 0u);
+    CHECK_EQ(cq_qubits_retired(&p), 0u);
+    CHECK(cq_qubits_recycles(&p));      /* D4 again, not the qec sink's mode */
     check_identities(&p, "after dispose");
 
     /* usable again without a second init */
@@ -369,5 +381,10 @@ CQ_TEST_MAIN(
     CQ_CASE(the_ceiling_bounds_live_qubits_not_total_acquires),
     CQ_CASE(a_ceiling_can_be_raised_lowered_and_lifted),
     CQ_CASE(a_provably_clean_qubit_releases_and_comes_back),
+    CQ_CASE(a_stranded_qubit_stays_live_and_never_reaches_the_free_list),
+    CQ_CASE(stranding_is_not_free_and_is_not_release_measured_against_both),
+    CQ_CASE(recycling_is_on_by_default_and_off_makes_a_release_retire),
+    CQ_CASE(with_recycling_off_no_index_is_ever_handed_out_twice),
+    CQ_CASE(the_ceiling_bounds_total_minted_once_recycling_is_off),
     CQ_CASE(dispose_returns_the_pool_to_its_initial_state)
 )

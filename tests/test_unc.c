@@ -129,9 +129,13 @@ static void ux_open(ux_fix *f)
 }
 
 /* Deliberately frees nothing. A rail holding a value on materialised qubits is
- * genuinely not |0>, and a rotation-tainted one cannot be proven clean at all
- * (bd 2cf); refusing to free either is Rule 6 working. cq_ctx_dispose returns
- * nothing to the pool, which is PRD §10's intended Rule-6 safe leak. */
+ * genuinely not |0>, and a rotation-tainted one cannot be proven clean BY THE
+ * SHADOW (bd 2cf, closed; PRD §15 D15); refusing to free either is Rule 6
+ * working. This used to say "cannot be proven clean at all" — an unqualified
+ * universal that D15 refutes: its certificate reads the call stream rather
+ * than the shadow, and discharges rails the shadow never could.
+ * cq_ctx_dispose returns nothing to the pool, which is PRD §10's intended
+ * Rule-6 safe leak. */
 static void ux_close(ux_fix *f)
 {
     cq_ctx_dispose(&f->ctx);

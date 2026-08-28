@@ -10,8 +10,17 @@
  * EVERY COLUMN IS ENUMERATED FOR EVERY ROW, which is the point rather than
  * thoroughness for its own sake. The mutation the enumeration exists to catch
  * is "the zero-qubit check runs only on the Ry identity rows": the Rz constant
- * column is the one that would then survive materialising, and it is the cell
- * PRD §15 D12's twelve corpus rails depend on.
+ * column is the one that would then survive materialising, and that cell is
+ * where Rule 15's asymmetry and L5's zero-cost claim live — an `rz` on a
+ * classical bit must cost zero gates AND zero qubits, so an all-constant rail
+ * stays all-constant (I4) and needs no free-time evidence at all.
+ *
+ * This used to be justified instead as "the cell PRD §15 D12's twelve corpus
+ * rails depend on". That justification was false twice over and is recorded
+ * rather than deleted: those rails are materialised by the Fredkin before the
+ * `rz` arrives, so they never reach this cell, and they are not kept freeable
+ * by D12 either — measured 2026-08-22, PRD §15 D15. The mutation this
+ * enumeration catches is real; only the reason given for caring was wrong.
  *
  * THE ANGLES ARE SPELLED AS MULTIPLES OF π DELIBERATELY, and that is safe here
  * for the reason PRD §15 D10 records: the residual M21 tests is

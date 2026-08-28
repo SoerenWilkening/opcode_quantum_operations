@@ -27,8 +27,17 @@
  *
  * K8's one advantage is the ANCILLA COUNT — `1`, against `W` for ripple — which
  * is worth having exactly where the accumulator is a long-lived scratch
- * register inside a bigger sandwich. That is K11 (M18, Step 16), and nowhere
- * else in v1. PRD-v1.md:534-541 records the decision to substitute Cuccaro into
+ * register inside a bigger sandwich. That is K11 (M18, Step 16).
+ *
+ * K8 HAS A SECOND CALLER SINCE 2026-08-23, AND IT IS NOTHING LIKE K11 (PRD §15
+ * D17, `bd dzj`). `shim/cq_runtime_rail.c`'s `rail_addc` — the body of
+ * `cqrt_addc_i<W>`, reached straight from CQ_lang's frozen ABI — runs this
+ * accumulator IN PLACE and NOT inside a sandwich, because `cqrt_addc` is
+ * `h := (h + imm) mod 2^W` and libcqops has no other in-place adder. Four
+ * statements in this header were written when K11 was the only caller and are
+ * corrected below where they occur. The one to carry: with no sandwich there is
+ * no I6(b), so that caller materialises every operand and the ancilla itself,
+ * and disposes them itself. PRD-v1.md:534-541 records the decision to substitute Cuccaro into
  * the multiplier as a deliberate delta from upstream, since `multiplier.jl:29`
  * calls the ripple `lower_add!` and no upstream construction composes shift-add
  * with Cuccaro. K08.md §5 D2 still presents that as an OPEN fork; it is not,
@@ -54,8 +63,16 @@
  *   (c) A caller inside a sandwich must have acc, b and x all inside its own
  *       scratch extent. K11 satisfies this: the accumulator, every partial
  *       product and every Cuccaro ancilla are bits of one pre-materialised
- *       region (K11.md §2b, §4). Anywhere else the Debug extent check fires,
- *       and it is right to.
+ *       region (K11.md §2b, §4).
+ *
+ *       "ANYWHERE ELSE THE DEBUG EXTENT CHECK FIRES, AND IT IS RIGHT TO" — this
+ *       clause said that until 2026-08-23 and it is FALSE, which matters
+ *       because it named the backstop a second caller would rely on.
+ *       `check_target` (src/emit.c) is inside `#if CQOPS_DEBUG_INVARIANTS` AND
+ *       is conditioned on `ctx->scratch_lo` being non-NULL, which only
+ *       `cq_sandwich` sets. Outside a sandwich it is inert in BOTH
+ *       configurations, so for M26's `rail_addc` the ONLY guard is
+ *       `cq_addacc_check` below.
  *
  * THE ANCILLA IS SUPPLIED BY THE CALLER, NOT ALLOCATED HERE, and that is
  * forced rather than tidy (K11.md §2b's interface note, K08.md §4's 2026-08-15
@@ -65,9 +82,13 @@
  * very wire K11.md's R8 trace indicts — `x` is read as a control at adder.jl:104
  * while still BIT_ZERO and materialised as a target at adder.jl:142, so the
  * reverse pass would emit gates the forward never did while L1 stayed green.
- * It also settles who frees it: nobody here. `x` is a bit of the caller's
- * region and goes back to the pool through cq_sandwich's epilogue on the
- * CQ_ZERO_BY_PALINDROME premise.
+ * It also settles who frees it: nobody here — but WHO the caller is decides how.
+ * For K11 `x` is a bit of the caller's scratch region and goes back to the pool
+ * through cq_sandwich's epilogue on the CQ_ZERO_BY_PALINDROME premise. For
+ * M26's `rail_addc` (PRD §15 D17) there is no sandwich and no region: the
+ * ancilla is a one-bit REGISTER the wrapper mints, materialises and frees
+ * itself, on its own `CQ_ZERO_BY_CUCCARO_RESTORE` premise — which rests on the
+ * same upstream hygiene contract 3 this file already cites.
  */
 #ifndef CQOPS_KERNELS_ADDACC_H
 #define CQOPS_KERNELS_ADDACC_H
@@ -150,10 +171,15 @@ void cq_kernel_addacc(cq_ctx *ctx, const cq_addacc_block *k);
  * not add a redundant call to make the comment true.
  *
  * WHY "EVERY BIT IS ALREADY A QUBIT" IS THE CHECK, and why it is not the L5
- * classical short-circuit every other kernel has. K8 has no cqrt_* opcode, is
- * never entered from CQ_lang, and its only v1 caller hands it pre-materialised
- * scratch — so there is no classical entry path to short-circuit, and a
- * classical bit arriving here is a caller bug rather than a cheap case. It is
+ * classical short-circuit every other kernel has. K8 STILL HAS NO L5, and the
+ * reason changed on 2026-08-23 rather than going away. It used to be that K8
+ * "has no cqrt_* opcode, is never entered from CQ_lang, and its only v1 caller
+ * hands it pre-materialised scratch"; the first two clauses became false when
+ * PRD §15 D17 made `cqrt_addc_i<W>` a caller. What is true now is that K8's L5
+ * LIVES IN M26's WRAPPER, which is where the ABI boundary is: `rail_addc` folds
+ * an all-classical rail at zero gates and zero qubits and only then reaches
+ * this kernel, materialising every operand on the way. So a classical bit
+ * arriving HERE is still a caller bug rather than a cheap case. It is
  * also an ACTIVE HAZARD, in the two ways K08.md §2 consequence 3 and K11.md's
  * R8 trace name:
  *

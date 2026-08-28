@@ -143,11 +143,28 @@ buildable at all.
    its qubits are still held: `_unc` reclaims nothing, and `cqrt_free` is the sole
    deallocator (PRD §10). The pool is empty after the **free**, not after the `_unc` —
    and for a rail CQ_lang deliberately never frees, it stays held for good, which is the
-   intended safe leak rather than a failure of this condition.
+   intended safe leak rather than a failure of this condition. **There is a second such
+   population, added 2026-08-22 by `PRD §15 D15`: a rail that IS freed but whose qubits
+   the free-time certificate cannot discharge is STRANDED — never released, never on the
+   free list, counted.** That is the same intended safe leak, for the same reason, one
+   layer down; the alternative — recycling an index that may not be `|0⟩` — hands the
+   next allocation a dirty qubit and corrupts an unrelated rail, which is §3's silent
+   miscompile rather than a leak. Read D15 for the disposition; this condition only
+   records that stranded qubits do not falsify it.
 4. **Grover.** A Grover search written in ordinary C compiles through `cqc`, links, and
    emits a gate stream whose oracle arithmetic is verified exactly in classical mode.
-5. **Hardware.** Flipping one flag routes the same stream into `qec_x` / `qec_cx` /
-   `qec_ccx` / `qec_rz`, and the QEC library reports physical resource costs for a
-   program nobody wrote a circuit for.
+5. **Hardware.** Flipping one flag — `CQOPS_SINK=qec` — routes the same stream into
+   `qec_x` / `qec_cx` / `qec_ccx` / `qec_mz` / `qec_rz`, and the QEC library reports
+   physical resource costs for a program nobody wrote a circuit for. Two riders, both
+   established by reading and measuring the library rather than by planning against it
+   (PRD §15 D19, D20). **There is no `qec_ry`, and `Ry` is CONSTRUCTED rather than
+   absent**: `Ry(θ) = S·H·Rz(θ)·H·S†`, emitted in the reverse of that order and exact
+   rather than up-to-phase — which is what makes point 4 reachable through this sink at
+   all, since `cqrt_h` is an over-declaration and Grover-from-rotations is forced. And
+   **what is VISIBLE through the QEC repo's drawer is bounded by Toffoli count**: at
+   d = 3 one logical `CX` is 1,830 physical gates and one `CCX` is 562,564, so a
+   Toffoli-free region at small width is genuinely inspectable and anything carrying
+   Toffolis is not. That is fault tolerance, not a defect in either library, and it is
+   the honest scope of this condition.
 
 Point 4 is the one that matters. Everything else is scaffolding for it.

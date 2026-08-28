@@ -36,6 +36,15 @@ void cq_death_skip(const char *why)
     _Exit(0);
 }
 
+void cq_death_require(const char *file, int line, const char *expr, int cond)
+{
+    if (cond) return;
+    fprintf(stderr, "%s:%d: precondition failed in a death case: %s\n",
+            file, line, expr);
+    fflush(NULL);
+    _Exit(3);      /* distinct from 1 (survived) and 4 (aborted while disarmed) */
+}
+
 void cq_death_survived(const char *file, int line, const char *stmt)
 {
     fprintf(stderr, "%s:%d: expected an abort from: %s\n", file, line, stmt);

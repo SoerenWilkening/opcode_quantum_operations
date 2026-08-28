@@ -40,17 +40,26 @@
  * is M22's, and is PRD §15 D12: only `Ry` at an angle OFF the lattice poisons,
  * because a diagonal gate cannot move a computational-basis value.
  *
- * CORRECTION, 2026-08-17 at Step 19. This comment used to claim that keeping
- * M21 and the shadow apart "lets bd ckd.18's twelve `rz`-rooted frees stay
- * clean: those bits are never materialised and never poisoned". THAT WAS
- * MEASURED FALSE. All twelve are `alloc(0); cswap(qflag,·,tmp); rz(tmp,φ);
- * cswap; free`, and the Fredkin's `CCX` — two `Q` controls, a constant target —
- * MATERIALISES `tmp` before the `rz` ever arrives, so §7's Rz-CONSTANT cell
- * never applies to them and this module's split had nothing to do with it. They
- * are physically |0> at the free (cswap is an involution), which makes them
- * ckd.17b cases and not ckd.18 ones; what actually keeps them freeable is D12,
- * decided at Step 19. ckd.18's true scope is 25 `ry`-rooted frees, every one
- * born from a NON-ZERO alloc literal. Verify before re-asserting either claim.
+ * CORRECTION, 2026-08-17 at Step 19 — AMENDED 2026-08-22, BECAUSE THE
+ * CORRECTION WAS ALSO WRONG. Two claims died here in a row; both retractions
+ * stay, because the arc is the lesson.
+ *
+ * (1) "Keeping M21 and the shadow apart lets bd ckd.18's twelve `rz`-rooted
+ * frees stay clean: those bits are never materialised and never poisoned" —
+ * MEASURED FALSE at Step 19. The Fredkin's `CCX` MATERIALISES the target
+ * before the `rz` ever arrives, so §7's Rz-CONSTANT cell never applies to
+ * them and this module's split had nothing to do with it.
+ *
+ * (2) Its replacement, "what actually keeps them freeable is D12" — MEASURED
+ * FALSE on 2026-08-22. Physically |0> is right; the SHADOW cannot see it, and
+ * the cause is not the rotation: it is stated once, in PRD §10's trap (ii)
+ * and in §15 D12's own note. Those rails are discharged by the observed undo
+ * certificate over the call stream at M26 — PRD §15 D15, which closed ckd.17b
+ * (bd c1a), ckd.18 and 2cf on 2026-08-22. "Twelve" was itself an artefact of
+ * modelling `cqrt_cswap` as writing only one of its two data args; ckd.18's
+ * true scope is the `ry`-rooted frees, every one born from a NON-ZERO alloc
+ * literal, and under the certificate those are provably DIRTY rather than
+ * unprovable (D15 §4). Verify before re-asserting either claim.
  */
 #ifndef CQOPS_ANGLE_H
 #define CQOPS_ANGLE_H

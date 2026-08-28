@@ -1,5 +1,11 @@
 /* src/reg.c — M07. The handle table, tombstones (D5), the sole deallocator,
- * the I2 owner-map sweep and the D7a/D7b operand checks. See reg.h. */
+ * and the physical copy. See reg.h.
+ *
+ * THE I2 SWEEP AND THE D7 OPERAND CHECKS ARE NOT HERE. They moved to
+ * src/reg_check.c at Step 23 on plan §3's recorded seam, `table ↔ invariant
+ * checking`, when PRD §15 D15's free-time disposition took this file past the
+ * 240 trigger. reg.h still declares all of it: the split is a translation-unit
+ * boundary, not an API one. */
 
 #include "reg.h"
 
@@ -19,8 +25,10 @@
 /* Hard errors live in BOTH configurations, except where reg.h says otherwise.
  * CQOPS_DEBUG_INVARIANTS gates checking machinery and never behaviour, and
  * every condition below is a miscompile signature rather than a style
- * question — a free of a dirty rail puts a non-|0⟩ qubit on the free list, and
- * a use-after-free hands a kernel a stale width and a stale bits pointer. */
+ * question — releasing a rail this file could not prove clean would put a
+ * non-|0⟩ qubit on the free list, which is why the disposition below strands
+ * instead (PRD §15 D15 §3), and a use-after-free hands a kernel a stale width
+ * and a stale bits pointer. */
 static void cq_reg_die(const char *what, long a, long b)
 {
     fprintf(stderr, "libcqops: FATAL: reg: %s (%ld, %ld)\n", what, a, b);
@@ -184,18 +192,107 @@ uint32_t cq_reg_owned_qubits(const cq_reg_table *t, int32_t h)
     return n;
 }
 
-/* --- The free path. Rule 6, PRD §10, and bd ckd.17 left open. ------------ */
+/* --- The free path. Rule 6, PRD §10, PRD §15 D15 (mechanism: bd 06t). ---- */
 
-int cq_reg_clean(const cq_ctx *ctx, int32_t h, cq_zero_proof proof)
+/* CQOPS_FREE_ABORT. Resolved on EVERY call, exactly as cq_sink_active is, so a
+ * setter or an environment change takes effect without a rebuild — which is
+ * PRD §15 D15 §3's explicit requirement for this flag. A negative override
+ * means "no override"; 0 and 1 force. */
+static int free_abort_override = -1;
+
+void cqops_set_free_abort(int on) { free_abort_override = on; }
+
+int cq_free_abort_active(void)
+{
+    if (free_abort_override >= 0) return free_abort_override != 0;
+
+    const char *want = getenv("CQOPS_FREE_ABORT");
+    if (!want || want[0] == '\0') return 0;      /* unset or empty means absent */
+
+    if (strcmp(want, "0") == 0) return 0;
+    if (strcmp(want, "1") == 0) return 1;
+
+    /* A HARD ERROR, NEVER A QUIET "OFF", and this is the clause that is easy to
+     * drop. cq_sink_active refuses an unregistered CQOPS_SINK rather than
+     * substituting the default, for the reason that quietly handing a caller a
+     * different behaviour than the one they asked for is worse than stopping.
+     * Here the asymmetry is sharper still: CQOPS_FREE_ABORT=true silently
+     * meaning OFF gives a maintainer who asked for termination exactly the
+     * silence they were trying to break. */
+    cq_reg_die("CQOPS_FREE_ABORT must be \"0\" or \"1\"", 0, 0);
+    return 0;                                    /* unreachable; cq_reg_die aborts */
+}
+
+/* THE THREE-VALUED VERDICT. This is where the collapse used to live: until
+ * Step 23 the only whole-rail predicate returned 0 for dirty and unproven
+ * alike, so cq_reg_free could not have branched three ways however it was
+ * written — the information was already gone one call down. See reg.h.
+ *
+ * NO EARLY RETURN ON THE UNPROVEN ROW. Dirty is absorbing and unproven is not,
+ * so a fold that stopped at the first non-clean bit would answer UNPROVEN for a
+ * rail carrying a conviction further along — which is precisely the residue
+ * split D15 §3 says must be producible. Stopping at the first DIRTY bit is
+ * sound (nothing can outrank it) and is what the loop does. */
+int cq_reg_disposition(const cq_ctx *ctx, int32_t h, cq_zero_proof proof)
 {
     const cq_reg *r = cq_reg_readable(&ctx->regs, h);
+    int verdict = CQ_PROOF_CLEAN;
+
     for (uint32_t i = 0; i < r->width; i++) {
         /* A constant owns no qubit index, so it can neither reach the free
-         * list nor collapse — see reg.h on why the scope is deliberate. */
+         * list nor collapse — see reg.h on why the scope is deliberate. This
+         * is also what keeps an all-constant rail CLEAN under a NULL proof
+         * (I4), which 40 of the corpus's 45 in-scope frees depend on. */
         if (!cq_bit_is_qubit(r->bits[i])) continue;
-        if (!proof || !proof(ctx, h, cq_bit_qindex(r->bits[i]))) return 0;
+
+        /* A NULL proof is a missing argument, not evidence. The predicate
+         * answers UNPROVEN so that cq_reg_clean keeps its pre-Step-23 meaning
+         * at its seven external call sites; cq_reg_free is where the missing
+         * argument becomes a hard error. */
+        int p = proof ? proof(ctx, h, cq_bit_qindex(r->bits[i])) : CQ_PROOF_UNPROVEN;
+
+        if (p < 0) return CQ_PROOF_DIRTY;        /* absorbing */
+        if (p == 0) verdict = CQ_PROOF_UNPROVEN; /* and keep looking for a <0 */
     }
-    return 1;
+    return verdict;
+}
+
+/* A THIN WRAPPER, AND `> 0` IS THE ONLY CORRECT SPELLING. A conviction is a
+ * NEGATIVE int, so `!= 0` — or returning the disposition raw — hands every one
+ * of the seven external call sites a non-zero "clean" for the dirtiest rail the
+ * library can recognise, and two of those sites read it as a number. */
+int cq_reg_clean(const cq_ctx *ctx, int32_t h, cq_zero_proof proof)
+{
+    return cq_reg_disposition(ctx, h, proof) > 0;
+}
+
+uint32_t cq_reg_strand_reports(const cq_ctx *ctx) { return ctx->strand_reports; }
+
+/* D15 §3's residue split. See src/reg.h for why there are two GRAINS and why
+ * the rail rows deliberately do not sum to the number of frees. */
+uint32_t cq_reg_stranded_dirty   (const cq_ctx *c) { return c->stranded_dirty; }
+uint32_t cq_reg_stranded_unproven(const cq_ctx *c) { return c->stranded_unproven; }
+uint32_t cq_reg_frees_dirty      (const cq_ctx *c) { return c->frees_dirty; }
+uint32_t cq_reg_frees_unproven   (const cq_ctx *c) { return c->frees_unproven; }
+
+/* D15 §3's report. The FIRST occurrence names the handle; the rest are silent,
+ * because the residue spans a great many frees and a line per stranded qubit
+ * buries the one line that matters under its own noise. Stranding is loud, not
+ * silent — but loud once. */
+static void report_first_strand(cq_ctx *ctx, int32_t h, uint32_t q, int verdict)
+{
+    /* THE COUNTER IS INCREMENTED ONLY WHERE THE LINE IS ACTUALLY PRINTED, which
+     * is what makes the one-shot falsifiable: delete the early return and the
+     * count runs away with the number of stranded qubits. Incrementing it above
+     * the guard would restore the untestable flag in a new spelling. */
+    if (ctx->strand_reports > 0u) return;
+    ctx->strand_reports++;
+    fprintf(stderr,
+            "libcqops: STRANDED: qubit q%u of handle h%d is %s at its free — "
+            "never released, never on the free list, counted "
+            "(PRD §15 D15 §3; set CQOPS_FREE_ABORT=1 to stop here instead). "
+            "Further strands are not reported.\n",
+            q, (int)h, verdict < 0 ? "provably NOT |0>" : "not provably |0>");
 }
 
 void cq_reg_free(cq_ctx *ctx, int32_t h, cq_zero_proof proof)
@@ -206,30 +303,75 @@ void cq_reg_free(cq_ctx *ctx, int32_t h, cq_zero_proof proof)
     if (r->state == CQ_SLOT_MEASURED)
         cq_reg_die("free of a measured rail — measurement is terminal", h, 0);
 
-    /* 1. Verify the whole rail before releasing any of it, so a dirty free
-     *    never leaves the rail half-returned to the pool. */
-    if (!cq_reg_clean(ctx, h, proof))
-        cq_reg_die("free of a rail that is not provably clean",
+    /* A MISSING ARGUMENT, NOT AN EPISTEMIC STATE, and the distinction is worth
+     * the extra branch. "The caller supplied no oracle" and "the oracle cannot
+     * tell" are different facts; only the second is D15's unproven row.
+     * Aborting here is strictly more conservative than D15 requires — aborting
+     * is not recycling — and it keeps an all-constant free working with no
+     * evidence at all, which I4 guarantees is safe and which the corpus's
+     * classical loop counters depend on. */
+    if (!proof && cq_reg_owned_qubits(&ctx->regs, h) > 0u)
+        cq_reg_die("free of a qubit-owning rail with no zero-proof supplied",
                    h, (long)cq_reg_owned_qubits(&ctx->regs, h));
 
-    /* 2. Forward the proof's PER-QUBIT answer. Never a literal 1 here: that
-     *    would be a laundering site invisible to a grep for cq_reg_free, and
-     *    it would defeat the whole reason M03 takes the evidence as an
-     *    argument. `proof` cannot be NULL on this path — step 1 returns 0 for
-     *    any Q bit under a NULL proof, so the loop body is unreachable.
+    /* 1. The WHOLE RAIL's verdict, before anything is released. Under
+     *    stranding a partly-released rail is the correct outcome rather than a
+     *    hazard, so this pass is no longer about atomicity against a mid-loop
+     *    abort — it is about producing the rail-level verdict, and about being
+     *    the one place CQOPS_FREE_ABORT can stop without half-returning. */
+    int verdict = cq_reg_disposition(ctx, h, proof);
+
+    /* THE RAIL ROW IS TALLIED BEFORE THE ABORT, NOT AFTER, and that ordering is
+     * the whole reason it is here rather than folded into the loop below. Under
+     * CQOPS_FREE_ABORT the next statement does not return, so a tally placed
+     * after it would be permanently zero in exactly the configuration a
+     * maintainer reaches for when they want to know what is happening. */
+    if (verdict < 0)       ctx->frees_dirty++;
+    else if (verdict == 0) ctx->frees_unproven++;
+
+    if (verdict <= 0 && cq_free_abort_active())
+        cq_reg_die(verdict < 0
+                       ? "CQOPS_FREE_ABORT: free of a rail PROVEN not to be |0>"
+                       : "CQOPS_FREE_ABORT: free of a rail not provably |0>",
+                   h, (long)cq_reg_owned_qubits(&ctx->regs, h));
+
+    /* 2. PER QUBIT (D15 §3 says per qubit, not per rail): CLEAN releases,
+     *    everything else strands. A per-rail act passes every uniform fixture
+     *    and leaks the provably clean qubits of every mixed rail, which nothing
+     *    would shout about — the pool would just grow.
+     *
+     *    `p` IS THE PROOF'S OWN ANSWER AND IT IS POSITIVE ON THIS BRANCH, never
+     *    a literal 1: that would be a laundering site invisible to a grep for
+     *    cq_reg_free. Note what the three-valued contract does to M03's guard
+     *    beneath us — a CONVICTION is a negative int, which `!proven_zero`
+     *    reads as TRUE, i.e. as proof. That is why the branch is `p > 0` and
+     *    why cq_qubits_release now refuses `proven_zero <= 0` rather than
+     *    `!proven_zero`; either alone would let a convicted qubit onto the free
+     *    list, which is the one unforgivable bug.
      *
      *    THROUGH cq_ctx_release_qubit, NOT cq_qubits_release DIRECTLY (Step 8,
-     *    bd ckd.17a). That joint releases and then retires the shadow entry,
-     *    in that order, and it is deliberately not scratch-specific — M09's
-     *    sandwich epilogue uses the identical path. Retiring here is also what
-     *    closes the hazard Step 7 recorded and left open: nothing un-poisoned
-     *    a released index, so a REUSED index kept its stale entry, because
-     *    cq_ctx_fresh_qubit only ensures up to `minted` and cq_shadow_ensure
-     *    returns early for an index it has already seen. */
+     *    bd ckd.17a). That joint releases and then retires the shadow entry, in
+     *    that order, and it is deliberately not scratch-specific. A STRANDED
+     *    index is deliberately NOT retired: it is still live, nobody got it
+     *    back, and cq_shadow_retire writes {0,0} — publishing "provably |0⟩"
+     *    over the very entry that said otherwise. */
     for (uint32_t i = 0; i < r->width; i++) {
         if (!cq_bit_is_qubit(r->bits[i])) continue;
         uint32_t q = cq_bit_qindex(r->bits[i]);
-        cq_ctx_release_qubit(ctx, q, proof(ctx, h, q));
+        int p = proof(ctx, h, q);
+
+        if (p > 0) {
+            cq_ctx_release_qubit(ctx, q, p);
+        } else {
+            /* D15 §3's residue split, at the ONE branch that knows both the
+             * verdict and the act. `p` is the proof's own answer for THIS
+             * qubit — not the rail's `verdict`, which is absorbing and would
+             * report every unproven qubit of a mixed rail as convicted. */
+            if (p < 0) ctx->stranded_dirty++;
+            else       ctx->stranded_unproven++;
+            report_first_strand(ctx, h, q, p);
+            cq_qubits_strand(&ctx->pool, q);
+        }
     }
 
     /* 3. ONLY NOW. Writing a constant over a Q bit before its release erases
@@ -248,7 +390,7 @@ void cq_reg_mark_measured(cq_reg_table *t, int32_t h)
     r->state = CQ_SLOT_MEASURED;
 }
 
-/* --- The physical copy (Rule 5), and the D7 operand checks. -------------- */
+/* --- The physical copy (Rule 5), and the rail-to-rail exchange. ---------- */
 
 void cq_reg_xor_into(cq_ctx *ctx, int32_t dst, int32_t src)
 {
@@ -263,72 +405,27 @@ void cq_reg_xor_into(cq_ctx *ctx, int32_t dst, int32_t src)
     for (uint32_t i = 0; i < w; i++) cq_emit_cx(ctx, &s[i], &d[i]);
 }
 
-void cq_reg_check_operands(const cq_reg_table *t, int32_t out,
-                           const int32_t *srcs, uint32_t n)
+/* cqrt_cswap's CONSTANT-control row: 0 gates, 0 qubits. See reg.h for the
+ * three wrong routes that give the right value and the wrong cost.
+ *
+ * BY CONTENTS, NOT BY POINTER. Swapping the two `bits` pointers is O(1) and
+ * computes the same thing, and it would quietly break reg.h's promise that a
+ * register's bits array is stable for its life — a promise Rule 7's kernel
+ * contract rests on, since a kernel is handed a cq_bit * and holds it. W is at
+ * most CQ_REG_WIDTH_MAX, so the loop is bounded by 128. */
+void cq_reg_swap_bits(cq_reg_table *t, int32_t a, int32_t b)
 {
-    if (out != CQ_REG_NONE && !cq_reg_is_live(t, out))
-        cq_reg_die("operand check: the result handle is not a live rail", out, 0);
+    if (a == b) cq_reg_die("swap of a rail with itself", a, b);
 
-    for (uint32_t i = 0; i < n; i++) {
-        if (!cq_reg_is_live(t, srcs[i]))
-            cq_reg_die("operand check: a source handle is not a live rail",
-                       srcs[i], (long)i);
-        /* D7a only. Source-source aliasing is D7b and is LEGAL — CQ_lang ships
-         * ten integer-surface fixture lines that do it. See reg.h. */
-        if (out != CQ_REG_NONE && srcs[i] == out)
-            cq_reg_die("D7a: the result handle is also a source", out, (long)i);
+    uint32_t w = cq_reg_width(t, a);
+    if (w != cq_reg_width(t, b))
+        cq_reg_die("width mismatch in a rail-to-rail swap", a, b);
+
+    cq_bit *pa = cq_reg_bits(t, a);
+    cq_bit *pb = cq_reg_bits(t, b);
+    for (uint32_t i = 0; i < w; i++) {
+        cq_bit tmp = pa[i];
+        pa[i] = pb[i];
+        pb[i] = tmp;
     }
-}
-
-int cq_reg_sources_alias(const int32_t *srcs, uint32_t n)
-{
-    for (uint32_t i = 0; i + 1u < n; i++)
-        for (uint32_t j = i + 1u; j < n; j++)
-            if (srcs[i] == srcs[j]) return 1;
-    return 0;
-}
-
-void cq_reg_audit(const cq_ctx *ctx)
-{
-#if CQ_REG_DEBUG
-    const cq_reg_table *t = &ctx->regs;
-    uint32_t minted = cq_qubits_minted(&ctx->pool);
-    int32_t *owner = NULL;
-
-    if (minted > 0u) {
-        owner = malloc((size_t)minted * sizeof *owner);
-        if (!owner) cq_reg_die("out of memory building the I2 owner map", (long)minted, 0);
-        memset(owner, 0xFF, (size_t)minted * sizeof *owner);   /* == CQ_REG_NONE */
-    }
-
-    /* MEASURED slots are swept and DEAD ones are not: a measured rail still
-     * owns its qubits (they are deliberately never reclaimed), while a
-     * tombstone's bits array is gone. I2 is scoped to live registers. */
-    for (int32_t h = 0; h < t->n; h++) {
-        const cq_reg *r = cq_reg_slot(t, h);
-        if (r->state == CQ_SLOT_DEAD) continue;
-
-        for (uint32_t i = 0; i < r->width; i++) {
-            cq_bit b = r->bits[i];
-            if (!cq_bit_valid(b))
-                cq_reg_die("I1: malformed bit — a constant carrying a qubit index", h, (long)i);
-            if (!cq_bit_is_qubit(b)) continue;
-
-            uint32_t q = cq_bit_qindex(b);
-            if (q >= minted)
-                cq_reg_die("register holds a qubit index that was never minted", h, (long)q);
-            if (cq_qubits_is_free(&ctx->pool, q))
-                cq_reg_die("register holds a qubit that is on the free list", h, (long)q);
-            if (owner[q] == h)
-                cq_reg_die("I2: one register holds the same qubit index twice", h, (long)q);
-            if (owner[q] != CQ_REG_NONE)
-                cq_reg_die("I2: qubit index held by two live registers", owner[q], (long)q);
-            owner[q] = h;
-        }
-    }
-
-    free(owner);
-#else
-    (void)ctx;
-#endif
 }

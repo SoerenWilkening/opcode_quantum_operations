@@ -12,6 +12,14 @@ void cq_ctx_init(cq_ctx *ctx, const cq_sink *sink)
     ctx->sink = sink ? sink : cq_sink_active();
     ctx->sandwich_depth = 0;
     cq_ctrl_stack_init(&ctx->ctrl);
+    ctx->strand_reports = 0;
+    /* D15 §3's residue split (Step 23 landing 2). Zeroed here rather than
+     * left to a memset that does not exist: cq_ctx is an object declared by
+     * value and every field in it is initialised by name. */
+    ctx->stranded_dirty    = 0;
+    ctx->stranded_unproven = 0;
+    ctx->frees_dirty       = 0;
+    ctx->frees_unproven    = 0;
 
 #if defined(CQOPS_DEBUG_INVARIANTS) && CQOPS_DEBUG_INVARIANTS
     ctx->scratch_lo = NULL;

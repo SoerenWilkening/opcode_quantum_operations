@@ -14,7 +14,8 @@
  *     that nothing checks is a claim.
  *   - dispose asserts every bit is back to CQ_BIT_ZERO. A KIND check, never a
  *     shadow read: poison is sticky, so a literal shadow check would fire on
- *     every legitimate sandwich kernel (bd ckd.17, K09.md:603).
+ *     every legitimate sandwich kernel (bd ckd.17 — closed, its unresolved
+ *     half now PRD §15 D15; K09.md:603).
  *
  * WHICH SINGLE CASE GOES RED IF THE DISPOSE CHECK IS DELETED (plan §2, the
  * Step 7 lesson): test_scratch_death.dispose_with_a_materialised_bit. Nothing

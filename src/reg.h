@@ -156,23 +156,87 @@ uint32_t cq_reg_owned_qubits(const cq_reg_table *t, int32_t h);
 /* Caller-supplied evidence that qubit index `q`, held by register `h`, is
  * provably |0⟩. Must be pure: cq_reg_free consults it twice per qubit.
  *
- * THIS IS A REFUSAL TO SETTLE bd ckd.17, NOT AN ANSWER TO IT. It is M03's
- * shape one level up — cq_qubits_release(pool, q, int proven_zero) — for M03's
- * reason: the two-bit shadow cannot be the free-time oracle, because §3's CX
- * rule makes poison sticky and a literal shadow check would hard-error on
- * every legitimate sandwich kernel. ckd.17 asks whether the certificate lives
- * per qubit in the shadow or per register in M07; passing BOTH h and q leaves
- * both homes open, so resolving it needs no signature change here. A whole-rail
- * boolean would pick per-register, and is the purest laundering vector
- * available besides — one wrong 1 launders every qubit of a dirty rail at once.
+ * THIS SHAPE WAS A REFUSAL TO SETTLE bd ckd.17, AND THE REFUSAL TURNED OUT TO
+ * BE THE ANSWER. It is M03's shape one level up — cq_qubits_release(pool, q,
+ * int proven_zero) — for M03's reason: the two-bit shadow cannot be the
+ * free-time oracle for a rotation-tainted rail, because §3's CX rule makes
+ * poison sticky and a literal shadow check would hard-error on a legitimate
+ * sandwich kernel over a tainted operand. ckd.17 asked whether the certificate
+ * lives per qubit in the shadow or per register in M07; passing BOTH h and q
+ * left both homes open. PRD §15 D15 answers with a THIRD home neither branch
+ * named — a per-handle record over the CALL STREAM at the M26 handle boundary
+ * — and KEEPS this exact signature: the certificate is what finally reads the
+ * `h`, which today's only proof throws away (`(void)h;`). A whole-rail boolean
+ * would pick per-register, and is the purest laundering vector available
+ * besides — one wrong 1 launders every qubit of a dirty rail at once.
  *
  * M07 SHIPS NO PROOF FUNCTION and the library defines none. NULL means "no
  * evidence": every CQ_BIT_Q bit then fails, which fails loud, which is the
- * correct behaviour for an unresolved P0 blocker. The only proof in the tree
- * lives in tests/support under a name saying it is valid only while no kernel
- * exists. Note `void cqrt_free(int32_t)` carries no evidence slot, so M07 is
- * the END of this chain: whatever ckd.17 decides, M26 supplies it here. */
+ * correct behaviour until M26 supplies D15's certificate at Step 23 (bd 06t).
+ * The only proof in the tree lives in tests/support under a name saying it is
+ * valid only while nothing has rotated. Note `void cqrt_free(int32_t)` carries
+ * no evidence slot, so M07 is the END of this chain: D15's certificate is
+ * supplied here.
+ *
+ * THAT "UNTIL" IS NOW MET (Step 23 landing 2, 2026-08-27), AND THE SENTENCE
+ * ABOVE IS KEPT VERBATIM BECAUSE shim/cq_shim_proof.h CITES IT AS ITS LICENCE.
+ * `cqrt_free` installs cq_shim_free_proof — D15's call-stream certificate AND
+ * the shadow, dirty dominating. Nothing in src/ gained a proof: M07 still ships
+ * none, which is what this paragraph is about, and the supplier is Layer 5.
+ *
+ * THE CONTRACT IS THREE-VALUED AND THE C TYPE DOES NOT CHANGE, because it was
+ * never a boolean: the return is an `int`, and D15 §3 splits it BY SIGN.
+ *
+ *     > 0   proven CLEAN     release to the pool
+ *    == 0   UNPROVEN         the oracle cannot tell
+ *     < 0   proven DIRTY     the library can SEE the rail is not |0⟩
+ *
+ * `cq_shadow_known_zero` conflates the last two — it returns 0 both for
+ * "unknown" and for "known 1" — and splitting them is exactly what this
+ * boundary is for. A proof may return any positive or any negative value; the
+ * SIGN is the contract and CQ_PROOF_* below are names for the canonical ones.
+ *
+ * A NULL PROOF IS A MISSING ARGUMENT AND NOT A FOURTH STATE. "The caller
+ * supplied no oracle" and "the oracle cannot tell" are different facts, and
+ * only the second is D15's unproven row: cq_reg_free hard-errors on the first
+ * whenever the rail owns a qubit, which is strictly more conservative than
+ * D15 requires (aborting is not recycling). Say it in those words at any new
+ * call site or someone will "fix" it into the unproven row.
+ *
+ * THE ACT IS TWO-VALUED EVEN THOUGH THE VERDICT IS NOT (D15 §4's last clause,
+ * confirmed 2026-08-22): proven-clean releases, and proven-dirty and unproven
+ * ALIKE are STRANDED. Rule 6's hard error is unmoved where it was aimed — a
+ * RELEASE of an index not proven |0⟩ — and that row can no longer arise,
+ * because neither non-clean row reaches the pool. The verdict stays distinct
+ * in the REPORT, which is what makes D15 §3's residue split producible at all;
+ * that split is `bd 06t`'s first obligation. See cq_reg_disposition. */
 typedef int (*cq_zero_proof)(const cq_ctx *ctx, int32_t h, uint32_t q);
+
+/* NAMES FOR THE THREE CANONICAL RETURNS, and the NUMBERING IS LOAD-BEARING
+ * rather than decorative — hence the asserts, on bit.h's and angle.h's
+ * precedent that a renumbering must break a BUILD and not just a comment.
+ *
+ * CQ_PROOF_CLEAN == 1 and CQ_PROOF_UNPROVEN == 0 are what let cq_reg_clean
+ * stay a plain boolean over the same seven external call sites it had before
+ * Step 23. Two of those read it as a NUMBER: tests/test_unc_asym.inc does
+ * CHECK_EQ(cx.clean, 1), and `if (ry.clean)` there prints a bd 2cf REGRESSION
+ * message on its TRUE branch — so any numbering with a non-zero UNPROVEN makes
+ * that site report a regression that did not happen, with a misleading
+ * message, on a rail nobody could clear. */
+enum {
+    CQ_PROOF_DIRTY    = -1,
+    CQ_PROOF_UNPROVEN =  0,
+    CQ_PROOF_CLEAN    =  1
+};
+_Static_assert(CQ_PROOF_CLEAN > 0 && CQ_PROOF_UNPROVEN == 0 && CQ_PROOF_DIRTY < 0,
+               "D15 §3 splits the proof by SIGN; cq_reg_clean is its positive row");
+
+/* Whether CQOPS_FREE_ABORT is in force — see cqops_set_free_abort in the
+ * public header for the whole contract. Resolved on every call, exactly as
+ * cq_sink_active is, so a setter or an environment change takes effect without
+ * a rebuild. An unrecognised environment value is a hard error here rather
+ * than a quiet "off". */
+int cq_free_abort_active(void);
 
 /* NON-ABORTING: does every qubit-carrying bit of `h` satisfy `proof`?
  *
@@ -191,19 +255,116 @@ typedef int (*cq_zero_proof)(const cq_ctx *ctx, int32_t h, uint32_t q);
  * it can neither reach the free list nor collapse. */
 int cq_reg_clean(const cq_ctx *ctx, int32_t h, cq_zero_proof proof);
 
+/* THE RAIL'S VERDICT: the three-valued fold of `proof` over every
+ * qubit-carrying bit, by the same sign convention (CQ_PROOF_* above).
+ * DIRTY DOMINATES UNPROVEN DOMINATES CLEAN — one convicted bit convicts the
+ * rail, and a rail with no conviction and any gap is unproven.
+ *
+ * THIS IS WHERE THE COLLAPSE USED TO LIVE, and moving it is the whole of the
+ * M07 half of `bd 06t`. Until Step 23 cq_reg_clean was the only whole-rail
+ * predicate and it returned 0 for dirty and unproven alike, so cq_reg_free
+ * could not have branched three ways however it was written — the information
+ * had already been thrown away one call down. cq_reg_clean is now a thin
+ * wrapper over this (`> 0`), which breaks the collapse WITHOUT re-typing the
+ * seven call sites that read it as a boolean.
+ *
+ * NON-ABORTING, like cq_reg_clean, and for the same recorded reason: a check
+ * inlined into the free would still abort if deleted, via M03's own guard one
+ * layer down, so its death test would pass on a broken library.
+ *
+ * An all-constant rail is CLEAN under any proof including NULL — by I4 it owns
+ * no index, so nothing can reach the free list and nothing can collapse. A
+ * NULL proof over a rail that DOES own a qubit answers UNPROVEN here; the
+ * missing-argument hard error is cq_reg_free's, not this predicate's. */
+int cq_reg_disposition(const cq_ctx *ctx, int32_t h, cq_zero_proof proof);
+
+/* Has this context already reported a strand on stderr? D15 §3 asks that the
+ * FIRST occurrence name the handle, and one line per stranded qubit would bury
+ * it: the corpus strands its residue across a great many frees. Exposed so
+ * that "the first, and only the first" is a tested claim rather than a
+ * reviewed one. PER CONTEXT rather than per process, which is what makes it
+ * observable from the second case of a test binary onward — and the shim's
+ * context is process-global anyway, so this is a superset of D15's wording.
+ *
+ * IT COUNTS EMISSIONS AND IS NOT A FLAG. A flag answers "did it ever report";
+ * the claim D15 makes is "it reported exactly ONCE", and only a count can carry
+ * that. Measured: as a flag, deleting the one-shot early return SURVIVED the
+ * whole suite in both configurations, because the suppressed path still set the
+ * flag. So the value is 0 before any strand and 1 for the rest of the
+ * context's life however many qubits strand. */
+uint32_t cq_reg_strand_reports(const cq_ctx *ctx);
+
+/* PRD §15 D15 §3's RESIDUE SPLIT — `bd 06t`'s FIRST obligation, and the reason
+ * this is four functions rather than one number.
+ *
+ * "AN IMPLEMENTATION THAT REPORTS A SINGLE RESIDUE FIGURE HAS NOT YET DECIDED
+ * WHICH ROW EACH FREE LANDS ON." Under D15 §4 the two non-clean rows take the
+ * SAME ACT — never released, never on the free list, counted — so the pool
+ * cannot tell them apart and `cq_qubits_stranded()` is one total by
+ * construction. The VERDICT survives the collapse and is reported here.
+ *
+ * TWO GRAINS, BECAUSE THEY ANSWER DIFFERENT QUESTIONS AND DISAGREE ON A REAL
+ * SHAPE. The QUBIT pair is D15 §3's residue — what actually leaked, one entry
+ * per qubit that never came back. The RAIL pair is `bd 06t`'s own wording,
+ * "which row each FREE lands on", one entry per call to cq_reg_free. They are
+ * NOT derivable from one another: a MIXED rail carrying one unproven qubit and
+ * one convicted qubit adds to BOTH qubit rows and to the rail-level DIRTY row
+ * ONLY, because cq_reg_disposition's lattice makes dirty absorbing. That rail
+ * is exactly the shape the fold's no-early-return exists to reach, so reporting
+ * one grain would discard the fact the fold was written for.
+ *
+ * THE QUBIT ROWS SUM TO cq_qubits_stranded() AND THAT IS AN ASSERTION, NOT A
+ * COINCIDENCE — every increment here sits beside the cq_qubits_strand call it
+ * describes, on the same branch. A drift between them means a strand happened
+ * somewhere that did not go through cq_reg_free, which is a fact worth a red
+ * test rather than a silent discrepancy. Note the sum holds PER POOL and these
+ * counters are PER CONTEXT; they coincide because a context owns one pool.
+ *
+ * THE RAIL ROWS DO NOT SUM TO ANYTHING. A clean free is counted nowhere: an
+ * all-constant rail (I4) never reaches the proof at all, and counting it would
+ * make the denominator mean "frees that owned a qubit" in one reading and
+ * "frees" in another. D15 §2 is explicit that the I4 frees are NOT certificate
+ * coverage; a total that silently included them would report exactly the
+ * inflation that warning is about. */
+uint32_t cq_reg_stranded_dirty   (const cq_ctx *ctx);
+uint32_t cq_reg_stranded_unproven(const cq_ctx *ctx);
+uint32_t cq_reg_frees_dirty      (const cq_ctx *ctx);
+uint32_t cq_reg_frees_unproven   (const cq_ctx *ctx);
+
 /* THE SOLE DEALLOCATOR (PRD §10). Two passes, and the order is load-bearing:
- *   1. verify EVERY bit through cq_reg_clean before releasing ANY, so a rail
- *      is never left half-returned;
- *   2. release each CQ_BIT_Q index, forwarding `proof`'s per-qubit answer to
- *      cq_qubits_release — NEVER a literal 1, which would be a laundering site
- *      invisible to a grep for cq_reg_free;
+ *   1. take the WHOLE RAIL's verdict through cq_reg_disposition before
+ *      releasing ANY of it;
+ *   2. then, PER QUBIT (D15 §3 says per qubit, not per rail): a proof answering
+ *      CLEAN releases the index; anything else STRANDS it. Forward `proof`'s
+ *      own per-qubit answer to cq_qubits_release — NEVER a literal 1, which
+ *      would be a laundering site invisible to a grep for cq_reg_free;
  *   3. only THEN free the bits array and tombstone the slot, because writing a
  *      constant over a Q bit first erases its index irrecoverably (a constant
  *      carries a canonical q == 0) and leaks the qubit in silence.
  *
- * Hard errors in BOTH configurations: a dirty free, a double free, a free of a
- * tombstone, a free of a MEASURED rail. Do not weaken any of them to a
- * warning. */
+ * WHY PASS 1 SURVIVES D15 §4, WITH A DIFFERENT REASON THAN IT WAS BUILT FOR.
+ * It existed so a rail was never left half-returned by a mid-loop abort. Under
+ * stranding nothing aborts mid-loop, and a partly-released rail is now the
+ * CORRECT outcome rather than a hazard — see step 2. What pass 1 is for now is
+ * the two things a per-qubit loop cannot do: it produces the rail-level verdict
+ * D15 §3's residue split is written in terms of, and it is where
+ * CQOPS_FREE_ABORT stops — which reintroduces the mid-loop abort, so the
+ * pre-pass is exactly what keeps that flag atomic. Deleting it makes
+ * CQOPS_FREE_ABORT half-return a rail, silently and only under the flag.
+ *
+ * HARD ERRORS IN BOTH CONFIGURATIONS: a NULL proof for a rail that owns a
+ * qubit (a MISSING ARGUMENT, not an epistemic state — see cq_zero_proof), a
+ * double free, a free of a tombstone, a free of a MEASURED rail, and — only
+ * when CQOPS_FREE_ABORT is in force — a rail that is not proven clean. Do not
+ * weaken any of them to a warning.
+ *
+ * WHAT IS NOT A HARD ERROR, AND THIS IS THE STEP-23 CHANGE: a free the library
+ * cannot clear. Both non-clean rows STRAND. Rule 6's hard error is unmoved
+ * where it was aimed — cq_qubits_release's own refusal of an index not proven
+ * |0⟩ — and under stranding the free path never reaches it, so that guard
+ * becomes a backstop rather than the normal disposition. What stays absolutely
+ * forbidden is RECYCLING: handing a non-|0⟩ index to the next cq_materialise
+ * corrupts an unrelated rail, and that is the one unforgivable bug. */
 void cq_reg_free(cq_ctx *ctx, int32_t h, cq_zero_proof proof);
 
 /* LIVE -> MEASURED. Keeps the bits and the qubits forever, emits nothing, and
@@ -221,6 +382,30 @@ void cq_reg_mark_measured(cq_reg_table *t, int32_t h);
  * dst == src aborts. NOTE the ABI spells cqrt_copy_<W>(src, dst), the reverse
  * of this argument order (cq_runtime.h:293-297). */
 void cq_reg_xor_into(cq_ctx *ctx, int32_t dst, int32_t src);
+
+/* RAIL-TO-RAIL EXCHANGE: `cqrt_cswap`'s CONSTANT-control row, which PRD §2.1
+ * prices at ZERO GATES and zero qubits. Emits nothing, allocates nothing,
+ * touches neither pool nor shadow — a constant control is a DECISION, not a
+ * circuit, which is the §3 fold table's own posture one level up. A quantum
+ * control is a different function entirely: a Fredkin per bit, through the
+ * emitter.
+ *
+ * THREE WRONG ROUTES GIVE THE RIGHT VALUE AND THE WRONG COST, all three
+ * verified against the emitter, and that is why this exists rather than a
+ * cq_emit_* call with a folded control. (i) The Fredkin with ctrl == CQ_BIT_ZERO
+ * keeps gates 1 and 3 — two gates where the spec says none, since only the
+ * middle CCX has the control on it. (ii) With ctrl == CQ_BIT_ONE the middle
+ * Toffoli folds to a CX and you get the three-CNOT SWAP plus three freshly
+ * materialised wires on a rail that was entirely classical — three gates and
+ * three qubits where the spec says none, and I4 violated in silence. (iii)
+ * Pushing a §9 region around an uncontrolled SWAP promotes it to THREE
+ * TOFFOLIS rather than 2·CX + 1·CCX. The cost IS the specification here.
+ *
+ * Widths must match and a == b aborts, in both configurations. It exchanges
+ * bit CONTENTS rather than the two `bits` pointers, so reg.h's promise that a
+ * register's bits array is stable for its life survives — a kernel holding a
+ * cq_bit * across a swap would otherwise be reading the other rail. */
+void cq_reg_swap_bits(cq_reg_table *t, int32_t a, int32_t b);
 
 /* D7, and THE CORPUS SETTLES ITS TWO HALVES IN OPPOSITE DIRECTIONS. Measured
  * at Step 7 over all 239 goldens — 62,930 cq_template_* calls, 25,147 _unc:
@@ -266,10 +451,13 @@ int cq_reg_sources_alias(const int32_t *srcs, uint32_t n);
  * `dst[i] = src[i]`, since cq_bit is a POD. I5 is what makes the sweep exact:
  * with no packed scalar, every owned qubit is visible by walking the bits.
  *
- * WHY NO AUTOMATIC CALL SITE. Cost is O(sum of live widths) and the corpus
- * performs 51,696 frees against a peak of 1,165 simultaneously live rails, so
- * auditing per free would be ~10^9 bit visits at Step 24 and the likely "fix"
- * would be deleting the check. Callers place it: the suites here at Step 7,
+ * WHY NO AUTOMATIC CALL SITE. Cost is O(sum of live widths), and the L6 corpus
+ * performs tens of thousands of frees against a peak in the low thousands of
+ * simultaneously live rails, so auditing per free would be on the order of 10^9
+ * bit visits at Step 24 and the likely "fix" would be deleting the check. (No
+ * exact figure here on purpose: the CQ_lang corpus is UNPINNED and moved four
+ * times on 2026-08-22 alone -- PRD §15 D15 §0. A count in a shipped header is a
+ * count nothing will ever re-check.) Callers place it: the suites here at Step 7,
  * the poolcheck harness on every L1 case from Step 10.
  *
  * IT ASSERTS ONLY THE WEAK FORM. `pool.live == sum of owned` is true today and

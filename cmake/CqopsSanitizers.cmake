@@ -13,9 +13,12 @@
 ## run's coverage claim stays literal (CLAUDE.md, Rule 17). A sanitizer that
 ## silently went missing would be the worst outcome of the three.
 ##
-## Homebrew LLVM's runtime does work; to get full Debug coverage on such a host:
-##   cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug \
-##         -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang
+## THIS MODULE CHOOSES AMONG FLAGS FOR A COMPILER THAT IS ALREADY FIXED, and on
+## that box the broken thing was the COMPILER. cmake/CqopsDebugToolchain.cmake
+## runs before project() and switches Debug to a toolchain whose ASan runtime
+## actually runs (`bd 6wg`, 2026-08-27), so on this dev box the probes below now
+## both succeed. The warning path is still live and still correct — it is what a
+## host with no working runtime at all falls back to.
 
 include(CheckCSourceRuns)
 
@@ -94,4 +97,157 @@ function(cqops_select_sanitizers out_var)
     endif()
 
     set(${out_var} "${flags}" PARENT_SCOPE)
+endfunction()
+
+## ---------------------------------------------------------------------------
+## LEAK DETECTION (`bd kfi`) — a THIRD probe, because LSan is neither implied by
+## ASan nor free to ask for.
+##
+## LeakSanitizer ships inside the ASan runtime, but on Darwin it is OFF BY
+## DEFAULT: a leaking binary built with -fsanitize=address exits 0 until
+## ASAN_OPTIONS=detect_leaks=1 is set. (The comment in tests/test_shim_ctx.c that
+## said LSan was "unavailable on Darwin" was measuring that default and drawing
+## the wrong conclusion; it is corrected.) So enabling it is an ENVIRONMENT
+## change, made in cmake/CqopsTest.cmake, not a compile flag — which is exactly
+## why it needs a probe of its own rather than riding on CQOPS_ASAN_ENABLED.
+##
+## AND ASKING FOR IT UNCONDITIONALLY IS NOT SAFE. On a platform whose ASan
+## runtime has no LSan, ASAN_OPTIONS=detect_leaks=1 is a FATAL "detect_leaks is
+## not supported on this platform" — so a hard-coded option string would break
+## EVERY test on such a host. Same posture as the two probes above and as
+## cmake/CqopsDebugToolchain.cmake: measure, then use what works.
+##
+## WHAT THE PROBE ASSERTS, AND WHY BOTH ARMS ARE NEEDED. A probe that only
+## checked "the option does not crash the process" would pass on a host that
+## IGNORES it, which is the failure this whole file exists to prevent. So it
+## runs two programs under detect_leaks=1 and requires them to DISAGREE:
+##
+##   leaky  -> non-zero exit AND the report names LeakSanitizer.  Non-zero on its
+##            own is not enough: the "not supported on this platform" fatal is
+##            also non-zero, and it does NOT say LeakSanitizer.
+##   clean  -> exit 0.  This is the false-positive arm — without it, a runtime
+##            that failed every process under the option would read as working.
+##
+## MEASURED 2026-08-27/28 on Homebrew clang 22.1.5, Darwin 25 / x86_64: leaky
+## exits 1 with "ERROR: LeakSanitizer: detected memory leaks / Direct leak of
+## 4096 byte(s)", clean exits 0, and abort_on_error=1 does NOT turn a leak into a
+## SIGABRT — a leak is a NORMAL non-zero exit. That last fact is what lets
+## tests/test_lsan_negative.c be a plain WILL_FAIL binary (death.h explains why
+## WILL_FAIL cannot express a crash).
+
+# cqops_probe_leak_check(<out>) — 1 iff ASAN_OPTIONS=detect_leaks=1 both works
+# and discriminates with the current compiler. Cached per compiler; delete the
+# CQOPS_LSAN_RUNS_* cache entry, or `cmake --fresh`, to re-measure.
+function(cqops_probe_leak_check out)
+    string(MAKE_C_IDENTIFIER "${CMAKE_C_COMPILER}" key)
+    set(cache_var "CQOPS_LSAN_RUNS_${key}")
+    if(DEFINED ${cache_var})
+        set(${out} "${${cache_var}}" PARENT_SCOPE)
+        return()
+    endif()
+
+    set(dir "${CMAKE_BINARY_DIR}/CMakeFiles/cqops-lsan-probe")
+    file(MAKE_DIRECTORY "${dir}")
+
+    ## The allocation goes through a noinline function and a volatile static that
+    ## is then cleared, so nothing on the stack or in a global still points at
+    ## the block when LSan's atexit hook runs — LSan scans both conservatively as
+    ## roots, and a block it can still reach is "still reachable", which it does
+    ## not report by default. tests/test_lsan_negative.c leaks the same way.
+    file(WRITE "${dir}/leaky.c"
+         "#include <stdlib.h>\n"
+         "static void *volatile hold;\n"
+         "__attribute__((noinline)) static void leak_one(void)"
+         " { hold = malloc(4096); hold = 0; }\n"
+         "int main(void) { leak_one(); return 0; }\n")
+    file(WRITE "${dir}/clean.c"
+         "#include <stdlib.h>\n"
+         "static void *volatile hold;\n"
+         "int main(void) { hold = malloc(4096); free((void *)hold); hold = 0; return 0; }\n")
+
+    set(ok 0)
+    set(leaky_rc "not built")
+    set(clean_rc "not built")
+
+    _cqops_lsan_build_and_run("${dir}/leaky.c" "${dir}/leaky" leaky_rc leaky_out)
+    _cqops_lsan_build_and_run("${dir}/clean.c" "${dir}/clean" clean_rc clean_out)
+
+    if(NOT leaky_rc STREQUAL "0" AND leaky_out MATCHES "LeakSanitizer"
+       AND clean_rc STREQUAL "0")
+        set(ok 1)
+    endif()
+
+    set(${cache_var} ${ok} CACHE INTERNAL
+        "ASAN_OPTIONS=detect_leaks=1 works with ${CMAKE_C_COMPILER}")
+    set(${out} ${ok} PARENT_SCOPE)
+endfunction()
+
+# _cqops_lsan_build_and_run(<src> <exe> <rc_var> <out_var>) — compiles <src> with
+# -fsanitize=address and runs it under detect_leaks=1, merging stdout+stderr.
+#
+# abort_on_error=0 is set so a host that DOES turn the report into a SIGABRT
+# still lands on a plain non-zero status rather than a signal, which keeps the
+# probe's verdict about leak detection rather than about signal handling.
+function(_cqops_lsan_build_and_run src exe rc_var out_var)
+    file(REMOVE "${exe}")
+    execute_process(COMMAND "${CMAKE_C_COMPILER}" -fsanitize=address "${src}" -o "${exe}"
+                    RESULT_VARIABLE build_rc OUTPUT_QUIET ERROR_QUIET)
+    if(NOT build_rc EQUAL 0 OR NOT EXISTS "${exe}")
+        set(${rc_var} "not built" PARENT_SCOPE)
+        set(${out_var} "" PARENT_SCOPE)
+        return()
+    endif()
+
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env
+                "ASAN_OPTIONS=detect_leaks=1:abort_on_error=0" "${exe}"
+        RESULT_VARIABLE run_rc
+        OUTPUT_VARIABLE run_out ERROR_VARIABLE run_err)
+    set(${rc_var} "${run_rc}" PARENT_SCOPE)
+    set(${out_var} "${run_out}${run_err}" PARENT_SCOPE)
+endfunction()
+
+# cqops_select_leak_check(<out_var>) — resolves CQOPS_LEAK_CHECK into 0/1.
+#
+# Requires ASan: LSan lives in that runtime, so with `address` dropped there is
+# nothing to turn on. A request for ON in that state is an error rather than a
+# silent 0, for the same reason CQOPS_SANITIZERS=ON is.
+function(cqops_select_leak_check out_var)
+    set(${out_var} 0 PARENT_SCOPE)
+
+    if(CQOPS_LEAK_CHECK STREQUAL "OFF")
+        message(STATUS "cqops: leak detection disabled by CQOPS_LEAK_CHECK=OFF")
+        return()
+    endif()
+
+    if(NOT CQOPS_ASAN_ENABLED)
+        if(CQOPS_LEAK_CHECK STREQUAL "ON")
+            message(FATAL_ERROR
+                "cqops: CQOPS_LEAK_CHECK=ON but AddressSanitizer is not enabled "
+                "in this configuration — LeakSanitizer ships inside the ASan "
+                "runtime and has nothing to attach to. Fix ASan first (see "
+                "cmake/CqopsDebugToolchain.cmake) or use CQOPS_LEAK_CHECK=AUTO.")
+        endif()
+        message(STATUS "cqops: leak detection OFF — ASan is not enabled here")
+        return()
+    endif()
+
+    cqops_probe_leak_check(lsan_ok)
+    if(lsan_ok)
+        message(STATUS "cqops: leak detection ACTIVE (ASAN_OPTIONS=detect_leaks=1)")
+        set(${out_var} 1 PARENT_SCOPE)
+        return()
+    endif()
+
+    if(CQOPS_LEAK_CHECK STREQUAL "ON")
+        message(FATAL_ERROR
+            "cqops: CQOPS_LEAK_CHECK=ON but ASAN_OPTIONS=detect_leaks=1 does not "
+            "detect a deliberate leak with ${CMAKE_C_COMPILER}. Use "
+            "CQOPS_LEAK_CHECK=AUTO to build without it.")
+    endif()
+
+    message(WARNING
+        "cqops: leak detection UNAVAILABLE — ASAN_OPTIONS=detect_leaks=1 does "
+        "not report a deliberate leak with ${CMAKE_C_COMPILER}. Debug coverage "
+        "is reduced; say so when reporting what was verified (Rule 17).")
 endfunction()

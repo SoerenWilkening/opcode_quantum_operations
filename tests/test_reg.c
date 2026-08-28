@@ -1,5 +1,6 @@
 /* tests/test_reg.c — M07, Step 7. The handle table, D5, tombstones, I4, the
- * free path, the I2 audit and the D7a/D7b operand split.
+ * free path, the I2 audit and the D7a/D7b operand split. Two of those four
+ * subjects live in .inc siblings — see the include block near the bottom.
  *
  * The Prime Directive applies here as everywhere: a green run proves the table
  * bookkeeping, not the circuit. The assertions that actually bite are the ones
@@ -17,11 +18,19 @@
 #include "support/harness.h"
 #include "support/mock_sink.h"
 
-/* THE ONLY ZERO-PROOF IN THE TREE, and it lives here rather than in src/ on
- * purpose. bd ckd.17 (P0, OPEN) establishes that the two-bit shadow CANNOT be
- * the free-time oracle: §3's CX rule makes poison sticky, so after any
- * sandwich kernel on a tainted operand every bit of a result rail reads
- * unknown and this predicate would hard-error on every legitimate program.
+#include <stdlib.h>   /* setenv/unsetenv: POSIX, and this suite already links a platform libc */
+
+/* THE FIRST ZERO-PROOF IN THE TREE — it was the only one when this was
+ * written, and there are now three, all of them in tests/ (this one, which
+ * test_reg_death.c copies; cq_pc_zero_proof_rotation_free in
+ * tests/support/poolcheck.c; and proof_this_case_built_the_zero_itself in
+ * tests/test_sandwich_certificate.inc). It lives here rather than in src/ on
+ * purpose. bd ckd.17 — closed 2026-08-15 by the split into ckd.17a/ckd.17b,
+ * and its half of the argument confirmed by measurement at PRD §15 D15 §2 —
+ * establishes that the two-bit shadow CANNOT be the free-time oracle: §3's CX
+ * rule makes poison sticky, so after any sandwich kernel on a tainted operand
+ * every bit of a result rail reads unknown and this predicate would hard-error
+ * on every legitimate program.
  *
  * It is sound ONLY while no kernel exists — i.e. exactly at Step 7 — because
  * the only qubits any of these cases can produce come from cq_materialise on a
@@ -244,77 +253,6 @@ CQ_TEST(owned_qubits_counts_what_the_emitter_actually_allocated)
 
 /* --- The free path, and the ckd.17 refusal. ------------------------------ */
 
-CQ_TEST(freeing_an_all_constant_rail_needs_no_evidence)
-{
-    fixture f; fx_open(&f);
-    /* `int x = 5;` going out of scope. By I4 the rail owns zero qubits, so
-     * nothing can reach the free list and nothing can collapse — which is why
-     * Rule 6 is scoped to QUBIT-CARRYING bits. Read literally ("every bit is
-     * BIT_ZERO or a known-zero qubit") this line aborts, and L5's zero-cost
-     * classical path becomes unreachable. PRD §10 is amended to match. */
-    int32_t h = cq_reg_alloc_const(&f.ctx.regs, 32, 5u, 0u);
-    CHECK(cq_reg_clean(&f.ctx, h, NULL));
-    cq_reg_free(&f.ctx, h, NULL);
-    CHECK_EQ(cq_reg_state(&f.ctx.regs, h), CQ_SLOT_DEAD);
-    CHECK_EQ(cq_qubits_live(&f.ctx.pool), 0);
-    CHECK_EQ(cq_qubits_minted(&f.ctx.pool), 0);
-    CHECK_EQ(cq_qubits_free(&f.ctx.pool), 0);
-    fx_close(&f);
-}
-
-CQ_TEST(free_returns_exactly_the_indices_the_rail_held)
-{
-    fixture f; fx_open(&f);
-    int32_t h = cq_reg_alloc_zero(&f.ctx.regs, 4);
-    uint32_t held[4]; uint32_t n = 0;
-
-    for (uint32_t i = 0; i < 4; i++)
-        held[n++] = materialise_bit(&f, h, i, CLEAN_CTRL);
-    uint32_t before = cq_qubits_free(&f.ctx.pool);
-
-    cq_reg_free(&f.ctx, h, proof_shadow_pre_kernel_only);
-
-    CHECK_EQ(cq_qubits_free(&f.ctx.pool), before + n);
-    /* The SET matters, not just the count: clearing a bit before releasing its
-     * index erases the index (a constant carries a canonical q == 0) and leaks
-     * the qubit in silence, and a count-only assertion stays green. */
-    for (uint32_t i = 0; i < n; i++) CHECK(cq_qubits_is_free(&f.ctx.pool, held[i]));
-    fx_close(&f);
-}
-
-CQ_TEST(clean_is_false_when_the_proof_refuses)
-{
-    fixture f; fx_open(&f);
-    int32_t h = cq_reg_alloc_zero(&f.ctx.regs, 4);
-    (void)materialise_bit(&f, h, 2, POISONED_CTRL);   /* shadow now unknown */
-
-    /* THE MUTATION-PROOF ASSERTION, and it is an ORDINARY test rather than a
-     * death test on purpose. If M07's evidence forwarding were deleted, a
-     * death test would still see an abort — from M03's own
-     * `if (!proven_zero) cq_pool_die(...)` one layer down — and would pass on a
-     * broken library. That is the defence-in-depth trap plan §0 recorded when
-     * deleting M05's distinctness check still aborted. Nothing aborts here at
-     * all, so nothing can mask it. */
-    CHECK(!cq_reg_clean(&f.ctx, h, proof_shadow_pre_kernel_only));
-    CHECK(!cq_reg_clean(&f.ctx, h, NULL));   /* no evidence => not clean */
-    fx_close(&f);
-}
-
-CQ_TEST(clean_is_total_over_the_rail_before_anything_is_released)
-{
-    fixture f; fx_open(&f);
-    int32_t h = cq_reg_alloc_zero(&f.ctx.regs, 8);
-    for (uint32_t i = 0; i < 8; i++)            /* every bit clean but the last */
-        (void)materialise_bit(&f, h, i, i == 7 ? POISONED_CTRL : CLEAN_CTRL);
-    CHECK(!cq_reg_clean(&f.ctx, h, proof_shadow_pre_kernel_only));
-    /* Nothing was released: the free verifies the WHOLE rail before touching
-     * the pool, so a dirty rail is never left half-returned. */
-    CHECK_EQ(cq_qubits_free(&f.ctx.pool), 0);
-    fx_close(&f);
-}
-
-/* --- Rule 5's physical copy. --------------------------------------------- */
-
 CQ_TEST(copying_a_quantum_source_allocates_and_emits_per_bit)
 {
     fixture f; fx_open(&f);
@@ -374,6 +312,13 @@ CQ_TEST(marking_measured_keeps_the_qubits_and_emits_nothing)
     fx_close(&f);
 }
 
+/* THE TWO SEAMS, both recorded in plan §3 before either file was written.
+ * `table ↔ invariant checking` gave test_reg_invariants.inc (and, at Step 23,
+ * src/reg_check.c on the source side); `the table and its lifecycle ↔ the
+ * FREE-TIME DISPOSITION` gave test_reg_free.inc when PRD §15 D15 arrived.
+ * Rule 12's guard counts .c/.h/.py only, which is what makes an .inc a real
+ * escape hatch rather than a rename that dodges the limit. */
+#include "test_reg_free.inc"
 #include "test_reg_invariants.inc"
 
 /* --- Lifetime of the table itself. --------------------------------------- */
@@ -413,6 +358,17 @@ CQ_TEST_MAIN(
     CQ_CASE(free_returns_exactly_the_indices_the_rail_held),
     CQ_CASE(clean_is_false_when_the_proof_refuses),
     CQ_CASE(clean_is_total_over_the_rail_before_anything_is_released),
+    CQ_CASE(the_disposition_is_three_valued_and_dirty_dominates_unproven),
+    CQ_CASE(clean_is_the_positive_row_of_the_disposition_and_its_value_is_one),
+    CQ_CASE(an_unproven_rail_strands_every_qubit_it_owns_and_releases_none),
+    CQ_CASE(a_proven_dirty_rail_takes_the_same_act_as_an_unproven_one),
+    CQ_CASE(the_free_is_per_qubit_so_a_partly_clean_rail_splits),
+    CQ_CASE(only_the_first_strand_reports_and_the_program_continues),
+    CQ_CASE(the_residue_splits_by_verdict_although_the_act_does_not),
+    CQ_CASE(the_rail_row_is_tallied_even_when_the_free_aborts),
+    CQ_CASE(free_abort_is_off_by_default_and_the_setter_wins_over_the_environment),
+    CQ_CASE(xor_into_a_nonzero_dst_is_an_xor_and_not_a_copy),
+    CQ_CASE(swap_bits_exchanges_two_rails_for_zero_gates_and_zero_qubits),
     CQ_CASE(copying_a_quantum_source_allocates_and_emits_per_bit),
     CQ_CASE(copying_a_constant_source_costs_nothing),
     CQ_CASE(marking_measured_keeps_the_qubits_and_emits_nothing),

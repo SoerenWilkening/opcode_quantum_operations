@@ -80,13 +80,25 @@ The **integer** half of CQ_lang's frozen ABI, at widths `i1, i8, i16, i32, i64, 
 | Family | Symbols | Source construction |
 |---|---|---|
 | Core runtime | `cqrt_alloc/measure/free`, `cqrt_x/cnot/toffoli`, `cqrt_copy_<W>`, `cqrt_cswap`, `cqrt_addc/xorc_<W>`, `cqrt_ry/rz_<W>` | this repo |
-| Core runtime, **controlled** | `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled`, `cqrt_rz_<W>_controlled_inv` | §2.1 |
+| Core runtime, **controlled** | `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled`, `cqrt_rz_<W>_controlled_inv`, **`cqrt_ry_<W>_controlled_inv`** (5 integer widths; there is NO plain `cqrt_ry_<W>_controlled` at any width), **`cqrt_x_controlled`**, **`cqrt_cnot_controlled`** | §2.1, §15 **D16** |
 | Binary arith | `add sub mul sdiv udiv srem urem` | Bennett `adder.jl`, `multiplier.jl`, `divider.jl` |
 | Binary bitwise | `and or xor shl lshr ashr` | Bennett `lowering/arith.jl` |
 | Compare | `icmp` × 10 predicates | Bennett `lower_eq!/ult!/slt!` |
 | Casts | `sext zext trunc` (int↔int) | Bennett `lower_cast!` |
 | Shapes | `qq`, `hl`, `lh` | free — a literal is an array of constant bits |
-| Axes | forward, `_unc`, `_controlled` — plus `_inv` / `_controlled_inv`, which are **generated and refused** rather than implemented (§15 **D14**: `_inv` is `f⁻¹`, and `f⁻¹` does not exist for the non-injective opcodes) | §9, §10, §15 |
+| Axes | forward, `_unc`, `_controlled` — plus `_inv` / `_controlled_inv`, which on the **`cq_template_*` DATA grid** are **generated and refused** rather than implemented (§15 **D14**: there `_inv` is `f⁻¹`, and `f⁻¹` does not exist for the non-injective opcodes) | §9, §10, §15 |
+
+> **THE `_inv` ROW MEANT TWO THINGS AND THE TABLE READ AS THOUGH IT MEANT ONE
+> (corrected 2026-08-23, Step 23 landing 1 step 4).** The Axes row said `_inv` and
+> `_controlled_inv` are "generated and refused", and the Core-runtime-controlled row lists
+> `cqrt_rz_<W>_controlled_inv` as IN SCOPE. Both are right and they are about different
+> families: §15 **D14**'s whole finding is that the suffix names two unrelated things — on
+> the 915 `cq_template_*` DATA symbols it is a fresh-minting inverse OPERATION that does not
+> exist for `and`/`or`/`udiv`/`trunc`/`icmp`, and on the 16 controlled ROTATIONS it is
+> **θ-negation**, which is total and which D14 says in terms is "Step 23's to implement".
+> The Axes row is now scoped to the data grid. Three core symbols were also in NEITHER list
+> and are added above — `cqrt_ry_<W>_controlled_inv`, `cqrt_x_controlled` and
+> `cqrt_cnot_controlled` — which is what §15 **D16**'s capability rule settles.
 
 > **`cqrt_h` is struck from this row (Step 0.7 — resolved).** Earlier drafts listed
 > `cqrt_x/h/cnot/toffoli`, which contradicted three other places: constraint 1 below forbids
@@ -165,9 +177,11 @@ but available on every target CQ_lang already requires.
 
 ### Out of scope for v1
 
-- **All floating-point widths** (`f16/f32/f64/f80`, 878 symbols) — **v2**, via Bennett's
+- **All floating-point widths** (`f16/f32/f64/f80`, **884** symbols — the figure in the
+  table above, not the ~~878~~ of the `ce3837bc` snapshot; the six that separate them are
+  `bitcast_f80_to_i80{,_inv,_unc}` and `bitcast_i80_to_f80{,_inv,_unc}`) — **v2**, via Bennett's
   `src/softfloat/` branchless soft-float suite. `gen_shim.py` still emits a body for each
-  of the 878: a loud abort naming the symbol, so the link always succeeds and an fp
+  of the 884: a loud abort naming the symbol, so the link always succeeds and an fp
   program fails with `cqops: cq_template_sitofp_i32_to_f64 not implemented (fp is v2)`
   rather than an undefined-reference wall. Free diagnostics, and it makes the v2 boundary
   visible at runtime instead of at link time.
@@ -254,7 +268,12 @@ with `return next_handle++;` (`runtime/cq_runtime.c:64,67`) and every golden ope
 so the "no register" sentinel has to be **negative**. The counter is *process-global* and
 shared with `cqrt_tape_alloc` (prints `t<N>`) and `cqrt_qram_alloc_<W>` (prints `a<N>`):
 both are out of v1 scope, but a second counter for them later would diverge handle
-numbering and fail every L6 trace diff while every assert stayed silent.
+numbering — and while the original worry was "fail every L6 trace diff while every
+assert stayed silent", **§15 D18 retired that diff, and the divergence has since
+happened anyway from a different direction**: `cqrt_addc`'s two transients and D7b's
+defensive copy mint rails CQ_lang never sees, so the counter is already ahead of the
+stub's. That is not a defect — those rails are ours and the ABI does not name them —
+and it is a second, independent reason the goldens are not an oracle for us.
 
 **Qubit pool**: monotonic counter + LIFO free list. A qubit returned to the free list is
 asserted to be |0⟩ (§11). The pool has a configurable ceiling so it can be matched
@@ -395,7 +414,13 @@ This single shape satisfies all three axes at once:
   call the kernel, return `dst`'s handle. `0 ^ f(a,b) = f(a,b)`. ✔
 - **Uncompute** (`cq_template_add_i32_unc(out,a,b)`) — call the *same kernel* with
   `dst = out`. Since `out` holds `f(a,b)` and `a,b` are still live,
-  `f(a,b) ^ f(a,b) = 0`. ✔ Then free `out`'s qubits.
+  `f(a,b) ^ f(a,b) = 0`. ✔ **It reclaims NOTHING** — see §10. The retired clause here
+  read *"Then free `out`'s qubits"*, which §10 contradicts outright (*"`_unc` owns no
+  qubits and reclaims nothing … `cqrt_free` is the **sole** place a qubit ever goes back
+  to the pool"*), and §10 is the operative statement: it is dated, reasoned, and backed
+  by measurement over the corpus. **A generated `_unc` body written from the retired
+  clause double-frees.** Corrected 2026-08-22 at Step 22, when M27's bodies had to be
+  written against one of the two.
 - **Controlled** — promote the kernel's gates (§9).
 
 > **ARITY AND WIDTH ARE NOT PART OF THE CONTRACT — THE SEMANTICS ARE. Resolved
@@ -698,11 +723,17 @@ D11 gives the exact correction for each and **v1 refuses rather than emitting it
 (10), and `CQ_lang/runtime/cq_runtime.h:159-160` says the pass *begins* emitting the
 controlled `rz` in WP3.
 
-**The `Ry` sink entry stays `double` all the way down.** `qec_rz` currently takes an
-exact rational `(p, q_denom, precision)` and there is no `qec_ry` at all; converting
-angle representations is the *QEC sink's* problem, not the kernel layer's. Until QEC
-grows float `Rz` and a logical `Ry`, the QEC sink's `ry`/`rz` entries are stubs that
-record the call — the printf sink is the v1 default.
+**The `Ry` sink entry stays `double` all the way down.** `qec_rz` takes an exact
+rational `(long p, long q_denom, int precision)` — θ = π·p/q_denom, ε = 2^−precision —
+and there is no `qec_ry` entry at all; converting angle representations is the *QEC
+sink's* problem, not the kernel layer's. **Both halves of that sentence were read as
+"therefore the qec sink stubs `ry`/`rz`" and that inference is now retired — see §15
+D19.** The rational is not a clumsy spelling of a double we could hand over: p and
+q_denom are separate `long`s that reach `gs_rz_synthesize` unmodified, at
+`4·precision + 96` bits of working precision, and the angle is in **units of π**, so
+`(1, 4)` is exactly π/4 where no double is. And `Ry` is constructible from what the
+API does have. D19 gives both, with the denominator-cap band and the emission order
+measured; the printf sink remains the v1 default.
 
 ### Measurement
 
@@ -731,8 +762,40 @@ v1 ships three: **printf** (default; one line per gate, in the *lexical conventi
 CQ_lang's golden traces use — see the correction below), **counter** (per-kind totals
 and T-count, matching `gate_count` / `t_count` in Bennett.jl so baselines are directly
 comparable), and
-**qec** (compiled only when `C_quantum_error_correction` is present; `qec_x`, `qec_cx`,
-`qec_ccx`, `qec_mz`, `Ry`/`Rz` stubbed). Selected at runtime via
+**qec** (compiled only when `C_quantum_error_correction` is present — the name is
+right, but it names a REPOSITORY and not the artefact: the library is that repo's `qec/`
+subdirectory, built as **`libqec.a`** with its header at **`qec/qec.h`**, so a
+`find_library` spelled from the project name finds nothing. The local clone is
+`~/Desktop/CQ_lang_hardware`, whose directory name differs from the repo's; `qec_x`, `qec_cx`, `qec_ccx`, `qec_mz` map 1:1, and `ry`/`rz` are **no longer
+stubs** — §15 D19).
+
+> **SHIPPED AT STEP 26, and one sentence above needs qualifying: "compiled only when
+> the library is present" is NOT what was built.** `src/sink_qec.c` compiles either way,
+> and its no-library arm **registers nothing** — so `CQOPS_SINK=qec` in a build without
+> the library takes §8's own hard error, `CQOPS_SINK names an unregistered sink (qec)`
+> (verified by hand in a no-library Release build), rather than falling back to `printf`
+> and handing the caller a circuit they did not ask for. Only the *library* is
+> conditional, through `-DCQOPS_QEC_DIR=<a built qec/>`; the *file* is not, which is also
+> what keeps the M26 shim free of a build-configuration branch.
+>
+> Three environment inputs join `CQOPS_SINK`, all with §8's empty-means-absent rule:
+> **`CQOPS_QEC_CONFIG`** (required when the sink binds — there is no default, because one
+> would silently pick a code distance and an `n_logical`), **`CQOPS_QEC_TRACE`**
+> (optional; written to a NAMED `<path>.partial` and renamed only by a clean teardown, so
+> an `abort()` still leaves the partial trace on disk) and **`CQOPS_QEC_PRECISION`**
+> (default 20, refused above 30 — above that the accuracy would be set by M25b's rational
+> approximation rather than by the synthesis, silently).
+>
+> **THE SINK WRITES NO TEXT, EVER (§15 D21).** `#REGISTER` lines and `# STAGE: op
+> begin/end` brackets are the M26 shim's, which knows the opcode, the handles and the
+> widths a sink structurally never sees; every gate line and every `#PATCH` is the QEC
+> library's own. What M25 owns of the trace is the `FILE*` and its `atexit` teardown —
+> plus, since `bd 76r` landed, two hooks: `cq_sink_qec_trace()`, the borrowed stream that
+> is the annotation layer's ONE activation test, and `cq_sink_qec_set_header()`, which is
+> how D21 (a)'s end-of-program header reaches the front of the buffered body without a
+> Layer-4 module calling up into Layer 5.
+
+Selected at runtime via
 `cqops_set_sink()`; the default is chosen by environment variable so CQ_lang's existing
 fixtures need no changes.
 
@@ -823,10 +886,13 @@ fixtures need no changes.
 > backend is linked, the placeholder is gone — NORTH_STAR's finish-line condition 1
 > says exactly that, and asks only that the fixtures "link against `libcqops` and
 > run" — so there is no longer anything in the process that would emit those bytes,
-> and nothing for our stream to collide *with*. The open question is not which
-> stream M23 writes to; it is what Step 24 compares against, given that
-> IMPLEMENTATION_PLAN's "diff emitted traces / Traces match" and NORTH_STAR's
-> "link and run" are not the same criterion.
+> and nothing for our stream to collide *with*. The question that WAS open — what
+> Step 24 compares against, given that IMPLEMENTATION_PLAN's "diff emitted traces /
+> Traces match" and NORTH_STAR's "link and run" are not the same criterion — is
+> **CLOSED as §15 D18 (2026-08-27): NORTH_STAR's criterion wins and "traces match"
+> is retired.** Read D18 before reopening it; it also records that `bd 590`'s own
+> fallback oracle (the goldens' `cqrt_measure_*` values) was measured FALSE, and
+> that our handle numbering already diverges from the stub's on purpose.
 
 ---
 
@@ -991,10 +1057,18 @@ rather than a re-derivation — the same posture D11 takes for the phases.
   > `rt_value` and `cq_measure` return 0 for a poisoned bit exactly as §7's *measurement*
   > specifies, and Rule 13 forbids the simulator. **The instrument that does exist is a
   > DIFFERENTIAL**, and it is what makes the cancellation witnessable at all: a source
-  > lane can also be materialised by `CX(q, lane)` applied twice — the corpus's own
-  > pattern, 26,376 of 51,696 frees are on rails last written by a bare self-inverse gate
-  > — which drifts the representation identically and does **not** poison. Measured over
-  > 13 kernels × `W ∈ {2..5}` × every lane: the two routes emit the uncompute **gate for
+  > lane can also be materialised by `CX(q, lane)` applied twice, which drifts the
+  > representation identically and does **not** poison. **That exact SHAPE is narrower than
+  > anything the corpus ships** — `tests/test_unc_asym.inc`'s header records that no pair of
+  > adjacent identical `cqrt_cnot` lines exists anywhere in it, so the statistic below must
+  > not be quoted for the fixture. It is the same FAMILY as the corpus's commonest free:
+  > roughly half of all frees are on rails whose LAST WRITE is a bare self-inverse gate —
+  > the `cqrt_toffoli` and `cqrt_cnot` rows of the last-write classification in this
+  > section's `ckd.18` block, most of it `cqrt_toffoli`. **That is a DIFFERENT CUT from
+  > §15 D15 §2's `U2`**, whose entry condition reduces a rail's whole write history rather
+  > than reading its last write; the two populations happen to sit within about forty of
+  > each other, which is exactly why neither may be quoted for the other. Measured over
+  > 18 kernels × `W ∈ {2..5}` × every lane: the two routes emit the uncompute **gate for
   > gate including operands**, and only the un-poisoned one can be freed. Same circuit,
   > same input state, therefore same output — and that output is provably zero.
   >
@@ -1034,10 +1108,14 @@ rather than a re-derivation — the same posture D11 takes for the phases.
   > own "return every qubit `h` still owns". Settled at Step 7; CLAUDE.md's Rule 6 was the
   > imprecise restatement and has been corrected to match.
   >
-  > **This does NOT resolve `ckd.18`.** There the rail's bits *are* qubits — `ry` at
-  > arbitrary θ materialises all 32 of them — physically holding `|5⟩` with an unknown
-  > shadow. The scope clarification exempts constants, not materialised bits, so the
-  > rotation-root free still hard-errors and `ckd.18` stays open.
+  > **This does NOT reach `ckd.18`, which is §15 D15's carve-out.** There the rail's bits
+  > *are* qubits — `ry` at arbitrary θ materialises all of them — physically holding
+  > `|birth-literal⟩` with an unknown shadow, so the scope clarification exempts constants
+  > and not materialised bits. `ckd.18` **closed 2026-08-22**: under D15 those rails are
+  > **provably dirty** rather than unprovable, because the certificate reads the birth
+  > literal and the cancelling pair that the shadow cannot see. **A proven-dirty rail is
+  > STRANDED, not aborted — D15 §4's last clause, confirmed 2026-08-22 at the start of
+  > Step 23.** Read it there; do not restate the argument here.
 
   > **THE STRUCTURAL ZERO CERTIFICATE — `ckd.17a`, settled 2026-08-15.**
   >
@@ -1129,77 +1207,133 @@ rather than a re-derivation — the same posture D11 takes for the phases.
   > ordered-stream palindrome check in `mock_sink` is the only thing with teeth on the
   > poisoned surface, and it lives in `tests/`, where Rule 13 permits the recording.
   >
-  > **`ckd.17b` — a CQ_lang rail at `cqrt_free` — is NOT settled and is filed separately.**
-  > A sandwich certificate reaches *none* of the corpus's 51,696 frees, because none of them
-  > is on a scratch region; and no in-library theorem can cover the general case
-  > (`slice_loop_break.expected.log:10-25` rests on loop-condition algebra that never reaches
-  > us; `specialize_transitive_caller.expected.log:3-16` uncomputes by recomputing into a
-  > *different* handle, defeating any handle-keyed matching). At Step 23 M26 chooses at one
-  > greppable call site between **`CQOPS_FREE_ABORT`** (the default — Rule 6 as written) and
-  > **`CQOPS_FREE_RETIRE`** (tombstone the handle and take its indices out of circulation
-  > forever, so they never reach the free list and I3 holds absolutely — PRD §10's
-  > already-blessed safe leak, applied at the free instead of at a withheld one).
-  > **There is no `CQOPS_FREE_TRUST` and one must never be added:** releasing unproven
-  > indices to the pool is laundering under another name.
+  > **`ckd.17b` — a CQ_lang rail at `cqrt_free` — IS SETTLED, as of 2026-08-22, and it is
+  > §15 D15. Read that decision; this paragraph is its SUMMARY and carries conclusions
+  > only** — every argument behind them, and every count **except one**, lives in D15's
+  > numbered sections and is not repeated here. The exception is the last-write
+  > classification below, which is measured nowhere else in the tree: §10 is its HOME, not a
+  > restatement of it, and deleting it as a duplicate loses it. What else belongs to §10 is
+  > the negative result: a sandwich
+  > certificate reaches *none* of the corpus's frees, because none of them is on a scratch
+  > region.
   >
-  > **AND THAT PROHIBITION NOW RESTS ON 25 NAMED FREES RATHER THAN ON AN ARGUMENT
-  > (`ckd.18`, re-measured at Step 19).** Classifying all **51,696** frees by how the rail
-  > was *last written*: 25,138 `cq_template_*_unc`, 19,153 `cqrt_toffoli`, 7,223
-  > `cqrt_cnot`, 91 `cqrt_copy`, 40 `cqrt_addc`, **25 `cqrt_ry`**, 15 `cqrt_cswap`, 11
-  > `cqrt_qram_load_unc`, and **0 `cqrt_rz`**. The 25 are exactly the rails born from a
-  > **non-zero** `cqrt_alloc` literal whose only writes are a cancelling `(θ, −θ)` `ry`
-  > pair, and they are physically `|birth-literal⟩` at the free — so `TRUST` would push
-  > `|1⟩` qubits onto the free list on all 25 and break **I3** outright. The positive
-  > control is in the same corpus: of the **65** freed rails born from a non-zero literal,
-  > the other **40** are returned to `|0⟩` by an explicit `cqrt_addc_<W>(h, −L)` first, and
-  > `sum(addc) == −L` in **40/40**.
+  > **The resolution is a LAYERING statement first: the `|0⟩` obligation is CQ_lang's, and
+  > it cannot be discharged at our layer at all.** Upstream states the precondition as a
+  > non-negotiable principle and discharges it at the **IR layer**, where the rail is an SSA
+  > name and the loop algebra is still present; it also states the limit from our side, that
+  > no trace label can witness "freed at `|0⟩`" **at any ABI**. So v1 does not duplicate a
+  > proof it cannot perform. What v1 owes is the *operation* — and Rule 7's involution is
+  > what L3 tests on every case of every kernel. Both quotations, with line references, are
+  > **§15 D15 §1**.
   >
-  > **`ckd.18` therefore has no disposition of its own and folds into this bullet.** No
-  > in-library evidence can reconstruct those 25 — cancellation restores the *birth
-  > constant*, never zero — and no mechanism is worth building for 25 frees out of the
-  > **51,651 of 51,696 (99.91%)** that are rotation-tainted once M22 lands. Fixing the 25
-  > perfectly would still leave 51,626 frees hard-erroring, so `ckd.17b`'s disposition is
-  > the gating decision and `ckd.18` is one of its counterexample sets. Measured cost of
-  > `CQOPS_FREE_RETIRE` as an upper bound: **93,593** permanently-retired qubits across the
-  > whole corpus (worst fixture 31,334), **3,028** across the 56 integer-only fixtures — set
-  > against 131,583 for a single i128 `udiv`, and D2's pool is unbounded by default.
+  > **What v1 holds instead is an OBSERVED UNDO CERTIFICATE over the call stream** — the
+  > rail's write history reduces to the identity (U1 an `_unc` naming the rail; U2 a
+  > self-inverse pair-off; U3 an `addc` sum) — which discharges the overwhelming majority of
+  > the corpus's frees, where the shadow discharges **none**. The three entry conditions,
+  > their preconditions and the two ways of misreading them are **§15 D15 §2**, which also
+  > carries the ratio and the residue; the revision they are pinned against is **§0**.
   >
-  > **Two traps recorded with it.** (i) The bead's older "37 rotation-rooted frees, of which
-  > 12 are `rz`-rooted on rails born 0 and therefore stay classical" is **false**: those 12
-  > are `alloc(0); cswap(qflag,·,tmp); rz; cswap; free`, and the Fredkin **materialises**
-  > `tmp` before the `rz` arrives, so §7's `Rz`-constant cell never applies to them. They
-  > are physically `|0⟩` at the free and are `ckd.17b` cases, not `ckd.18` ones — and under
-  > **D12** they free cleanly, which is that decision's measured payoff. (ii)
-  > `CQOPS_FREE_RETIRE` must **not** go through `cq_ctx_release_qubit`: `cq_shadow_retire`
-  > does not fire on a poisoned entry, so it would silently clear poison on a **still-live**
-  > qubit — the one write the shadow's discipline forbids structurally. The name collision
-  > with `cq_shadow_retire` is an active trap and the two mean opposite things.
+  > **The EPISTEMIC STATE is THREE-VALUED and the ACT is TWO-VALUED, and the residue is
+  > STRANDED rather than released.** Proven-clean releases; **proven-dirty and unproven ALIKE
+  > are STRANDED** — never released, never on the free list, counted, first occurrence named
+  > on `stderr`, and the program continues. (This paragraph said *"proven-dirty is a hard
+  > error in both configurations"* until 2026-08-22, which was **§3 as drafted** and is
+  > superseded by **§4's last clause**, confirmed the same day: a rail the certificate
+  > convicts takes the same ACT as one it cannot reach, so the free path has two dispositions
+  > and the three rows survive only in the REPORT. Rule 6's hard error is unmoved where it
+  > was aimed — a *release* of a non-`|0⟩` index — which is the row that can no longer arise.) **The layering licenses NOT ABORTING; it does not license
+  > RECYCLING**, so `CQOPS_FREE_TRUST`'s prohibition is **narrowed and KEPT**, not lifted:
+  > releasing an unproven index to the pool stays forbidden. **`CQOPS_FREE_ABORT` survives as
+  > a development flag** and is not the default. Why each of those is the right side, and why
+  > stranding is "never release" rather than a third pool bucket, is **§15 D15 §3** — argued
+  > there once, against `src/qubits.h`'s own release contract; do not re-derive it here.
+  >
+  > **`ckd.18` FOLDS IN AS THE CARVE-OUT, AND ITS PREMISE WAS WRONG.** Classifying all
+  > **51,696** frees by how the rail was *last written* — **a measurement recorded nowhere
+  > else in the tree**, which is why this block carries it rather than citing one: 25,138
+  > `cq_template_*_unc`, 19,153 `cqrt_toffoli`, 7,223 `cqrt_cnot`, 91 `cqrt_copy`, 40
+  > `cqrt_addc`, **25 `cqrt_ry`**, 15 `cqrt_cswap`, 11 `cqrt_qram_load_unc`, and **0
+  > `cqrt_rz`**. **That total is what DATES the classification**: it is the pre-`397c67c`
+  > snapshot, and §15 D15 §0 records the corpus moving past it — twice — inside one day, and
+  > records that nothing in this repo pins CQ_lang. Re-measure before quoting any row of it.
+  > The `cqrt_ry` row is exactly the rails born from a **non-zero** `cqrt_alloc` literal
+  > whose only writes are a cancelling `(θ, −θ)` `ry` pair, physically `|birth-literal⟩` at
+  > the free — and the bead's
+  > premise, that the `|0⟩` requirement there was *"OURS (Rule 6, I3)"*, is **false**;
+  > upstream states it (D15 §1). They are also **not unprovable**: the certificate reads the
+  > birth literal, the cancelling pair and the absence of any other write, which makes them
+  > **provably dirty** rather than unknown, so they never reach the free list. **That row is
+  > STRANDED rather than aborted — D15 §4's last clause, confirmed 2026-08-22. Read it
+  > there; do not restate the argument here.** The positive control is in the same corpus: the *other* freed rails
+  > born from a non-zero literal are returned to `|0⟩` by an explicit `cqrt_addc_<W>(h, −L)`,
+  > which is the certificate's **U3** (D15 §2). That control was **checked, not assumed** —
+  > the immediates summed to `−L` in every one of them, with no exceptions to explain away.
+  >
+  > **Two traps recorded with it, and the second was itself a false claim.** The rest of the
+  > tree cites them by the literal labels below, so do not renumber them or insert a third
+  > between them.
+  >
+  > **Trap (i).** The bead's
+  > older *"37 rotation-rooted frees, of which 12 are `rz`-rooted on rails born 0"* is
+  > **false** — a write-model error, reproduced to the unit by executing the counterfactual.
+  > The rule it violated is **§15 D15 §6(ii)**: `cqrt_cswap` writes BOTH data args
+  > (`cq_runtime.h:258`), and a certificate that misses it silently widens every rule, so
+  > enumerate a write set from `cq_runtime.h` and never from the symbol names.
+  >
+  > **Trap (ii).** **The claim that those twelve rails "free CLEANLY under D12" is FALSE.**
+  > (The "twelve" is trap (i)'s artefact; the true population is the thirty named below.)
+  > It was
+  > carried in about a dozen sites across the tree — including this section, §15 D12's own
+  > note, three in `src/`, and a TEST NAME, which outlives a comment — and all of them were
+  > cleared on 2026-08-22; `bd 06t`'s notes hold the list, which is where it belongs rather
+  > than in a document that would have to be re-verified to stay true. All 30 rails whose
+  > last rotation is an `rz` are unprovable by the shadow: the shape is
+  > `alloc(0); cswap(qflag, src, tmp); rz; cswap; free`, and
+  > `cq_shadow_ccx`'s `t.unknown |= a.unknown | b.unknown` carries the **swapped-in data
+  > rail's** poison into `tmp` whatever the flag is. The test that pins it,
+  > `tests/test_rotate.c`'s `an_rz_in_a_cswap_bracket_on_determinate_operands_frees_cleanly`,
+  > mints **both** operands with `cq_bk_reg` — determinate
+  > quantum rails, which the corpus never has — and its own comment says so: *"the shadow
+  > tracks both exactly, because nothing here poisoned."* **D12 itself is unaffected**: an
+  > `Rz` genuinely does not poison. What is false is the corollary that D12 buys these rails
+  > their free — and under D15 they are discharged by **U2**, not by the shadow. **This
+  > mechanism is stated in full in exactly two places — here and in §15 D12's own note.**
+  > Cite one of them; do not restate it a third time.
 
-  > **What "provably clean" reads is NOT settled by this bullet, and it is not obvious.** It
-  > cannot be the two-bit shadow **on a tainted rail**: §3's `CX` rule propagates `unknown`,
-  > so an uncomputed *rotation-tainted* rail is all-`Q unknown` and a literal shadow check
-  > would hard-error on it. There the evidence has to be **structural** — the §4 kernel
-  > contract plus I6 palindromic reversal — which means one sanctioned un-poisoning write,
-  > the sole exception to §3's "conservative in the safe direction only". This bites M08's
-  > "assert clean on release" at **Step 8, before any kernel exists**. Tracked separately;
-  > **do not** weaken this hard error to a warning to make a fixture pass.
+  > **What "provably clean" reads is SETTLED — it is §15 D15 — and the answer is different
+  > on the two surfaces.** The retired text opened *"NOT settled by this bullet, and it is
+  > not obvious"*, and its diagnosis was right even though its remedy was wrong: it cannot
+  > be the two-bit shadow **on a tainted rail**, because §3's `CX` rule propagates `unknown`
+  > and an uncomputed rotation-tainted rail is all-`Q unknown`. Where it went wrong was in
+  > concluding that the evidence therefore needs *"one sanctioned un-poisoning write, the
+  > sole exception to §3's conservative-in-the-safe-direction-only"*. **No such write is
+  > added, and none may be.** The evidence is an OBSERVED UNDO CERTIFICATE at the M26
+  > handle boundary, which reads the call stream rather than the shadow and so needs no
+  > exception to anything. **Do not** weaken the STRAND to a release to make a fixture pass —
+  > that, and not the abort, is the clause this sentence exists to protect. (It read *"do not
+  > weaken the proven-dirty hard error to a warning"* until 2026-08-22. §4's last clause
+  > settled that row as STRAND, so the hard error it named is no longer the default
+  > disposition; what survives absolutely is that nothing unproven or convicted reaches the
+  > pool. `CQOPS_FREE_ABORT` restores termination on demand.)
   >
-  > **CORRECTED 2026-08-15 at Step 10 — the paragraph above said "every legitimate sandwich
-  > kernel" and that over-generalised, in a way that contradicted this same section three
-  > pages up.** `Ry`/`Rz` are the ONLY producers of `unknown` (`src/shadow.c:121` is the sole
-  > writer of `e[q].unknown = 1`); `CX` and `CCX` merely propagate what is already there. So
-  > **on the rotation-free surface — Steps 10 through 17, every kernel and no rotation —
-  > nothing is tainted, every shadow entry is determinate, and `cq_shadow_known_zero` is not
-  > conservative but EXACT.** It is a genuine free-time proof there, which is exactly the
-  > reach this section already claims two paragraphs earlier for `cq_shadow_retire`
-  > ("a complete detector … across the whole rotation-free kernel surface (Steps 10–17),
-  > because `Ry`/`Rz` are the only producers of `unknown`"). Read literally, the older
-  > wording said Step 10's L3 free must hard-error, and it does not: Step 10 frees its result
+  > **CORRECTED 2026-08-15 at Step 10, and the correction is still operative.** A general
+  > `Ry` is the ONLY producer of `unknown` (`src/shadow.c` is its sole writer, and since
+  > **D12** its only caller is M22's general-`Ry` row); `CX` and `CCX` merely propagate what
+  > is already there. So **on the rotation-free surface — Steps 10 through 17, every kernel
+  > and no rotation — nothing is tainted, every shadow entry is determinate, and
+  > `cq_shadow_known_zero` is not conservative but EXACT.** It is a genuine free-time proof
+  > there, and it stays the proof the kernel suites use: Step 10 onward frees its result
   > rails through `cq_reg_free` with
-  > `tests/support/poolcheck.c:cq_pc_zero_proof_rotation_free`, and 75 ctest tests pass in
-  > both configurations. **The scope is the whole content of that proof and its name says so**
-  > — it becomes a laundering device the moment M22 lands at Step 19, which is what `ckd.17b`
-  > and `ckd.18` are about, and neither is answered by it.
+  > `tests/support/poolcheck.c:cq_pc_zero_proof_rotation_free`, in both configurations.
+  >
+  > **What changed at D15 is the OTHER surface, and the measurement is what settles it.**
+  > `cq_pc_zero_proof_rotation_free`'s name has always been its scope, and it becomes a
+  > laundering device the moment a rail is rotation-tainted. Measured across the whole
+  > corpus: **not one qubit reaching a `cqrt_free` is ever determinate, at any point in any
+  > trace** — the shadow discharges **none** of them and convicts **none** (§15 D15 §2; the
+  > counts and the revision they are pinned against are §0). So the two surfaces
+  > do not overlap at all. The shadow is exact and sufficient where no rotation has
+  > happened; the certificate is what carries L6, where one always has.
 
 ---
 
@@ -1215,7 +1349,7 @@ The whole point of the tri-valued design is that levels 1–3 need no quantum si
 | L3 | Uncompute round-trip | forward → `_unc` → assert `dst`'s **values** are all-zero. The pool is **not** restored yet — `_unc` reclaims nothing (§10). The harness then frees `dst` explicitly and asserts **`live` is back to its pre-call value and every index `dst` held is back on the free list** |
 | L4 | Gate-count goldens | Pin per-kernel `(NOT, CNOT, Toffoli)` at each W. Cross-check against Bennett's published baselines where the construction matches, and document every deliberate delta. See the arity and staleness notes below — both bit an earlier draft |
 | L5 | Classical short-circuit | Assert **zero** gates and **zero** qubits for the fully-classical case, and exactly 1 qubit / 1 CX for `int a = 0; a \|= b << 3` |
-| L6 | CQ_lang e2e | Link against CQ_lang's existing fixtures, diff emitted traces |
+| L6 | CQ_lang e2e | **Link against CQ_lang's existing fixtures, RUN them, and do not abort** (§15 **D18**). ~~diff emitted traces~~ — the goldens are CQ_lang's regression oracle for its OWN IR pass, captured against a *"trace-only runtime stub"* that stops existing once the real backend is linked. Measured before retiring it: every stub measure body returns a LITERAL, so all 266 golden measure lines read `-> 0` whatever the circuit computes, and our handle numbering already diverges because `cqrt_addc` and D7b mint rails the ABI does not name. Correctness is carried by L1–L5; L6 adds the one claim they cannot make |
 | L7 | Grover | §12 |
 
 L1 and L5 are the two that actually catch bugs. L4 is what stops a "harmless" refactor
@@ -1390,7 +1524,7 @@ v1 is accepted when:
 | 5 | K10 (mux) + variable shifts; K8 (Cuccaro accumulator); K11 (mul) | L1–L4 green — **COMPLETE 2026-08-16** (Steps 14, 15, 16). K8 is the exception the criterion did not anticipate: it is not a Rule 7 kernel, so its levels are restated by hand and **L5 does not apply to it at all** (K08.md §5 D7) |
 | 6 | K12 (div/rem) — **COMPLETE 2026-08-16 (M19, M20)** | L1–L4 green, **plus L5** (the all-classical short-circuit is not optional here — pre-materialisation would otherwise take `8W²+4W−1` qubits for an operation with no quantum input; risk R9) **and D3** (`sdiv`/`srem` by zero never traps and whatever it returns is pinned). L4 at `W ∈ {1,8,16,32,64,128}` — **i128 is a shipped `divrem` width**. All four opcodes green in both configurations; every figure in `K12.md` §3 and §4 reproduced on the first run, **including the four signed columns that had never been executed** |
 | 7 | `_unc` and `_controlled` axes; rotations + θ special cases; measurement. (`_inv` is **not** implemented — §15 D14) | L3 green across all kernels; classical mode works |
-| 8 | Generated shim over the full integer grid (**1595**, or **1455** if i80 is ruled out of scope — §1), of which **992 are wrappers and 603 are `_inv` abort bodies** (§15 D14); CQ_lang link; Grover | L6, L7 green — **v1 done** |
+| 8 | Generated shim over the full integer grid (**1595** — i80 is IN scope, decided 2026-08-14; the ~~1455~~ hedge this row carried is residual drafting, not a live option, and §1 says so twice), of which **992 are wrappers and 603 are `_inv` abort bodies** (§15 D14), **plus the 884 fp abort bodies from the same generator** — 2479 in all; CQ_lang link; Grover | L6, L7 green — **v1 done** |
 | 9 | *(stretch)* QRAM — port Bennett's QROM (`src/qrom.jl`, self-cleaning AND tree, 2(L−1) Toffoli) and Shadow (`src/softmem.jl`) behind `cqrt_qram_*` | load/store round-trip |
 
 Increments 2–6 are independent after 1 and can be built in any order or in parallel.
@@ -1404,11 +1538,43 @@ include/cqops/cqops.h        public API: context, sink, config
 src/bit.[ch] reg.[ch] qubits.[ch] emit.[ch] rotate.[ch] controlled.[ch]
 src/sink_printf.c sink_count.c sink_qec.c
 src/kernels/{bitwise,shift,cast,add,addacc,cmp,mux,mul,divrem}.c
-shim/gen_shim.py             reads CQ_lang's tools/opcode_table.yaml
-shim/cq_runtime_impl.c       the cqrt_* surface
-shim/cq_templates_impl.c     generated dispatch (1595 thin wrappers; see §1 on i80)
+shim/gen_shim.py             M27 grid: reads third_party/cq_lang/opcode_table.yaml
+shim/gen_bodies.py           M27 bodies: the only file naming a libcqops/M26 symbol
+shim/cq_shim.h               the M26 <-> M28 contract (declarations only)
+shim/cq_runtime_impl.c       M26: the cqrt_* surface
+shim/generated/*.gen.c       M28: **one file per opcode family**, all 2479 bodies —
+                             992 thin wrappers + 603 `_inv` aborts + 884 fp aborts
 tests/
 ```
+
+> **A FOURTH CORRECTION, 2026-08-23 AT STEP 23: `include/cqops/cqops.h` DOES NOT CARRY A
+> CONTEXT, AND WILL NOT.** The sketch's first line says *"public API: context, sink,
+> config"*; `src/ctx.h` reserved that question by name for Step 23, on the ground that the
+> only consumer of a public context would be M26. M26 landed and does not want one, and the
+> answer is forced rather than chosen. **M26 IS IN THIS REPOSITORY** — `shim/cq_shim_ctx.c`
+> holds the one process-global `cq_ctx` and reaches the internals by include path, exactly as
+> `tests/` has since Step 2. **NO CALLER OUTSIDE IT CAN EVER HOLD ONE:** measured, 0 of
+> CQ_lang's 2479 `cq_template_*` declarations and 0 of its 173 `cqrt_*` declarations name a
+> context, a pointer or a struct — every parameter in both frozen ABIs is a scalar, and
+> `opcode_table.yaml` contains the string `ctx` zero times. **THERE IS NO OPAQUE PATH TO
+> PUBLISH** (every `cq_ctx` in the tree is by value; no `cq_ctx_create`, no heap allocation,
+> no `sizeof(cq_ctx)`), so publishing it means publishing the whole struct — **whose LAYOUT IS
+> CONFIGURATION-DEPENDENT**, 128 bytes without `CQOPS_DEBUG_INVARIANTS` and 144 with it, which
+> would put a Debug/Release-varying layout into the one surface §14 documents as the place
+> that define must not reach. The *sink* and *config* halves of the line are satisfied and
+> always were. Full statement in `src/ctx.h` and `shim/cq_shim_ctx.h`.
+>
+> **THIS SKETCH WAS WRONG IN THREE WAYS AND IS CORRECTED ABOVE (2026-08-22, at Step 22,
+> when it had to be built).** It said `gen_shim.py` reads *"CQ_lang's
+> `tools/opcode_table.yaml`"* — the un-vendored sibling repo; the source of record is the
+> pinned `third_party/cq_lang/opcode_table.yaml` (§1, Rule 1). It sketched **one**
+> generated TU, `cq_templates_impl.c`, where plan §3 and risk **R7** require **one
+> `.gen.c` per opcode family** (ten of them; four are MIXED wrapper/abort families, which
+> is why "wrappers ↔ aborts" is not the file seam). And it accounted only for the integer
+> half — *"992 + 603 = 1595"* — giving the **884** fp abort bodies **no file at all**,
+> while §1 above requires the same generator to emit every one of them. CLAUDE.md's
+> standing rule settles the general case: *the plan's module map supersedes PRD §14's
+> layout sketch where they differ.*
 
 C11, CMake, no dependencies beyond libc — mirroring CQ_lang's own build so the two link
 without ceremony. Library `libcqops`, prefix `cqops_` for public symbols and `cq_` for
@@ -1439,6 +1605,13 @@ and diffs.
 | **D12** | **Which §7 rows poison the shadow** | **Resolved 2026-08-17 at Step 19 and SHIPPED as M22 the same day. ONLY `Ry` at an angle off the π-lattice poisons. A diagonal gate — every `Rz`, and the `Z` of the θ ≡ π row — cannot move a computational-basis value, so a determinate entry stays determinate and `cq_shadow_known_zero` remains EXACT rather than becoming conservative. `cq_shadow_rotate` is unchanged; what this decides is which rows call it. See the note below** |
 | **D13** | **Whether `cq_materialise`'s `X` is promoted inside a §9 region** (`bd skh`, deferred at Step 6) | **Resolved 2026-08-20 at Step 20: NO — materialisation is UNPROMOTED, and it is forced rather than chosen. M06 hooks `cq_emit_x/cx/ccx` and nothing else, so `cq_materialise`'s deliberate bypass to the sink is already the correct behaviour and Step 20 changed no code — only the comment, from a deferral into the decision. D11's constant column is stated to be contingent on this answer. See the note below** |
 | **D14** | **What the `_inv` axis is, and what a v1 body does** | **Resolved 2026-08-21 at Step 21. `_inv` MEANS TWO DIFFERENT THINGS ON TWO FAMILIES and this project's documents used both senses without flagging it: on the controlled ROTATIONS it is θ-negation (16 `cqrt_*_controlled_inv` symbols, PRD §2.1's family, Step 23's to implement); on the DATA TEMPLATES it is a fresh-minting inverse OPERATION — 915 `cq_template_*_inv` symbols, 603 purely-integer. **NEITHER IS EMITTED BY ANYTHING at the pinned revision** — 0 `_inv` lines across all 239 goldens — so liveness does not distinguish them and is not the ground. **The ground is SPECIFIABILITY.** `_inv` is `f⁻¹`, not `f`: `ir-pass/test/lowering_invert_add_i32.ll:25` pins a bracketed `add %a, 2` as lowering to `cq_template_add_i32_hl_inv(%a, 2)` — i.e. SUBTRACT. And `f⁻¹` **does not exist** for `and`, `or`, `udiv`, `trunc` or any `icmp`: they are not injective. No uniform definition of the data family is possible in **any** version. **v1 gives it a loud abort naming the symbol**; the obligation lands on Step 22, not Step 23. See the note below** |
+| **D15** | **What evidence `cqrt_free` reads for a CQ_lang rail, and what happens when there is none** (`bd c1a` / `ckd.17b`, open since 2026-08-15) | **Resolved 2026-08-22. THE `\|0⟩` PROOF OBLIGATION IS CQ_LANG'S, STATED IN ITS OWN WORDS, AND IT CANNOT BE DISCHARGED AT OUR LAYER AT ALL.** `CQ_lang/ROADMAP.md:381-386` makes it a non-negotiable principle: `cqrt_free` is emitted *"only on a proven-`\|0⟩` rail"*, and *"a rail not provably `\|0⟩` is **left allocated** … never freed"*; `CQ_lang/tests/e2e/run_slice.sh:10-13` states the limit from the other side — *"no trace label can say whether a rail was ACTUALLY `\|0⟩` at the free, **at any ABI**"*. So v1 does not duplicate that proof. What it holds instead is an **OBSERVED UNDO CERTIFICATE** over the call stream — measured to discharge the overwhelming majority of the corpus's frees, ~99.75%, where the shadow discharges **none** (every figure is pinned and dated in the note's §0, and the corpus is not frozen) — and a rule at the free whose EPISTEMIC state is **three-valued** while its ACT is **two-valued**: proven-clean releases, and **proven-dirty and unproven alike are STRANDED** — never released, never on the free list, counted. (That clause read *"proven-dirty is a hard error in both configurations"* until 2026-08-22 and was the pre-correction half of this very cell, whose own tail already said otherwise — the recorded pattern of a correction propagating to the paragraph being edited and stopping there.) **The layering licenses NOT ABORTING; it does not license RECYCLING**, so `CQOPS_FREE_TRUST`'s prohibition is **narrowed and KEPT** rather than lifted (the first draft released the residue and an adversarial review refuted it the same day). `CQOPS_FREE_ABORT` survives as a development flag. `ckd.18`'s `ry`-cancelled rails are the one carve-out — the certificate makes them **provably dirty** rather than unprovable, so they never reach the free list; **that row is STRANDED rather than aborted — the last clause of this decision, confirmed 2026-08-22 at the start of Step 23, so the whole of D15 now stands**. Note what that leaves: the free path has **two** dispositions (release, or never-release-and-count) while the *epistemic* state stays three-valued and is reported separately, and Rule 6's hard error survives verbatim for the row it was written about — a RELEASE of a non-`\|0⟩` index — which is the row that can no longer arise. See the note below** |
+| **D16** | **Which of the 173 `cqrt_*` symbols get a body at all** (`bd vxk`, `bd r3y`; PRD §1 and `docs/cqrt_census.txt` gave OPPOSITE answers for `cqrt_h`) | **Resolved 2026-08-23 at Step 23 landing 1 step 4. THE DISCRIMINATOR IS CAPABILITY, NOT LIVENESS, and "is it minted by the pass?" — the discriminator both documents implied — is measurably the wrong one.** Define every symbol libcqops COULD serve: implemented where v1 is in scope, a loud `cq_shim_unsupported` naming the symbol where v1 defers. Leave UNDEFINED only what libcqops could not serve at any point in v1. **That is exactly two symbols — `cqrt_h` and `cqrt_h_controlled`** — because Rule 4 forbids `H` on the classical path and §8's vtable is frozen at six entries with no `h` slot. The 11 never-minted symbols are not one population: `cqrt_x_controlled` and `cqrt_cnot_controlled` are IMPLEMENTED (measured — the `int32_t` operand of `cqrt_x`/`cqrt_cnot`/`cqrt_toffoli` is a rail HANDLE and not a raw wire, so the two are literally a `CX` and a `CCX`), and the five integer `cqrt_ry_<W>_controlled_inv` are IMPLEMENTED as D14 requires — with the honest qualifier that under a QUANTUM control three of §7's Ry rows hit D11's refusal, which `cqrt_rz_<W>_controlled[_inv]` already carries and PRD §2.1 already ships. The **34 fp-width core symbols** (`bd r3y`) join the **63 `qram`**, **11 `tape`** and `cqrt_alloc_handle` in `shim/cq_runtime_v2.c` as loud aborts, and the ground is **LINKAGE rather than scope**: `libcq_runtime.a` is one object holding all 173, so leaving a REFERENCED symbol undefined produces a duplicate-symbol wall naming symbols we implement correctly — or, measured and worse, a SILENT successful link in which CQ_lang's trace-only stub serves every call. `cqrt_h`'s omission is free only because nothing references it, which is PRD §1's own antecedent and is true of `cqrt_h` alone. See the note below |
+| **D17** | **How `cqrt_addc_<W>` adds in place when libcqops has no in-place adder that can serve it** (`bd dzj`, P0, filed 2026-08-22) | **Resolved 2026-08-22 by measurement, BUILT 2026-08-23 at Step 23 landing 1 step 4, and recorded here because a bead is not a design-of-record — `addc` appears 8 times across this file and the plan and not one of those lines stated the decision.** FOLD when the rail is all-classical; otherwise materialise the immediate into a fresh W-bit rail, materialise the rail's remaining classical lanes, take ONE ancilla, and run **M15's Cuccaro accumulator in place** — `acc = h`, `b = immediate`, `x = ancilla` — then drive the immediate rail back to `\|0⟩` with one `cq_emit_x` per set bit and free it. Two rows short-circuit first and both are PORTS rather than peepholes: `imm == 0` emits nothing (upstream's own identity peephole) and `W == 1` is `h ^= imm`, one gate, because addition mod 2 has no carry. **THE CLASSICAL FOLD IS MANDATORY, NOT AN OPTIMISATION**: D15 measured 40 of the corpus's 45 I4 frees on rails written only by `cqrt_alloc` + `cqrt_addc`, and making this path materialise collapses that to 5. **AND THE QUANTUM PATH CANNOT BE DEFERRED**, which was the open question: most corpus `cqrt_addc_i32` calls land on a rail that already owns qubits, through a chain rooted at a general `cqrt_ry`. Rule 1 is satisfied on both halves and nothing is re-derived — Bennett ships NO add-constant construction at all, and what upstream does for `x + const` is MATERIALISE it (`operand.jl` allocates and emits one NOT per set bit) and then run the general adder. See the note below for the four traps, the transient disposition and what it costs |
+| **D18** | **What Step 24's ORACLE is — NORTH_STAR says the fixtures "link against libcqops and run", the plan and §11 say "diff emitted traces / Traces match", and those are not the same criterion** (`bd 590`, P0, filed at Step 9) | **Resolved 2026-08-27. STEP 24 IS NORTH_STAR CONDITION 1 VERBATIM: the fixtures LINK, RUN, and do not abort. "Traces match" is RETIRED from the plan and from §11.** The retired criterion named an oracle that stops existing the moment condition 1 is satisfied: CQ_lang's `runtime/cq_runtime.c` calls itself a *"trace-only runtime stub"*, its e2e goldens are CQ_lang's regression oracle for CQ_lang's **own IR pass** captured against that placeholder, and once the real backend is linked nothing in the process emits those bytes. **AND THE BEAD'S OWN FALLBACK ORACLE IS FALSE, measured 2026-08-27 before it was written down.** `bd 590` proposed that correctness be carried by `cqrt_measure_*` return values, *"which ARE part of the ABI and ARE checkable against the goldens' measure lines"*. They are not: every measure body in the stub is `printf("… -> 0\n"); return false;` — a LITERAL — so all **266** measure lines across **244** goldens read `-> 0` whatever the circuit computes. Diffing against them would pass vacuously where the true value is 0 and fail where it is not, and the failure would be **us being right and the golden being a placeholder artefact**. **A SECOND, INDEPENDENT REASON THE GOLDENS CANNOT BE DIFFED IN ANY COLUMN: our handle numbering already diverges, by construction and on purpose.** `cqrt_addc` on a rail that owns qubits mints two transients CQ_lang never sees, so the D5 counter advances by 2 and the next `cqrt_alloc_*` returns `h4` where the stub returned `h2` — measured in Release and recorded at `shim/cq_runtime_rail.c`; D7b's defensive copy (`bd 493`) does the same on an aliased call. §2's own warning about a second counter diverging handle numbering has already come true from a different direction, and it is not a defect: those rails are ours, and the ABI does not name them. **SO WHAT CARRIES CORRECTNESS AT STEP 24 IS L1–L5 AND THE LINK, and that is the honest statement rather than a weakened one.** L1 (value against the C operator), L2/L3 (the pool as a SET), L4 (pinned counts) and L5 (the classical short-circuit) all run today over the kernel surface, in both configurations. What Step 24 adds is the only thing they cannot: that the **frozen ABI's 173 + 2479 symbols resolve against a real backend and that a real CQ_lang program drives them end to end without aborting** — which is exactly what NORTH_STAR condition 1 asks and is a claim no unit test can make. The **residue report** (D15 §3) is read alongside it as an observation, never as a gate: a fixture that strands is running correctly under a certificate that could not clear every rail. **THE ARCHITECTURAL POINT THIS TURNS ON, and it governs more than this decision: libcqops is a standalone linkable C library and CQ_lang is ONE CALLER of it. Our coupling is the frozen `cqrt_*` ABI and NOTHING ELSE — not its trace format, not its harness, not its golden corpus.** No libcqops module may be designed around what CQ_lang's harness happens to diff. Two riders. **(i) M23's default stream stays STDOUT** — ordinary library behaviour, not a concession, and `cq_sink_printf(FILE *)` redirects it in one line; Step 9's format decision (`x`/`cx`/`ccx`, `q<N>`, `%a`) is untouched, having rested on a sink structurally never seeing a handle. **(ii) Candidate (b) — pinning OUR gate stream against OUR OWN goldens — was weighed and NOT taken.** It is a real regression check and it is what "diff emitted traces" most plausibly meant, but trace goldens churn on D4 free-list and D6 non-demotion changes, which is **risk R5** and is exactly why kernel goldens pin COUNTS and not traces. It is filed for v2 rather than refused: what makes it affordable later is a stability claim about D4/D6 that v1 does not have |
+| **D19** | **What the qec sink's `ry` and `rz` entries do, given that `qec_rz` refuses a float and `qec_ry` does not exist** (Step 26 / M25; filed 2026-08-28 after reading the API rather than the plan) | **Resolved 2026-08-28. NEITHER IS A STUB.** §7's *"the QEC sink's `ry`/`rz` entries are stubs that record the call"* is retired: it was inferred from two true API facts, and neither fact implies it. **(1) `rz` — the double becomes an exact rational by CONTINUED FRACTIONS on θ/π, and the DENOMINATOR CAP is D10's tolerance wearing a different hat.** `qec_rz(ctx, q, long p, long q_denom, int precision)` means θ = π·p/q_denom exactly, ε = 2^−precision; p and q_denom reach `gs_rz_synthesize` as integers at `4·precision + 96` bits of working precision and are never divided, so the pair is not a spelling of a double — `(1, 4)` is exactly π/4, which no double is. Best-rational approximation supplies the conversion, and the cap has a failure mode at BOTH ends, MEASURED 2026-08-28: **too small and the corpus's own `3.14` becomes `1/1`, a silent 1.593e-03 rad rewrite to π** — D10's named miscompile arriving through a second door — **and too large and `fl(π/4)` stops being `1/4` and becomes `365555973729107575/1462223894916430357`, the same double and the same round-trip.** **CORRECTION, MEASURED 2026-08-28 AT STEP 26 THROUGH THE LIBRARY ITSELF rather than inferred from the paper: the upper end's cost claim — *"a generic rotation costing ~3·log₂(1/ε) T gates instead of ONE"* — IS FALSE FOR π/4.** On `config_ccx.json` at precision 20, `qec_rz(q, 1, 4, 20)` costs **1,200** physical `T`, and the 2^62 convergent costs **exactly the same 1,200**. This driver's Ross-Selinger Lemma-7.2 degenerate branch catches multiples of **π/2** and not of π/4: `(1,1)`, `(1,2)`, `(2,1)` and `(0,·)` are T-FREE at every precision, and those — not π/4 — are precisely §7's folding rows, which is why the cheap angles stay cheap regardless. **The BAND is unaffected**, because it was established by bisection on the CONVERSION rather than on the emitted string, and the **lower end remains a real miscompile**; what changes is only which angle illustrates the upper end. The general shape survives verbatim — the two conversions round-trip to the identical double, so no value check can separate them — and `test_sink_qec.c` therefore asserts the T-free rows it MEASURED and not the one it was told. Both survive any value check: the round-trip to the input double is bit-exact on both sides, so **only `qec_count(QEC_GATE_T)` can tell them apart** — the Prime Directive's "a right answer is not a right circuit", relocated into the angle conversion. The band is wide and was measured, not guessed: π/4, π/8 and π snap to `1/4`, `1/8`, `1/1` for every cap up to **2^53.5** (3π/4 to 2^51.9), while arbitrary doubles round-trip exactly from cap **2^27–2^30** up, so **any cap in [2^32, 2^48]** buys both with two decades of margin. The snapping is a mechanism rather than luck — a double near a nice rational has a huge partial quotient, so the convergent holds across an enormous cap range. Two riders: θ/π must be formed against π at MORE than double precision or the division by the rounded π reinjects the |θ|·1.2e-16 drift `src/angle.h` already fights (`tests/test_angle.c`'s double-double `PI_HI + PI_LO` is the technique, and it moves library-side); and §7's folding rows need no search at all, since M21 already recovers the integer `k` and those are `(k, 1)`. `qec_rz`'s own guard, `q_denom > LONG_MAX/2`, is ~2^62 and protects nothing. **(2) `ry` — CONSTRUCTED, not stubbed: `Ry(θ) = S·H·Rz(θ)·H·S†`, and the EMISSION ORDER IS THE REVERSE.** `Y = S X S†` gives `Ry(θ) = S Rx(θ) S†` and `Rx(θ) = H Rz(θ) H`; verified numerically exact (max deviation 2.220e-16 at θ ∈ {0.1, π/4, 3.14, π, −2.5, 1e-9}) and **exactly, not up to a global phase** — unlike §7's half-turn row. `qec_s`, `qec_h` and `qec_sdg` all exist. **The circuit is `sdg; h; rz; h; s`**: a matrix product applies its leftmost factor LAST, and emitting `s` first is wrong by 6.858e-01 — this is §7's own *"a matrix product and a circuit read in opposite orders"* trap, so M25 must pin the order with an executed check and not with the identity as written. **The conjugation is T-FREE**: `QEC_GATE_T` is produced only by `qec_t`, reached only from the gridsynth string walk (`qec.c:1749`), so `Ry(θ)` costs exactly `Rz(θ)`'s T-count plus four Clifford gadgets. **This unblocks §12**, which had no other route — `cqrt_h` is an over-declaration, so Grover-from-rotations is forced, and a stubbed `ry` made the qec sink structurally unable to run v1's acceptance gate. **§7's half-turn spelling is UNCHANGED**: `x; rz(q, π)` is two Clifford ops against five, so the preference survives even though its stated reason (*"there is no `qec_ry` at all"*) is now true only of the API and not of what the sink can build. **This is a sink-level single-qubit Clifford conjugation, below the kernel layer, so it is outside Rule 1's scope** — Rule 1 governs reversible constructions for the integer surface, ported from Bennett.jl — but it is a DECISION and belongs here rather than in a comment |
+| **D20** | **What the qec sink is reached FOR, and what bounds it** (Step 26 / M25; filed 2026-08-28) | **Resolved 2026-08-28 by reading the QEC library's configs and MEASURING its own `trace` driver.** **(1) `n_logical` IS A CONFIG CONSTANT AND RAISING IT RAISES THE CODE DISTANCE.** `qec_n_logical(ctx)` is documented as *"the valid range for every `q` argument"* and comes from the loaded JSON; the shipped example configs carry n_logical ∈ {1, 3, 4, 6, 7}, and one states outright that *"at n_logical=5 the derived d rises to 5 and a d=5 fabric at this F does not fit"* — the error budget splits across the logical qubits. So D2's *"set the pool ceiling to `qec_n_logical`"* is a HARD ceiling, not a formality: K12's `divrem` at W = 8 alone takes W²+2W−1 = 79 scratch qubits before operands and M18's `mul` at i128 takes 16,640 (`bd fxz`), so exceeding it must fail loud rather than grow. **(2) WHAT IS VISIBLE THROUGH THE SINK IS BOUNDED BY TOFFOLI COUNT, AND THE BOUND IS SHARP.** `scripts/draw_circuit.py` parses the `execute_gate` trace, which is PHYSICAL — post-distillation, post-lattice-surgery. MEASURED with the library's own `trace` driver, one LOGICAL gate: at **d = 3** (`config_ccx.json`) a `CX` is **1,830** physical gates and a `CCX` is **562,564**; at **d = 11** (`config.json`) a `CX` is **112,134** and a `CCX` is **34,417,428**. The gap is magic-state distillation — §7's `Ry`/`Rz` land in the same place through gridsynth. **So a Toffoli-FREE region at small width is genuinely inspectable** (`cq_kernel_xor` at W = 4 is 4 CX ≈ 7,300 physical gates at d = 3, well inside the drawer's `--qubits` / `--max-gates` / `--pixel-art` handling) **and anything carrying Toffolis is not** — K6's `add` at W = 4 is already ~12 Toffolis ≈ 6.7M gates. That is a property of fault tolerance, not a defect in either library, and it is the honest scope for NORTH_STAR condition 5. **THE SINK IS THE ONLY SANCTIONED ROUTE TO A DRAWING AND THIS REPO GROWS NO SECOND ONE.** Rule 13 is the reason: emission is a stream, a gate is gone from our side once emitted, and what a consumer does with it is the consumer's business — the drawer is the QEC repo's, reached by routing the same stream into `qec_*` under one flag. A libcqops-side drawer was proposed while resolving this and REJECTED: it would fork a second visualisation path, duplicate a shipped capability, and put a structure where §1 constraint 3 says there is none. **A rider that evaporated with it, recorded so it is not rediscovered as an objection:** the drawer's parser reads `parts[1]` and `parts[2]` only, which would silently drop a three-operand `ccx` target — but `qec_gate_kind` is H/S/X/Z/Y/CX/MZ/MX/T, every one at most two qubits, so `execute_gate` never emits a three-operand line and the parser is exactly right for its own input. The catch existed only for the rejected design |
+| **D21** | **Whether libcqops emits the QEC repo's INSTRUCTION-level trace annotations, and where that code lives** (Step 26 / M25 + M26; filed 2026-08-28) | **Resolved 2026-08-28: (a) LAZY ALLOCATION WINS and the header is TWO-PASS; (b) ONE INDEX PER REGISTER WINS and the qec sink DISABLES RECYCLING; (c) is not a loss. Recorded in full because two earlier answers in this file were WRONG and the contract is normative. READ THE DIVISION OF LABOUR FIRST, IT IS THE WHOLE SHAPE: libcqops emits annotations for OPERATIONS ONLY and prints NOTHING for a gate. `#REGISTER` lines and `# STAGE: op begin`/`op end` brackets are ours; every gate line, every `#PATCH`, and every `# STAGE: logical CX begin/end`, merge, split and syndrome round is the LIBRARY's, written by its own `execute_gate` when we call `qec_cx`. §7 says so as a prohibition — *never print gate lines* — and the consequence is that the annotation is NOT a sink and MUST NOT be one: the six vtable entries call `qec_*` and write no text at all, while M26 writes two line kinds around them. **THE HAZARD THIS FORBIDS IS CONCRETE AND CHEAP TO HIT: pointing M23's printf sink at the same `FILE*` as the qec trace corrupts EVERY trace.** Our `cx(q0, q1)` is neither a conformant gate line (the library owns those, spelled `CX 0 17`) nor a conformant annotation, and §9's table makes an unrecognised line inside an opted-in trace a **fatal parse error** — the pipeline aborts, no JSON, no HTML, no degraded render. M23 and the qec path are disjoint consumers of one stream and must never share a stream.** `qec/docs/HOST_LANGUAGE_HANDOFF.md` is a **273-line NORMATIVE contract, v4, approved 2026-08-27**, whose stated audience is *"the team building the higher-level quantum programming language that compiles data-structure operations down to `qec_*` calls"* — **that is us**, and it is the complete specification for the print statements our runtime must emit so the viewer can render at the algorithm level. **CORRECTION 1: there is no injector API and none is needed.** §1 — the host writes its annotation lines with ordinary `fprintf` to **the same `FILE*` it passed to `qec_set_trace`**, whole lines, only BETWEEN `qec_*` calls, at `QEC_TRACE_FULL`. So this is our obligation, not an upstream feature request. **CORRECTION 2: it is NOT the sink's job, and that is structural.** A `cq_sink` is handed a raw `uint32_t` and structurally never sees a handle, a width or an opcode name (§8) — but `#REGISTER name=a type=int qubits=0,1,2,3` and `# STAGE: op begin (name=Add, in=a|b, out=b)` need exactly those three. **They live at the M26 shim boundary**, which already knows the opcode, the handles and the widths. M25 stays the six vtable entries; the annotation is a separate concern at a different layer. **WHAT THE CONTRACT DEMANDS**: `#REGISTER` lines, ALL of them before the first bracket, `qubits=` a comma-separated list of the same `uint32_t` we pass to `qec_*`; one flat `# STAGE: op begin (name=…, in=…|…, out=…)` / bare `# STAGE: op end` pair around the ENTIRE compiled expansion of each language-level operation; tokens matching `[A-Za-z0-9_.$\[\]-]+`; and full coverage — **a gate line outside any bracket is a FATAL parse error**, no degraded render. **THREE GENUINE COLLISIONS WITH THIS REPO'S DESIGN, and they are why this is a DECISION and not a formatting pass. (a) THE CONTRACT'S REGISTER MODEL IS STATIC AND OURS IS LAZY.** §3: *"Registers are static: declare once, never re-declare, free, re-bind, or slice"*, and every `#REGISTER` must precede the first bracket. But Rule 5 / NORTH_STAR §2 allocate **lazily, per bit, never at declaration**, and **I4** gives an all-constant rail **zero** qubits — so at the moment the register map must be printed we do not know a rail's indices, and for a rail that stays classical there never are any. Pre-materialising to fix it would destroy L5. **(b) D4 RECYCLES INDICES AND THE CONTRACT FORBIDS IT.** §3: *"Every index belongs to at most one register"*; but after `cqrt_free` a LIFO index returns to the pool and `cq_materialise` hands it to an unrelated rail, so over one program an index legitimately belongs to several. Declaring both is an overlapping `#REGISTER` — a fatal parse error. **(c) OPERATIONS DO NOT NEST (v3 policy), so the SANDWICH CANNOT BE BRACKETED — and under the division above that is CORRECT rather than a loss.** The forward / copyout / reverse halves are circuit structure, and circuit structure is what the library narrates: they are already visible as the sequence of `# STAGE: logical CX begin/end` fences the viewer nests inside our one block. What we describe is the OPERATION — `Add`, `Measure` — not how we compiled it. Brackets therefore go at the OUTERMOST shim entry point and nowhere else, which is what the contract wants and what our own layering wants; the temptation to bracket the sandwich halves is the same category error as printing gate lines. **ONE THING THAT FITS WELL:** §6 rule 3 — *"workspace qubits stay unregistered"* — is exactly our scratch, left out of every `qubits=` list and shown as extra lanes inside the op, so the scratch region needs no register and (a) bites only on rails. **COVERAGE IS WIDER THAN `cq_template_*`:** every logical `qec_*` including `qec_mz`/`qec_mx`/`qec_idle` must be inside a bracket, so `cq_runtime_gate.c`'s 30 direct-gate `cqrt_*`, `cqrt_free`'s cleanup, `cqrt_addc`'s transients and D7b's defensive copy all need one too. A reference producer (`examples/circuit_demo_registers.c`) and the viewer pipeline (`scripts/verifyview/`) both ship **RESOLUTION OF (a): the conflict was never lazy-vs-eager, and the contract's static header is unsatisfiable by ANY runtime with mid-program allocation.** §3 requires EVERY `#REGISTER` before the FIRST `op begin`, and CQ_lang emits `cqrt_alloc` throughout a program — so even eager allocation at `cqrt_alloc` cannot put a rail allocated after the first operation ahead of it. The header is therefore ASSEMBLED AT END OF PROGRAM and written ahead of the buffered trace, regardless of allocation policy — and once that is so, lazy allocation costs nothing extra. Three rules follow. The `#REGISTER` line lists the rail's FINAL index set: D6 never demotes, so the set only grows and is well-defined at the end, and a bit not yet materialised during an early op simply *"contributes no lane"* there (§6 rule 4). An all-constant rail (I4) gets NO line: it owns zero qubits, so it is not a quantum register, and the viewer showing zero rails for it IS L5 made visible. `cqrt_addc`'s transients and D7b's copy stay UNREGISTERED — workspace (§6 rule 3), shown as extra lanes inside the op — so only handles CQ_lang received back get a line. Mechanically the shim owns the trace `FILE*` (it must anyway, for `qec_set_trace`), writes to a NAMED `.partial` file rather than `tmpfile()` so an `abort()` mid-program still leaves the partial trace on disk (the same reason M23 flushes per line), and at teardown writes the header then appends it. Teardown is `atexit`: the frozen ABI has no shutdown symbol (`docs/cqrt_census.txt`) and the shim registers nothing today. **RESOLUTION OF (b): the contract wins, and the consequence is that INDICES ARE NEVER REUSED UNDER THE QEC SINK** — monotonic, exactly like D5's handles, which is exactly what the contract's static model presupposes. The alternatives do not survive: recycling SCRATCH only is worse, not better — an index used as workspace in op 1 and materialised into rail `h5` in op 3 renders as `h5`'s lane doing work in an op before `h5` existed, a confident wrong picture; partitioning rail and scratch index spaces is the v2 refinement. Two things make it cheap. The pool already has the mechanism: `cq_qubits_strand` keeps the index in `live`, so `minted == live + free` holds and this is NOT the third bucket D15 §3 rejected (`src/qubits.h:23-25`); retiring a CLEAN rail needs only its own counter so the D15 residue report never confuses *"retired for the trace contract"* with *"could not prove `|0⟩`"*. And it is a DISPLAY-MODEL constraint, not a physical one — qec's patch holds `|0⟩` after our free and would happily be reused — which is why it is a sink-mode toggle set at install time, alongside D2's ceiling, and NOT a change to D4. Cost: `qec_n_logical` now bounds TOTAL MINTED rather than peak, which under D20's Toffoli-free-small-width scope is not what limits anything. **WHERE IT LANDS:** Step 26 (`bd k26`) owns the six vtable entries, D19's `ry`/`rz`, the trace `FILE*` and its `atexit` teardown, and the install hook that now sets TWO pool modes — ceiling and no-recycle; `bd 76r` owns the header assembly and the `op begin`/`op end` brackets at the shim entry points, which is the bulk and is the deliverable — without it the viewer shows only the v2 logical-qubit skeleton. **BOTH HALVES ARE NOW BUILT and `bd 76r` is discharged (2026-08-28), in `shim/cq_shim_trace.[ch]` plus one bracket at each of M26's `cqrt_*` and `cq_shim_*` entry points.** Four things the build settled that this decision did not, recorded so they are not re-derived. (i) **THE HEADER IS PREPENDED BY A COPY, NOT A RENAME, AND THE DEPENDENCY POINTS DOWNWARD**: the register map is M26's and the file is M25's, so the composition happens in `cq_sink_qec_teardown` and the CONTENT arrives through a callback M26 installs (`cq_sink_qec_set_header`) — a Layer-4 module calling up into Layer 5 would be the alternative. (ii) **THE SNAPSHOT REPLACES RATHER THAN UNIONS.** "The set only grows" is the obvious reading of (a) and it is right for every row but one: `cqrt_cswap` with a CLASSICAL ONE flag exchanges two rails' BIT ARRAYS for zero gates, so a union would have both handles claiming both index sets — an OVERLAPPING `#REGISTER`, which §9 makes a fatal parse error rather than a merely wrong picture. Replacing at every touch makes the recorded lanes follow the bits, exactly as `cq_rec_swap` makes the birth value follow them. (iii) **A FORWARD TEMPLATE BRACKET NAMES A HANDLE IT HAS NOT MINTED YET.** D7b's defensive copy is a loop of `cq_emit_cx` and runs BEFORE the mint, so a bracket opened after the mint would leave those gates outside every bracket; the predicted handle is `cq_reg_count + (sources alias ? 1 : 0)`, checked by execution rather than by an assert. (iv) **THE PACKAGE RULE HAS A REACHABLE REFUSAL ROW.** §6 makes an op bracket with zero `#REGISTER` lines fatal, and a program whose every rail stays classical produces exactly that — so the teardown REFUSES to ship it, leaving the `.partial` on disk and saying so on `stderr`. Nothing is withheld: a gate needs a materialised bit and a materialised bit is a register, so such a trace has no gate lines either. **MEASURED END TO END 2026-08-28** against the QEC repo's own `scripts/verify_view.py`: a six-operation program produced 3 `#REGISTER` lines and 12 `level: "OP"` units in the rendered document, with the all-constant `i8` rail correctly absent — which is L5 made visible |
 
 > ### D10 — the window is absolute, and the relative reading was built and measured first
 >
@@ -1871,7 +2044,11 @@ and diffs.
 > **THE GATE IS STEP 22, NOT STEP 23.** An uncalled symbol produces no undefined reference,
 > and the corpus calls zero `_inv`, so plan §4's Step 23 row (*"`nm` shows no undefined
 > `cq_template_*` from the opcode grid"*) could not go red if the 603 were simply missing.
-> What would fail is Step 22's *"emitted symbol count reconciles with Step 0.5"*. Step 22's
+> What would fail is Step 22's symbol-count clause — which then read *"emitted symbol
+> count reconciles with Step 0.5"* and was **reworded on 2026-08-22** to name the partition
+> outright (2479 = 992 wrappers + 603 `_inv` aborts + 884 fp aborts, `opcode_table.yaml`
+> only), because Step 0.5's row named the ~~1474~~ phantom and a gate may not delegate its
+> numbers to a question. Step 22's
 > other clause needs correcting too: the abort bucket is no longer 884 fp but **884 fp + 603
 > integer**, and the integer grid is **992 wrappers + 603 aborts**, not 1595 wrappers. Step 22
 > should assert that the integer abort set is **exactly** the `_inv` symbols, so nothing else
@@ -1924,13 +2101,30 @@ and diffs.
 > §3's rule table and has always been per-gate. No gate count depends on it, no L4 golden
 > moves, and "kind, never shadow" is untouched.
 >
-> **Measured payoff, and it is why the exact side is the right side.** The corpus's twelve
-> `rz`-rooted rails are `alloc(0); cswap(qflag,·,tmp); rz(tmp,φ); cswap; free` — the Fredkin
-> materialises `tmp` *before* the `rz` arrives (a `CCX` with two `Q` controls and a constant
-> target materialises), so under a poisoning rule all twelve become unfreeable, and under
-> D12 the `cswap` involution restores their shadow to zero and they free cleanly. `Ry(π)` on
-> a qubit likewise keeps its rail freeable. The alternative costs `ckd.18` twelve extra
-> frees and buys nothing.
+> **Measured payoff — and the corollary this note used to draw was FALSE, corrected
+> 2026-08-22 when D15 measured it.** What D12 buys is real and is a property of the SHADOW:
+> a rail that met only a diagonal row keeps a determinate entry, which is what makes
+> `cq_pc_zero_proof_rotation_free` exact across Steps 10–17, and `Ry(π)` on a qubit likewise
+> keeps its rail freeable.
+>
+> **What it does NOT buy is the corpus's `rz`-rooted frees, and this note asserted that it
+> did.** The retired text read: *"the corpus's twelve `rz`-rooted rails are
+> `alloc(0); cswap(qflag,·,tmp); rz(tmp,φ); cswap; free` … under D12 the `cswap` involution
+> restores their shadow to zero and they free cleanly."* Measured: **all 30 rails whose last
+> rotation is an `rz` are unprovable by the shadow.** `cq_shadow_ccx`'s
+> `t.unknown |= a.unknown | b.unknown` carries the **swapped-in DATA rail's** poison into
+> `tmp` whatever the flag holds, and in the corpus that data rail is always the
+> generally-rotated one. With `cqrt_cswap` correctly modelled as writing **both** data args
+> there are **0** `cqrt_rz`-rooted frees in the last-write classification at all — the
+> "twelve" were an artefact of the same modelling error that produced the historical "37".
+> Those rails are discharged by **D15**'s U2 reduction, not by D12.
+>
+> The test that appeared to pin the retired claim,
+> `tests/test_rotate.c:an_rz_in_a_cswap_bracket_on_determinate_operands_frees_cleanly`
+> (renamed 2026-08-22 — its old name asserted the refuted claim, and a name outlives a
+> comment), mints **both** operands determinate — a state the corpus never has — and says so itself: *"the shadow
+> tracks both exactly, because nothing here poisoned."* It reproduces the SHAPE and not the
+> STATE. **D12 is unaffected; only its stated corpus payoff was wrong.**
 >
 > **The honest limit.** The argument is *derived* from "a determinate `value` means a
 > definite computational-basis value", which holds today because every gate below Layer 4 is
@@ -1938,3 +2132,538 @@ and diffs.
 > measure it. What bounds the risk is that §9's controlled axis cannot break it either — a
 > controlled diagonal puts a *relative* phase on the **control**, whose own basis value is
 > likewise unmoved — and that D11 refuses the quantum-controlled fold rows outright.
+
+> ### D15 — the proof is CQ_lang's; ours is a certificate, and what it cannot cover is STRANDED rather than recycled
+>
+> **Resolved 2026-08-22, closing `bd c1a` (`ckd.17b`), `bd ckd.18` and `bd 2cf`. The first
+> draft of this decision released the residue to the free list and an adversarial review
+> refuted it the same day; the reversal is recorded in §3 because the distinction it turns
+> on is the whole of I3 and is easy to lose again.**
+>
+> > **BUILT 2026-08-27 AT STEP 23 LANDING 2, AND THREE THINGS THE BUILD SETTLED THAT THIS
+> > DECISION LEFT OPEN. `bd 06t` is discharged.** The free path landed at landing 1 (§3);
+> > landing 2 added the residue split and the certificate. `cqrt_free` installs
+> > `cq_shim_free_proof` — the certificate AND the shadow, **DIRTY dominating, then CLEAN,
+> > then UNPROVEN** — because both are sound in all three rows and differ only in
+> > COMPLETENESS, so either one's proof suffices and either one's conviction stands. A
+> > best-evidence-first rule would have made the answer depend on consultation order.
+> >
+> > **(i) RULE 1 WAS NOT SATISFIED FOR THE PORT THIS SECTION MANDATES, and nobody had
+> > checked.** §2 says "port the reduction, do not re-derive the parity" and names four
+> > upstream guards. Measured before any code: **none of those four strings appeared anywhere
+> > under `third_party/`** — they are in CQ_lang, which this repository does not pin. Resolved
+> > by vendoring `tools/free_pairing_check.py` into `third_party/cq_free_pairing/` at a pinned
+> > revision with its own COMMIT and a **configure-time** sha guard
+> > (`cmake/CqopsFreePairingPin.cmake`), in its own directory so that no byte of any existing
+> > `third_party/` file changed. Reading the pin paid immediately: upstream's flag parity is
+> > masked **`& 1`** and is frozen on **control slots only**, neither of which is derivable
+> > from the four names, and getting either wrong makes the certificate discharge almost
+> > nothing.
+> >
+> > **(ii) ONE ENGINE IS BUILT AS ONE ENGINE, and the mechanism is a RECORDING choice rather
+> > than a rule shape.** The `cq_template_*` FORWARD is recorded as a WRITE to the rail it
+> > mints, with its `_unc` as the declared TWIN. So U1 needs no matching step of its own: the
+> > same `reduces_to_identity` that serves U2 pairs a forward with its uncompute, and upstream's
+> > T2 (operands unchanged between the halves) falls out of `pair_operands_unchanged`'s READS
+> > loop rather than being a rule. U3 is the classical-immediate fast path and is the only
+> > entry condition that does not call the engine at all.
+> >
+> > **(iii) THE BIRTH VALUE IS WHAT MAKES §4's CARVE-OUT A MECHANISM RATHER THAN A CASE, and it
+> > is the port's one deliberate divergence from upstream's OBLIGATION.** Upstream's rules prove
+> > "a known classical basis STATE, unentangled" — its A-rules explicitly accept a rail
+> > returning to its ALLOC-TIME value `v`, because ITS free is a reset that collapses nothing on
+> > a basis state. Rule 6 needs `|0⟩`. **A faithful transcription would have handed `|v⟩`
+> > indices to the free list.** Carrying the birth value alongside the reduction fixes that AND
+> > produces §4's conviction for free: a reduced history returns the rail to what it was MINTED
+> > holding, so a template rail (born `|0⟩`) clears and `alloc_i32(5); ry(θ); ry(−θ)` — the same
+> > reduction, the same engine — is CONVICTED. §4's carve-out and §3's residue split are the
+> > same fact read twice.
+> >
+> > **AND TWO PLACES THE PORT IS DELIBERATELY *NOT* UPSTREAM, both recorded at
+> > `shim/cq_shim_reduce.h`.** Upstream's **R1** needs whole-function look-ahead that does not
+> > exist when `cqrt_free` arrives; dropping it would WIDEN us, so it is replaced by a
+> > **past-only** witness — a rail carrying a non-diagonal rotation that was READ after it is
+> > UNPROVEN — which is strictly stronger than R1 and additionally closes the hole §5
+> > demonstrates upstream leaving open. And upstream's escalation of "minted, no reversal" to a
+> > VIOLATION is **not inherited**: it is sound for upstream's obligation and would be an
+> > over-claim for ours, where a conviction means the library can SEE the rail is not `|0⟩`.
+> > That shape answers UNPROVEN here. The ACT is identical either way; what would have been
+> > damaged is the residue split.
+>
+> #### 0. Corpus figures in this decision are PINNED AND ALREADY MOVING
+>
+> Everything measured below is against CQ_lang at **`397c67c`**, where `tests/e2e` holds
+> **241** goldens and **51,705** `cqrt_free` calls. **The CQ_lang corpus is not frozen and
+> nothing in this repo pins it** — `third_party/bennett/COMMIT` has no counterpart on the
+> CQ_lang side. Measured within one session on 2026-08-22 the corpus went 239 → 240 → 241
+> fixtures and 51,696 → 51,698 → 51,705 frees, and a **26th** `ckd.18`-shaped rail appeared
+> in `slice_intrinsic_ctlz.expected.log`. Treat every count here as an ORDER OF MAGNITUDE
+> and a RATIO; re-measure before quoting one, and never let a golden-derived figure become a
+> gate without a pin beside it.
+>
+> #### 1. The `|0⟩` obligation is upstream's, and it is stated upstream
+>
+> Every earlier draft assumed the requirement that a freed rail be provably `|0⟩` was
+> **ours** — `ckd.18`'s note says so in terms ("the requirement … is OURS (Rule 6, I3)") on
+> the ground that `cq_runtime.h:40-41` calls `cqrt_free` a "width-irrelevant lifetime hook;
+> declared but unused" and states no precondition. **That ground is false.** The
+> precondition is stated, in CQ_lang's own design-of-record, as a non-negotiable principle:
+>
+> > **No added measurements — ever.** … Its one teeth: `cqrt_free` is emitted **only on a
+> > proven-`|0⟩` rail** — freeing a dirty/entangled rail is a hidden reset = measurement
+> > that collapses `q`. A rail not provably `|0⟩` is **left allocated** (a qubit "leak,"
+> > accepted in the qubits-not-scarce regime), never freed. This is precisely what the
+> > struck "v1" got wrong — it freed dirty rails; the fix is *don't free dirty*, not *free
+> > carefully*. — `CQ_lang/ROADMAP.md:381-386`
+>
+> And CQ_lang states the limit from the other side, in `run_slice.sh` — one of TWO runners,
+> and the check runs unconditionally in both — **stage 2b** in `run_slice.sh:65`, and the
+> identically-placed **Stage 3b** in `run_slice_multi.sh:61`, which numbers its stages
+> differently; "stage 2b" below is `run_slice.sh`'s name for it:
+> *"The golden byte-diff cannot witness 'freed at `|0⟩`' — **no trace label can say whether
+> a rail was ACTUALLY `|0⟩` at the free, at any ABI**"* (`tests/e2e/run_slice.sh:10-13`). It
+> therefore discharges Rule 6 **at the IR layer**, in `tools/free_pairing_check.py`, run as
+> stage 2b of every slice, where the rail identity is an SSA name and the loop algebra is
+> still present.
+>
+> This is NORTH_STAR's layering stated by the other side of the interface. **v1 does not
+> duplicate a proof that cannot be performed at our layer**, and Rule 13 forecloses the only
+> instrument that could. What v1 owes is the *operation* — that `f` followed by `f` returns
+> the rail to `|0⟩`. That is Rule 7's involution, and `cq_kd_case`'s L3 re-runs the same
+> kernel on every case of every kernel under each of §9's four regions, asserts `dst == 0`,
+> frees, and asserts the pool came back.
+>
+> #### 2. The evidence is an OBSERVED UNDO CERTIFICATE, not the shadow
+>
+> **The shadow cannot be the free-time oracle, and that is now a measurement.**
+> `cq_shadow_rotate` is the only PRODUCER of `unknown` — `cq_shadow_cx`/`ccx` write the byte
+> too, but only ever propagate what is already there — and `cq_shadow_cx` carries it
+> control→target with no clearing path — the direction a kernel's sources travel — so on
+> **every free that reaches the shadow at all it reports `unknown`**: the shadow discharges
+> **0** and convicts **0**.
+>
+> **The vacuity in that sentence is worth stating, because the first draft hid it.** ~45
+> frees never reach the shadow: their rails are all-constant at the free, so by **I4** they
+> own no qubits and `cq_reg_clean` (`src/reg.c:189-199`) skips every bit without invoking the
+> proof. Those are discharged today, with a NULL proof and no certificate — they are the
+> complement of the recorded "51,651 of 51,696 rotation-tainted", 9 in each of the five
+> `slice_loop_break*` fixtures, and they are U3's population plus one all-classical compare
+> flag. **Poison is not what silences the shadow there; I4 is.** The shadow stays exact, and
+> stays used, on the rotation-free kernel surface; it is empty at L6 for everything that
+> owns a qubit.
+>
+> What M26 *can* see is the call stream. The certificate is a per-handle record — **not a
+> gate list** (Rule 13): the rail's producer, its operand handles, a per-handle write epoch,
+> and the active §9 control context. **Its size is bounded by the live-handle count and is
+> small — tens of bytes per live handle against a corpus peak of ~1,165 simultaneously-live
+> rails — but no byte figure here has been reconstructed twice, so derive it from the record
+> you actually build rather than quoting one.** Three rules, measured disjoint:
+>
+> | | Rule | Frees | Why the rail is `\|0⟩` |
+> |---|---|---|---|
+> | **U1** | rail minted by `cq_template_F(srcs) -> R`; a later `cq_template_F_unc(R, srcs)` names it with the same handles; **`R`'s write history between the two, and every source's, itself REDUCES TO THE IDENTITY** (not merely "is empty" — see below); and both halves ran under the same §9 control context | ~25,110 | `dst ^= f` is an involution and both applications see the same operand values, so the net effect on `R` is the identity |
+> | **U2** | every write to `R` since it was minted reduces to the identity: applications of a self-inverse gate pair off, **and every operand of a pair is unwritten between its two halves, and every write between them commutes with it** | ~26,419 | A self-inverse gate applied twice on unchanged operands is the identity |
+> | **U3** | born `cqrt_alloc_W(L)`, `sum` of `cqrt_addc` immediates is `−L`, no other write | 40 | Upstream's own rule (A1): a known classical state plus a classical offset |
+>
+> **Measured: ~99.75% of frees, zero overlap, residue ~127** — falling to ~54 under
+> upstream's own relaxations (a diagonal `Rz` is transparent, which is **D12**, and
+> `Ry(θ)/Ry(−θ)` is an adjoint pair), of which **~50 are in the five `slice_loop_break*`
+> fixtures**. See §3's warning about exactly those five.
+>
+> **THE RESIDUE IS NOT ONE POPULATION AND §3 TREATS ITS HALVES OPPOSITELY.** Some of it is
+> `ckd.18`-shaped — the certificate reads enough to convict, so those rails are
+> **proven dirty** (§4). The rest is genuinely evidence-free and is **stranded** (§3). An
+> implementation that reports a single residue figure has not yet decided which row each
+> free lands on, and that split is the first thing bd `06t` owes.
+>
+> > **U2'S PARITY CLAUSE IS NOT SUFFICIENT AND THE FIRST DRAFT OMITTED THE REST OF IT.**
+> > Written as a bare *"even number of applications of the same self-inverse gate on the same
+> > operands"*, U2 states a **parity** where soundness needs a **nested reduction with
+> > operand stability**. Measured against a tracker built literally from that text: **82
+> > rails in the shipped corpus are discharged on a premise the trace violates** — 474
+> > intervening writes, all `cqrt_copy_<W>_controlled` whose control flag was flipped by
+> > `cqrt_x` in between, plus 10 `cqrt_cswap` whose swap partner moved. And the ORDER matters
+> > independently of the parity: reordering a reverse pass from `A B B A` to `A B A B` leaves
+> > every quantity the parity rule inspects bit-identical while leaving the rail at
+> > `h1 ⊕ h2`. **Upstream had this exact bug and fixed it on 2026-08-07**, with four
+> > dedicated guards (`pair_operands_unchanged`, `co_written_stable`, `commutes`,
+> > `unchanged_over`) after a live miscompile in which `cswap/ry/cswap/free` reported
+> > `A2-reduces-to-identity` at exit 0 with `Ry(0.75)|0⟩` parked on the freed rail
+> > (`free_pairing_check.py:96-120`, `:197-209`). **Port the reduction, do not re-derive the
+> > parity** — Rule 1's posture applied to an analysis rather than a circuit.
+> >
+> > **And U2's "since it was minted" must not be read as "since its `cqrt_alloc`".**
+> > `cqrt_qram_load_<W>` mints a rail with no allocator anywhere in the trace, holding a cell
+> > value and entangled with a quantum index; 11 shipped frees are on such rails.
+>
+> > **U1 CONTAINS U2'S REDUCTION — THERE IS ONE ENGINE, NOT THREE RULES, and the first draft
+> > got this wrong in a way that would have under-discharged the corpus.** U1 was written as
+> > *"neither `R` nor any source is written between"*, and measured against the corpus that
+> > is too strict: **425 shipped frees have at least one intervening write to `R`** — 397 the
+> > `¬flag` `cqrt_x` bracket (`classical_call_under_control_caller.expected.log:3-11`), 20 the
+> > `rz` keep-alive bracket (`slice_intrinsic_ctlz.expected.log:7-11`,
+> > `slice_uncompute_dead_dag.expected.log:10-14`), 8 controlled qram/tape writes — plus 10
+> > with an intervening write to a SOURCE, all `cqrt_cswap`. Those are the corpus's ordinary
+> > shapes, not corner cases, so U1-as-written could not have produced ~25,110.
+> >
+> > **The repair is to say what is true: the emptiness condition is the REDUCTION condition.**
+> > There is one reduction engine — ported once from upstream's
+> > `reduces_to_identity` / `unchanged_over` / `pair_operands_unchanged` / `co_written_stable`
+> > — and U1, U2 and U3 are three ENTRY CONDITIONS into it, not three independent rules.
+> > "Three rules, measured disjoint" partitions the free POPULATION, never the mechanism, and
+> > an implementation that builds three separate checkers will get U1 wrong in exactly the
+> > way this paragraph records.
+>
+> **SCOPE THE CERTIFICATE AS "THE OBSERVED WRITE HISTORY REDUCES TO THE IDENTITY", OF WHICH
+> `_unc` IS ONE CLAUSE.** The natural framing — match the `_unc` to its forward — cuts the
+> population in the wrong place: U2 is **larger by count** than U1. Scoped to `_unc` the
+> certificate leaves roughly a third of the at-risk qubits stranded that the full rule
+> reclaims. **Both percentages a reader may find in the working notes are in an
+> UNDEFINED metric** — qubits-at-risk was never given a definition that survives the
+> stranding disposition — so re-derive the ratio before quoting one.
+> (Do **not** repeat the first draft's attribution of U2's whole population to
+> `cqrt_alloc_i1` conjunction flags: there are fewer `alloc_i1` rails in the corpus than U2
+> discharges, so the sentence is arithmetically impossible as written.)
+>
+> #### 3. The disposition is THREE-VALUED — and the residue is STRANDED, not released
+>
+> `cq_shadow_known_zero` returns 0 both for *"unknown"* and for *"known 1"*, and those two
+> deserve opposite treatment. At the free, per qubit:
+>
+> - **proven clean** — release to the pool. This is a real proof, not a courtesy: §2's
+>   certificate, or the shadow on the rotation-free surface.
+> - **proven dirty** — ~~**hard error, in both configurations.**~~ **STRANDED, exactly as the
+>   row below.** Rule 6's real content is that the library can *see* the rail is not `|0⟩`;
+>   what that buys is a distinct VERDICT, not a distinct ACT. Under the shadow this row was
+>   empty; under the certificate `ckd.18`'s rails land here. **§4's last clause — confirmed
+>   2026-08-22, so nothing here is open any more — settled the act as (b) STRAND**, and this
+>   bullet is kept in its original wording, struck, because the abort is the reading a fresh
+>   reader will reconstruct on their own and it must be refused explicitly.
+> - **unproven** — **STRANDED. The qubit is never released, never reaches the free list, and
+>   is counted.** The program continues.
+>
+> **SO THE EPISTEMIC STATE IS THREE-VALUED AND THE ACT IS TWO-VALUED**, and keeping those apart
+> is the whole of this section as amended. The two non-clean rows must stay distinguishable in
+> the REPORT — that is what makes this section's own residue split producible at all, and it is
+> the first thing `bd 06t` owes — while taking the same disposition. `CQOPS_FREE_ABORT` is what
+> turns a conviction back into termination, on demand, without a rebuild.
+>
+> > **THE FIRST DRAFT RELEASED THIS ROW, AND THAT WAS THE ERROR — RECORDED BECAUSE THE STEP
+> > IS EASY TO REPEAT.** §1's layering establishes that the `|0⟩` proof is CQ_lang's and that
+> > we cannot perform it. **That licenses NOT ABORTING. It does not license RECYCLING**, and
+> > the two have different failure modes: not-aborting costs a leaked qubit if the caller was
+> > wrong, while recycling hands a non-`|0⟩` index to the next `cq_materialise` and corrupts
+> > an unrelated rail. `src/qubits.h`'s `cq_qubits_release` contract names that second one
+> > *"the one unforgivable bug in this project"*. The draft quoted upstream's own remedy
+> > for exactly this epistemic state — *"left allocated (a qubit 'leak'), never freed"* —
+> > in §1, and then did not apply it. **Stranding IS that remedy, one layer down.**
+> >
+> > **So `CQOPS_FREE_TRUST`'s prohibition is NOT lifted — it is narrowed and kept.**
+> > Releasing an unproven index to the pool stays forbidden. What the layering buys is the
+> > *abort*, not the *recycle*, and that is the whole of the change.
+> >
+> > **Three facts make stranding the right side rather than the timid one.** (i) The residue
+> > is ~0.25% of frees, so the leak is small and bounded. (ii) It costs only qubits, and D2's
+> > pool is unbounded by default — upstream calls this "the qubits-not-scarce regime" and
+> > accepts the same trade. (iii) **The residue is precisely the population upstream itself
+> > declines to certify**: the ~50 `slice_loop_break*` frees sit in the only five e2e entries
+> > that pass **`--allow-unproven`** to the very stage-2b checker §1 cites as the discharge
+> > (`tests/e2e/CMakeLists.txt:2744, 2764, 2783, 2803, 2818`). Releasing them would be
+> > trusting a proof that upstream explicitly did not complete.
+>
+> **`CQOPS_FREE_ABORT` survives as a development and CI flag** — it is how a maintainer finds
+> out that a caller stopped pairing its frees — and must stay reachable without a rebuild.
+> It is not the default: under it, NORTH_STAR condition 1 is unreachable by construction.
+>
+> **The stranding mechanism is "never release", NOT a third pool bucket.** Measured, a
+> `retired` state breaks **both** of `qubits.h`'s documented identities —
+> `minted == live + free` *and* `peak == minted`, which is §8's entire qubit metric — and a
+> retired index reads as a leaked ancilla to `cq_pc_live_is_exactly`, which runs on every L1
+> case of every kernel. Simply not calling `cq_ctx_release_qubit` keeps both identities, and
+> keeps `cq_shadow_retire` away from a still-live poisoned entry, which is the trap
+> `ckd.18` recorded. What is added is observability, not a bucket: one explicit
+> `cq_qubits_strand(pool, q)` that pushes nothing, marks the index so a double-strand or a
+> later release is caught, and increments a counter the caller can read.
+>
+> #### 4. `ckd.18`'s rails are the carve-out, and the certificate is what finds them
+>
+> `alloc_i32(5); ry(θ); ry(−θ); free` — 25 such frees at the measured revision (26 at
+> `397c67c`), all born from a **non-zero** literal, all with `n_ry == 2` and `sum(ry) == 0.0`
+> exactly, physically `|birth-literal⟩` at the free. They are **not unprovable**: the same
+> call stream gives the birth literal, the cancelling pair and the absence of any other
+> write, so the rail is **provably dirty**. The shadow could never see this — it reports
+> `unknown`; the certificate can.
+>
+> **They are also a genuine upstream contract violation.** `ROADMAP.md:383` forbids exactly
+> this; upstream's checker lets it through because its rule (A2) discharges a rail
+> *"returning … to its alloc-time classical `v`"* rather than to zero, and
+> `slice_uncompute_dead_dag` is a registered e2e test — its `add_test` block in
+> `tests/e2e/CMakeLists.txt` passes no `FREECHECK_FLAGS`, so stage 2b runs on it strict, and
+> the descriptive comment ABOVE that block reads *"SIX frees, one per rail, each after its
+> last reverse-use"*. Three of those six rails sit at `|2⟩`, `|2⟩` and `|5⟩`, verified from
+> the golden. **We do not negotiate with the frozen ABI**
+> (Rule 1).
+>
+> > **CONFIRMED 2026-08-22 AS (b) STRAND, at the start of Step 23. This callout is kept as
+> > the record of what was weighed, not as a live question** — an implementer reading it
+> > must not re-open it, and `bd 06t`'s "do not implement that clause until it is confirmed"
+> > is now discharged. What that means concretely: a rail the certificate **convicts** takes
+> > the *same act* as the unproven row — never released, never on the free list, counted,
+> > first occurrence named on `stderr`, program continues — so **the free path has two
+> > dispositions, not three**, while the *epistemic* state stays three-valued and is
+> > reported separately (§3's residue split is still owed, and is still the first thing
+> > `bd 06t` owes). `CQOPS_FREE_ABORT` is what turns conviction into termination, on demand,
+> > without a rebuild. **Rule 6's "hard error" survives verbatim for the row it was written
+> > about — a *release* of a non-`|0⟩` index — which is the row that never happens now,
+> > because neither convicted nor unproven qubits reach the pool.** The reading below is
+> > preserved because the argument for (a) is the honest one and a future v2 with a
+> > different fixture posture may take it.
+> >
+> > §3's proven-dirty row says
+> > *hard error*, and applied to these rails that means **13 rails in 7 v1-in-scope fixtures
+> > abort at Step 24** — including `slice_uncompute_dead_dag`, which CQ_lang ships as
+> > passing. (An earlier draft said "13 fixtures". The rails live in 13 fixtures *in total*,
+> > but 6 of those are fp-bearing and v1 aborts on them long before any free, so the
+> > in-scope cost is 7 fixtures / 13 rails. 10 of the 25 rails are fp rails and never reach
+> > a v1 free at all. **A rails count and a fixtures count are not interchangeable and
+> > neither is a proxy for the other** — that conflation overstated this cost twofold.) Two readings, and the choice
+> > is a judgement about whether failing a shipped fixture is acceptable, not something
+> > further measurement decides:
+> >
+> > **(a) Abort.** Rule 6 as written, and correct under `ROADMAP.md:383` as well as under our
+> > I3. The library reports a true positive. Costs Step 24 those fixtures.
+> > **(b) Strand — RECOMMENDED.** Same act as §3's unproven row: never released, counted,
+> > first occurrence named on `stderr`. I3 holds absolutely and nothing is laundered — which
+> > is the whole of what Rule 6's hard error protects — and the fixtures run.
+> >
+> > (b) is recommended because Rule 6's *rationale* is laundering, not termination, and
+> > because `CQOPS_FREE_ABORT` already gives a maintainer (a) on demand. ~~**Until this is
+> > confirmed the rest of D15 stands and this clause does not.**~~ **Confirmed as (b) — see
+> > the head of this callout. The whole of D15 now stands.**
+>
+> #### 5. What v1 does NOT claim
+>
+> **The certificate reasons over WRITES to a rail; entanglement is created by READS of it.**
+> Upstream documents this about itself and scopes its checker accordingly
+> (`free_pairing_check.py:436-448`): it is *"permutation-only BECAUSE that is the class the
+> oracle can decide, and that deliberately excludes the superposition class"*, and
+>
+> > a `cqrt_ry(R,t) … <a CNOT-class READ of R> … cqrt_ry(R,-t)` pair cancels here while **R
+> > is left entangled with the reader**, because the reduction reasons over WRITES to R and
+> > never asks what read it.
+>
+> Demonstrated rather than argued: adding one `cqrt_cnot(%h,%k)` between the two `ry` calls
+> of `ROTATED_NO_TAPE` — a committed **must-verify positive** fixture of upstream's own gate
+> — leaves the verdict at exit 0 while exact two-qubit simulation gives `P(h ≠ |0⟩) = 0.1149`,
+> purity `0.885`.
+>
+> **This is not a defect v1 can close.** Detecting it needs a simulator (Rule 13 forbids one
+> *anywhere*), and a rail arriving at `cqrt_free` entangled has already violated
+> `ROADMAP.md:383` before the call reaches us. It is also the reason §3 strands rather than
+> releases: a certificate that cannot see the entangling class must not be spent on
+> recycling.
+>
+> > **AND DO NOT OVERSTATE U1'S GROUND.** The first draft called the composite *"the identity
+> > operator on the joint space, not merely the value is zero"*. That is true when both
+> > applications see the same operand values and nothing read `R` in between — which is what
+> > U1's preconditions are for — and it is **false in general**: at
+> > `classical_call_under_control_caller.expected.log:3-11` the composite deliberately leaves
+> > the rail correlated with its source. State U1 as its preconditions, not as a slogan.
+>
+> #### 6. Two mechanism notes, both traps
+>
+> **(i) The certificate must record the §9 CONTROL CONTEXT.** An uncontrolled `_unc` after a
+> controlled forward leaves `dst` at `ctrl · f(a,b)`, not zero —
+> `tests/support/kerneldrv.c:163-165` records this on the test side. A U1 match whose halves
+> ran under different regions is not a match. (No corpus witness: there are **zero**
+> `cq_template_*_controlled` calls in the goldens. The guard is for callers, not for CQ_lang.)
+>
+> **(ii) `cqrt_cswap` writes BOTH data args** (`cq_runtime.h:258`; upstream models it
+> `reads=(0,) writes=(1,2)`). A write-tracker that misses it silently widens every rule —
+> the same modelling error that produced the historical "37 rotation-rooted frees" figure,
+> **reproduced to the unit by executing the counterfactual: dropping that write turns the 15
+> `cswap`-rooted frees into 12 `rz`-rooted plus 3 alloc-rooted, i.e. `25 + 12 = 37`, which is
+> where both the "37" and the "twelve `rz`-rooted rails" came from.** All four counts there
+> are rows of §10's pre-`397c67c` classification, not `397c67c` figures — §0's blanket
+> dating does not reach them. That reconstruction is the evidence for the retraction and is
+> recorded here only; §10's trap (i) cites it.
+> Enumerate the write set from `cq_runtime.h`, never from the symbol names.
+>
+> #### 7. What this decision retires, and what it leaves standing
+>
+> - **The `cq_zero_proof` C signature does not change** — it is already
+>   `int (*)(const cq_ctx *, int32_t h, uint32_t q)`, and the certificate is what finally
+>   uses the `h`; today's only proof throws it away (`(void)h;`,
+>   `tests/support/poolcheck.c:181`). **Its CONTRACT does change**: it becomes three-valued,
+>   and the stranding disposition is not expressible through a boolean, so the free path — not
+>   the proof — is where the third state lives.
+> - **`ckd.18` and `2cf` have no disposition of their own** and close with this decision.
+>   `2cf`'s two regression markers were written to go red once `cqrt_free` had evidence other
+>   than the shadow; that is now what happens, on purpose, and they become the positive cases
+>   for U1 rather than being deleted.
+> - **The "sanctioned un-poisoning write" is foreclosed.** PRD §10's older text, and the
+>   plan's Deviation 2, both anticipated one exception to §3's conservative-in-the-safe-
+>   direction-only rule, living in `shadow.h`. D15 needs none: the certificate reads the call
+>   stream, not the shadow. **No such write may be added.**
+> - **`ckd.17b`'s "no in-library theorem can cover the general case" survives, narrowed.** It
+>   is true of the *general* case — `slice_loop_break`'s flag rail rests on loop algebra that
+>   never reaches us — and false of 99.75% of the corpus. Both halves matter: the first is why
+>   §3 has a residue at all, the second is why the residue is small enough to strand.
+
+
+> ### D16 — the discriminator is CAPABILITY, and "is it minted?" strikes four symbols we can serve
+>
+> **THE CONTRADICTION THIS SETTLES IS BETWEEN TWO OF OUR OWN DOCUMENTS.** §1's struck-`cqrt_h`
+> callout says omitting it "is not a link failure, because an unreferenced declaration
+> produces no undefined reference … **DO NOT PAPER OVER IT WITH A SHIM STUB**".
+> `docs/cqrt_census.txt`'s E1 says the opposite in as many words — implement `cqrt_h` and
+> `cqrt_h_controlled` "AS DEFINED-BUT-UNREACHABLE BODIES". `bd vxk` filed the contradiction
+> and forbade settling it by editing one document to match the other; this is the decision
+> that settles it, and the census now records that its E1 is superseded.
+>
+> **§1 WINS, AND ITS ARGUMENT IS STRICTLY STRONGER: for a symbol whose EMISSION IS ITSELF
+> THE BUG, a build-time failure dominates a run-time one.** It fires before anything runs,
+> it names the symbol, and it cannot produce a wrong circuit. A loud abort can only fire
+> after the pass has already emitted a gate we have no vtable entry for.
+>
+> **BUT THE DISCRIMINATOR BOTH DOCUMENTS REACH FOR — "is it minted by the pass?" — IS
+> MEASURABLY WRONG, and that is the part neither of them states.** Measured over
+> `ir-pass/`: eleven of the 173 have no minter anywhere, and `cqrt_alloc_handle` is a
+> twelfth of a different kind. (`bd vxk`'s DESCRIPTION says 13 and its own enumeration lists
+> 11; the 13 is a phantom.) Four of those eleven — `cqrt_x_controlled`,
+> `cqrt_cnot_controlled` and, on the rotation side, the family `ControlledSymbols.cpp:32`
+> cannot name because it hard-codes the stem `"cqrt_rz_"` — are symbols **libcqops can serve
+> correctly today**. Striking them for want of a minter would leave the ABI's own
+> declarations undefined for no reason at all.
+>
+> A second, independent refutation of the same discriminator: only 65 of the 173 appear
+> anywhere in the corpus at all, and the 108 absentees include `cqrt_alloc_i8`,
+> `cqrt_copy_i1` and `cqrt_xorc_i16`. **Corpus absence is a property of the fixture set, not
+> of the ABI.**
+>
+> **CAPABILITY IS THE RULE, AND IT PARTITIONS THE 173 EXACTLY.**
+>
+> | population | n | disposition | why |
+> |---|---|---|---|
+> | rail surface | 32 | implemented, `shim/cq_runtime_rail.c` | v1 scope |
+> | gate surface | 30 | implemented, `shim/cq_runtime_gate.c` | v1 scope; includes the two `_controlled` primitives and the five integer `ry_*_controlled_inv` |
+> | fp widths | 34 | loud abort, `shim/cq_runtime_v2.c` | §1 puts fp in v2 |
+> | `qram` | 63 | loud abort, `shim/cq_runtime_v2.c` | emitted by the pass, so a link error would block every fixture |
+> | `tape` | 11 | loud abort, `shim/cq_runtime_v2.c` | same |
+> | `cqrt_alloc_handle` | 1 | `shim/cq_runtime_v2.c`, and it is **not** an ordinary abort — see `bd ck6` | REFERENCED by CQ_lang's own template archives |
+>
+> **ALL 109 SHIPPED 2026-08-27 (Step 23 landing 1 step 5), and two things about them are
+> worth stating because neither is derivable from the table above.**
+>
+> **The buckets are by FAMILY first and by WIDTH second.** `cqrt_qram_alloc_f32` carries an
+> fp token *and* a qram family, and it is QRAM's: there is no addressable quantum array in
+> libcqops at `i1` either, so the fp width is not what defers it. This is not in tension with
+> `bd 819`'s name rule ("a symbol is fp-touching iff its name carries an `f16/f32/f64/f80`
+> token") — that rule partitions the 2,479 `cq_template_*` names expanded from
+> `opcode_table.yaml`, a different population reached through a different header. `bd vxk`'s
+> measured trap is about FIXTURE attribution rather than symbol attribution: 21 of the 33
+> fixtures that reach `qram` before any fp call hit `cqrt_qram_alloc_f{32,64,80}` FIRST, so at
+> the fixture level the same line dies either way and only the reason string changes.
+>
+> **The suite reads the MESSAGE, not the abort, and that is forced rather than stylistic.**
+> With 109 bodies coming out of twelve macros, the interesting failure is not a missing abort
+> — it is one that NAMES THE WRONG SYMBOL or carries the WRONG BUCKET, and a death case plus a
+> `FAIL_REGULAR_EXPRESSION` is blind to both. `tests/test_runtime_v2.c` forks each of the 109
+> and compares stderr byte for byte, with the name set checked BOTH WAYS against
+> `shim/cq_runtime_abi.h` — an oracle neither the shim's macros nor the test's thunk macros
+> can reach. Measured: shortening one stringified literal so four symbols print a name that is
+> already another symbol's leaves the abort, the format and the bucket all correct, and is
+> caught by that set check alone.
+> | `cqrt_h`, `cqrt_h_controlled` | 2 | **UNDEFINED** | Rule 4 forbids `H`; §8's vtable has no `h`; nothing references them |
+>
+> **THE 34 fp WIDTHS ARE DECIDED ON LINKAGE, NOT ON SCOPE, AND THE TWO GROUNDS DO NOT HAVE
+> TO AGREE** — `bd r3y` asked that the choice be explicit rather than inherited from
+> `qram`'s. §1 alone would license leaving them undefined, since fp is out of v1 either way.
+> Linkage forbids it: `libcq_runtime.a` is a single object holding all 173 as `T`, so any
+> undefined REFERENCED symbol pulls the whole member and produces a duplicate-symbol wall
+> naming `cqrt_alloc_i32` and `cqrt_free` — symbols we implement correctly — with the actual
+> culprit named nowhere. Measured, and with a failure mode the bead does not record: under
+> the other candidate link line the same omission links **silently and successfully**, with
+> CQ_lang's trace-only stub serving every call. Defining them makes `libcq_runtime.a` inert
+> under both, so the decision does not wait on `bd 590`.
+>
+> **AND `cqrt_h`'s OMISSION IS SAFE FOR A REASON NARROWER THAN §1 STATES.** §1's antecedent
+> — "an unreferenced declaration produces no undefined reference" — is TRUE, and the
+> conclusion it is used to justify holds only while nothing references the symbol. Measured
+> both ways with real link experiments: with `cqrt_h` and `cqrt_h_controlled` undefined the
+> link succeeds under BOTH candidate lines, and the duplicate-symbol wall is triggered by
+> `cqrt_alloc_handle` instead — a symbol CQ_lang's template archives really do reference
+> (`bd ck6`). So `cqrt_h`'s disposition is **not** contingent on `bd 590`, and §1 is stronger
+> than its own note claimed. `cq_runtime.h` reserves `cqrt_h` for a later phase, so if the
+> pass ever starts emitting it the link error is the intended outcome and this row is what
+> produces it.
+>
+> **THE HONEST QUALIFIER ON THE FIVE `cqrt_ry_<W>_controlled_inv`.** "Implemented" here means
+> implemented-with-D11's-refusal: under a quantum control, §7's `−I` row and both half-turn
+> rows hard-error, so only the identity and general rows go through. That is not a new
+> liability — `cqrt_rz_<W>_controlled[_inv]`, which §2.1 has listed as in scope since before
+> M06 existed, carries the identical refusal — and D11 is where the decision to refuse rather
+> than emit five hand-derived phases lives.
+>
+> ### D17 — `cqrt_addc` folds or runs Cuccaro in place, and it is never sandwiched
+>
+> **THE GAP NO DOCUMENT NAMED.** `cqrt_addc_<W>(h, imm)` is `h := (h + imm) mod 2^W`, IN
+> PLACE. libcqops has exactly two adders and neither serves it: **M14's ripple is OUT of
+> place**, so using it means minting a temporary, computing `tmp = h + imm`, and then needing
+> `h := tmp` — with the old `h` still live and correlated, and freeing it needing a proof it
+> has not got. **M15's Cuccaro accumulator is in place** and is the only one, and
+> `cq_addacc_check` hard-errors in BOTH configurations unless every bit of both operands and
+> the ancilla is already `CQ_BIT_Q`.
+>
+> **THE DECISION.** Fold when the rail is all-classical. Otherwise: materialise the immediate
+> into a fresh W-bit rail, materialise `h`'s remaining classical lanes, allocate ONE ancilla,
+> call M15 **in place** with `acc = h`, `b = immediate`, `x = ancilla`, then drive the
+> immediate rail back to `|0⟩` with one `cq_emit_x` per set bit and free it. Two rows
+> short-circuit before any of that: `imm == 0` (a PORT — upstream's `_try_identity_peephole!`
+> does the same) and `W == 1`, which is `h ^= imm`.
+>
+> **FOUR TRAPS, THE FIRST FATAL TO A READER WHO KNOWS RULE 8.**
+>
+> 1. **DO NOT WRAP IT IN `cq_sandwich`.** The driver replays the compute half in reverse,
+>    which UNDOES the in-place write: `h` comes back unchanged behind a perfect palindrome
+>    and a plausible gate count. M20 applies `condneg` to a SCRATCH COPY inside a sandwich
+>    for exactly this reason. With no sandwich there is no I6(b), so **every materialisation
+>    is manual including the ancilla** — `cq_addacc_check` refuses a non-qubit `x[0]` at
+>    every W, including W = 1 where no gate touches it.
+> 2. **THE NAMING IS INVERTED FROM BENNETT.** libcqops `acc` is Bennett's `b`, the register
+>    that is OVERWRITTEN; libcqops `b` is Bennett's `a`, the addend, which is RESTORED. So
+>    `h` goes in `acc`. Swapped, the circuit computes into the wrong register and still looks
+>    like the source.
+> 3. **THE TRANSIENTS GET NO PRIVILEGE, AND THAT IS A DELIBERATE COST.** Both really are back
+>    at `|0⟩` by construction — Bennett's own hygiene contract 3 — so a third `proven_zero`
+>    literal beside `CQ_ZERO_BY_PALINDROME` and `CQ_ZERO_BY_CTRL_UNCOMPUTE` is tempting and
+>    is refused: a blanket-clean proof is the laundering site D15 §3 and `bd 216`'s checklist
+>    both forbid. They are freed with the ordinary evidence, and whatever it cannot clear
+>    STRANDS. On a determinate rail it clears all of it. On a rotation-poisoned one it does
+>    not, and the split is **width-dependent** rather than uniform — `bd dzj`'s trap 3 says
+>    "whenever `h` is", which is false at W ≤ 2: K8 targets the addend only inside the full
+>    MAJ/UMA blocks, so at W ≥ 3 the poison reaches lanes `0 … W−3` plus the ancilla and two
+>    of the `W+1` transients still come back.
+> 4. **`cq_addacc_check` COMPARES RANGES, NOT BASE POINTERS.** A mixed-kind `h` reaching K8
+>    unmaterialised is a hard error, not a fold.
+>
+> **COST**, per quantum call at width W: `W+1` transient qubits, `cq_addacc_steps(W)` gates
+> for the accumulate plus `2·popcount(imm)` for the immediate rail up and down, plus one
+> materialisation per classical lane of `h`. **Negative immediates are the expensive half** —
+> `addc(h, −1)` at i32 is `0xFFFFFFFF`, so 32 X up and 32 down — and a substantial share of
+> the corpus's quantum calls carry one.
+>
+> **WHAT LANDING 2 OWES BECAUSE OF THIS, AND IT IS NEW.** The two transient rails have write
+> histories that match none of D15's three certificate rules as written: U1 needs a
+> `cq_template_F` / `_unc` pair, U2 needs self-inverse gates pairing off, and U3 needs
+> `cqrt_alloc` plus `cqrt_addc` immediates summing to `−L`. The immediate rail's history is
+> materialise → K8 → X-down, which is an identity by **Bennett's theorem about K8** and not
+> by any rule D15 states. D15's residue measurement was taken over the CQ_lang corpus, which
+> contains none of these internal frees, so the certificate does not cover them and the
+> residue figure does not include them.
+>
+> **AMENDMENT THIS FORCED.** `src/kernels/addacc.h` said K8 "has no `cqrt_*` opcode, is never
+> entered from CQ_lang" and that its ancilla "goes back to the pool through `cq_sandwich`'s
+> epilogue". Both became false the moment this landed, in four places across that header and
+> its `.c`, and they are amended rather than worked around. K8 still gets **no L5** — the
+> classical fold lives in M26's wrapper, which is where the ABI boundary is.

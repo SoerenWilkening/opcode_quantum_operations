@@ -13,3 +13,8 @@
 build*/
 cmake-build-*/
 compile_commands.json
+
+# Python bytecode from shim/gen_shim.py and the two Step-22 suites. The ctest
+# registration also sets PYTHONDONTWRITEBYTECODE=1; this catches a bare run.
+__pycache__/
+*.pyc

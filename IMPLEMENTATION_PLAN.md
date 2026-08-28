@@ -298,7 +298,7 @@ against a specification that is not present.
 | 0.2 | **Extract each construction.** For K1–K12: Julia source excerpt, gate sequence as indexed pseudo-code, gate-count formula in `W`, ancilla count. | `docs/constructions/K01..K12.md` |
 | 0.3 | Pin CQ_lang: record the revision, copy `tools/opcode_table.yaml`, run the PRD §2.1 census `grep -rhoE '"cqrt_[a-z0-9_]*"' ir-pass/src` and commit the result. | `docs/cqrt_census.txt`, `third_party/cq_lang/opcode_table.yaml` |
 | 0.4 | Locate Bennett's published gate-count baselines (referenced by PRD §11 L4 with no path) and record where they live. | `docs/constructions/BASELINES.md` |
-| 0.5 | Resolve the three PRD blockers from review: **1455 vs 1474** symbol count (recount from the real yaml); **`_unc` vs `cqrt_free` qubit ownership** (who returns qubits to the pool — this decides M09's API); **L4 golden tuple arity** (`58/6/40/12` is four numbers against a three-tuple). | PRD-v1 edits |
+| 0.5 | Resolve the three PRD blockers from review: the **symbol count** (recount from the real yaml — the question was framed as ~~**1455 vs 1474**~~ and **both framings were wrong**. **RESOLVED 2026-08-14, re-verified 2026-08-22:** the opcode grid is **2479 = 1595 purely-integer + 884 fp-touching**; `1474` is a **phantom** matching no revision and no partition, `1732` a stale generated-header comment, and `1455` is the integer count only if i80 is ruled out — it is **not** (PRD §1, `docs/cqrt_census.txt` Part F)); **`_unc` vs `cqrt_free` qubit ownership** (who returns qubits to the pool — this decides M09's API); **L4 golden tuple arity** (`58/6/40/12` is four numbers against a three-tuple). | PRD-v1 edits |
 | 0.6 | Write the inverted list — *what is **not** from Bennett*: fold table, shadow, handle table, qubit pool, rotations (§7), sinks (§8), `cswap`/Fredkin, nested-control AND. | PRD §0 "Provenance" |
 | 0.7 | Resolve **`cqrt_h`**: listed in PRD §1's core family, absent from §8's sink vtable, forbidden by constraint 1, and built from rotations in §12. Decide before M04 freezes the vtable in Step 5. | PRD-v1 edits |
 | 0.8 | Resolve the **fold-table case count**: §4 Step 6 enumerates 155 and then gates at "175/175". Settle it *in this plan* before `test_emit_fold.c` is written. | this plan, §4 Step 6 |
@@ -325,6 +325,14 @@ Those formulas become the L4 goldens; without them L4 has nothing to assert agai
 > `_unc` epilogue calls nothing in the pool; M03 keeps exactly **one** release site,
 > reachable only from `cqrt_free`; and M07 must carry whatever evidence `cqrt_free`'s
 > assert reads — which is its own open question, below.
+>
+> **That last clause put the evidence in the wrong module, and the question is settled
+> (2026-08-22, `PRD §15 D15`).** M07 carries the *plumbing* — the `proof` function
+> pointer, unchanged — while the evidence is built at the **M26 handle boundary**, since
+> it is a record over the call stream and M07 never sees a call. `bd 06t` BUILT it at
+> Step 23 landing 2 (2026-08-27): `shim/cq_shim_record.[ch]` + `shim/cq_shim_reduce.[ch]`
+> + `cq_shim_certificate`, with M07's `proof` pointer unchanged, exactly as this
+> paragraph predicted.
 
 ### Step 0 status (2026-08-14)
 
@@ -334,7 +342,7 @@ Those formulas become the L4 goldens; without them L4 has nothing to assert agai
 | 0.2 | **done** | `docs/constructions/K01..K12.md` — *but see GAP 1 below* |
 | 0.3 | **done** | `docs/cqrt_census.txt`; `third_party/cq_lang/` @ `a6a92fe` |
 | 0.4 | **done** | `docs/constructions/BASELINES.md` |
-| 0.5 | items 1 and 3 **done** (PRD §1, PRD §11); item 2 **open** | — |
+| 0.5 | **all three done.** Item 1 → PRD §1 (2479 = 1595 int + 884 fp; `1474` phantom). Item 2 → PRD §10, settled 2026-08-14: `cqrt_free` is the sole deallocator, and it does **not** decide M09's API (see the note above). Item 3 → PRD §11 | PRD §1, §10, §11 |
 | 0.6 | **done** | PRD §0 "Provenance" |
 | 0.7 | **done** — over-declaration; struck from PRD §1. Vtable unaffected, M04 unblocked | PRD §1 |
 | 0.8 | **done** — **159** (155 + 4). Uncovered a 15-case hole in PRD §3's `CCX` table, now fixed | §4 Step 6; PRD §3 |
@@ -461,19 +469,39 @@ Three things worth knowing:
 2. **`src/version.c` is scaffolding, not a module.** It exists so the Step 1 gate
    proves a real link — include path, archive, link line — rather than proving only
    that the harness runs. It is not in the §3 module map and carries no design weight.
-3. **DEVIATION — `Debug` is UBSan-only on the default toolchain.** Apple clang 17 on
-   Darwin 25 / x86_64 has a broken AddressSanitizer runtime: a trivial `main` built
-   with `-fsanitize=address` dies with `SIGILL` inside `libsystem_pthread` before
-   reaching `main`. Hard-coding the plan's `-fsanitize=address,undefined` would make
-   every Debug binary in the project unrunnable on this box. So each sanitizer is
-   **probed** — compiled *and run* — via `check_c_source_runs`, and only what works is
-   enabled; what is missing gets a CMake warning, and `test_skeleton` cross-checks the
-   build's belief against the compiler's `__has_feature` so the gap can never go
-   quiet. `CQOPS_SANITIZERS=ON` turns a missing sanitizer into a hard configure error;
-   `-DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang` (Homebrew LLVM) restores both,
-   verified. UBSan on Apple clang does genuinely abort, verified via
-   `-fno-sanitize-recover=all`. **Until ASan is available by default, a Debug run
-   verifies less than the plan assumes — Rule 17 applies when reporting it.**
+3. **DEVIATION — `Debug` was UBSan-only on the default toolchain. CLOSED 2026-08-27
+   (`bd 6wg`); the plan's `-fsanitize=address,undefined` is what Debug now builds
+   with.** Apple clang 17 on Darwin 25 / x86_64 has a broken AddressSanitizer runtime:
+   a trivial `main` built with `-fsanitize=address` dies with `SIGILL` inside
+   `libsystem_pthread` before reaching `main` (re-measured 2026-08-27 on clang
+   17.0.0/clang-1700.6.4.2 — still exit 132). Hard-coding the flag would make every
+   Debug binary in the project unrunnable on this box. So each sanitizer is **probed**
+   — compiled *and run* — via `check_c_source_runs`, and only what works is enabled;
+   what is missing gets a CMake warning, and `test_skeleton` cross-checks the build's
+   belief against the compiler's `__has_feature` so the gap can never go quiet.
+   `CQOPS_SANITIZERS=ON` turns a missing sanitizer into a hard configure error. UBSan
+   on Apple clang does genuinely abort, verified via `-fno-sanitize-recover=all`.
+
+   **What closed it is that the COMPILER is now probed too.** A sanitizer probe can
+   only choose among flags for a compiler that is already fixed, and here the broken
+   thing was the compiler. `cmake/CqopsDebugToolchain.cmake` runs **before
+   `project()`** — forced, since `CMAKE_C_COMPILER` is consumed by the C language
+   enable — probes the default compiler with `-fsanitize=address`, and only if that
+   binary does not RUN searches for one whose does (`brew --prefix llvm`, then the two
+   Homebrew prefixes). Probed, never pinned: a hard-coded `/usr/local/opt/llvm` is
+   absent on a box without Homebrew LLVM and wrong on Apple Silicon. **Debug only** —
+   Release pins gate counts (R5) and has no use for a sanitizer runtime — and an
+   explicit `-DCMAKE_C_COMPILER=`/`CC=` always wins. `CQOPS_DEBUG_TOOLCHAIN` is `AUTO`
+   (default) / `ON` (a hard configure error if nothing on the host runs ASan) / `OFF`.
+   CMake cannot change a build tree's compiler in place, so an existing tree keeps its
+   old one and is told to `make clean`.
+
+   **Measured on this box 2026-08-27, Homebrew clang 22.1.5:** the whole tree builds
+   clean under `-Wall -Wextra -Werror -Wconversion`, `cqops: Debug sanitizers ACTIVE:
+   undefined, address`, and **292/292 ctest green** — i.e. no ASan finding anywhere in
+   the tree, which is the first time that claim has been makeable. Rule 17 still
+   applies to the *host*: a box with no ASan-capable compiler falls back to UBSan-only
+   with a warning, and a run there must say so.
 
 Also added beyond the letter of §2.2, because the harness is the foundation every
 later verification claim rests on: `tests/test_harness_negative.c`, a binary registered
@@ -555,11 +583,30 @@ would bake in exactly the mechanism that bead says fails. The parameter lets ckd
 structural certificate be substituted without touching M03, and forces every caller to
 name its evidence where a grep finds it.
 
-**Deviation 2 — M02 ships no un-poison, deliberately.** Nothing in `shadow.h` can return
-an entry to determinate; entries are born known-0 by `cq_shadow_ensure` and that is the
-only route to clean. A convenience setter would have settled `ckd.17` by accident, in
-the one direction that launders a dirty rail into a provably-clean one. ckd.17 carries a
-note saying the sanctioned write goes in `shadow.h` when it is resolved.
+> **Vindicated 2026-08-22, and the "cannot" is now measured rather than argued:
+> `PRD §15 D15`.** The evidence that replaces the shadow at the CQ_lang free boundary is
+> an observed undo certificate read off the *call stream*, and it is substituted exactly
+> here, through this parameter, with **no change to M03 and no change to this signature**.
+> Read D15 for what the certificate is rather than restating it at a call site.
+
+**Deviation 2 — M02 ships no un-poison of a LIVE qubit, deliberately.** Nothing in
+`shadow.h` can return a **live** entry to determinate; entries are born known-0 by
+`cq_shadow_ensure` and that is the only route to clean. A convenience setter would have
+settled `ckd.17` by accident, in the one direction that launders a dirty rail into a
+provably-clean one.
+
+> **Two corrections, both 2026-08-22, and the paragraph above is the amended text.**
+> (i) The word **live** was missing and the sentence was false from Step 8 onward:
+> `cq_shadow_retire` does write `{0, 0}`, and the comment heading it in `src/shadow.c`
+> calls it *"the one write that clears `unknown`"* — but it runs strictly *after*
+> `cq_qubits_release` has returned, so it never touches a live qubit. `src/shadow.h`'s
+> header note ("THERE IS DELIBERATELY NO UN-POISON OF A **LIVE** QUBIT") has always
+> carried the correctly scoped version; this paragraph did not.
+> (ii) **The promised sanctioned write is FORECLOSED, not pending.** This paragraph used
+> to end *"ckd.17 carries a note saying the sanctioned write goes in `shadow.h` when it is
+> resolved"*. It is resolved — `PRD §15 D15` — and D15 needs no such write, because the
+> evidence it substitutes is read off the call stream rather than off a shadow entry.
+> **No un-poisoning write may be added to `shadow.h`.**
 
 **Deviation 3 — a sixth test-support file, `tests/support/death.[ch]`**, beyond §2.2's
 list of five, plus `add_cqops_death_test()` in `cmake/CqopsTest.cmake`. Forced by a
@@ -616,9 +663,16 @@ defensive copy is now **required** at M26, filed as `bd -493`.
 1. **The budget overshot by 57%,** and the module landed whole. Four causes §3's 180 did
    not anticipate: a three-state slot (§10 needs live/tombstone/measured), the
    `INT32_MAX` handle guard, the D7a/D7b split, and the two-pass free. The recorded seam
-   — *table ↔ invariant checking* — is unused and stays available at a 240-line trigger
-   on `reg.c`. `tests/test_reg.c` **did** hit the 300 guard and split along that same
-   line into `tests/test_reg_invariants.inc`.
+   — *table ↔ invariant checking* — ~~is unused and stays available at a 240-line trigger
+   on `reg.c`~~ **was TAKEN at Step 23 (2026-08-22), at exactly that trigger and for
+   exactly the reason it was recorded**: PRD §15 D15's free-time disposition would have
+   put `reg.c` at ~285. `src/reg_check.c` now carries `cq_reg_check_operands`,
+   `cq_reg_sources_alias` and `cq_reg_audit`; `reg.h` declares all of it unchanged, so
+   the split is a translation-unit boundary and not an API one. `tests/test_reg.c` **did**
+   hit the 300 guard and split along that same line into
+   `tests/test_reg_invariants.inc`, and at Step 23 took its SECOND recorded seam —
+   *the table and its lifecycle ↔ the free-time disposition* — into
+   `tests/test_reg_free.inc`. See the M07 row in §3 for both, and for the reserve.
 2. **`cq_ctx` gained a struct tag.** It was an anonymous typedef; `reg.h` needs to name
    a `cq_ctx *` without including `ctx.h`, so `reg.h` now carries the single
    `typedef struct cq_ctx cq_ctx;` and `ctx.h` spells `struct cq_ctx { ... };`. The
@@ -629,10 +683,18 @@ defensive copy is now **required** at M26, filed as `bd -493`.
    that bead's own "per qubit or per register?" open in both directions. The library
    ships **no** proof; `NULL` fails loud. The only proof in the tree is a `static` in the
    two test files, named `proof_shadow_pre_kernel_only`.
+   **[Annotated 2026-08-22 rather than rewritten, because the refusal was the right call
+   at the time: it is settled as `PRD §15 D15`, which keeps this C signature unchanged and
+   is what finally reads the `h` — today's only proof throws it away (the `(void)h;` in
+   `cq_pc_zero_proof_rotation_free`, `tests/support/poolcheck.c`). What D15 changes is the *contract*, not the type: the
+   disposition at the free becomes three-valued, and the third state is not expressible
+   through this boolean, so it lives on the free path rather than in the proof.]**
 4. **Rule 6's literal wording was aborting on valid input** and has been rescoped in both
    CLAUDE.md and PRD §10 to the rail's *qubit-carrying* bits. "Every bit is `BIT_ZERO` or
    a known-zero qubit" rejects a `CQ_BIT_ONE`, i.e. `int x = 5;` going out of scope — and
-   makes L5's zero-cost classical path unreachable. It does **not** let `ckd.18` through.
+   makes L5's zero-cost classical path unreachable. It does **not** let `ckd.18` through
+   — and `ckd.18` closed 2026-08-22 as `PRD §15 D15` §4, where those rails come out
+   **provably dirty** rather than unprovable, so they never reach the free list either way.
 5. **A death test can now assert WHICH LAYER aborted.** Measured here: deleting M07's
    `cq_reg_clean` call left all 24 reg tests green, because M03's own
    `if (!proven_zero)` fired one layer down and the rail was merely half-returned to the
@@ -673,6 +735,13 @@ entry (`cq_ctx_fresh_qubit` only ensures up to `minted`, and `cq_shadow_ensure` 
 early). Safe today only because the sole available evidence *is* the shadow; the moment
 ckd.17's structural certificate allows a free under a poisoned entry, the pool hands the
 next `cq_materialise` a genuinely `|0⟩` qubit carrying a stale determinate entry.
+
+> **CLOSED one step later, at Step 8, and it stays closed under the certificate.**
+> `cq_reg_free` was rewired through `cq_ctx_release_qubit`, which releases and *then*
+> retires the shadow entry; the comment on `cq_reg_free`'s release loop in `src/reg.c`
+> names this exact hazard as what that ordering closes. `PRD §15 D15` does not reopen it — a rail whose certificate does not
+> discharge it is **stranded**, never released and never on the free list at all, so no
+> index can come back to `cq_materialise` carrying a stale entry.
 
 ### Step 8 status (2026-08-15) — **M08 + M09 landed; the `ckd.17a` certificate is code**
 
@@ -985,7 +1054,7 @@ it grows.
 
 | ID | Module | LOC | Split seam |
 |---|---|---|---|
-| M07 | `reg.[ch]` — handle table, tombstones (D5), I2 owner-map **sweep**, D7a abort + D7b query | ~~180~~ **283 landed** | table ↔ invariant checking — unused; trigger at 240 in `reg.c` |
+| M07 | `reg.[ch]` — handle table, tombstones (D5), the free path, the physical copy and `cq_reg_swap_bits`; **`reg_check.c`** carries the I2 owner-map **sweep** and the D7a abort + D7b query | ~~180~~ ~~283 landed~~ **`reg.c` 230 + `reg_check.c` 73 + `reg.h` 67 = 370 across two TUs** | **`table ↔ invariant checking` — TAKEN 2026-08-22 at Step 23, at the recorded 240 trigger.** PRD §15 D15's free-time disposition (`bd 06t`) added ~57 lines to the table half and would have put `reg.c` at ~285, so the seam was taken as scheduled rather than improvised (Rule 12). The moved half is the part that **mutates nothing** — it reads the table and aborts — and `cq_reg_xor_into` stayed behind on purpose although the header lists it beside `cq_reg_check_operands`: it EMITS, and D7b's defensive copy (`bd 493`) lands on it. The audit now walks the table through the **public validating accessors** rather than reg.c's static slot reader, which is a strict improvement — a duplicated reader would have been the masking-layer trap plan §0 records. **Reserve seam, table side: `the free-time disposition ↔ the table`** → `src/reg_free.c`, trigger 260; landing 2's certificate plugs into `cq_reg_disposition`'s caller and is the thing likely to take it. **Test side, two seams, both recorded before either file was written:** `table ↔ invariant checking` gave `tests/test_reg_invariants.inc` at Step 7, and **`the table and its lifecycle ↔ the FREE-TIME DISPOSITION` gave `tests/test_reg_free.inc` at Step 23** — the four pre-existing free-path cases moved with it, because leaving them behind would have made the seam a size cut rather than a subject one |
 | M08 | `scratch.[ch]` — allocate/dispose the `cq_bit` **array**; dispose asserts every bit is back to `CQ_BIT_ZERO` (a **kind** check, never a shadow read). **Ships no release a kernel can call** | 90 | — |
 | M09 | `sandwich.[ch]` — the §0.1 driver. **Owns the scratch qubits end to end**: pre-materialises at step 0 (I6(b)) and releases in its own epilogue. I6 extent armed for the **compute halves only** | 110 | the checksum helper moves to `scratch.c` — **never** the release, which would reopen "a kernel can call it" |
 
@@ -1010,20 +1079,196 @@ it grows.
 | ID | Module | LOC | Notes |
 |---|---|---|---|
 | M21 | `angle.[ch]` | 80 | **DONE, Step 18; `bd fna`'s `k mod 4` split landed at Step 20 (73/80: 51 body + 22 header), so `CQ_ANGLE_HALF_TURN` is now `k ≡ 1 (mod 4)` and `CQ_ANGLE_NEG_HALF_TURN` is `k ≡ 3` — the two differ by a global −1 that nothing uncontrolled can observe, which is why M22 still emits the identical pair for both and `test_rotate_table.inc` pins that. It became load-bearing three ways at once (PRD §15 D11): the constant column owes `π·b` against `π·(1−b)`, the qubit column `∓π/2`, and `_inv` swaps the two while fixing 0 and 2. Step 18's own figure was 69/80, split 19 + 50 since Step 19 moved `CQ_ANGLE_PI` into the header so M22 has one home for it (18 + 51 before that).** Pure classification of θ against §7's rows, tolerance configurable. Exhaustively testable, zero dependencies. What §7 left open is now **PRD §15 D10**: the window is `tol·π` (ABSOLUTE), one refusal `\|θ\|·1.6e-16 ≤ tol·π` carries the error bound `\|θ − k·π\| ≤ 2·tol·π`, and `tol` is capped at `1e-3`. The θ-relative reading was built first and is a miscompile |
-| M22 | `rotate.[ch]` | 150 | §7 Ry/Rz per bit, the θ≡π asymmetry, measurement. **Step 20 took it to 119/150 (108 body + 11 header)**: row 0's skip at the top of each bit function (which has to be HERE, not in the emitter, because the general row materialises before it emits — so an M22 relying on `cq_emit_*` alone would take W qubits for a region that does not run), D11's refusal at the three folding sites with `half_turn_row` naming the parity, `cq_ctrl_ry`/`cq_ctrl_rz` for the two general rows, and a measurement refusal. **DONE, Step 19 — 96/150 (85 + 11 at the step's close; 83 + 11 after the adversarial review trimmed a guard).** THE FIRST CALLER OF `cq_shadow_rotate` IN `src/`, on exactly two of §7's twelve cells — the general-`Ry` row, both columns (**PRD §15 D12**). Carries `bd lk0`'s resolution — the `Z` is `sink.rz(q, π)`, no seventh vtable entry — and refuses to run inside a sandwich compute half, which is the only guard it owns outright. Split seam recorded: **`§7's rotation table ↔ measurement`**, `cq_measure` moving to `src/measure.c` if `rotate.c` passes 240 |
+| M22 | `rotate.[ch]` | 150 | §7 Ry/Rz per bit, the θ≡π asymmetry, measurement. **Step 20 took it to 119/150 (108 body + 11 header)**: row 0's skip at the top of each bit function (which has to be HERE, not in the emitter, because the general row materialises before it emits — so an M22 relying on `cq_emit_*` alone would take W qubits for a region that does not run), D11's refusal at the three folding sites with `half_turn_row` naming the parity, `cq_ctrl_ry`/`cq_ctrl_rz` for the two general rows, and a measurement refusal. **DONE, Step 19 — 96/150 (85 + 11 at the step's close; 83 + 11 after the adversarial review trimmed a guard).** THE FIRST CALLER OF `cq_shadow_rotate` IN `src/`, on exactly two of §7's twelve cells — the general-`Ry` row, both columns (**PRD §15 D12**). Carries `bd lk0`'s resolution — the `Z` is `sink.rz(q, π)`, no seventh vtable entry — and refuses to run inside a sandwich compute half, which is the only guard it owns outright. Split seam recorded: **`§7's rotation table ↔ measurement`**, `cq_measure` moving to `src/measure.c` if `rotate.c` passes 240. **TEST SIDE, THIRD SEAM RECORDED 2026-08-22 AT STEP 23, BEFORE IT IS NEEDED: `which rows POISON, and what that costs at the FREE` → `tests/test_rotate_poison.inc`, trigger 290.** Both of this suite's earlier seams were spent at Step 19, when it reached 437 of 300 and took two splits at once; Step 23 added the `ckd.18` default-disposition case (a general-`Ry` rail STRANDS, by index) and it stands at **283**, so the next cut is named rather than improvised. It is a subject cut: those three cases are the only ones in the file whose subject is the SHADOW's disposition rather than the emitted gate stream, the only ones that free anything, and the ones D15's certificate will keep moving |
 | M23 | `sink_printf.c` | 70 | Default; CQ_lang's golden-trace **convention**, not its lines — the goldens are handle-level and a sink sees only qubit indices. `x`/`cx`/`ccx`/`ry`/`rz`/`mz`, operands `q<N>`, `%a` angles, flush per line. See the PRD §8 correction |
 | M24 | `sink_count.c` | 100 | Per-kind totals, T-count = 7×Toffoli. **NOT peak qubits** — Bennett's `peak_live_wires` is a simulator (Rule 13) and `cq_qubits_peak()` in M03 already has the number exactly. `total` = x+cx+ccx only. See the PRD §8 correction |
-| M25 | `sink_qec.c` | 100 | Conditional on `C_quantum_error_correction`; Ry/Rz stubbed per §7 |
+| M25 | `sink_qec.c` | 140 | **SHIPPED at Step 26 (129 lines).** NOT conditional on the library being present — the file always compiles, and its no-library arm registers NOTHING, so `CQOPS_SINK=qec` takes M04's existing "names an unregistered sink" hard error instead of a silent fallback (and the shim needs no build-configuration branch). The library is found through `-DCQOPS_QEC_DIR=<a built qec/>`, opt-in exactly as `CQOPS_CQLANG_DIR` is. **THE INSTALL IS TWO CALLS, ONE ON EACH SIDE OF `cq_ctx_init`, and there is no instant at which both preconditions hold**: `cq_sink_qec_register()` must precede it because a context resolves `cq_sink_active()` ONCE at construction, and `cq_sink_qec_bind(&ctx->pool)` must follow it because the pool it configures is inside the context. Runtime inputs are `CQOPS_QEC_CONFIG` (required; no default, since one would silently pick a code distance and an n_logical), `CQOPS_QEC_TRACE` (optional; written as a NAMED `.partial` and renamed only by a clean teardown) and `CQOPS_QEC_PRECISION` (default 20, refused above 30 — see M25b). Conditional on `C_quantum_error_correction` being present. **That name is a REPOSITORY, not the artefact** (PRD §15 D19): the library is its `qec/` subdirectory, built as `libqec.a` with header `qec/qec.h`, so a `find_library` spelled from the project name finds nothing. `x`/`cx`/`ccx`/`mz` map 1:1 onto `qec_x`/`qec_cx`/`qec_ccx`/`qec_mz`; every `qec_*` returns `int` where our vtable returns `void`, so −1 aborts through `cq_sink_die`. ~~Ry/Rz stubbed~~ — **D19 retired the stub**: `rz` converts the double to `(p, q_denom)` and `ry` is emitted `sdg; h; rz; h; s` |
+| M25b | `sink_qec_angle.c` | 120 | **SHIPPED at Step 26 (74 lines), and it is the half that is BUILT AND TESTED ON EVERY BOX** — it depends on `<math.h>` and nothing else, so a tree with no QEC library still runs its seven cases and four deaths. Cap `2^40`, inside D19's measured `[2^32, 2^48]`. MEASURED CONTRACT, IN THREE BANDS, because one bound over one range provably could not pin the double-double: **A** shipped cap, 1e-4 … 1e5 — 0.00243 ulp against 0.35055 for the same continued fraction with the `PI_LO` term dropped, bound 0.05, and this is the band that pins it; **B** cap `2^30`, 1e0 … 1e12 — 0.06337 against 0.37224, bound 0.15, reached by TURNING THE CAP DOWN so `p` stays under 2^53 and the identical arithmetic can be checked seven decades higher; **C** shipped cap, 1e-6 … 1e-5 — both variants 0.44325, bound 0.50, because there the CAP binds and nothing about the quotient is under test. The single 0.5-ulp bound the case shipped with first killed a fully naive quotient and **survived** the `PI_LO`-only deletion, which is what a mutation battery found. Above ~1e15 the **`long p` bound, not the cap**, is what stops the expansion; below ~2.9e-12 rad the ratio folds to `(0, 1)`, which is why the precision knob is capped at 30. **SPLIT SEAM RECORDED IN ADVANCE (Rule 12).** The double → `(p, q_denom)` continued-fraction conversion, the denominator cap and the >double-precision π. It is a self-contained numeric concern with its own suite, it is where D19's measured cap band lives, and it is the half that has nothing to do with a vtable |
 
 ### Layer 5 — shim
 
 | ID | Module | LOC | Notes |
 |---|---|---|---|
-| M26 | `shim/cq_runtime_impl.c` | 220 | The `cqrt_*` surface incl. the PRD §2.1 easy-to-miss families |
-| M27 | `shim/gen_shim.py` | 280 | Reads `opcode_table.yaml`; emits one `.gen.c` per opcode family + fp aborts |
+| M26 | `shim/cq_runtime_impl.c` | 220 | The `cqrt_*` surface incl. the PRD §2.1 easy-to-miss families. **Three scopes have been assigned to M26 since this budget was written — `PRD §15 D15`'s undo certificate and three-valued free (`bd 06t`), D7b's defensive copy (`bd 493`) and sink registration (`bd utk`) — so the 220 is very likely wrong. It is left AS WRITTEN rather than guessed at: a Rule-12 budget and a split seam are design decisions, and none of the three beads has been built, so there is nothing to measure yet. Set it, with a recorded seam, when M26's shape is known.** **ANSWERED 2026-08-22 AT STEP 23, once the surface had been measured rather than guessed at. The paragraph below stands as the record of the two times the question was asked and refused, and the hypothesis it floated is REJECTED — tested, not overridden.**
+
+> **THE SEAM IS WHO CALLS IT, NOT WHEN IT IS BUILT.** The hypothesis below,
+> `the cqrt_* gate surface ↔ the free-time certificate`, cuts M26 where the *schedule* cuts
+> it. Measured, the subject boundary that actually exists is
+> **`cqrt_*` (hand-written, CQ_lang's IR pass calls it) ↔ the sixteen `cq_shim_*` entry
+> points (M28's 992 generated wrappers call them)**. Those two surfaces share nothing but a
+> context: different arities, different error dispositions, different ABIs, different owners
+> upstream. The certificate is a *third* subject and sits under both.
+>
+> **THE 220 IS OFF BY ROUGHLY 4×, AND THE CAUSE IS THE ABI, NOT SCOPE CREEP.** M26 must
+> define **173** `cqrt_*` symbols (65 in v1 scope, 34 fp aborts, 63 `qram`, 11 `tape`) plus
+> the sixteen entry points. C macros are what keep that inside Rule 12 — nine widths of a
+> family are one macro definition plus nine one-line invocations, and `check_loc.sh` counts
+> non-blank non-comment lines, so a family costs ~15 lines rather than ~90. That is not a
+> trick; it is the only way 173 frozen-ABI signatures fit a 300-line rule, and generating
+> them instead is out of **M27's** scope, which reads `opcode_table.yaml` **only**.
+>
+> **THE SPLIT, five files, seamed by subject** (estimates, to be replaced by measurements as
+> each lands):
+>
+> | file | subject | est. | budget |
+> |---|---|---|---|
+> | `shim/cq_shim_ctx.[ch]` | the process-global context, sink installation (`bd utk`), the one §9 region bracket (`bd d6m` fix (a)), `cq_shim_unsupported` | ~~90 · 45~~ **LANDED 2026-08-23: 64 · 8** | 150 |
+> | `shim/cq_runtime_rail.c` | the rail lifecycle: `alloc` / `measure` / `free` / `copy[_controlled]` / `cswap` / `addc` / `xorc` | ~~170~~ **LANDED 2026-08-23: 199** (193 at first draft; the adversarial review's fixes added six). **250 after `bd 76r`'s brackets (2026-08-28). The 240 trigger has fired; the split was REVIEWED AND DECLINED the same day (`bd 2z1`, closed) — 250 against Rule 12's 300 WALL, `check_loc.sh` green, and a trigger is a scheduling prompt rather than the limit. The `LIFETIME ↔ CONTENTS` seam stays recorded here and at the top of the file, with the two things it must not get wrong, for whoever next needs the room** | 220 |
+> | `shim/cq_runtime_gate.c` | the gate surface: `x` / `cnot` / `toffoli` / `x_controlled` / `cnot_controlled` / `ry` / `rz` / `rz_controlled[_inv]` / `ry_controlled_inv` | ~~140~~ **LANDED 2026-08-23: 151** (156 at first draft; the review retired a guard whose comment was false) | 200 |
+> | `shim/cq_runtime_v2.c` | everything v1 defers: 34 fp widths, 63 `qram`, 11 `tape`, `alloc_handle`. One abort shape, macro-expanded | ~~90~~ **LANDED 2026-08-27: 96**, and `bd r3y`'s worry that the 90 was written before either population was counted turned out to be unfounded — twelve macro bodies cover all 109 | 150 |
+> | `shim/cq_template_impl.c` | the FIFTEEN remaining `cq_shim_*` entry points (the sixteenth, `cq_shim_unsupported`, is `cq_shim_ctx.c`'s): handle resolution, D7a refusal, D7b copy, minting `dst`, kernel selection, opening the region | ~~230~~ **LANDED 2026-08-27: 232, AND THE RECORDED SEAM WAS TAKEN** — the file came in at **270** against the 280 budget and the 240 trigger, which is Rule 12's "a scheduled split, never a surprise refactor" exactly | 280 |
+> | **`shim/cq_template_dispatch.[ch]`** | **LANDED 2026-08-27, on the seam recorded below before either file existed.** The three tables indexed by the frozen ABI's own enums — 13 opcodes, 10 predicates, 3 cast kinds — each with a `_Static_assert` tying its length to the last enumerator, each with a bounds check (C does not require an enum object to hold one of its enumerators, and an unchecked index calls whatever follows the table in `.rodata`), and **every `src/kernels/` include in the shim**. That last is the second argument for the cut: the boundary half names no kernel and so cannot quietly acquire a per-opcode special case. A cast carries its own function-pointer type — two widths `(F, T)` where a binary kernel has one `W` — because widening `cq_kernel_fn` to cover both is what Rule 7 forbids | **57 · 11** | 280 |
+> | **`shim/cq_shim_proof.[ch]`** | **LANDED 2026-08-23, AND IT IS WHERE THIS TABLE'S LANDING-2 ROW NOW GOES.** The free-time EVIDENCE: `cq_shim_shadow_proof`, a `cq_zero_proof` reading the shadow three-valued. It exists because `cqrt_free` could not otherwise be written at all — the library shipped no proof and M07 hard-errors on a NULL one for any qubit-owning rail | **10 · 6** | 120 |
+> | **`shim/cq_shim_trace.[ch]`** | **LANDED 2026-08-28 (`bd 76r`, PRD §15 D21).** M26's ANNOTATION half: the `#REGISTER` header, assembled at END of program because handoff §3 wants every one before the FIRST bracket and CQ_lang allocates throughout, and the flat `op begin`/`op end` brackets every `cqrt_*` and `cq_shim_*` entry point opens. It prints NOTHING for a gate — those, and every `#PATCH`, are the QEC library's own — so it is NOT a sink and must not become one. Its ONE activation test is `cq_sink_qec_trace()`, which is NULL under every other sink and in a build without the library; that is what keeps M23's printf sink and the qec trace disjoint consumers of two streams, which D21 names as the concrete hazard. The call sites cost the three surface files **+27 (rail), +23 (gate), +13 (template)** — one bracket per entry point, uniformly, because "bracket the ones that emit" is not a checkable rule | **143 · 13** | 200 |
+> | **`shim/cq_runtime_abi.h`** | **LANDED 2026-08-23.** CQ_lang's 173 `cqrt_*` declarations, VERIFIED-verbatim, on `tests/abi/cq_templates_abi.txt`'s precedent but under `shim/` because the LIBRARY includes it. Without it a wrong return or parameter type in one of the 62 definitions compiles clean, links clean (C has no name mangling) and surfaces at Step 24 as a wrong answer; `-Wmissing-prototypes` is not in the flag set | **184** | — |
+>
+> **Reserve seam, recorded before a line is written:** `cq_template_impl.c` at **240** splits
+> on `the opcode DISPATCH TABLE ↔ the handle BOUNDARY`, into `shim/cq_template_dispatch.c`.
+> **TAKEN 2026-08-27 AS RECORDED.** The discriminator turned out to be *what makes each half
+> change*: the dispatch half is transcription of the frozen ABI and grows when the yaml gains
+> an opcode; the boundary half is `tpl_binary`'s ordered call sequence, D7a, D7b and the §9
+> region, and grows when a DECISION changes. A `.h` was needed as well, at 11 lines, because
+> the two halves are separate translation units — which is also what gives each file a
+> DISJOINT set of refusal strings (the dispatch half's three name an ENUM, the boundary
+> half's name a WIDTH or a HANDLE), so a swapped message is caught by a
+> `FAIL_REGULAR_EXPRESSION` rather than by a reviewer.
+> **Landing 2** adds D15's ported reduction engine and the per-handle record — and it lands
+> in **`shim/cq_shim_proof.[ch]`**, which is the same file under a name that is true in both
+> landings. This row said `shim/cq_certificate.[ch]` until 2026-08-23; the file arrived early
+> because landing 1's `cqrt_free` needs a supplier, and naming it for the certificate it does
+> not yet hold would have meant a rename at landing 2 rather than an addition. Its own
+> reserve seam is recorded in its header: `the EVIDENCE ↔ the RECORD` →
+> `shim/cq_shim_record.[ch]`.
+>
+> **THE TWO NEW SEAMS, RECORDED BEFORE EITHER FILE WAS WRITTEN, AND BOTH TRIGGERS ARE THE
+> HOUSE 240** — measured against Rule 12's 300-line hard limit and not against the file's
+> budget, which is why M06's (140), M07's (180), M20's (110) and M22's (150) all sit above
+> their own budgets and why M07's fired correctly at Step 23. `shim/cq_shim_ctx.c`'s 120 is
+> the single ratio-derived trigger in the tree; both new files' first drafts copied it, and
+> `0.8 × 220 = 176` would have fired the rail seam on the day the file landed at 193 — a
+> two-file plan wearing a trigger's clothes rather than a scheduled split. A budget is an
+> estimate; the 300 is the wall.
+>
+> | file | seam | moves to | landed |
+> |---|---|---|---|
+> | `shim/cq_runtime_rail.c` | **`the rail's LIFETIME ↔ the rail's CONTENTS`** — the discriminator is EMISSION and it is a DISJOINTNESS: the lifetime half (`alloc`, `measure`, `free`; 11 symbols) emits `mz` and nothing else, the contents half (`copy`, `copy_controlled`, `cswap`, `addc`, `xorc`; 21) takes live handles, returns void and emits nothing BUT X/CX/CCX. **NOT** "only the lifetime half changes a slot state" and **NOT** "only it reads D15's disposition" — `rail_addc` mints two rails, tombstones both and frees both, and measured in Release it advances the D5 handle counter by 2 permanently. What is only the lifetime half's is the SUBJECT: a handle CQ_lang named. A producer/consumer boundary, so landing 2's growth lands on one side. **At the split, `rail_r` is needed on BOTH sides and drags `cq_rail_die` and `RAIL_WIDTH` with it — make the two messages disjoint, as Step 15 did for `cq_addacc_check`, or the CMake pins (which discriminate on the MESSAGE, not the module) mask a deleted guard** | `shim/cq_runtime_write.c` | **199 of 240** (re-measured 2026-08-27) |
+> | `shim/cq_runtime_gate.c` | **`the DISCRETE gate primitives ↔ the ROTATION families`** — the five discrete symbols carry no width token, act on one-bit rails and reach M05's exact-shadow surface; all 25 rotations carry a `double angle`, walk every lane and reach M22, which is the only thing in the shim that can make a rail unfreeable or hard-error on D11. Rejected: `uncontrolled ↔ controlled`, a size cut wearing a subject's clothes — Rule 9 makes the axis an emitter MODE, so there is no controlled machinery to move | `shim/cq_runtime_rotate.c` | **151 of 240** (re-measured 2026-08-27) |
+> | `shim/cq_runtime_v2.c` | **`the DEFERRED CORE WIDTHS ↔ the ADDRESSABLE-MEMORY families`** — recorded 2026-08-27, before a line of the file was written, because `bd r3y` measured the file over its budget with **no seam owned by anyone**. The 34 fp-width symbols are the SHIPPED families at a width v1 defers — `alloc` / `measure` / `ry` / `rz` / `rz_controlled[_inv]` / `ry_controlled_inv` / `copy[_controlled]`, one width token away from `cq_runtime_rail.c` and `cq_runtime_gate.c` — and in v2 they become real code by WIDENING what already exists. The 74 `qram` + `tape` symbols are a different DATA MODEL: an addressable quantum array and an append-only tape, neither of which libcqops has any representation for at any width, so they never become code by widening anything and need a subsystem. `cqrt_alloc_handle` goes with the fp half and NOT with memory — it is about the shared D5 handle counter, and it is the one body in the file that is REACHABLE today (CQ_lang's own template archives reference it), which is a property of that half's callers rather than of its subject. **Rejected:** `by reason string`, which is this table's cut wearing a implementation detail's clothes, and `fp ↔ integer`, which would put `cqrt_qram_alloc_f32` on the fp side of a family that is undecidable at every width | `shim/cq_runtime_v2_mem.c` | **96 of 240** (landed 2026-08-27) |
+>
+> **THE TEST SIDE TOOK THE GATE SEAM IMMEDIATELY**, at the 300 HARD LIMIT rather than at a
+> trigger: `tests/test_runtime_gate.c` reached 306 and the rotation half moved to
+> `tests/test_runtime_gate_rotate.inc`. The rail suite took its seam pre-emptively —
+> `tests/test_runtime_rail_write.inc` — on `tests/test_shim_ctx.c`'s precedent that both
+> sides wanting the same cut is the argument for the seam.
+>
+> **AND THE DEATH SUITE TAKES THE SAME GATE SEAM, RECORDED 2026-08-27 BEFORE ITS NEXT CASE
+> WAS WRITTEN (Rule 12: a split is scheduled, never improvised).**
+> `tests/test_runtime_gate_death.c` stood at **233 of 300** with **no seam recorded anywhere**
+> — not in its own header and not in this table — and `bd pnu`'s fixes add five cases, which
+> crosses the house **240** trigger. The cut is the module's own, the third file to want it:
+> `the DISCRETE gate primitives ↔ the ROTATION families` → **`tests/test_runtime_gate_death_rotate.inc`**.
+> It is a subject cut and not a size cut, and on this side the discriminator is even sharper
+> than on the source side, because a death case's subject *is* which layer refuses: everything
+> that moves refuses through `gate_rot_width` or through **M22** (D11's two refusals, the
+> tombstone/measured ORDER pair), and everything that stays refuses through `gate_target` /
+> `gate_ctrl` / `gate_distinct` — M05's and M06's surface, where the two-bit shadow is exact
+> and where PRD §9 **row 0** is the row the shim is the SOLE detector on. The `.c` keeps the
+> one-bit guard, the coincidence guard and row 0; the `.inc` keeps every symbol carrying a
+> `double angle`. `CQ_DEATH_MAIN`'s registry stays in the `.c`, which is what makes the
+> include order load-bearing (the `.inc` goes above it).
+>
+> **The rail death suite does NOT take a seam yet and that is deliberate**: at **169 of 300**
+> with two `bd pnu` cases to add it is nowhere near the trigger, and its seam — the same
+> `LIFETIME ↔ CONTENTS` cut `tests/test_runtime_rail_write.inc` already took on the ordinary
+> side — is already recorded above.
+>
+> **`tests/test_template.c`'s SEAM, RECORDED 2026-08-27 BEFORE ITS FIRST CASE WAS WRITTEN**
+> (Rule 12: a split is scheduled, never improvised; and the `.c` did not exist when this
+> line was written, which is the whole point of recording it here rather than in its header).
+> Step 23.6's Red column asks for **one case per entry point across fifteen of them** plus
+> D7a on the six `_unc` shapes, D7b, and the aliased-CONTROLLED case — which is more subject
+> than one file holds. The cut is **the same one `shim/cq_template_impl.c` already records**,
+> and that both sides want it is the argument for it (`tests/test_shim_ctx.c`'s precedent):
+>
+> | file | seam | moves to | trigger |
+> |---|---|---|---|
+> | `tests/test_template.c` | **`the OPCODE SURFACE ↔ the HANDLE BOUNDARY`** — the surface half is what the fifteen entry points COMPUTE: one case per shape, the value through `cq_pc_value_w`, the result WIDTH (`icmp`→1, `cast`→`to_bits`), the pool round trip, and the classical-operand `_hl`/`_lh` lanes. The boundary half is what an entry point does to its HANDLES on the way in and out — D7a's refusal, D7b's defensive copy and its un-copy, the strand/settle accounting for the temporary, and the aliased-CONTROLLED case whose whole subject is the ORDER of the copy against `cq_ctrl_push`. The discriminator is whether the case would still exist if every source handle were distinct: the surface half would, the boundary half is exactly the cases that would not | `tests/test_template_d7.inc` | **240** |
+>
+> **AND A SECOND SEAM, RECORDED THE SAME DAY BEFORE IT WAS TAKEN.** With the boundary half
+> already in the `.inc`, the surface half still reached **298 of 300** once the predicate
+> fixture grew the three operand pairs a strict/non-strict mutant needs (measured: with one
+> pair, `cq_kernel_ule` in the `ult` row survived the whole suite). The cut is the module's
+> own and is the property `tpl_req.wout` exists for:
+>
+> | file | seam | moves to | trigger |
+> |---|---|---|---|
+> | `tests/test_template.c` | **`the OPERAND-WIDTH shapes ↔ the RESULT-WIDTH shapes`** — the nine binary entry points (three operand shapes × forward / `_unc` / `_controlled`) all mint `dst` at the operand width, and everything that can go wrong with them is about which LANE carries what. `icmp` and `cast` are the two families where the result width is NOT the operand width — one bit at any width, and `to_bits` — which is the trap the arity-2 signature actively suggests otherwise, and they are the only two that would still be red if every operand lane were correct. `cast` joins `icmp` rather than the binary nine because it is the second instance of exactly that property, not because it is small | `tests/test_template_width.inc` | **240** |
+>
+> **The DEATH cases are a separate binary from the start and that is not a seam**: D7a is a
+> hard error in both configurations, and `add_cqops_death_test` needs its own `CQ_DEATH_MAIN`
+> translation unit — `tests/test_template_death.c`, on `tests/test_runtime_rail_death.c`'s
+> precedent. Its own reserve seam is the same cut, to `tests/test_template_death_d7.inc`.
+>
+> **`cq_shim_ctx.c`'s OWN reserve seam, recorded 2026-08-23 before the file was written:**
+> `the process CONTEXT ↔ the BOUNDARY VOCABULARY`. The context half is the global `cq_ctx`,
+> `cq_shim_ctx_reset` and sink installation — one stateful subject, and the one every other
+> M26 file touches. The boundary half is what an entry point calls on its way *in* and on its
+> way *out*: `cq_shim_region` and `cq_shim_unsupported`, both stateless, and with different
+> callers (the three controlled shapes; M28's 1,487 abort bodies plus `cq_runtime_v2.c`). It
+> moves to `shim/cq_shim_region.c`. **Trigger at 120**, which is the house 240/300 ratio
+> applied to this file's 150 budget rather than the house figure copied across a smaller
+> budget. Measured at landing: **64**, so it is not close.
+>
+> **THE TEST SIDE TOOK THAT SAME SEAM IMMEDIATELY, and it is recorded here rather than
+> improvised in the file.** `tests/test_shim_ctx.c` reached **410 of 300** on its first run —
+> `make lint` red — and the cut is the module's, not a size cut: `tests/test_shim_ctx_region.inc`
+> carries the §9 bracket's three arms (`bd d6m`) and PRD §1's boundary, and the `.c` keeps the
+> context, the reset and sink installation. That the two halves want the same seam on both
+> sides is the argument for the seam.
+>
+> **`tests/test_shim_cert.c`'s SEAM AND `shim/cq_shim_record.[ch]`'s, BOTH RECORDED
+> 2026-08-27 BEFORE LANDING 2's FIRST CASE WAS WRITTEN** (Rule 12: a split is scheduled,
+> never improvised; and neither file existed when this line was written, which is the whole
+> point of recording it here). The test side of landing 2 had **no seam recorded anywhere** —
+> not in a header and not in this table — which is the same gap `tests/test_runtime_gate_death.c`
+> was in at **233 of 300** two paragraphs above, and it is closed the same way and for the
+> same reason. `tests/support/refmodel.c` is the standing counter-example: **284 of 300 with
+> no seam** (`bd zmo`), and it got there one line at a time.
+>
+> | file | seam | moves to | trigger |
+> |---|---|---|---|
+> | `shim/cq_shim_record.c` | **`the RECORD ↔ the REDUCTION`** — the record half is the per-handle write history and the EFFECT TABLE that says, per `cqrt_*` / `cq_template_*` opcode, which operands are read, which are written, which are controls and which are classical immediates. It is transcription of the frozen ABI and it changes only when the ABI does. The reduction half is the PORTED engine — `reduces_to_identity` and its four guards — which is transcription of `third_party/cq_free_pairing/free_pairing_check.py` and changes only when that pin moves. The discriminator is **which pinned artefact a line answers to**: a wrong read/write set is an ABI transcription bug that `cq_runtime.h` settles, a wrong pairing is an analysis bug that the vendored checker settles, and no line answers to both. That is a sharper cut than "data ↔ algorithm" and it is why this seam is not a size cut | `shim/cq_shim_reduce.[ch]` | **240** |
+> | `tests/test_shim_cert.c` | **`the ENGINE ↔ the ENTRY CONDITIONS`** — the engine half drives `cq_shim_reduce` directly on synthesised histories: pairing, the strict-open interval, the top-down scan, an unpaired write, the two `commutes` intervals, `co_written_stable` on `cqrt_cswap`, and both narrowing tripwires. Those cases name no `cqrt_*` entry point and would still exist if D15 had only ever stated ONE rule. The entry-condition half drives real `cqrt_*` / `cq_template_*` call sequences through the shim and asserts the VERDICT: U1's `_unc` shape, U2's self-inverse brackets, U3's `addc` arithmetic, and the birth-value split that convicts `ckd.18`. The discriminator is whether the case would survive D15 losing U1/U2/U3 and keeping only "the write history reduces to the identity": the engine half would, the entry half is exactly the cases that would not | `tests/test_shim_cert_rules.inc` | **240** |
+>
+> **The rejected cut, named so it is not re-proposed: `the CLEAN row ↔ the two non-clean rows`.**
+> It is a size cut wearing a subject's clothes. Every certificate case asserts a verdict on the
+> three-valued lattice and the interesting ones are exactly the pairs that DISAGREE — a rail whose
+> history reduces and whose birth value is 5 is CLEAN under upstream's own A-rules and DIRTY under
+> ours, and splitting the rows puts the two halves of that single fact in two files. The two seams
+> above both keep such a pair together.
+>
+> **AND THE DEATH CASES ARE A SEPARATE BINARY FROM THE START, WHICH IS NOT A SEAM** —
+> `tests/test_shim_cert_death.c`, on `tests/test_template_death.c`'s and
+> `tests/test_runtime_rail_death.c`'s precedent: `CQ_DEATH_MAIN` needs its own translation
+> unit. Its reserve seam is the same `ENGINE ↔ ENTRY CONDITIONS` cut, to
+> `tests/test_shim_cert_death_rules.inc`.
+
+M26 appears to have **three** subjects rather than two — the handle boundary (resolve, D7a refusal, D7b copy), the gate surface (`x`/`cnot`/`toffoli`/`copy`/`cswap`/`addc`/`xorc`/`ry`/`rz` + the controlled families), and the rail lifecycle (`alloc`/`measure`/`free` with D15's certificate) — and it is the third that is new and unbuilt, which is exactly why the seam cannot be named yet. A document-grounded *hypothesis* to test when M26 is designed, **not** a derived result: `the cqrt_* gate surface ↔ the free-time certificate`, on the grounds that Step 23's row below calls D15's mechanism "the largest thing M26 owes" and a stateful per-rail analysis over the call stream is a different subject from ABI transcription. **THE HYPOTHESIS WAS TESTED AT LANDING 2 AND IS CONFIRMED, which is the first of the three M26 hypotheses in this table to survive contact.** The certificate is three files that touch no `cqrt_*` body — `shim/cq_shim_record.[ch]` (the per-handle call history and the effect table), `shim/cq_shim_reduce.[ch]` (the PORTED reduction) and `cq_shim_certificate` in `shim/cq_shim_proof.c` — and what the gate and rail surfaces gained is ONE `rec(...)` line per entry point. **The two `rec` helpers are duplicated across `cq_runtime_rail.c` and `cq_runtime_gate.c` deliberately rather than hoisted**: each is four lines and `static`, and a shared helper would put the ABI's operand ORDER one indirection away from the entry point that knows it — and operand order is exactly what D15 §6(ii) says a write model gets wrong. `shim/cq_shim_record.[ch]`'s own reserve seam, `the RECORD ↔ the REDUCTION`, was recorded before either file was written and TAKEN immediately; the discriminator is **which pinned artefact a line answers to** — `cq_runtime.h` for a read/write set, `third_party/cq_free_pairing/` for a pairing — and no line answers to both. |
+| M27 | `shim/gen_shim.py` | 280 | Reads `opcode_table.yaml`; emits one `.gen.c` per opcode family, **plus BOTH abort buckets — the 884 fp AND the 603 integer `_inv` bodies (PRD §15 D14, `bd w1c`)**; the pre-D14 wording said "fp aborts" and named only half the bucket. **Split seam recorded 2026-08-22, before a line is written (Rule 12: a split is scheduled, never improvised): `the ABI grid ↔ the emitted bodies`.** `gen_shim.py` keeps everything the frozen ABI dictates and stays the path CI invokes — the yaml load and its sha, the `:35-59` naming-rule expander (**`:39-58` until 2026-08-22 — it starts four lines INSIDE the block, omitting `:36-38`'s three forward-form rules, i.e. the base symbol shape itself; a generator built from it has no `fwd_qq`/`_hl`/`_lh` spelling at all**), the row model, `signature(row)` (with the classical operand's `c_type` read out of the yaml's own `widths` map, never a hand-kept table), each symbol's v1 bucket, PRD §1's partition audit, R7's per-family bucketing, the banner and `--check`. `shim/gen_bodies.py` takes a row and returns the text between the braces, and is **the only file in M27 that names a libcqops or M26 symbol**. Import is one-way; the row record is the whole interface. The seam is where Step 22's gate stops and Step 23's begins, and it is what lets the round-trip oracle — 2479 names AND 2479 signatures diffed against CQ_lang's own generated `runtime/cq_templates.h` — run from the grid half alone with no body emitted. **Trigger it at 240**, the house threshold (M07, M06, M20, M22). **LANDED 2026-08-22 AT STEP 22, PRE-SPLIT, AND THE PROTOTYPE'S FIGURE WAS THE GOOD ESTIMATE: `gen_shim.py` **183** and `gen_bodies.py` **56** under `check_loc.sh`'s py rule — 239 together against the prototype's 190 and the "plausibly ~290" caveat.** The TEST side is where the room went instead, and its seam is recorded in its own header: `tests/test_gen_bodies.py` reached **259 of 300** after an adversarial review, and `the ASSERTIONS ↔ the PROVOCATIONS` moves to `tests/test_gen_bodies_provoked.py` — a THIRD registered ctest test, because Python has no `.inc` escape hatch. The split was taken **before** the trigger and that is the plan working as written rather than an exception: this row already calls the seam's case *ownership, not churn*, and the ownership boundary is exactly where Step 22's gate stops and Step 23's begins. Three artefacts landed with it that the row did not anticipate and that are recorded here so they are not re-derived: **`shim/cq_shim.h`** (40 lines) is the M26↔M28 *contract* — a generator cannot emit calls into a vacuum, so Step 22 ships the sixteen declarations and Step 23 ships their definitions; **`tests/abi/cq_templates_abi.txt`** is the round-trip oracle *vendored* rather than read live out of an unpinned CQ_lang, carrying the yaml-sha256 that proves it is the expansion of the yaml we actually pin (CQ_lang's HEAD has already moved past `third_party/cq_lang/COMMIT` while the yaml has not); and **`cmake/CqopsPython.cmake`** probes for a python3 that can `import yaml` in the compile-and-*run* style of `CqopsSanitizers.cmake`, warning and declining to register the two suites rather than registering them to pass — the reserve seam below is what the warning is warning about. **Reserve seam, grid side: `the reader ↔ the expander`** — PyYAML is present on this box's `python3` and absent from `/usr/bin/python3`, so if CI forces a hand-rolled reader it lands here (~+60–90) and moves to `shim/yamlmin.py`. Two riders: `check_loc.sh` counts every line of a multi-line string literal as code and Python has no `.inc` escape hatch, so emitted C templates cost the bodies half a line each — a second, independent reason that half grows first; and a re-pin costs **no code on either side** (simulated: a new width, predicate and cast pair took 2479 → 2528 with zero edits), so the seam's case is ownership, not churn |
 | M28 | generated `*.gen.c` | exempt | **992** integer wrappers + **603** integer `_inv` abort bodies + **884** fp abort bodies (PRD §1 and §15 **D14**; the 1595 integer symbols split 992/603 because `_inv` is `f⁻¹` and `f⁻¹` does not exist for `and`/`or`/`udiv`/`trunc`/`icmp`. 1455 integer if i80 is ruled out of scope) |
 
 Hand-written total ≈ **3,400 LOC** across 27 modules.
+
+### Layer 6 — the L6 harness *(Step 24; not a library module, and `tools/` IS linted)*
+
+`tools/check_loc.sh`'s roots are `src include tests shim tools`, so a `.py` under `tools/`
+is subject to Rule 12 exactly as a kernel is. Both seams below are recorded **before**
+either file needs one.
+
+| file | LOC | Split seam |
+|---|---|---|
+| `tools/l6/run_slice_cqops.sh` | **106 raw** (shell is not counted by `check_loc.sh`) | Not applicable, and deliberately so: this is CQ_lang's own four-stage pipeline with ONE line changed — the link — and the whole value of it is that it stays diffable against `CQ_lang/tests/e2e/run_slice{,_multi}.sh`. Splitting it would defeat the review that keeps it faithful |
+| `tools/l6/l6_run.py` | **142 of 300** (landed 2026-08-27) | **`the FIXTURE LIST ↔ the VERDICT`** → `tools/l6/l6_report.py`, trigger **240**. The fixture half reads `ctest --show-only=json-v1` out of an UNPINNED CQ_lang and answers to whatever CQ_lang registers; the verdict half (`classify`, the `DEFERRED` regex, the residue observation) answers to OUR abort texts in `shim/cq_shim_ctx.c` and `src/reg.c`. The discriminator is **which repository a line breaks with**, and no line answers to both — the same test this table applies to `shim/cq_shim_record.c`. Rejected: `run ↔ report`, which sounds like the same cut and is not, because `--reuse` already makes the report runnable without the run and a cut there would only move `main`'s loop |
 
 ---
 
@@ -1041,7 +1286,7 @@ proceed). PRD increment mapping in the right column.
 | 4 | `test_qubits.c` — LIFO order (D4); ceiling exceeded fails loud (D2); releasing a qubit whose shadow is not known-0 is a **hard error** (I3); peak tracking | M03 | All green | 1 |
 | 5 | `test_sink.c` + `mock_sink` — every vtable entry dispatches; env-var default selection | M04 + `mock_sink` | Recording sink usable by later tests | 1 |
 | 6 | **`test_emit_fold.c` — L0, exhaustive.** Target/control ∈ {const-0, const-1, Q known-0, Q known-1, Q unknown}: `5 X + 25 CX + 125 CCX` = **155** cases, the full Cartesian product. Each pins **gates emitted, qubits allocated, resulting bit-kind, and shadow** — four *assertions* per case, not four cases. Plus **4** distinctness death-tests: `c == t` (CX) and `c1 == c2`, `c1 == t`, `c2 == t` (CCX). Each death-test needs **Q** operands, since the assert compares qubit indices and cannot fire on constants | M05 | **159/159** (155 + 4). This is the most important suite in the project — everything above it is Bennett transcribed against these three functions | 1 |
-| 7 | `test_reg.c` + `test_reg_invariants.inc` + `test_reg_death.c` — handles monotonic, never reused (D5); tombstones; I4 (all-constant register owns zero qubits); free of a dirty rail is a hard error **in M07, not merely somewhere**; I2 owner map catches a double-owned qubit; **D7a aborts and D7b deliberately does not** | M07 | **DONE** — 45 ctest green both configurations + ASan/UBSan | 1 |
+| 7 | `test_reg.c` + `test_reg_invariants.inc` + `test_reg_death.c` — handles monotonic, never reused (D5); tombstones; I4 (all-constant register owns zero qubits); free of a dirty rail is refused **in M07, not merely somewhere** (~~a hard error~~ — `PRD §15 D15` §4 made the ACT stranding, confirmed 2026-08-22 and shipped at Step 23; the gate's content, that M07 and not M03 is the layer that refuses, is unchanged, and `CQOPS_FREE_ABORT` restores the stop); I2 owner map catches a double-owned qubit; **D7a aborts and D7b deliberately does not** | M07 | **DONE** — 45 ctest green both configurations + ASan/UBSan | 1 |
 | 8 | `test_scratch.c`, `test_sandwich.c` — driver runs compute forwards, copyout, compute backwards; a synthetic step function's recorded stream is a **palindrome around the copyout**; I6 violation (target outside scratch) is caught in Debug | M08, M09 | All green | 1 |
 | 9 | `test_sink_printf.c`, `test_sink_count.c` — the trace format is line-exact and its angles round-trip bit-exactly; counter totals match the mock sink's stream. **The gate as written was unsatisfiable and is corrected:** "matches CQ_lang's goldens" cannot hold, because all 239 goldens are handle-level and contain no gate lines at all — what M23 matches is the *convention* (PRD §8) | M23, M24 | **DONE** — 69 ctest green both configurations, 22/22 mutants killed. PRD Increment 1 complete | 1 |
 
@@ -1110,7 +1355,12 @@ Random masks are sampled on top.
 > `tests/support/poolcheck.c:cq_pc_zero_proof_rotation_free`, whose name is its scope: sound
 > on the rotation-free surface (Steps 10–17) because `cq_shadow_rotate` is the only producer
 > of `unknown`, and a laundering device the moment M22 lands at Step 19. It does **not**
-> answer `ckd.17b` or `ckd.18`.
+> answer `ckd.17b` or `ckd.18` — **nor is it meant to.** Both were settled 2026-08-22 as
+> `PRD §15 D15` (`bd c1a`, `bd ckd.18`), by an observed undo certificate at the **M26
+> handle boundary** rather than by this predicate, which stays exactly what its name says
+> it is. "The library ships no proof" stayed true until M26 supplied that certificate at
+> Step 23 landing 2 (`bd 06t`, closed 2026-08-27); what `cqrt_free` installs now is
+> `cq_shim_free_proof`, the certificate AND this predicate, and the sentence is history.
 
 | Step | Kernels | Module | PRD |
 |---|---|---|---|
@@ -1137,7 +1387,7 @@ documented, and never traps. Assert it does not trap; pin whatever it returns.
 | 18 | `test_angle.c` — every row of §7's table incl. mod-4π vs mod-2π boundaries and tolerance edges. **The gate as written is not achievable in M21 and is corrected:** §7's table is six rows × TWO columns, and the constant/qubit split is Rule 15's whole point — choosing a column needs a `cq_bit`, so M21 pins the **ROW** and M22 owns the cells at Step 19 | M21 | **DONE** — 19 cases + 8 deaths green in both configurations, 39/39 real mutants killed with 4 deliberately-equivalent controls alive, then a 29-agent adversarial review whose 9 surviving findings added 3 cases and `-ffp-contract=off` | 7 |
 | 19 | `test_rotate.c` — **the θ≡π asymmetry**: `Ry(π)` on a constant bit flips it with **0 gates and 0 qubits**; on a qubit it emits `X` then `Z`. `Rz` on a constant is a no-op at every φ. Measurement returns shadow, 0 for unknown, emits `mz`, is terminal. **Two clarifications the step forced.** The `Z` had no vtable entry and no `cq_emit_*`; it is `sink.rz(q, π)` (**PRD §7**, `bd lk0`) — and note "`Ry(π) = XZ`" is a MATRIX product while "emit `X` then `Z`" is a CIRCUIT, so the emitted pair is `Z·X = Ry(3π)`, which is the same row up to a global −1 that no fixed spelling can remove. **Which rows poison is a decision, not a detail** — PRD §15 **D12**: only `Ry` off the lattice | M22 | **DONE** — 19 cases + 12 deaths green in both configurations at 94/150 LOC (83 + 11), 35/35 real mutants killed across three rounds | 7 |
 | 20 | `test_controlled.c` — promotion table verbatim from `controlled.jl`; ancilla shared across the region and returned |0⟩; nested control uses **one** control wire; **every Phase-B kernel re-runs its L1–L4 suite under `cq_ctrl_push`**. **Three decisions came due with it and all three are now in the PRD rather than in code**: `bd skh` is **D13** (materialisation is UNPROMOTED, forced by one cell of an eight-row truth table), `bd pf4`'s D11 refusal is BUILT at one greppable site, and `bd fna`'s `k mod 4` split shipped first so the refusal can NAME the parity it refuses. **§9 grew three libcqops-side rows** (A: fold on controls first, promote before folding on the target; B: a control coinciding with an operand is a hard error, measured 0/4,918 in the corpus; C: D13) | M06 | **DONE** — 20 cases + 19 deaths green in both configurations, **195 ctest tests**; all ten Rule-7 kernel modules re-run L1/L2/L3/L5 under four regions and assert §9's tuple transform at every shipped width. **Two mutation batteries proposed 67 mutants; 56 landed, 51 killed in both configurations, 5 survived** — three of the five were real holes in the SUITE (D11's identity rows had no exemption case, the refusal MESSAGE was unread so `half_turn_row`'s parity was unpinned, and the driver never checked that a mode it calls quantum minted a WIRE) and are closed and re-verified by hand; the other two are genuinely equivalent and recorded at their sites on M09's `0xAA` precedent | 7 |
-| 21 | `test_unc.c` — `_unc` across every kernel; the PRD §10 asymmetry is **expected**, so forward and `_unc` counts are pinned **separately**. `_inv` for compare flags. `cqrt_free` of a dirty rail is a hard error. **Two clauses of that gate were not satisfiable as written and are corrected in the PRD rather than worked around.** (i) *"`_unc` across every kernel"* is already discharged by `cq_kd_case`, whose L3 runs on every case of every kernel under each of §9's four regions; a twelfth re-drive with hand-written call adapters would detect nothing. (ii) *"`_inv` for compare flags"* names a symbol **CQ_lang no longer emits** — `CompareLowering` emits the void in-place `_unc` twin (its bd `8txa`), and `_inv` appears on **0** lines of all 239 goldens against 21,323 `cq_template_icmp_*_unc` — so what is testable is the self-inverse PROPERTY, and the symbol family becomes **PRD §15 D14**. What Step 21 therefore builds is the axis's own claims: the asymmetry MEASURED, `dst ^= f` at a dst that is not zero, and the free | (thin, in M26) | **DONE** — 12 cases + 2 deaths green in both configurations, **198 ctest tests** | 7 |
+| 21 | `test_unc.c` — `_unc` across every kernel; the PRD §10 asymmetry is **expected**, so forward and `_unc` counts are pinned **separately**. `_inv` for compare flags. ~~`cqrt_free` of a dirty rail is a hard error~~ — `PRD §15 D15` §4 made the ACT **stranding**, so what Step 21's two death cases assert is the REFUSAL, each arming `CQOPS_FREE_ABORT` in C. **Two clauses of that gate were not satisfiable as written and are corrected in the PRD rather than worked around.** (i) *"`_unc` across every kernel"* is already discharged by `cq_kd_case`, whose L3 runs on every case of every kernel under each of §9's four regions; a twelfth re-drive with hand-written call adapters would detect nothing. (ii) *"`_inv` for compare flags"* names a symbol **CQ_lang no longer emits** — `CompareLowering` emits the void in-place `_unc` twin (its bd `8txa`), and `_inv` appears on **0** lines of all 239 goldens against 21,323 `cq_template_icmp_*_unc` — so what is testable is the self-inverse PROPERTY, and the symbol family becomes **PRD §15 D14**. What Step 21 therefore builds is the axis's own claims: the asymmetry MEASURED, `dst ^= f` at a dst that is not zero, and the free | ~~(thin, in M26)~~ **no module; the free is M26's and is NOT thin — `PRD §15 D15`** | **DONE** — 12 cases + 2 deaths green in both configurations, **198 ctest tests** | 7 |
 
 Step 20's re-run is why the controlled axis is an emitter mode (§0.3): it costs one
 parameter in the kernel test driver, not twelve new suites. **Measured: the driver's own
@@ -1159,16 +1409,16 @@ still `test_kernel_shift_var`, 68 s → 95 s. Re-measure rather than quoting the
 
 | Step | Red | Green | Gate | PRD |
 |---|---|---|---|---|
-| 22 | `test_gen_shim.py` — generator round-trips the real `opcode_table.yaml`; **emitted symbol count reconciles with Step 0.5**; every fp symbol gets a named abort body — **and so does every integer `_inv` symbol (PRD §15 D14, `bd w1c`), with the integer abort set asserted to be EXACTLY the 603 `_inv` names** so nothing else is swept into the bucket unobserved. This is the gate D14 lands on, not Step 23's: an uncalled symbol produces no undefined reference, so a missing `_inv` body cannot turn `nm` red | M27 | Generator green | 8 |
-| 23 | `test_runtime.c` — the PRD §2.1 families: `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled[_inv]`, `cqrt_cswap` (constant ctrl = **0 gates**; quantum ctrl = Fredkin per bit) | M26, M28 | Full grid links; `nm` shows no undefined `cq_template_*` **from the opcode grid**. The 401 intrinsic/libm symbols come from CQ_lang's own archives and are deliberately *not* ours (PRD §1) — an unqualified "no undefined `cq_template_*`" cannot pass | 8 |
-| 24 | **L6** — link against CQ_lang's existing fixtures, diff emitted traces | — | Traces match | 8 |
+| 22 | **LANDED 2026-08-22.** `test_gen_shim.py` (the GRID) **and `test_gen_bodies.py` (the BODIES), split on the module's own recorded seam** — generator round-trips the real `opcode_table.yaml`; **the emitted symbol SET reconciles with PRD §1's resolved partition** — **2479 = 992 integer wrappers + 603 integer `_inv` abort bodies + 884 fp abort bodies**, asserted as a set difference in both directions against the names expanded from the pinned `opcode_table.yaml` (a count is not an identification, and 20 same-size variant transpositions leave all three counts exact: swapping `controlled_inv_qq` ↔ `controlled_qq`, **82 each**, aborts 82 of the integer `_controlled` grid Step 20 built M06 for and turns nothing in the tree red — **this row said "the whole 214-symbol grid" until 2026-08-22 and was overstated by 132**: a single-token swap leaves `controlled_hl` (82) + `controlled_lh` (50) live, and aborting all 214 takes the COMPOSITE three-token swap, which is not one of the 20 and so needs its own negative control). **Scope is `opcode_table.yaml` ONLY** (PRD §1, decided 2026-08-14): CQ_lang's `intrinsic_table.yaml` (389) and `libm_table.yaml` (12) emit `cq_template_*` into the same link namespace and stay CQ_lang's, which is why Step 23's gate reads *from the opcode grid*. Do **not** delegate these figures to Step 0.5's row, which framed the question as the ~~1474~~ phantom; every fp symbol gets a named abort body — **and so does every integer `_inv` symbol (PRD §15 D14, `bd w1c`), with the integer abort set asserted to be EXACTLY the 603 `_inv` names** so nothing else is swept into the bucket unobserved. This is the gate D14 lands on, not Step 23's: an uncalled symbol produces no undefined reference, so a missing `_inv` body cannot turn `nm` red | M27 | Generator green | 8 |
+| 23 | `test_runtime.c` — the PRD §2.1 families: `cqrt_copy_<W>_controlled`, `cqrt_rz_<W>_controlled[_inv]`, `cqrt_cswap` (constant ctrl = **0 gates**; quantum ctrl = Fredkin per bit) | M26, M28 | Full grid links; `nm` shows no undefined `cq_template_*` **from the opcode grid**. The 401 intrinsic/libm symbols come from CQ_lang's own archives and are deliberately *not* ours (PRD §1) — an unqualified "no undefined `cq_template_*`" cannot pass. **PLUS D15's MECHANISM, WHICH THIS GATE AS FIRST WRITTEN COULD NOT NOTICE AT ALL and which is now the largest thing M26 owes** (`PRD §15 D15`, `bd 06t`): the observed undo certificate and the three-valued free must be built and *exercised*, with every free landing in one of D15 §3's three rows rather than being reported as a single residue figure. A link check and a coverage percentage are both blind to a certificate that has degenerated into "always yes", so **the gate must carry the negative control**: the certificate must REFUSE `tests/test_unc_death.c:free_without_the_uncompute`, a rail with no `_unc`, no pair-off and no `addc` sum. Do **not** pin a corpus percentage here — the CQ_lang corpus is unpinned and D15 §0 records it moving repeatedly inside a single day, so any coverage figure is an order of magnitude and a ratio. **LANDING 1's FIRST INCREMENT IS IN (2026-08-22): the THREE-VALUED FREE PATH IS BUILT AND EXERCISED, WITH NO EVIDENCE PLUGGED IN.** `cq_reg_disposition` splits the verdict by SIGN, `cq_reg_clean` is its positive row, the act is per QUBIT, and `CQOPS_FREE_ABORT` is reachable without a rebuild — so every qubit-owning rail is UNPROVEN and strands, which is monotone (landing 2 adds evidence and converts strands to releases). **209 ctest tests green in both configurations.** What the gate still wants from this clause is the CERTIFICATE and the RESIDUE SPLIT; the negative control named above now asserts the VERDICT (`< 0`, proven dirty) rather than the act, and its sibling asserts `== 0`, so the two cases DISAGREE — before this they both asserted only "it aborts", and a certificate degenerated into "discharge nothing" would have left both green, which is the exact failure this control exists to prevent. **LANDING 1's STEP 3 IS IN (2026-08-23): `shim/cq_shim_ctx.[ch]` — 64 + 8 lines against a 150 budget — THE FIRST THING UNDER `shim/` CMAKE COMPILES.** The process-global `cq_ctx` and `cq_shim_ctx_reset`; the built-in sinks installed per (re-)init before `cq_ctx_init` (`bd utk`, CLOSED); the ONE §9 region bracket with `bd d6m` fix (a)'s comment and three arms (CLOSED); and PRD §1's `cq_shim_unsupported`, whose message is now read from the definition libcqops ships rather than from a stub the Python suite writes for itself. **219 ctest tests green in both configurations** (+1 suite, +9 deaths). It also ANSWERS the public-context ABI question `src/ctx.h` reserved by name for this step: `cq_ctx` stays INTERNAL, forced rather than chosen — see that header, `shim/cq_shim_ctx.h` and PRD §14's fourth correction. **LANDING 1's STEP 4 IS IN (2026-08-23): `shim/cq_runtime_rail.c` 199/220 AND `shim/cq_runtime_gate.c` 151/200 — libcqops NOW DEFINES 62 OF THE 173 `cqrt_*` SYMBOLS** (32 rail, 30 gate), plus `shim/cq_shim_proof.[ch]` (the free-time evidence, without which `cqrt_free` could not be written — M07 hard-errors on a NULL proof for any qubit-owning rail) and `shim/cq_runtime_abi.h` (CQ_lang's 173 declarations verbatim, because C has no name mangling). **35 cases + 37 deaths green in both configurations, 258 ctest tests.** It also BUILDS **PRD §15 D17** (`bd dzj`): `cqrt_addc` folds on an all-classical rail and otherwise runs M15's Cuccaro accumulator IN PLACE, never sandwiched, disposing its two transients through `CQ_ZERO_BY_CUCCARO_RESTORE` — the third and last `proven_zero` constant and the first outside `src/`. **What this step does NOT discharge:** the two remaining M26 files (`cq_runtime_v2.c`, `cq_template_impl.c`), the other 111 `cqrt_*` symbols, the link gate (step 8), and clause 3 — landing 2's certificate. **THE BATTERY WAS RE-RUN 2026-08-27** — it was launched on 2026-08-23 and its results were never read, the session having ended mid-run. **63 mutants proposed, 63 LANDED AND RAN (zero NOOP, zero NOCOMPILE, zero PERLFAIL), 51 KILLED IN BOTH CONFIGURATIONS, 4 REAL SURVIVORS, 8 deliberate equivalent controls alive, and no configuration asymmetry.** Each survivor was re-confirmed against the FULL 258-test suite in both configurations rather than the 49-test subset the battery ran for speed. **All four were predicted by name before the run and all four are TEST-SIDE holes, so no mutant can turn them green** (`bd pnu`, which now blocks this step): three are a live, load-bearing guard tested in only ONE direction (`gate_rot_width`'s width compare, both directions of `gate_ctrl`'s read/write accessor asymmetry, and `rail_w`'s resolve-before-compare order — whose own comment forbids the swap and for which the gate file has two cases and the rail file none); the fourth is the recorded masking-layer trap **introduced by a FIXTURE improvement rather than a code change**, where `one_bit()` now mints a real `CQ_BIT_Q` wire so M06 catches a coincidence one layer down with a string the case's `FAIL_REGULAR_EXPRESSION` does not name — the review had measured that same mutant as KILLED, so a mutant's verdict has a shelf life. **LANDING 1's STEP 5 IS IN (2026-08-27): `shim/cq_runtime_v2.c` 96/150** — all 109 symbols v1 defers, as loud `cq_shim_unsupported` bodies through twelve macros (`PRD §15 D16`; `bd vxk`, `bd r3y`, `bd ck6` CLOSED). **LANDING 1's STEPS 6, 7, 8 AND 9 ARE IN (2026-08-27), AND STEP 23 IS STILL NOT DONE** — its gate has three clauses, landing 1 discharges two, and clause 3 (D15's certificate, `bd 06t`) is untouched. **Step 6:** `shim/cq_template_impl.c` **232** and `shim/cq_template_dispatch.[ch]` **57 · 11** — the FIFTEEN remaining `cq_shim_*` entry points, with the recorded 240 seam TAKEN rather than deferred (the file came in at 270 against a 280 budget). **Step 7:** the ten `*.gen.c` listed EXPLICITLY in `CMakeLists.txt` — never `file(GLOB)`, which does not re-glob when a family file disappears — so `libcqops.a` now defines **2479** `cq_template_*` and **171** `cqrt_*` where `grep -c cq_template` on the archive was **0**. **Step 8:** the LINK GATE, `cmake/CqopsLinkWitness.cmake` **93** + `cmake/CqopsSymbolSets.cmake` **64** — pure CMake with no PyYAML in the path, the R3 `file(SHA256)` guard inside the generator, two EXTERNAL-LINKAGE address tables `_Static_assert`ed at 2479 and 171 and read at a RUNTIME index so `-Wl,-dead_strip` and plain `-flto` cannot fold them, and a target in `all`. **289 ctest tests green in both configurations, `make lint` clean, `third_party/` 0 modified.** **FIVE PROVOCATIONS OBSERVED, each naming its symbol**: delete one `.gen.c` body → link RED naming `_cq_template_add_i1`; delete one `cqrt_*` definition → link RED naming `_cqrt_qram_alloc_i8`; RENAME one definition → the archive still holds exactly 2479 and the link is GREEN, so only the set arm fires; ADD one out-of-grid definition → the link is GREEN and `test_link_smoke` PASSES, so again only the set arm; corrupt the manifest's sha → configure RED. Plus the negative control, the complete archive linking and the witness printing its two row counts. **TWO OF STEP 8's OWN REQUIREMENTS WERE NOT SATISFIABLE AS WRITTEN**, measured rather than worked around: `docs/cqrt_census.txt` holds 98 distinct `cqrt_*` TOKENS, most of them PREFIXES, and never spells the 173 expanded names, so table 2 reads `shim/cq_runtime_abi.h` — with the census cross-check already living in `tests/test_runtime_abi.inc`, both directions — and CMake's regex has no `{n}` repetition, so the obvious sha extraction matches `a256` out of the word `yaml-sha256` itself. **THE BATTERY: 37 mutants over four rounds, 34 KILLED IN BOTH CONFIGURATIONS, 2 deliberate equivalents alive, 1 made UNREPRESENTABLE.** All three round-1 survivors were real: `tpl_out`'s WRITE door was swappable because `out` was resolved a second time at the kernel call, and is now fixed STRUCTURALLY (it returns the pointer, so the swap does not compile — verified by applying it); the predicate fixture drove ONE operand pair, and `ult`/`ule` agree at every pair where the operands differ, so it now sweeps three including `a == b`; and `tpl_src`'s resolve-before-compare order is a GENUINE equivalent, established by the PAIRED mutation rather than left untested, because `cq_reg_check_operands` runs first and makes the tombstone row unreachable **LANDING 2 IS IN (2026-08-27) AND CLAUSE 3 IS DISCHARGED, SO STEP 23 IS DONE.** `shim/cq_shim_record.[ch]` **192 · 62**, `shim/cq_shim_reduce.[ch]` **112 · 8**, `cq_shim_certificate` + `cq_shim_free_proof` in `shim/cq_shim_proof.c` **57**, `tests/test_shim_cert.c` **199** + `tests/test_shim_cert_death.c` **40**, and the RESIDUE SPLIT in `src/reg.[ch]` + `src/ctx.[ch]` (`reg.c` **238** against its 260 trigger, so the reserved `src/reg_free.c` seam was NOT needed). **`shim/cq_shim_record.c`'s OWN reserve seam, recorded at landing rather than when it bites: `the STREAM ↔ the EFFECT TABLE`** — the append-only call log, the per-handle index and the parity counter stay; the `EFF` table with its `controls ⊆ reads` and completeness asserts moves to `shim/cq_shim_effects.[ch]`. Discriminator: a line that answers to `cq_runtime.h` goes with the table, a line that answers to how a stream is stored stays. Trigger **240**; it is at 192, and v2's 63 `qram` and 11 `tape` rows are what would take it. `cqrt_free` installs the certificate AND the shadow, DIRTY dominating. **290 ctest tests green in BOTH configurations, `make lint` clean, `third_party/` 0 modified.** **BEFORE ANY CODE: RULE 1 WAS NOT SATISFIED FOR THE PORT `bd 06t` MANDATES.** None of the four upstream guards it names appeared anywhere under `third_party/` — they are in CQ_lang, which this repo does not pin — so the analysis was VENDORED to `third_party/cq_free_pairing/` with its own COMMIT and a configure-time sha guard (`cmake/CqopsFreePairingPin.cmake`, five arms provoked against a SCRATCH COPY of the tree, never the pinned bytes). Reading the pin immediately caught two port bugs no citation could have: upstream masks the flag parity **`& 1`**, and freezes it on **control slots only**. **THE ENGINE IS ONE ENGINE BY A RECORDING CHOICE**: the `cq_template_*` forward is recorded as a WRITE to the rail it mints with its `_unc` as the declared twin, so U1 needs no matching step and upstream's T2 falls out of the operand check. **THE BIRTH VALUE decides the sign**, which is the port's one divergence from upstream's OBLIGATION (upstream proves a *known classical basis state*; Rule 6 needs `|0⟩`) and is what makes `ckd.18` a CONVICTION. **THE BATTERY: 45 mutants over three rounds, both configurations, 43 KILLED IN BOTH, 1 recorded ACCEPT ARM alive, 1 NOOP.** Four round-1 survivors were real holes and one failed in the UNSOUND direction — deleting the `cqrt_cswap` QUANTUM-row record leaves a Fredkin-written rail with an empty history that reduces vacuously and RELEASES. Fixing it also corrected a MODELLING error a test found: `cqrt_cswap`'s three rows are three different physical events, and the first draft recorded a write on all of them — row 0 does nothing and row 1 relabels ownership for zero gates, so only the histories move. `co_written_stable`'s `v == target` skip is the one live ACCEPT ARM with no killer at the v1 op surface, recorded at the site with the reason rather than deleted | 8 |
+| 24 | **L6** — link CQ_lang's existing fixtures against `libcqops` and RUN them (**PRD §15 D18**; ~~diff emitted traces~~) | — | **THE FIXTURES LINK, RUN, AND DO NOT ABORT — NORTH_STAR condition 1 verbatim. "Traces match" is RETIRED (`bd 590` CLOSED 2026-08-27 as PRD §15 D18).** It named an oracle that stops existing the moment condition 1 is satisfied: the goldens are CQ_lang's regression oracle for CQ_lang's OWN IR pass, captured against a *"trace-only runtime stub"* that the real backend replaces. **AND `bd 590`'s OWN FALLBACK ORACLE WAS MEASURED FALSE BEFORE IT WAS ADOPTED**: it proposed carrying correctness on `cqrt_measure_*` return values "checkable against the goldens' measure lines", but every stub measure body prints a LITERAL and returns `false`, so all **266** measure lines across **244** goldens read `-> 0` whatever the circuit computes — a diff that passes vacuously where the true value is 0 and fails where it is not, with the failure being US being right. A second, independent reason the goldens are not an oracle in ANY column: **our handle numbering already diverges on purpose** — `cqrt_addc`'s two transients and D7b's defensive copy mint rails the ABI does not name, so the D5 counter runs ahead of the stub's (measured in Release, recorded at `shim/cq_runtime_rail.c`). **WHAT CARRIES CORRECTNESS IS L1–L5, WHICH ARE GREEN TODAY IN BOTH CONFIGURATIONS; what this step adds is the one claim they cannot make** — that the frozen ABI's 173 + 2479 symbols resolve against a real backend and that a real CQ_lang program drives them end to end without aborting. The D15 §3 **residue report** is read alongside as an OBSERVATION, never as a gate. **CANDIDATE (b) — pinning OUR gate stream against OUR OWN goldens — was weighed and NOT taken**, and is filed for v2 rather than refused: trace goldens churn on D4 free-list and D6 non-demotion changes, which is **risk R5** and is exactly why kernel goldens pin COUNTS. This row's "run" was also conditional on `PRD §15 D15` §4's last clause, CONFIRMED 2026-08-22 as (b) STRAND, so that condition is discharged too: a provably-dirty free strands rather than aborting, nothing is laundered, and the shipped fixtures those rails live in run. Reading (a) — hard error, taking some of them with it — is preserved in D15 §4 as the argument, not as a live option, and `CQOPS_FREE_ABORT` gives a maintainer it on demand. **`bd 493`'s acceptance lands here**: its code shipped at Step 23.6 and what remains is its ten integer-surface fixture lines running end to end, seven of which are reachable. **LANDED 2026-08-27. MEASURED AGAINST CQ_lang `134e625` (2026-08-27), tracked tree clean, 249 goldens — CQ_lang is NOT pinned by this repo, so carry the SHA and the ratios, never the counts.** Of its **250** registered e2e fixtures (230 single-file + 20 multi-file, read out of `ctest --show-only=json-v1` rather than out of its CMakeLists), **every one LINKED and RAN**: **43** ran to completion with exit 0, **207** aborted at a LOUD, NAMED v1 deferral — 168 fp, 27 `qram`, 6 `tape`, 6 `cqrt_alloc_handle` (PRD §15 **D16**; the six are the purely-integer INTRINSIC-bearing fixtures, exactly the six `bd 216`'s recon predicted) — and **0** failed to build or link, **0** aborted for a reason we do not own, **0** failed at run time and **0** linked against a CQ_lang archive. The casualty list is fp- and intrinsic-bearing and nothing else; `bd 216`'s "≥11 of 52" is superseded. **THE RUNS ARE NOT VACUOUS**: through the printf sink `slice_i128_mulhi` emits **204,113** gates (131,008 `cx` + 72,960 `ccx` + 17 `x`, plus 64 `ry` and 64 `mz`) and `control-seq-grover` 2,374 including 64 `ry` + 64 `rz` + 32 `mz`. **`bd 493` is CLOSED**: 7 of its 7 reachable aliased lines ran, across three opcodes and both doors, and its own correction (3) is sharpened — the stopper in `slice_select_rail_alias_cond` is `cqrt_alloc_f64` at golden line 15, not `fcmp_olt_f64` at 18. **THE RESIDUE, read as an OBSERVATION**: 13 of 250 fixtures printed D15 §3's one-shot `STRANDED` line, 12 of the 43 that complete — so the certificate discharges every rail in **31 of those 43**. Harness: `tools/l6/run_slice_cqops.sh` (CQ_lang's four-stage pipeline with ONE line changed, the link) + `tools/l6/l6_run.py`, registered as an OPT-IN ctest entry behind `-DCQOPS_CQLANG_DIR=` because this repo neither pins nor can build CQ_lang | 8 |
 | 25 | **L7** — Grover per PRD §12. (a) compiles through `cqc`, links, emits a gate stream; (b) **classical mode**: `M_PI/2 → M_PI` runs deterministically and `cq_measure` returns what plain C computes; (c) counter sink reports Toffoli count and T-count, **peak qubits from `cq_qubits_peak()` rather than from the sink** (PRD §8 correction), stable across runs and pinned | — | **v1 done** | 8 |
 
 ### Phase E — optional
 
 | Step | Work | PRD |
 |---|---|---|
-| 26 | `sink_qec` against `C_quantum_error_correction`; pool ceiling wired to `qec_n_logical` (D2) | 8 |
+| 26 | **LANDED 2026-08-28.** `sink_qec` against `C_quantum_error_correction` — whose library is its `qec/` subdirectory, `libqec.a` + `qec/qec.h`, NOT an artefact bearing the project name; pool ceiling wired to `qec_n_logical` (D2 — and D20 measures that ceiling as a HARD one, n_logical ∈ {1,3,4,6,7} across the shipped configs, with the derived code distance RISING as it grows). **This step is also the ONLY route to a circuit drawing** — the drawer is the QEC repo's and this repo grows no second one (Rule 13); D20 measures what is visible through it (Toffoli-free at small width, yes; one logical CCX is 562,564 physical gates at d = 3); `ry`/`rz` built rather than stubbed per D19 | 14. **PULLED AHEAD OF STEP 25 on 2026-08-28**: the `k26 → kt9` edge was scheduling, not technical — M25 needs M04's registry (Step 5), M22 (Step 19) and D2's `cq_qubits_set_ceiling` (Step 4), nothing from Grover — and the qec sink plus `bd 76r`'s annotations (D21) are how this repo's work is INSPECTED, which is worth having before the acceptance gate rather than after. The install hook now sets TWO pool modes, ceiling AND no-recycle (D21 (b)). **WHAT LANDED**: `src/sink_qec.[ch]` + `src/sink_qec_angle.[ch]` on the recorded seam; M03 gained a third disposition, RETIREMENT — `cq_qubits_set_recycle` plus its own mark and counter, kept apart from stranding because a retired qubit WAS proven `|0⟩` and `bd 06t`'s residue report must not call it a leak; two calls in `shim/cq_shim_ctx.c` bracketing `cq_ctx_init`; and suites in both build arms — `test_sink_qec_angle` (+4 deaths) always, `test_sink_qec` (+4 deaths) only under `-DCQOPS_QEC_DIR=`, plus one cross-check in `test_sink.c` that runs in BOTH. **307/307 Debug and 306/306 Release with the library, 301/301 Release without it.** Rule 17: the L6 corpus was not re-run and no golden moved. **Two document claims were MEASURED FALSE and corrected in place**: D19's *"π/4 costs ONE T gate"* (it costs 1,200, the same as the 2^62 convergent — this driver's degenerate branch catches multiples of π/2, which are exactly §7's folding rows), and a motive for no-recycle that reached two header comments before being checked — `peak == minted` means D2's ceiling already bounds the INDEX with recycling ON |
 | 27 | *(stretch)* QRAM — port `qrom.jl` (self-cleaning AND tree, 2(L−1) Toffoli) and `softmem.jl` | 9 |
 
 ---
@@ -1225,7 +1475,7 @@ v1 ships when NORTH_STAR's five conditions hold, each traced to a step:
 
 | # | NORTH_STAR condition | Step |
 |---|---|---|
-| 1 | **Link** — CQ_lang's fixtures link against `libcqops` and run | 24 |
+| 1 | **MET 2026-08-27** — CQ_lang's fixtures link against `libcqops`, **RUN, and do not abort** (`PRD §15 D18`). Measured against CQ_lang `134e625`: all **250** registered e2e fixtures linked and ran, **43** to completion and **207** stopping at a loud, named v1 deferral, with **0** build/link failures, **0** unexplained aborts and **0** provenance failures, identical in both configurations. Re-run it with `-DCQOPS_CQLANG_DIR=`; CQ_lang is not pinned here, so re-measure rather than quoting. ~~Not unconditional: `PRD §15 D15` §4 leaves open whether a *provably dirty* free aborts or is stranded~~ — **that clause was CONFIRMED 2026-08-22 as (b) STRAND, so this row is unconditional now**: proven-dirty and unproven alike are stranded, nothing is laundered, and the fixtures those rails live in reach the end. Under `CQOPS_FREE_ABORT`, a development flag rather than the default, this condition is unreachable by construction — never run L6 with it on and then report the abort as a libcqops defect | 24 |
 | 2 | **Correct** — every integer opcode differential-tested against C semantics at every width on its shipped ladder, over a small constant number of seeded random `(bit-kind mask, value)` samples per width, with the all-classical and all-quantum masks and the value corners forced into every draw | 10–17 (L1) |
 | 3 | **Clean** — after every template call the pool holds exactly the result rail's qubits; after `_unc`, nothing | 10–17 (L2), 21 (L3) |
 | 4 | **Grover** — ordinary C compiles through `cqc`, links, emits a gate stream whose oracle arithmetic is verified exactly in classical mode | 25 |

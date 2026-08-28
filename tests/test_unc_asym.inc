@@ -43,13 +43,15 @@
  *
  * THE SECOND ROUTE IS THE OTHER WAY A SOURCE LANE BECOMES A WIRE: a rail
  * written by a self-inverse gate and un-written by re-applying it. That family
- * is the corpus's own — measured over the 239 goldens, 26,376 of 51,696 frees
- * (51%) are on rails last written that way — but the SHAPE this fixture uses is
- * narrower than that statistic, and the statistic must not be quoted for it.
- * The corpus figure is 19,153 `cqrt_toffoli` and 7,223 `cqrt_cnot`; the
- * CNOT-rooted share is 14%, the target is a one-bit flag rail rather than a
- * data lane, and there is not one pair of ADJACENT identical `cqrt_cnot` lines
- * anywhere in the 239 files. What the corpus actually ships is a bracket
+ * is the corpus's own — about half of all corpus frees are on rails last
+ * written that way — but the SHAPE this fixture uses is narrower than that
+ * statistic, and the statistic must not be quoted for it. Most of that half is
+ * `cqrt_toffoli`; the CNOT-rooted share is roughly a seventh of frees, the
+ * target is a one-bit flag rail rather than a data lane, and there is not one
+ * pair of ADJACENT identical `cqrt_cnot` lines anywhere in the corpus. (Ratios,
+ * not counts: the CQ_lang corpus is unpinned and moved four times on
+ * 2026-08-22 — PRD §15 D15 §0. Re-measure before quoting a figure.) What the
+ * corpus actually ships is a bracket
  * re-applied in reverse with work in between —
  * `slice_control_select_compound.expected.log:6-8` builds a flag with
  * `cnot(h1,h3); cnot(h2,h3); toffoli(h1,h2,h3)`, `:15-17` strips it with the
@@ -88,15 +90,22 @@
  *   comparison is exact only if every other register gets the same indices.
  *
  * ---------------------------------------------------------------------------
- * AND THE COST OF THE ASYMMETRY IS THE FREE. `bd 2cf`, open since 2026-08-15
- * and deferred on the premise that "nothing can rotate anything before M22
- * lands at Step 19" — M22 has landed. The Ry route leaves `dst` physically
- * |0> with no certificate, so cq_reg_free hard-errors on a rail that IS clean.
- * The predicate half is asserted here (clean == 0 on the Ry route, 1 on the CX
- * route, from an identical circuit); the abort is
+ * AND THE COST OF THE ASYMMETRY IS THE FREE. `bd 2cf`, filed 2026-08-15 and
+ * deferred on the premise that "nothing can rotate anything before M22 lands
+ * at Step 19" — M22 has landed, and the bead CLOSED 2026-08-22 as PRD §15 D15.
+ * The Ry route leaves `dst` physically |0> with no SHADOW evidence, so
+ * cq_reg_free hard-errors on a rail that IS clean. The predicate half is
+ * asserted here (clean == 0 on the Ry route, 1 on the CX route, from an
+ * identical circuit); the abort is
  * tests/test_unc_death.c:free_of_a_rotation_tainted_uncomputed_rail. Neither
- * is a defect being tolerated — they PIN the current behaviour so that
- * resolving bd ckd.17b at Step 23 turns them red on purpose.
+ * is a defect being tolerated — they PIN the current behaviour.
+ *
+ * This paragraph used to say that resolving `bd ckd.17b` at Step 23 would turn
+ * them red on purpose. That is still what happens, and it is now a decision
+ * rather than a forecast: D15 supplies evidence other than the shadow — an
+ * observed undo certificate over the call stream — and both fixtures are
+ * positive cases for it. What changes at Step 23 (`bd 06t`) is WHICH PREDICATE
+ * this differential reads, not the differential itself. Keep it.
  *
  * THE EXTREME CASE IS `an_all_classical_forward_is_free_and_its_uncompute_is_
  * not`, and it is where the axis stops being a delta at all: on the row L5

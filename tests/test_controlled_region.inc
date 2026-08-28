@@ -458,9 +458,13 @@ CQ_TEST(the_frame_stack_survives_its_own_growth)
      * push_slot, and from the fifth push on that pointer was into freed memory.
      *
      * Six rather than five so the case keeps testing the growth path if that
-     * initial 4 ever changes. It is worth running under the full-sanitizer
-     * configuration CLAUDE.md's Build & Test section names — the default Debug
-     * build here is UBSan-only (bd 6wg) and a use-after-free is invisible to it.
+     * initial 4 ever changes. MEASURED 2026-08-27 with the pointer form put
+     * back, in both configurations: this case fails on the AND-Toffoli count
+     * (4 != 5) and then trips mock_sink's own bounds FATAL -- a DOWNSTREAM
+     * symptom -- while Debug's ASan, live since bd 6wg selected a compiler whose
+     * runtime runs, names the heap-use-after-free AT THE READ. Two instruments,
+     * neither redundant: a case only sees a fault whose effect it asserts, and a
+     * sanitizer only sees one the suite executes.
      *
      * CQ_lang cannot express nesting at all (one i32 flag per template call, no
      * bracket), so this depth is reachable only from inside the library. PRD §9
@@ -651,12 +655,29 @@ CQ_TEST(the_two_rotation_rows_promote_exactly)
         };
         pin_stream(&f, want, 4u, "controlled rz");
 
-        /* D12'S MEASURED PAYOFF SURVIVES THE AXIS, and this is the assertion
-         * that says so: controlled-Rz is diagonal exactly as Rz is, so the
-         * four-gate block moves no computational-basis value and the target's
-         * shadow must stay DETERMINATE. Letting the two CXs update the shadow
-         * individually would poison it from the control wire and take the
-         * corpus's twelve rz-rooted rails out of Rule 6's reach. */
+        /* D12'S PAYOFF SURVIVES THE AXIS, and this is the assertion that says
+         * so: controlled-Rz is diagonal exactly as Rz is, so the four-gate
+         * block moves no computational-basis value and the target's shadow
+         * must stay DETERMINATE.
+         *
+         * WHY LETTING THE TWO CXs UPDATE THE SHADOW INDIVIDUALLY IS WRONG, in
+         * the two ways that are true. It would poison a target that provably
+         * did not move — determinate-to-unknown is conservative, but M02's
+         * discipline forbids claiming LESS than the truth in a way that then
+         * cannot be recovered, and here the truth is exactly known. And it
+         * would cost D12 its real payoff: cq_pc_zero_proof_rotation_free stays
+         * EXACT for every rail that met only rows the table leaves
+         * determinate, and that exactness is the whole reason D12 exists.
+         *
+         * This comment used to justify it instead by "the corpus's twelve
+         * rz-rooted rails" being taken out of Rule 6's reach. That claim is
+         * FALSE — measured 2026-08-22, PRD §15 D15. The cause is not the
+         * rotation, and it is stated once: PRD §10's trap (ii) and §15 D12's
+         * own note. Those rails were never in reach to be taken out of, and
+         * they are discharged by D15's certificate rather than by D12. D12
+         * itself is untouched; only that corollary was wrong. (Nor could this
+         * block reach them: the corpus contains no controlled rotation at
+         * all.) */
         CHECK(cq_shadow_get(&f.ctx.shadow, 0u).unknown == 0u);
         CHECK(cq_shadow_get(&f.ctx.shadow, 0u).value == 0u);
         fx_dispose(&f);

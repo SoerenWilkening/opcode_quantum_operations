@@ -171,8 +171,18 @@ void cq_rotate_rz_bit(cq_ctx *ctx, cq_bit *b, double phi)
 
     /* The qubit column. No cq_shadow_rotate: D12 — and the promotion adds none
      * either, because controlled-Rz is diagonal exactly as Rz is, so the whole
-     * four-gate block still cannot move a computational-basis value. That is
-     * what keeps the corpus's twelve rz-rooted rails freeable under the axis. */
+     * four-gate block still cannot move a computational-basis value. What that
+     * buys is that D12 stays EXACT under §9 rather than merely conservative.
+     *
+     * IT DOES NOT BUY THE CORPUS'S RAILS WHOSE LAST ROTATION IS AN rz THEIR
+     * FREE, and this comment said it did — "that is what keeps the corpus's
+     * twelve rz-rooted rails freeable under the axis" — until 2026-08-22,
+     * when that was measured FALSE. ("rz-rooted" is itself an artefact of
+     * mis-modelling cqrt_cswap's write set.) The cause is not the rotation
+     * and is stated once, in PRD §10's trap (ii) and §15 D12's own note;
+     * what discharges those rails is the observed undo certificate over the
+     * call stream at M26 (PRD §15 D15), not the shadow. D12 itself is
+     * unaffected: a diagonal genuinely does not poison. */
     cq_ctrl_rz(ctx, cq_bit_qindex(*b), phi);
 }
 

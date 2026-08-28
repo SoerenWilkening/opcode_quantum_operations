@@ -210,6 +210,22 @@ CQ_TEST(a_general_rz_emits_its_angle_on_its_own_qubits)
 
 /* --- PRD §15 D12: which rows poison -------------------------------------- */
 
+/* THE THIRD SEAM, RECORDED BEFORE IT IS NEEDED (Rule 12: a split is scheduled,
+ * never improvised). This file took TWO splits at once at Step 19 — it reached
+ * 437 against the 300 limit — and both recorded seams are now spent. Step 23
+ * added one case here and it stands at 283, so the next one is named now rather
+ * than improvised later: `which rows POISON, and what that costs at the FREE`
+ * moves to tests/test_rotate_poison.inc — this section head down to the module
+ * tolerance, i.e. only_a_general_ry_poisons_the_shadow,
+ * a_rail_the_table_left_determinate_is_still_freeable and
+ * a_general_ry_rail_strands_rather_than_aborting. Trigger at 290.
+ *
+ * It is a subject cut and not a size cut: those three are the only cases in the
+ * file whose subject is the SHADOW's disposition rather than the emitted gate
+ * stream, they are the only ones that free anything, and they are the ones D15
+ * will keep moving as the certificate lands. Everything above them is §7's
+ * twelve cells. */
+
 /* THE MOST IMPORTANT CASE IN THE SUITE, in both directions.
  *
  * Omitting `cq_shadow_rotate` on a general Ry is invisible to every value,
@@ -222,7 +238,12 @@ CQ_TEST(a_general_rz_emits_its_angle_on_its_own_qubits)
  * With NULL it was blind, which is measured and is why it changed.
  *
  * Calling it on a row that must NOT poison is the mirror image: also correct in
- * value and count, also invisible, and it costs D12's twelve corpus rails. */
+ * value and count, also invisible — and what it costs is D12's actual payoff,
+ * the EXACTNESS of cq_pc_zero_proof_rotation_free on every rail that met only
+ * rows the table leaves determinate. (This sentence used to price that mutation
+ * in "D12's twelve corpus rails", and that was false — those rails were never
+ * D12's to lose. The cause is not the rotation, and it is stated once: PRD
+ * §10's trap (ii) and §15 D12's own note. Measured 2026-08-22, PRD §15 D15.) */
 CQ_TEST(only_a_general_ry_poisons_the_shadow)
 {
     for (int c = 0; c < RT_N_CELLS; c++) {
@@ -250,8 +271,9 @@ CQ_TEST(only_a_general_ry_poisons_the_shadow)
  * that only ever met rows the table left determinate is STILL FREEABLE, and
  * every one of its qubit indices comes back.
  *
- * This is `ckd.18`'s clean half. Under the rejected alternative — poison on any
- * emitted rotation — the first two of these three would hard-error. */
+ * This is the clean half of `bd ckd.18` (closed; PRD §15 D15). Under the
+ * rejected alternative — poison on any emitted rotation — the first two of
+ * these three would hard-error. */
 CQ_TEST(a_rail_the_table_left_determinate_is_still_freeable)
 {
     int examined = 0;
@@ -290,14 +312,98 @@ CQ_TEST(a_rail_the_table_left_determinate_is_still_freeable)
     CHECK_EQ(examined, RT_N_CELLS - 2);   /* the two general-Ry rows poison */
 }
 
-/* THE CORPUS SHAPE, REPRODUCED. All twelve `rz`-rooted frees in CQ_lang's 239
- * goldens are `alloc(0); cswap(qflag,·,tmp); rz(tmp,φ); cswap; free`, and the
- * Fredkin's Toffoli — two quantum controls, a constant target — MATERIALISES
- * `tmp` before the `rz` arrives. So §7's Rz-CONSTANT cell never reaches them;
- * what keeps them freeable is D12, and this case is that claim end to end.
+/* AND THE OTHER HALF OF ckd.18: A GENERAL-Ry RAIL STRANDS. Its death-suite
+ * sibling, test_rotate_death.c:ckd18_a_general_ry_rail_cannot_be_freed, keeps
+ * the REFUSAL under CQOPS_FREE_ABORT; this is the DEFAULT disposition PRD §15
+ * D15 §4 confirmed on 2026-08-22, and without it the default would be the one
+ * behaviour ckd.18's own fixture never exercised.
  *
- * `src/angle.h` asserted the opposite until Step 19 measured it. */
-CQ_TEST(the_cswap_phase_kickback_shape_frees_cleanly)
+ * WHY THE VERDICT IS UNPROVEN AND NOT DIRTY, which is the thing a reader will
+ * get wrong. The corpus's ckd.18 rails are born from a NON-ZERO literal and
+ * carry a CANCELLING (θ, −θ) pair, and D15 §4 CONVICTS them on exactly those
+ * two facts — read off the CALL STREAM, at M26, by a certificate that does not
+ * exist yet (`bd 06t`). This fixture has neither: it is born |0> with one
+ * uncancelled Ry, and the only evidence in the tree today is the shadow, which
+ * reports `unknown` and can therefore only ever say UNPROVEN. Asserting a
+ * conviction here would be claiming evidence the library does not hold — the
+ * failure mode `bd 06t` names by hand — so the case asserts what is true now
+ * and says what would change it.
+ *
+ * BOTH ROWS TAKE THE SAME ACT ANYWAY, which is D15 §4's whole point, so the
+ * strand assertions below are unaffected either way. */
+CQ_TEST(a_general_ry_rail_strands_rather_than_aborting)
+{
+    fixture f; fx_open(&f);
+    const uint32_t W = 4;
+
+    /* BEFORE THE RAIL EXISTS, which is what cq_pc_same means and is easy to get
+     * wrong: it asks whether the pool came back to where it started, so a
+     * snapshot taken after the qubits are already live compares 4 against 4 and
+     * the net-of-strands correction inverts. Taken here, both sides are
+     * `live - stranded` == 0, and a qubit that leaked WITHOUT being stranded
+     * moves only the first term and is caught. */
+    const cq_pc_snap before = cq_pc_take(&f.ctx);
+
+    int32_t h = cq_reg_alloc_zero(&f.ctx.regs, W);
+
+    cq_rotate_ry(&f.ctx, h, 0.5);          /* materialises AND poisons all four */
+
+    uint32_t idx[8];
+    uint32_t n = cq_pc_indices(&f.ctx, h, idx, 8);
+    CHECK_EQ(n, W);
+    CHECK_EQ(cq_reg_disposition(&f.ctx, h, cq_pc_zero_proof_rotation_free), 0);
+
+    uint32_t live_before = cq_qubits_live(&f.ctx.pool);
+    cq_reg_free(&f.ctx, h, cq_pc_zero_proof_rotation_free);
+
+    /* NAMED, NOT COUNTED — after the free tombstones the rail these indices are
+     * unrecoverable from the register side, so this is the only thing that can
+     * say WHICH ones leaked. */
+    for (uint32_t i = 0; i < n; i++) {
+        CHECK(cq_qubits_is_stranded(&f.ctx.pool, idx[i]));
+        CHECK(!cq_qubits_is_free(&f.ctx.pool, idx[i]));
+    }
+    CHECK_EQ(cq_qubits_stranded(&f.ctx.pool), W);
+    CHECK_EQ(cq_qubits_free(&f.ctx.pool), 0);
+    CHECK_EQ(cq_qubits_live(&f.ctx.pool), live_before);   /* still live: nobody got them back */
+
+    /* AND THE SAME CLAIM THROUGH poolcheck, which is what gives `bd evv`'s
+     * exemption a consumer and therefore a detector. Delete the stranded
+     * exemption in cq_pc_live_is_exactly and this line goes red; strand the
+     * WRONG index and cq_pc_indices_settled goes red naming it, which is why
+     * the exemption is spelled as a SET rather than a count. The hand-rolled
+     * assertions above are kept deliberately: they are the independent check
+     * that does not go through the predicate being exempted. */
+    CHECK(cq_pc_indices_settled(&f.ctx, idx, n, W));
+    CHECK(cq_pc_live_is_exactly(&f.ctx, NULL, 0));
+    CHECK(cq_pc_same(cq_pc_take(&f.ctx), before));
+    fx_close(&f);
+}
+
+/* THE SHAPE, ON A CLEAN SHADOW — AND THE SCOPE IS IN THE NAME BECAUSE A NAME
+ * OUTLIVES A COMMENT. The Fredkin's Toffoli — two quantum controls, a constant
+ * target — MATERIALISES `tmp` before the `rz` arrives, so §7's Rz-CONSTANT
+ * cell never applies to this shape at all; and because the `rz` sits on a row
+ * D12 leaves determinate, the bracket's own inverse returns `tmp` to |0> with
+ * a shadow that still tracks it. That is the claim, end to end, and every
+ * assertion below is unchanged.
+ *
+ * WHAT THIS CASE IS NOT, corrected 2026-08-22 (PRD §15 D15). It was called
+ * `the_cswap_phase_kickback_shape_frees_cleanly` and its header called it "THE
+ * CORPUS SHAPE, REPRODUCED" — the claim being that CQ_lang's `rz`-rooted
+ * corpus frees are this shape and that D12 is what keeps them freeable. The
+ * shape half is right; the FREE half is false. This fixture mints BOTH
+ * operands with `cq_bk_reg`, i.e. determinate quantum rails, which the corpus
+ * never has — and its own comment below concedes as much ("nothing here
+ * poisoned"). WHY the corpus rails differ is stated once — PRD §10's trap (ii)
+ * and §15 D12's own note — and it is not the rotation: the shadow refuses those
+ * rails, and D15's call-stream certificate is what discharges them. D12 itself
+ * is untouched: a diagonal rotation genuinely does not poison, which is exactly
+ * what this case still pins. It reproduces the SHAPE, not the STATE.
+ *
+ * `src/angle.h` asserted the opposite about the Rz-CONSTANT cell until Step 19
+ * measured it. */
+CQ_TEST(an_rz_in_a_cswap_bracket_on_determinate_operands_frees_cleanly)
 {
     fixture f; fx_open(&f);
 
@@ -464,7 +570,8 @@ CQ_TEST_MAIN(
     CQ_CASE(a_general_ry_on_a_constant_materialises_once_then_rotates),
     CQ_CASE(only_a_general_ry_poisons_the_shadow),
     CQ_CASE(a_rail_the_table_left_determinate_is_still_freeable),
-    CQ_CASE(the_cswap_phase_kickback_shape_frees_cleanly),
+    CQ_CASE(a_general_ry_rail_strands_rather_than_aborting),
+    CQ_CASE(an_rz_in_a_cswap_bracket_on_determinate_operands_frees_cleanly),
     CQ_CASE(the_module_tolerance_is_consulted_rather_than_the_default),
     CQ_CASE(the_corpus_rz_angle_is_a_real_rotation_at_every_legal_tolerance),
     CQ_CASE(the_rows_are_width_generic_to_the_widest_register),

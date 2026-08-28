@@ -73,6 +73,30 @@ typedef struct {
  * is borrowed, not copied: it must outlive its use. */
 void cqops_set_sink(const cq_sink *s);
 
+/* PRD §15 D15 §3 — CQOPS_FREE_ABORT, a DEVELOPMENT AND CI FLAG, and it is
+ * deliberately NOT the default.
+ *
+ * By default a free that cannot prove a qubit is |0⟩ STRANDS it: never
+ * released, never on the free list, counted, and the program continues. That
+ * covers both non-clean rows — the ones the library can SEE are dirty and the
+ * ones it merely cannot clear — because Rule 6's hard error is about a RELEASE
+ * of a non-|0⟩ index and neither row reaches the pool. This flag turns that
+ * conviction back into termination, on demand, WITHOUT A REBUILD: it is how a
+ * maintainer finds out that a caller stopped pairing its frees, rather than
+ * discovering it as a slowly growing pool. Under it NORTH_STAR condition 1 is
+ * unreachable by construction, which is the whole reason it is opt-in.
+ *
+ * MODELLED ON cqops_set_sink, including the part that is easy to drop: an
+ * unresolvable CQOPS_FREE_ABORT value is a HARD ERROR, never a quiet
+ * substitution. `CQOPS_FREE_ABORT=true` silently meaning OFF would be this
+ * flag's worst failure — a maintainer who asked for termination and got
+ * silence — so only "0" and "1" resolve and anything else aborts. An unset or
+ * empty variable means ABSENT, which is off.
+ *
+ * `on` is 0 or 1 to force; any NEGATIVE value clears the override and returns
+ * to the environment's choice, which is what NULL does for the sink. */
+void cqops_set_free_abort(int on);
+
 #ifdef __cplusplus
 }
 #endif

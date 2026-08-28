@@ -14,11 +14,27 @@
  *     palindrome), scratch dirty. Both configurations, because ctx->
  *     sandwich_depth is not Debug-gated.
  *
- * (2) bd ckd.18 — A GENERAL-Ry RAIL CANNOT BE FREED. This pins an OPEN P0's
- *     CURRENT behaviour, not a desired one, and it is named for the bead so
- *     that resolving it changes this case rather than surprising someone. Under
- *     ckd.17b's CQOPS_FREE_RETIRE disposition (PRD §10) it will go red, and
- *     that is the intended signal.
+ * (2) A GENERAL-Ry RAIL CANNOT BE FREED — `bd ckd.18`, CLOSED 2026-08-22 into
+ *     PRD §15 D15. **THE PREDICTION THIS HEADER CARRIED CAME TRUE AT STEP 23,
+ *     AND BOTH OF THE TWO THINGS IT NAMED AS LIVE ARE NOW SETTLED.** It said
+ *     abort-vs-strand for a proven-dirty rail was unconfirmed: D15 §4's last
+ *     clause was CONFIRMED AS (b) STRAND on 2026-08-22, so proven-dirty and
+ *     unproven take the same act and neither aborts by default. It also said a
+ *     unit test emits no call stream, so this rail may land in the UNPROVEN row
+ *     rather than the dirty one: that is exactly where it lands, and the reason
+ *     is worth keeping — it is born |0> with ONE UNCANCELLED Ry, while the
+ *     corpus's ckd.18 rails are born from a non-zero literal and carry a
+ *     cancelling pair, which is what D15 §4 convicts on.
+ *
+ *     SO THE CASE WAS KEPT AS THE SHADOW-EVIDENCE REFUSAL IT ACTUALLY IS, which
+ *     is `bd 06t`'s option (a), taken deliberately rather than by default — the
+ *     bead demanded a choice between that and giving the fixture the corpus's
+ *     shape. What it now runs under is CQOPS_FREE_ABORT, the flag PRD §15 D15
+ *     §3 requires anyway, so nothing was deleted and the refusal keeps its
+ *     detector. The DEFAULT disposition for the same fixture — it STRANDS, by
+ *     index — is pinned in the ordinary suite as
+ *     tests/test_rotate.c:a_general_ry_rail_strands_rather_than_aborting.
+ *     Re-read both when the certificate lands; do not delete either.
  *
  * (3) THE ORDINARY LIFETIME GUARDS, which are M07's rather than M22's — a
  *     freed handle, a measured rail — reached through M22's entry points so
@@ -49,6 +65,8 @@
 #include "sandwich.h"
 #include "scratch.h"
 #include "shadow.h"
+
+#include "cqops/cqops.h"
 
 #include "support/death.h"
 #include "support/poolcheck.h"
@@ -169,14 +187,41 @@ static void measure_inside_a_sandwich_compute_half(void) { rotate_in_a_sandwich(
 
 /* --- (2) bd ckd.18 -------------------------------------------------------- */
 
-/* A rail a general Ry has touched is poisoned, so no evidence can prove it
- * clean and the free is a hard error. That is Rule 6 working, not failing, and
- * it is exactly the shape of CQ_lang's 25 `ry`-rooted corpus frees. */
+/* A rail a general Ry has touched is poisoned, so the evidence THIS SUITE
+ * supplies — the two-bit shadow — cannot prove it clean and the free is a hard
+ * error. That is Rule 6 working, not failing.
+ *
+ * TWO CORRECTIONS, BOTH PRD §15 D15, both to sentences this comment used to
+ * carry. (i) It said "no evidence can prove it clean". That is an unqualified
+ * universal and it is false: the shadow is not the only possible evidence, and
+ * D15's certificate reads the CALL STREAM instead. On this fixture the call
+ * stream is enough to CONVICT rather than merely to fail to clear: the rail is
+ * born |0>, its only write is one general Ry at a non-zero angle, and nothing
+ * else touches it — so the stream names the state it is left in, and that
+ * state is not |0>. Failing to reduce to the identity would only make it
+ * UNPROVEN; it is the positive evidence that puts it in D15 §3's PROVEN-DIRTY
+ * row instead. (ii) It said this was
+ * "exactly the shape" of the corpus's `ry`-rooted frees. It is not: those are
+ * born from a NON-ZERO literal and carry a CANCELLING (θ, −θ) pair, and both
+ * differences are what D15 §4 convicts on.
+ *
+ * WHAT THE EVIDENCE IN THIS TREE ACTUALLY SAYS, at Step 23: UNPROVEN. The only
+ * proof available is the shadow, which reports `unknown` for a rotated wire and
+ * can never say more than "I cannot tell" — so this fixture reaches D15 §3's
+ * unproven row, not its dirty one, and the sentence above describes what the
+ * CERTIFICATE would say about a DIFFERENT rail. That distinction is why the
+ * case runs under CQOPS_FREE_ABORT rather than asserting a conviction it has no
+ * evidence for. D15 §4's disposition clause is CONFIRMED (strand) as of
+ * 2026-08-22; this header's paragraph (2) has the whole reckoning. */
 static void ckd18_a_general_ry_rail_cannot_be_freed(void)
 {
     cq_ctx ctx;
     open_ctx(&ctx);
     preflight(&ctx);
+    /* The DEFAULT act for this rail is to strand — pinned by index in
+     * tests/test_rotate.c. This case is about the REFUSAL still being
+     * reachable, which is what the flag is for. */
+    cqops_set_free_abort(1);
 
     int32_t h = cq_reg_alloc_zero(&ctx.regs, 4);
     cq_rotate_ry(&ctx, h, 0.5);          /* materialises AND poisons all four */

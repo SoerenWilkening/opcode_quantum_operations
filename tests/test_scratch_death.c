@@ -11,8 +11,9 @@
  * THE DISPOSE CHECK IS A KIND CHECK, NEVER A SHADOW READ. That is not a
  * shortcut: after any sandwich half on a tainted operand every scratch bit
  * reads `unknown`, because §3's CX rule makes poison sticky, so a literal
- * Rule-6 shadow check would fire on every legitimate kernel (bd ckd.17,
- * K09.md:603, K11.md:677). The kind is the thing M08 can actually see.
+ * Rule-6 shadow check would fire on every legitimate kernel (bd ckd.17 —
+ * closed, its unresolved half now PRD §15 D15, whose §2 measures exactly
+ * this; K09.md:603, K11.md:677). The kind is the thing M08 can actually see.
  */
 
 #include "scratch.h"

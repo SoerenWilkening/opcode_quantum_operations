@@ -19,6 +19,7 @@
 typedef struct {
     uint32_t live, minted, n_free;
     uint32_t peak;
+    uint32_t n_stranded;   /* PRD §15 D15 §3 — see cq_pc_same */
 } cq_pc_snap;
 
 cq_pc_snap cq_pc_take(const cq_ctx *ctx);
@@ -34,8 +35,48 @@ cq_pc_snap cq_pc_take(const cq_ctx *ctx);
  * allocate. What "the pool is restored" actually means is that nothing stayed
  * live — which is `live` — plus the far sharper claim that the specific
  * indices came back, which is cq_pc_indices_are_free below and not a count at
- * all. */
+ * all.
+ *
+ * IT COMPARES `live` NET OF STRANDS since Step 23, and that is not a
+ * weakening. A stranded index legitimately stays live, so raw `live` cannot
+ * return across a stranding free; `live - n_stranded` is the count of indices
+ * that COULD have come back and did not, which is what this predicate always
+ * meant. A leaked index moves `live` without moving `n_stranded`, so it is
+ * still caught, and a free that stranded something it should have released
+ * moves both — caught by cq_pc_indices_settled, which names it. */
 int cq_pc_same(cq_pc_snap a, cq_pc_snap b);
+
+/* --- STRANDING (PRD §15 D15 §3, bd evv, decided 2026-08-22 as option (a)). --
+ *
+ * A STRANDED INDEX IS STILL `live` — nobody got it back — and once cq_reg_free
+ * tombstones the rail nobody OWNS it either. So to the three predicates above
+ * and below, a CORRECT strand is indistinguishable from a leaked ancilla:
+ * cq_pc_live_is_exactly reports it as one, cq_pc_same sees `live` not return,
+ * and cq_pc_indices_are_free sees an index that never reached the free list.
+ * All three, not just L2 — which is what `bd evv` under-stated.
+ *
+ * WHAT WAS DECIDED, AND WHAT IT DELIBERATELY DOES NOT DO. The exemption is
+ * spelled as the SET, never as a count, and it never widens what counts as
+ * acceptable: a leak that is not STRANDED is still caught by every one of
+ * them, because the mark is per index and only the marked ones are excused.
+ * L2 is the check that caught the Step-10 net-zero ancilla swap, and widening
+ * its exemption is exactly how a real leak becomes indistinguishable from a
+ * deliberate one — so the exemption is keyed on cq_qubits_is_stranded and on
+ * nothing else, and any case that relies on it must ALSO pin the stranded set
+ * by index and the exact total.
+ *
+ * cq_pc_indices_are_free IS NOT WEAKENED. Its name is its contract and a
+ * stranded index really did not come back. Strand-bearing cases use the
+ * sibling below, which is a STRONGER statement than either: it says which
+ * indices came back, which were stranded, and that the split is exactly the
+ * one expected. */
+
+/* Every index either came back to the free list or was STRANDED, and exactly
+ * `n_strand` of them were stranded. Reports the index that landed in the wrong
+ * place, so a free that stranded a clean qubit — or released a dirty one — is
+ * named rather than counted. */
+int cq_pc_indices_settled(const cq_ctx *ctx, const uint32_t *idx, uint32_t n,
+                          uint32_t n_strand);
 
 /* Collects the qubit indices a register currently holds, so L3 can name them
  * BEFORE the free tombstones the rail and check them after. Returns how many
@@ -108,14 +149,27 @@ int cq_pc_live_is_exactly(const cq_ctx *ctx, const int32_t *hs, uint32_t n);
  * a diagonal gate cannot move a computational-basis value — so a rail that met
  * only those rows keeps a determinate shadow and this stays an EXACT proof for
  * it. What it does refuse is a rail a general Ry has touched, which is correct
- * and is Rule 6 working: bd ckd.17b and ckd.18 are that problem, they are OPEN,
- * and this is NOT the answer to them. It also must never be promoted into src/:
- * the library defines no proof at
- * all, and NULL meaning "no evidence, fail loud" is the correct posture for an
- * unresolved P0 (src/reg.h). Its predecessor lives as a static in
+ * and is Rule 6 working: bd c1a (ckd.17b) and bd ckd.18 are that problem —
+ * both CLOSED 2026-08-22 as PRD §15 D15 — and this predicate is NOT the answer
+ * to them. That sentence used to read "they are OPEN"; the beads moved, the
+ * clause survives and is the point. D15 measured this predicate discharging
+ * essentially nothing on the CQ_lang surface, which is exactly why its answer
+ * had to read the CALL STREAM instead of the shadow. So this must never be
+ * promoted into src/: the library defines no proof at all, and NULL meaning
+ * "no evidence, fail loud" stays the correct posture until M26 supplies D15's
+ * certificate (src/reg.h; bd 06t) — an expiry clause MET at Step 23 landing 2
+ * (2026-08-27) and kept verbatim here because shim/cq_shim_proof.h cites it as
+ * its licence; the supplier is Layer 5 and src/ still defines no proof. Its
+ * predecessor lives as a static in
  * tests/test_reg.c under a name saying it was valid only while no kernel
  * existed; this one is the Step 10 successor, with the wider but still bounded
- * scope that a kernel-but-no-rotation surface allows. */
+ * scope that a kernel-but-no-rotation surface allows.
+ *
+ * THREE-VALUED SINCE STEP 23, by src/reg.h's sign convention: > 0 clean, == 0
+ * unproven, < 0 PROVEN DIRTY. Nothing it used to accept is now refused and no
+ * return changed sign — what changed is that its refusals split, which is what
+ * gives D15 §3's proven-dirty row a population at all. Callers reading it
+ * through cq_reg_clean are unaffected: that is its positive row. */
 int cq_pc_zero_proof_rotation_free(const cq_ctx *ctx, int32_t h, uint32_t q);
 
 #endif /* CQOPS_TEST_POOLCHECK_H */

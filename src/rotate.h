@@ -25,9 +25,15 @@
  * |v> to e^{i.alpha}|v>: it cannot move a computational-basis value, so a
  * determinate shadow entry stays CORRECT rather than merely conservative. The
  * half-turn row is `X` followed by a diagonal and therefore takes `X`'s shadow
- * rule. Measured payoff: the corpus's twelve `rz`-rooted rails stay freeable,
- * and so does any rail that only ever met a half turn. Full argument, and its
- * honest limit, in PRD §15 D12.
+ * rule. Measured payoff: a rail that only ever met a diagonal row, or a half
+ * turn, keeps a DETERMINATE entry and stays freeable on evidence the shadow
+ * can actually give. This sentence used to add "the corpus's twelve
+ * `rz`-rooted rails stay freeable"; that half was measured FALSE on
+ * 2026-08-22. The cause is not the rotation, and it is stated once — in
+ * PRD §10's trap (ii) and in §15 D12's own note. Those rails are discharged
+ * by the observed undo certificate at M26 (PRD §15 D15), not by the shadow.
+ * D12 itself is unaffected. Full argument, and its honest limit, in
+ * PRD §15 D12.
  *
  * bd lk0 — THE `Z` IS `sink.rz(q, pi)`, NOT A SEVENTH VTABLE ENTRY. §7 named a
  * gate that has none, and Rule 4 forbids inventing one; `Rz(pi) = diag(-i, +i)

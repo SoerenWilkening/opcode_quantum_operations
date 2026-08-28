@@ -283,10 +283,18 @@ CQ_TEST(the_last_gate_is_a_no_op_that_is_emitted_anyway)
  * NARROWED AT STEP 19 BY PRD §15 D12 — it is not "any rotation upstream" but a
  * GENERAL Ry: every Rz is diagonal, and so is the `Z` of the θ≡π row, so a rail
  * that met only those keeps a determinate shadow and stays freeable. What does
- * hard-error on a genuinely clean rail is a rail a general Ry has touched, which
- * is bd ckd.18's shape and is why the proof lives in tests/ and must never move
+ * REFUSE a genuinely clean rail is a rail a general Ry has touched, which
+ * is bd ckd.18's shape (closed; PRD §15 D15) and is why the proof lives in
+ * tests/ and must never move
  * into src/. So K08.md §4 is not wrong in general; it is wrong for Steps 10-17,
- * which is where M15 ships, and it stays wrong for any caller that only folds. */
+ * which is where M15 ships, and it stays wrong for any caller that only folds.
+ *
+ * THAT CLAUSE READ "does hard-error on a genuinely clean rail" UNTIL PRD §15 D15
+ * §4's last clause was confirmed 2026-08-22: the ACT is STRANDING, so the
+ * shadow's incompleteness costs qubits — loudly, once, by index — rather than
+ * killing the program. The refusal is unmoved; only its disposition changed. The
+ * old wording is quoted back at shim/cq_shim_proof.h as the objection that file
+ * answers, so both readings need to stay findable. */
 CQ_TEST(the_ancilla_can_be_freed_after_a_bare_call)
 {
     static const int WS[] = { 2, 3, 4, 8, 16 };

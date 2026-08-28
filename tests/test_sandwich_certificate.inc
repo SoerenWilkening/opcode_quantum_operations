@@ -132,13 +132,20 @@ CQ_TEST(retirement_clears_a_frozen_value_byte_not_just_the_poison)
  *
  * THE PROOF BELOW WOULD BE LAUNDERING ANYWHERE ELSE. It answers 1 without
  * looking, which is precisely what PRD §10 forbids in src/ and what
- * CQOPS_FREE_TRUST would have been. It is sound HERE only because the case
- * builds the |0> it asserts about: the bit is materialised from a fresh index
- * and never gated, so it is physically |0> and only the SHADOW is poisoned.
- * Without a proof of that shape this path is unobservable — every proof the
- * tree actually has is `cq_shadow_known_zero`, under which a freed entry is
- * already {0, 0} and retirement is a no-op. M26 supplies the real one at
- * Step 23 (reg.h; bd ckd.17b). */
+ * CQOPS_FREE_TRUST would have been — and PRD §15 D15 makes that contrast
+ * STRONGER rather than weaker: D15 §3 NARROWS `CQOPS_FREE_TRUST`'s prohibition
+ * without lifting it, so releasing an unproven index to the pool stays
+ * forbidden outright. The annotation is the only thing that changed here; the
+ * code is unchanged and must stay so.
+ *
+ * It is sound HERE only because the case builds the |0> it asserts about: the
+ * bit is materialised from a fresh index and never gated, so it is physically
+ * |0> and only the SHADOW is poisoned. Without a proof of that shape this path
+ * is unobservable — every proof the tree actually has is
+ * `cq_shadow_known_zero`, under which a freed entry is already {0, 0} and
+ * retirement is a no-op. M26 supplies the real one at Step 23 — D15's observed
+ * undo certificate over the call stream (reg.h; bd 06t, the mechanism bd c1a
+ * handed off to when it closed). */
 static int proof_this_case_built_the_zero_itself(const cq_ctx *ctx,
                                                  int32_t h, uint32_t q)
 {

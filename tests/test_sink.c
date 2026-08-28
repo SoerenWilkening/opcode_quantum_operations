@@ -18,6 +18,7 @@
  */
 
 #include "sink.h"
+#include "sink_qec.h"
 #include "support/harness.h"
 #include "support/mock_sink.h"
 
@@ -287,7 +288,43 @@ CQ_TEST(reset_empties_the_recorder_without_freeing_it)
     cq_mock_dispose(&m);
 }
 
+/* THE ONE CLAIM ABOUT M25 THAT IS CHECKABLE IN BOTH BUILD ARMS, and it belongs
+ * here rather than in tests/test_sink_qec.c because that suite is registered
+ * ONLY when the QEC library is present — so it can say nothing at all about the
+ * arm where the library is absent, which is the arm every ordinary developer
+ * builds.
+ *
+ * src/sink_qec.c compiles either way. Its no-library arm registers NOTHING, on
+ * purpose: `CQOPS_SINK=qec` then resolves to nothing and takes THIS module's
+ * existing hard error — "CQOPS_SINK names an unregistered sink (qec)", verified
+ * by hand in a no-library Release build — instead of quietly falling back to
+ * printf and handing the caller a circuit they did not ask for. The cross-check
+ * is the same shape test_skeleton makes for the sanitizers: what the build
+ * BELIEVES it enabled, against what is actually there.
+ *
+ * The unregistered path itself cannot be a case in this file, because it is an
+ * abort; test_sink_death.c owns that shape (unresolvable_sink_name). */
+CQ_TEST(the_qec_sink_registers_exactly_when_the_build_found_the_library)
+{
+    reset_selection();
+    cq_sink_qec_register();
+
+    if (cq_sink_qec_available())
+        CHECK(cq_sink_by_name("qec") != NULL);
+    else
+        CHECK(cq_sink_by_name("qec") == NULL);
+
+    /* And registration alone binds NOTHING in either arm: no config is read and
+     * no context exists until the install hook runs and finds this sink in
+     * force, so a process that never asks for qec needs no config file and pays
+     * nothing for the registration. */
+    CHECK(cq_sink_qec_handle() == NULL);
+
+    reset_selection();
+}
+
 CQ_TEST_MAIN(
+    CQ_CASE(the_qec_sink_registers_exactly_when_the_build_found_the_library),
     CQ_CASE(every_vtable_entry_dispatches),
     CQ_CASE(the_user_pointer_is_threaded_to_the_right_recorder),
     CQ_CASE(angles_survive_dispatch_bit_exactly),

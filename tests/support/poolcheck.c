@@ -18,12 +18,55 @@ cq_pc_snap cq_pc_take(const cq_ctx *ctx)
     s.minted = cq_qubits_minted(&ctx->pool);
     s.n_free = cq_qubits_free(&ctx->pool);
     s.peak   = cq_qubits_peak(&ctx->pool);
+    s.n_stranded = cq_qubits_stranded(&ctx->pool);
     return s;
 }
 
 int cq_pc_same(cq_pc_snap a, cq_pc_snap b)
 {
-    return a.live == b.live;   /* see the header: the rest are monotone */
+    /* NET OF STRANDS. A stranded index stays `live` by design, so raw equality
+     * cannot hold across a stranding free; the difference is what this always
+     * meant. A LEAK moves `live` and not `n_stranded`, so it is still caught.
+     * See the header. (The rest of the snapshot is monotone.) */
+    return a.live - a.n_stranded == b.live - b.n_stranded;
+}
+
+int cq_pc_indices_settled(const cq_ctx *ctx, const uint32_t *idx, uint32_t n,
+                          uint32_t n_strand)
+{
+    uint32_t seen = 0;
+    int ok = 1;
+
+    for (uint32_t i = 0; i < n; i++) {
+        int freed    = cq_qubits_is_free(&ctx->pool, idx[i]);
+        int stranded = cq_qubits_is_stranded(&ctx->pool, idx[i]);
+
+        /* DISJOINT, NEVER ORDERED — src/qubits.h says so, and a qubit that is
+         * somehow both is the laundering signature this predicate exists to
+         * make loud rather than a bookkeeping curiosity. */
+        if (freed && stranded) {
+            cq_h_fail(__FILE__, __LINE__,
+                      "L3: q%u is BOTH on the free list and stranded — the two "
+                      "states are disjoint", idx[i]);
+            ok = 0;
+        } else if (stranded) {
+            seen++;
+        } else if (!freed) {
+            cq_h_fail(__FILE__, __LINE__,
+                      "L3: q%u was freed but is neither on the free list nor "
+                      "stranded — the pool simply lost it", idx[i]);
+            ok = 0;
+        }
+    }
+
+    if (seen != n_strand) {
+        cq_h_fail(__FILE__, __LINE__,
+                  "L3: %u of the rail's indices were stranded, expected %u — a "
+                  "count is not an identification, so check WHICH ones above",
+                  seen, n_strand);
+        ok = 0;
+    }
+    return ok;
 }
 
 uint32_t cq_pc_indices(const cq_ctx *ctx, int32_t h, uint32_t *out, uint32_t cap)
@@ -159,7 +202,14 @@ int cq_pc_live_is_exactly(const cq_ctx *ctx, const int32_t *hs, uint32_t n)
     for (uint32_t q = 0; q < minted; q++) {
         int live = !cq_qubits_is_free(&ctx->pool, q);
 
-        if (live && !owned[q]) {
+        /* THE STRANDED EXEMPTION (bd evv, option (a)). A stranded index is not
+         * free and, once cq_reg_free tombstones its rail, is owned by nobody —
+         * so without this clause a CORRECT strand reports as a leaked ancilla.
+         * Keyed on the per-index mark and on nothing else: an ordinary leak is
+         * not stranded and is still caught here. Any case relying on this must
+         * also pin the stranded set through cq_pc_indices_settled — see the
+         * header on why the exemption is a SET and never a count. */
+        if (live && !owned[q] && !cq_qubits_is_stranded(&ctx->pool, q)) {
             cq_h_fail(__FILE__, __LINE__,
                       "L2: q%u is LIVE but no named register owns it — a "
                       "leaked ancilla", q);
@@ -178,6 +228,28 @@ int cq_pc_live_is_exactly(const cq_ctx *ctx, const int32_t *hs, uint32_t n)
 
 int cq_pc_zero_proof_rotation_free(const cq_ctx *ctx, int32_t h, uint32_t q)
 {
+    /* THREE-VALUED SINCE STEP 23, and it is a strict refinement rather than a
+     * new oracle: every rail this used to call clean it still calls clean, and
+     * every value it returns has the same sign it had. What changes is that the
+     * refusals SPLIT. cq_shadow_known_zero returns 0 both for "unknown" and for
+     * "known 1" — D15 §3's opening sentence — and those deserve opposite
+     * treatment, so this reads the raw pair and answers by sign.
+     *
+     * `unknown` FIRST, ALWAYS. An entry poisoned while it happened to hold 0
+     * still carries a zero value byte, and calling that CLEAN is the laundering
+     * src/shadow.h forbids by name. Reading `value` first would also convict a
+     * poisoned rail that happens to read 1, which is a claim this predicate has
+     * no right to make: after a rotation it knows nothing.
+     *
+     * THE CONVICTION IS WHY THIS MATTERS. Without it D15's proven-dirty row is
+     * unreachable from anywhere in the tree, and the row's whole content — that
+     * the library can SEE the rail is not |0⟩ — would be asserted against an
+     * empty population. On the rotation-free surface the shadow is EXACT, so
+     * a determinate non-zero entry really is a proof of dirtiness and not a
+     * guess. See the header for why that scope is the whole of its soundness. */
+    cq_shadow s = cq_shadow_get(&ctx->shadow, q);
     (void)h;   /* per-qubit evidence; the rail plays no part. See the header. */
-    return cq_shadow_known_zero(&ctx->shadow, q);
+
+    if (s.unknown)       return CQ_PROOF_UNPROVEN;
+    return s.value == 0 ? CQ_PROOF_CLEAN : CQ_PROOF_DIRTY;
 }

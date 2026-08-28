@@ -33,8 +33,13 @@
  * one rule; only the fact that `minted` never decreases had hidden that. The
  * single caller is cq_ctx_release_qubit, where the ORDER is the enforcement.
  * See PRD §10 for the certificate and IMPLEMENTATION_PLAN §0.1 for the
- * sandwich half; bd ckd.17b (the CQ_lang rail at cqrt_free) is still OPEN and
- * is not answered by this write.
+ * sandwich half. The CQ_lang rail at cqrt_free — bd c1a, filed as "ckd.17b",
+ * which is not a resolvable bead id — closed 2026-08-22 as PRD §15 D15, and it
+ * is STILL not answered by this write. D15 strengthens that rather than
+ * softening it: its evidence is an OBSERVED UNDO CERTIFICATE over the CALL
+ * STREAM at M26 (mechanism bd 06t, open), read instead of the shadow, and D15
+ * §7 forecloses the "sanctioned un-poisoning write" that older drafts of
+ * PRD §10 anticipated living here. No such write may be added.
  */
 #ifndef CQOPS_SHADOW_H
 #define CQOPS_SHADOW_H
@@ -73,8 +78,8 @@ cq_shadow cq_shadow_get(const cq_shadow_table *sh, uint32_t q);
 
 /* "Provably |0⟩" — the I3 and Rule 6 predicate. Tests `unknown` BEFORE
  * `value`: an entry poisoned while it happened to hold 0 still carries a zero
- * value byte, and calling that clean is exactly the laundering ckd.17 warns
- * about, arrived at by accident. */
+ * value byte, and calling that clean is exactly the laundering ckd.17 warned
+ * about (closed; PRD §15 D15 §3 still forbids it), arrived at by accident. */
 int cq_shadow_known_zero(const cq_shadow_table *sh, uint32_t q);
 
 /* The four PRD §3 update rules. Operands are qubit indices, and the two

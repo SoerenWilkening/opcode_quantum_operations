@@ -28,9 +28,11 @@
  *
  * NOTHING IN THIS KERNEL MAY BE FREED MID-COMPUTE-HALF. The remainder's dropped
  * top bit is provably `0` mathematically (K12.md §2.0) but the two-bit shadow
- * cannot prove it, so a mid-kernel `cqrt_free` would be the Rule 6 hard error
- * firing CORRECTLY. The sandwich reverse is the only thing that returns K12's
- * scratch to |0>.
+ * cannot prove it, so a mid-kernel `cqrt_free` would be Rule 6 refusing
+ * CORRECTLY — and under `PRD §15 D15` §3 that refusal STRANDS those qubits
+ * rather than aborting, so here it would present as a growing pool and one
+ * stderr line, not as a stop. The sandwich reverse is the only thing that
+ * returns K12's scratch to |0>.
  */
 #ifndef CQOPS_KERNELS_DIVREM_U_H
 #define CQOPS_KERNELS_DIVREM_U_H

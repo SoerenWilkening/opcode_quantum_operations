@@ -160,10 +160,16 @@ CQ_TEST(rule_x_flips_a_known_value_and_is_a_nop_on_poison)
                       state_name(s), (unsigned)e.unknown);
 
         /* On a poisoned entry the rule is "nop", not "flip a byte nobody
-         * reads". The distinction is invisible in v1 — `value` is meaningless
-         * under poison — but it stops being invisible the moment ckd.17's
-         * un-poisoning write lands and starts trusting that byte. Pin it now,
-         * while it costs one line. */
+         * reads" — PRD §3's table, pinned literally. This used to be motivated
+         * by a future un-poisoning write that would start trusting the byte;
+         * PRD §15 D15 §7 forecloses that write outright, so the motivation is
+         * now the other one and it is permanent. `value` under poison is stale,
+         * not merely meaningless, and it must stay exactly as stale as it was:
+         * the rejected free-time fix that reads that byte and emits corrective
+         * X's is wrong because it publishes a stale byte as determinate, and a
+         * rule that quietly mutated it would make that byte look live. The only
+         * writer that may reset both bytes is cq_shadow_retire, after release.
+         * Pin it while it costs one line. */
         int want_v = state_unknown(s) ? state_value(s) : !state_value(s);
         if (e.value != (uint8_t)want_v)
             cq_h_fail(__FILE__, __LINE__, "X on %s gave value %u, want %d",
@@ -278,10 +284,15 @@ CQ_TEST(rule_rotate_poisons_and_is_idempotent)
 
 CQ_TEST(no_rule_can_ever_clear_poison)
 {
-    /* Poison is sticky, and in v1 nothing un-poisons: the sanctioned
-     * un-poisoning write is still an OPEN decision (bd ckd.17), so M02 must
-     * expose no way to reach it. Every rule is driven against a poisoned
-     * target from every operand state; none may return it to determinate. */
+    /* Poison is sticky, and NOTHING un-poisons. This used to call the
+     * "sanctioned un-poisoning write" an open decision (bd ckd.17) and to pin
+     * the rules so that M02 exposed no way to reach it before it was settled.
+     * It is settled: PRD §15 D15 §7 forecloses that write in terms — D15's
+     * evidence is a certificate over the CALL STREAM, so it needs no exception
+     * to the conservative-in-the-safe-direction-only discipline — and NO SUCH
+     * WRITE MAY BE ADDED. This case is therefore a permanent guard, not a
+     * holding pattern. Every rule is driven against a poisoned target from
+     * every operand state; none may return it to determinate. */
     for (state other = SK0; other < N_STATES; other++)
     for (state tgt   = SU0; tgt   < N_STATES; tgt++) {
         cq_shadow_table sh;

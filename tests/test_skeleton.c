@@ -6,6 +6,8 @@
 #include "support/harness.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 CQ_TEST(library_links_and_reports_its_version)
 {
@@ -73,9 +75,43 @@ CQ_TEST(sanitizer_coverage_is_what_the_build_claims)
            CQ_ASAN_LIVE, CQ_UBSAN_LIVE);
 }
 
+/* LEAK DETECTION IS THE ONE THAT __has_feature CANNOT ANSWER (`bd kfi`).
+ * LeakSanitizer is not a -fsanitize= flag here: it lives inside the ASan runtime
+ * and is switched on by ASAN_OPTIONS=detect_leaks=1, which cmake/CqopsTest.cmake
+ * writes into every test's CTest ENVIRONMENT property. So the thing that can
+ * silently go missing is not a compile line but an environment string — and the
+ * cross-check has to read the environment, which is what this does.
+ *
+ * IT IS THE CHEAP HALF OF A PAIR. tests/test_lsan_negative.c is the expensive
+ * half: it leaks on purpose and is registered WILL_FAIL, so it goes red if the
+ * option stops working. But it is registered ONLY when the build claims leak
+ * detection, so on its own it cannot notice the build having quietly stopped
+ * claiming it. This case is what makes that direction loud, in every
+ * configuration, including the ones where the answer is a legitimate zero. */
+static int cq_env_has_detect_leaks(void)
+{
+    const char *opts = getenv("ASAN_OPTIONS");
+    return opts != NULL && strstr(opts, "detect_leaks=1") != NULL;
+}
+
+CQ_TEST(leak_detection_is_what_the_build_claims)
+{
+    CHECK_EQ(cq_env_has_detect_leaks(), CQOPS_BUILD_LSAN);
+
+    /* LSan ships inside the ASan runtime, so claiming it without ASan is a
+     * configuration that cannot exist. cmake/CqopsSanitizers.cmake refuses to
+     * produce one; this is the assertion that says so from the binary's side. */
+    if (CQOPS_BUILD_LSAN) CHECK_EQ(CQ_ASAN_LIVE, 1);
+
+    printf("# leak detection live in this run: %d (ASAN_OPTIONS=%s)\n",
+           cq_env_has_detect_leaks(),
+           getenv("ASAN_OPTIONS") ? getenv("ASAN_OPTIONS") : "(unset)");
+}
+
 CQ_TEST_MAIN(
     CQ_CASE(library_links_and_reports_its_version),
     CQ_CASE(check_macros_pass_on_truth),
     CQ_CASE(debug_invariants_track_the_configuration),
-    CQ_CASE(sanitizer_coverage_is_what_the_build_claims)
+    CQ_CASE(sanitizer_coverage_is_what_the_build_claims),
+    CQ_CASE(leak_detection_is_what_the_build_claims)
 )

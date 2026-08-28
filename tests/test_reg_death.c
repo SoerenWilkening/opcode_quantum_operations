@@ -1,10 +1,19 @@
 /* tests/test_reg_death.c — M07's fail-loud paths, Step 7.
  *
  * Two groups, and the split between them is deliberate. Everything down to
- * `d7a_out_aliases_a_source` is a hard error in BOTH configurations: a free of
- * a dirty rail, a use-after-free and a result handle that is also a source are
- * miscompile signatures, not style questions, and Rule 17 pins the L6 fixture
- * run at Step 24 under RELEASE, where a Debug-gated assert simply is not there.
+ * `d7a_out_aliases_a_source` is a hard error in BOTH configurations: a free
+ * that cannot prove its rail clean, a use-after-free and a result handle that
+ * is also a source are miscompile signatures, not style questions, and Rule 17
+ * pins the L6 fixture run at Step 24 under RELEASE, where a Debug-gated assert
+ * simply is not there.
+ *
+ * "A FREE OF A DIRTY RAIL" WAS THE FIRST OF THOSE, UNCONDITIONALLY, UNTIL
+ * PRD §15 D15 §4's last clause was confirmed 2026-08-22 and shipped at Step 23.
+ * The ACT is now stranding, so the two non-clean rows terminate only under
+ * CQOPS_FREE_ABORT — which their block below sets per case, in C, and never
+ * through ctest's ENVIRONMENT property. What survives unconditionally in both
+ * configurations is one layer down: cq_qubits_release on an index not proven
+ * |0>.
  * The I2 audit cases below them are Debug-only by plan §2.1, which names the
  * owner map, so they report a SKIP in Release rather than a false pass. */
 
@@ -16,16 +25,31 @@
 #include "qubits.h"
 #include "shadow.h"
 
+#include "cqops/cqops.h"
+
 #include "support/death.h"
 
+#include <stdlib.h>
 #include <string.h>
 
-/* See test_reg.c on why the only zero-proof in the tree is a static in a test
- * file: it is sound only while no kernel exists, and the library ships none. */
-static int proof_shadow_pre_kernel_only(const cq_ctx *ctx, int32_t h, uint32_t q)
+/* See test_reg.c on why a zero-proof is a static in a test file: it is sound
+ * only while no kernel exists, and the library ships none.
+ *
+ * THIS FILE'S COPY IS THREE-VALUED AND ITS TWO-VALUED PREDECESSOR IS GONE, and
+ * -Werror is what noticed: once free_dirty_rail was reshaped onto the CONVICTED
+ * row, nothing here read cq_shadow_known_zero any more and the old static went
+ * unused. Keeping both would have left a reader guessing which one a case meant
+ * to use, on the one question the whole file is now about. The split is by SIGN
+ * (PRD §15 D15 §3, src/reg.h): the two-valued form cannot reach the
+ * proven-dirty row at all, because cq_shadow_known_zero answers 0 for "unknown"
+ * and for "known 1" alike. `unknown` first, always — an entry poisoned while it
+ * happened to hold 0 still carries a zero value byte. */
+static int proof_shadow_three_valued(const cq_ctx *ctx, int32_t h, uint32_t q)
 {
+    cq_shadow s = cq_shadow_get(&ctx->shadow, q);
     (void)h;
-    return cq_shadow_known_zero(&ctx->shadow, q);
+    if (s.unknown)   return CQ_PROOF_UNPROVEN;
+    return s.value == 0 ? CQ_PROOF_CLEAN : CQ_PROOF_DIRTY;
 }
 
 static cq_ctx ctx;
@@ -69,8 +93,16 @@ static uint32_t materialise_bit(int32_t h, uint32_t i, int poison)
 
 /* --- The free path. Both configurations. --------------------------------- */
 
-/* The ckd.17 refusal, made loud. The library defines no proof, so NULL is the
- * honest state of an unresolved P0 blocker: no evidence, no free. */
+/* A MISSING ARGUMENT, AND IT SURVIVED STEP 23 UNCHANGED WHILE ITS FOUR
+ * NEIGHBOURS MOVED. PRD §15 D15 §3 makes a free the library cannot clear
+ * STRAND rather than abort, and this case does not touch that row: "the caller
+ * supplied no oracle" and "the oracle cannot tell" are different facts, and
+ * only the second is D15's unproven row. Aborting on the first is strictly
+ * more conservative than D15 requires — aborting is not recycling — so it is
+ * kept, and it needs no CQOPS_FREE_ABORT to fire. Measured: this case and
+ * test_rotate_death.c:a_null_proof_still_refuses_a_materialised_rail were the
+ * only two of the six free-time deaths that stayed green when the free path
+ * became three-valued. */
 static void free_without_proof(void)
 {
     open_ctx();
@@ -79,21 +111,121 @@ static void free_without_proof(void)
     CQ_EXPECT_ABORT(cq_reg_free(&ctx, h, NULL));
 }
 
+/* --- The two non-clean rows, under CQOPS_FREE_ABORT. --------------------- */
+
+/* NOTHING WAS DELETED HERE AND NOTHING STOPPED BEING TESTED, which is the whole
+ * reason these two run under the flag. D15's DEFAULT act for both rows is to
+ * strand — asserted positively, by index, in tests/test_reg_free.inc — and
+ * CQOPS_FREE_ABORT is the documented way to turn that conviction back into
+ * termination without a rebuild. Running the deaths under it keeps the two-pass
+ * ordering, the layer discrimination and the flag itself all tested by the same
+ * fixtures, and it means the flag has a caller rather than being a promise.
+ *
+ * THE FLAG IS SET PER CASE, NOT PER BINARY. A ctest ENVIRONMENT property would
+ * put it out of sight of the reader and would silently arm every OTHER case in
+ * this file — including free_without_proof, whose whole point is that it aborts
+ * for a different reason. The C setter wins over the environment by design, so
+ * this is also the spelling that cannot be defeated by a stale shell variable. */
+
+/* THIS CASE WAS MISNAMED UNTIL STEP 23 AND IS NOW RESHAPED TO MATCH ITS NAME.
+ * Its bad bit used to be materialise_bit(h, 3, POISONED), whose shadow reads
+ * `unknown` — that is D15's UNPROVEN row, not the dirty one, and the two are
+ * the distinction the whole decision turns on. Renaming it would have been the
+ * cheap fix and would have deleted the detector; the bit is instead built
+ * determinate-and-non-zero, which is the only shape the shadow can CONVICT.
+ * Its unproven sibling is directly below, so the row it used to test is not
+ * lost either.
+ *
+ * THE DIRTY BIT IS LAST, on purpose, and that is what this case is really for.
+ * Two clean qubits precede it, so a one-pass free would release both before
+ * discovering the problem and would leave the rail half-returned; the two-pass
+ * form releases nothing. That property became MORE important at Step 23, not
+ * less: under stranding a partly-released rail is the correct outcome, so
+ * pass 1's only remaining job is to be the place CQOPS_FREE_ABORT stops — and
+ * if it were deleted, the flag would half-return a rail, silently, and only
+ * under the flag. The exit code cannot see that; the MESSAGE can, and the
+ * FAIL_REGULAR_EXPRESSION in tests/CMakeLists.txt checks it: M07 says
+ * "CQOPS_FREE_ABORT: free of a rail PROVEN not to be |0>", M03 says "release of
+ * a qubit not proven |0>". A run reporting M03's message means M07's own
+ * pre-pass has been lost. */
 static void free_dirty_rail(void)
 {
     open_ctx();
+    cqops_set_free_abort(1);
     int32_t h = cq_reg_alloc_zero(&ctx.regs, 4);
-    /* THE DIRTY BIT IS LAST, on purpose. Two clean qubits precede it, so a
-     * one-pass free would release both before discovering the problem and
-     * would leave the rail half-returned; the two-pass form releases nothing.
-     * The exit code cannot tell those apart — both abort — but the MESSAGE
-     * can, and mutation testing checks it: M07 says "not provably clean",
-     * M03 says "release of a qubit not proven |0>". A run that reports M03's
-     * message means M07's own check has been lost. */
     (void)materialise_bit(h, 0, 0);
     (void)materialise_bit(h, 1, 0);
+
+    /* Determinate and non-zero: materialising a constant ONE emits an X and
+     * leaves the shadow {value 1, unknown 0}. */
+    cq_bit *b = &cq_reg_bits(&ctx.regs, h)[3];
+    *b = cq_bit_one();
+    cq_materialise(&ctx, b);
+
+    CQ_EXPECT_ABORT(cq_reg_free(&ctx, h, proof_shadow_three_valued));
+}
+
+/* THE ROW free_dirty_rail USED TO OCCUPY. Same act, DIFFERENT VERDICT, and the
+ * two are separable for the first time at Step 23 because the messages differ —
+ * before it, both rows produced the identical "not provably clean" string and
+ * no regex could have told them apart. That separability is not cosmetic: D15
+ * §3's residue split is `bd 06t`'s first obligation and it is stated in exactly
+ * these two rows. */
+static void free_unproven_rail(void)
+{
+    open_ctx();
+    cqops_set_free_abort(1);
+    int32_t h = cq_reg_alloc_zero(&ctx.regs, 4);
+    (void)materialise_bit(h, 0, 0);
     (void)materialise_bit(h, 3, 1);      /* poisoned control => unknown shadow */
-    CQ_EXPECT_ABORT(cq_reg_free(&ctx, h, proof_shadow_pre_kernel_only));
+    CQ_EXPECT_ABORT(cq_reg_free(&ctx, h, proof_shadow_three_valued));
+}
+
+/* THE FLAG'S OWN FAIL-LOUD PATH, on cqops_set_sink's precedent: an
+ * unresolvable value is a hard error, never a quiet substitution. This is the
+ * clause that is easy to drop and the one whose absence would hurt most —
+ * `CQOPS_FREE_ABORT=true` silently meaning OFF hands a maintainer who asked for
+ * termination exactly the silence they were trying to break. */
+static void an_unrecognised_free_abort_spelling_is_a_hard_error(void)
+{
+    open_ctx();
+    cqops_set_free_abort(-1);            /* clear the override; read the env */
+    /* setenv is POSIX rather than C11, and this file already links against a
+     * platform libc; the alternative is a putenv with a mutable buffer, which
+     * is worse. */
+    setenv("CQOPS_FREE_ABORT", "true", 1);
+    CQ_EXPECT_ABORT((void)cq_free_abort_active());
+}
+
+/* M03's GUARD, UNDER THE THREE-VALUED CONTRACT. A conviction is a NEGATIVE int,
+ * so the pre-Step-23 spelling `if (!proven_zero)` read the strongest refusal
+ * the library can make as PROOF and would have put a dirty index on the free
+ * list — the one unforgivable bug arriving through the very guard written to
+ * prevent it. Nothing above M03 can police this for it: cq_qubits_release never
+ * sees a proof function, only a value. */
+static void release_of_a_convicted_qubit_is_refused(void)
+{
+    open_ctx();
+    int32_t h = cq_reg_alloc_zero(&ctx.regs, 1);
+    uint32_t q = materialise_bit(h, 0, 0);
+    CQ_EXPECT_ABORT(cq_qubits_release(&ctx.pool, q, CQ_PROOF_DIRTY));
+}
+
+/* --- cqrt_cswap's constant-control row. ---------------------------------- */
+
+static void swap_a_rail_with_itself(void)
+{
+    open_ctx();
+    int32_t h = cq_reg_alloc_zero(&ctx.regs, 8);
+    CQ_EXPECT_ABORT(cq_reg_swap_bits(&ctx.regs, h, h));
+}
+
+static void swap_between_mismatched_widths(void)
+{
+    open_ctx();
+    int32_t a = cq_reg_alloc_zero(&ctx.regs, 8);
+    int32_t b = cq_reg_alloc_zero(&ctx.regs, 16);
+    CQ_EXPECT_ABORT(cq_reg_swap_bits(&ctx.regs, a, b));
 }
 
 /* None of the three slot states is numbered 0, so a zeroed slot — a memset, a
@@ -307,6 +439,11 @@ static void i2_invalid_bit(void)
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(free_without_proof),
     CQ_DEATH_CASE(free_dirty_rail),
+    CQ_DEATH_CASE(free_unproven_rail),
+    CQ_DEATH_CASE(an_unrecognised_free_abort_spelling_is_a_hard_error),
+    CQ_DEATH_CASE(release_of_a_convicted_qubit_is_refused),
+    CQ_DEATH_CASE(swap_a_rail_with_itself),
+    CQ_DEATH_CASE(swap_between_mismatched_widths),
     CQ_DEATH_CASE(a_zeroed_slot_is_not_a_valid_state),
     CQ_DEATH_CASE(double_free),
     CQ_DEATH_CASE(free_of_a_measured_rail),

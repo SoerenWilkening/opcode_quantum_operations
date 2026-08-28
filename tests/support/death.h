@@ -1,8 +1,13 @@
 /* tests/support/death.h — asserting that a fail-loud path really fires.
  *
- * Every hard error in libcqops is an abort() (Rule 6: a free of a dirty rail
- * is a hard error, not a warning). Asserting one is awkward for two reasons,
- * and this header exists to make both go away.
+ * Every hard error in libcqops is an abort() (Rule 6: releasing an index not
+ * proven |0> is a hard error, not a warning). Asserting one is awkward for two
+ * reasons, and this header exists to make both go away.
+ *
+ * That parenthesis read "a free of a dirty rail is a hard error" until PRD §15
+ * D15 §4's last clause was confirmed 2026-08-22 and shipped at Step 23: a free
+ * that cannot prove its rail clean now STRANDS by default and aborts only under
+ * CQOPS_FREE_ABORT, which the death cases that assert a refusal set per case.
  *
  * WHY NOT WILL_FAIL. CTest's WILL_FAIL inverts a non-zero EXIT CODE and does
  * NOT invert a crash: abort() raises SIGABRT, CTest reports "Subprocess
@@ -41,6 +46,29 @@ void cq_death_disarm(void);
 
 /* Reports that the statement returned instead of aborting, and exits 1. */
 void cq_death_survived(const char *file, int line, const char *stmt);
+
+/* AN ASSERTION THAT ACTUALLY FAILS, INSIDE A DEATH CASE. Added at Step 23,
+ * because a death binary had no such thing and the obvious substitute is a
+ * SILENT NO-OP: harness.h's CHECK increments a counter that only CQ_TEST_MAIN
+ * reads, and CQ_DEATH_MAIN never looks at it — so a CHECK in a death case
+ * prints a TAP diagnostic line, changes no exit code, and the case passes.
+ *
+ * IT EXISTS BECAUSE A DEATH TEST'S ONLY NATIVE CLAIM IS "IT ABORTED", AND THAT
+ * IS SOMETIMES TOO WEAK. PRD §15 D15 §3 splits a free's refusal into a PROVEN
+ * DIRTY row and an UNPROVEN one; both take the SAME ACT, and under
+ * CQOPS_FREE_ABORT both abort with the same exit code, so a pair of cases
+ * asserting only the abort cannot tell a refusal from ignorance — and
+ * IMPLEMENTATION_PLAN.md's Step 23 row names one of them by path as the
+ * certificate's mandatory negative control, which is a claim about the VERDICT
+ * and not about the act.
+ *
+ * Use it for a case's PRECONDITIONS, before CQ_EXPECT_ABORT arms the window; a
+ * failure here is a broken fixture rather than a library defect, which is why
+ * the exit status is distinct from both of the other two. */
+void cq_death_require(const char *file, int line, const char *expr, int cond);
+
+#define CQ_DEATH_REQUIRE(cond)                                                \
+    cq_death_require(__FILE__, __LINE__, #cond, (cond) != 0)
 
 /* Reports that the case cannot run in this configuration, and exits 0. */
 void cq_death_skip(const char *why);
