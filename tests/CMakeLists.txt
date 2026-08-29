@@ -123,6 +123,14 @@ add_cqops_test(test_kernel_sdivrem)   # M20 — K12 sdiv/srem. The signed path w
                                       # measurement pass did not reach; this is
                                       # where §3.4 stopped being arithmetic
 
+## L4's own loader, made falsifiable (bd 2r5). The `measured-at` cross-check and
+## risk R3's `# bennett:` one are the two things in tests/goldens/ that are DATA
+## rather than prose, and neither had ever been seen to fire. Every fixture is a
+## fresh mkstemp under /tmp: nothing here reads tests/goldens/ and nothing here
+## goes near third_party/bennett/COMMIT, which is read-only in the bytes and in
+## the pin (Rule 1, and the Step 10 near-miss it records).
+add_cqops_test(test_goldens)          # tests/support/goldens.c
+
 ## The driver's own assertions, made falsifiable — test_harness_negative's
 ## argument one level up. A mutation battery found five of the Phase-B pool
 ## assertions surviving mutation to always-true: correct, load-bearing, and

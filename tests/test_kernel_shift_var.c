@@ -151,7 +151,10 @@ CQ_TEST(l4_goldens)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/shift_var.counts",
                       "M12 kernels/shift_var.c — the barrel shifter "
-                      "(sandwiched, all-quantum value AND amount)",
+                      "(sandwiched)",
+                      "ALL-QUANTUM on both the value and the amount — the "
+                      "amount being quantum is what separates M12 from M11; "
+                      "at ctrl_depth 0",
                       CQOPS_BENNETT_COMMIT))
         return;
 

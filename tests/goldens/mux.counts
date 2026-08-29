@@ -1,17 +1,27 @@
-# M17 kernels/mux.c — K10 select (sandwiched, all-quantum operands including cond)
+# M17 kernels/mux.c — K10 select (sandwiched)
 # libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
 # (risk R5): a trace churns on D4 free-list order and D6
 # non-demotion, neither of which changes the circuit.
 #
 # bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+# measured-at: ALL-QUANTUM on all THREE sources — cond, t and f, not two; cond is one bit and t/f are W; at ctrl_depth 0
 #
-# Measured at operand mask ALL-QUANTUM on BOTH operands, and
-# at ctrl_depth 0. The mask is not arbitrary: operand folds
-# still fire (a^0 and x&0 legitimately emit fewer gates,
-# which is what L5 proves), so a count is a function of
-# (W, operand mask). All-quantum is the FIXED POINT — with no
-# demotion (D6) a mask can only drift towards Q — and is the
-# one mask where forward and unc agree.
+# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open
+# reads them back, and a checking run fails if either
+# disagrees with the snapshot on disk or with what the suite
+# declares. The mask matters because operand folds still fire
+# (a^0 and x&0 legitimately emit fewer gates, which is what L5
+# proves), so a count is a function of (W, operand mask) — and
+# a golden that does not say which mask it was taken at pins
+# nothing. The line above is per-file for the reason bd 2r5
+# records: as a literal in the writer it was false in four of
+# the twelve files and nothing could contradict it.
+#
+# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with
+# no demotion (D6) a mask can only drift TOWARDS Q, so it is
+# the FIXED POINT, and the one mask where forward and unc
+# agree. A file measured anywhere else says so above, and owes
+# the reader a note saying why.
 #
 # forward and unc are pinned SEPARATELY and their equality is
 # NOT an invariant (Rule 14, PRD §10): _unc may legitimately

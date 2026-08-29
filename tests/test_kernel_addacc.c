@@ -308,8 +308,12 @@ CQ_TEST(l4_goldens)
     cq_gold g;
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/addacc.counts",
-                      "M15 kernels/addacc.c — K8 Cuccaro accumulator (CLEAN, no "
-                      "sandwich; all-quantum operands, the only mask it accepts)",
+                      "M15 kernels/addacc.c — K8 Cuccaro accumulator (CLEAN, "
+                      "no sandwich)",
+                      "ALL-QUANTUM on acc and b — the ONLY mask K8 accepts "
+                      "(cq_addacc_check refuses a classical bit, K08.md §5 "
+                      "D7); hand-rolled measurement, not cq_kd_measure; no "
+                      "sandwich, no control region",
                       CQOPS_BENNETT_COMMIT))
         return;
 

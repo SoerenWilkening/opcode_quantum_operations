@@ -338,19 +338,23 @@ CQ_TEST(quantum_mode_counts_are_pinned_and_the_counter_sink_agrees)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/grover.counts",
                       "L7 Grover, PRD §12(3) — QUANTUM mode (theta = pi/2)",
+                      "NO OPERAND MASK IS A PARAMETER HERE — this is a whole "
+                      "program, not a kernel call: the rail is all-quantum "
+                      "because a general Ry put it there. At ctrl_depth 0",
                       CQOPS_BENNETT_COMMIT))
         return;
 
-    /* The fixed preamble above this block is a KERNEL golden's claim and three
-     * of its sentences are false here; `goldens.h` explains why the correction
-     * is a per-file note rather than a per-caller preamble. */
+    /* What is left of the fixed preamble after bd 2r5 moved the mask out to
+     * the `measured-at` line above is still a KERNEL golden's claim, and two of
+     * its sentences are false here; `goldens.h` explains why the correction is
+     * a per-file note rather than a per-caller preamble. */
     g.notes =
-        "# THIS IS A PROGRAM-SCALE GOLDEN, NOT A KERNEL ONE, SO THREE\n"
+        "# THIS IS A PROGRAM-SCALE GOLDEN, NOT A KERNEL ONE, SO TWO\n"
         "# SENTENCES ABOVE DO NOT APPLY AND THE COLUMN LINE BELOW IS\n"
         "# ONLY HALF RIGHT. There is no `forward`/`unc` split here (the\n"
-        "# program contains both), the operand mask is not a parameter\n"
-        "# (the rail is all-quantum because a general Ry put it there),\n"
-        "# and the three key columns mean:\n"
+        "# program contains both), so nothing above about pinning the two\n"
+        "# passes separately has anything to pin, and the three key\n"
+        "# columns mean:\n"
         "#\n"
         "#     kernel = the program        pass = the METRIC FAMILY\n"
         "#     W      = the ITERATION COUNT, not a width (it is 8)\n"

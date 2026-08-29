@@ -241,9 +241,10 @@ CQ_TEST(l4_goldens)
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/divrem_u.counts",
                       "M19 kernels/divrem_u.c — K12 udiv/urem (flat restoring "
                       "division over M16/M14/M17's exported step blocks, "
-                      "sandwiched, all-quantum operands). SELF-PINNED: upstream "
-                      "publishes no division gate count and could not be "
-                      "compared to anyway — it widens to 64 bits",
+                      "sandwiched). SELF-PINNED: upstream publishes no division "
+                      "gate count and could not be compared to anyway — it "
+                      "widens to 64 bits",
+                      "ALL-QUANTUM on both operands, at ctrl_depth 0",
                       CQOPS_BENNETT_COMMIT))
         return;
 

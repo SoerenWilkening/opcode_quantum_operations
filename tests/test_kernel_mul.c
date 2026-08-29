@@ -142,8 +142,10 @@ CQ_TEST(l4_goldens)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/mul.counts",
                       "M18 kernels/mul.c — K11 mul (shift-add over K8 Cuccaro, "
-                      "sandwiched, all-quantum operands). SELF-PINNED: this "
-                      "composition exists nowhere in Bennett", CQOPS_BENNETT_COMMIT))
+                      "sandwiched). SELF-PINNED: this composition exists "
+                      "nowhere in Bennett",
+                      "ALL-QUANTUM on both operands, at ctrl_depth 0",
+                      CQOPS_BENNETT_COMMIT))
         return;
 
     for (size_t i = 0; i < sizeof WS / sizeof WS[0]; i++) check_counts(&g, WS[i]);

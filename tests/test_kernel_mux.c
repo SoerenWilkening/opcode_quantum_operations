@@ -191,8 +191,10 @@ CQ_TEST(l4_goldens)
     cq_gold g;
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/mux.counts",
-                      "M17 kernels/mux.c — K10 select (sandwiched, all-quantum "
-                      "operands including cond)", CQOPS_BENNETT_COMMIT))
+                      "M17 kernels/mux.c — K10 select (sandwiched)",
+                      "ALL-QUANTUM on all THREE sources — cond, t and f, not "
+                      "two; cond is one bit and t/f are W; at ctrl_depth 0",
+                      CQOPS_BENNETT_COMMIT))
         return;
 
     for (size_t j = 0; j < sizeof WS / sizeof WS[0]; j++) {

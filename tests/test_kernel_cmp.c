@@ -285,7 +285,10 @@ CQ_TEST(l4_goldens)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/cmp.counts",
                       "M16 kernels/cmp.c — K9 icmp, all ten predicates "
-                      "(sandwiched, all-quantum operands)", CQOPS_BENNETT_COMMIT))
+                      "(sandwiched)",
+                      "ALL-QUANTUM on both operands, whose width is the W "
+                      "column; dst is ONE bit (icmp is i1); at ctrl_depth 0",
+                      CQOPS_BENNETT_COMMIT))
         return;
 
     for (int i = 0; i < N_ROWS; i++)

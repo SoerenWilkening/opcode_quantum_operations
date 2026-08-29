@@ -314,7 +314,9 @@ CQ_TEST(l5_the_shifted_in_zeroes_are_free)
 
 /* A shift's count is a function of (W, k), not of W alone, so the golden's key
  * carries k — the same trick the cast suite uses for its width pair. Pinned at
- * all-quantum `a`, like every other L4 golden. */
+ * all-quantum `a` AND a classical amount, which is this file's whole departure
+ * from the usual L4 mask and is why the golden's `measured-at` line says so in
+ * its own words rather than inheriting a boilerplate claim (bd 2r5). */
 static void check_shift_counts(cq_gold *g, const cq_kd_spec *spec, int W, int k)
 {
     char key[24];
@@ -365,6 +367,9 @@ CQ_TEST(l4_goldens)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/shift_const.counts",
                       "M11 kernels/shift_const.c — K4 constant shl/lshr/ashr (D8)",
+                      "ALL-QUANTUM value; the amount is a CLASSICAL immediate "
+                      "(shape classical[1] = ~0), the only kind M11 accepts — "
+                      "a quantum amount is M12; at ctrl_depth 0",
                       CQOPS_BENNETT_COMMIT))
         return;
 

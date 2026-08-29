@@ -45,6 +45,34 @@ static int read_commit_sha(const char *path, char *out, size_t cap)
     return found;
 }
 
+/* The `%255[^\n]` below is CQ_GOLD_MASK_MAX - 1 spelled as a literal, because
+ * a scanf width cannot be a macro. A renumbering must break a build, not just
+ * a comment (bit.h's rule for CQ_BIT_ZERO, applied here). */
+_Static_assert(CQ_GOLD_MASK_MAX == 256,
+               "the measured-at scanf width below is hard-coded at 255");
+
+/* Trims the trailing newline (and any CR/space before it) off a header value.
+ * `# measured-at: ...` is compared with strcmp, so an editor that left a CRLF
+ * in the file would otherwise report a mismatch against an identical string. */
+static void rstrip(char *s)
+{
+    size_t n = strlen(s);
+    while (n && (s[n - 1] == '\n' || s[n - 1] == '\r' || s[n - 1] == ' ' ||
+                 s[n - 1] == '\t'))
+        s[--n] = '\0';
+}
+
+/* Every early return out of cq_gold_open goes through here. The rows are
+ * already allocated by the time either cross-check runs, and LeakSanitizer is
+ * on in Debug (bd kfi) — a refusal that leaked them would report as a leak in
+ * whatever provoked the refusal, which is the wrong bug entirely. */
+static int gold_abandon(cq_gold *g)
+{
+    free(g->v);
+    g->v = NULL; g->n = g->cap = 0;
+    return 0;
+}
+
 static cq_gold_row *push_row(cq_gold *g)
 {
     if (g->n == g->cap) {
@@ -59,13 +87,16 @@ static cq_gold_row *push_row(cq_gold *g)
 }
 
 int cq_gold_open(cq_gold *g, const char *path, const char *title,
-                 const char *commit_file)
+                 const char *mask, const char *commit_file)
 {
     char want[80];
+    char got_mask[CQ_GOLD_MASK_MAX];
+    int  saw_mask = 0;
 
     g->v = NULL; g->n = g->cap = 0;
-    g->path = path; g->title = title; g->notes = NULL;
+    g->path = path; g->title = title; g->mask = mask; g->notes = NULL;
     g->commit[0] = '\0';
+    got_mask[0] = '\0';
     g->updating = cq_gold_updating();
     g->loaded = 0;
 
@@ -87,12 +118,23 @@ int cq_gold_open(cq_gold *g, const char *path, const char *title,
         return g->updating;
     }
 
-    char line[256];
+    /* Wide enough that a `# measured-at:` line at the cap round-trips whole:
+     * the 15-byte tag plus CQ_GOLD_MASK_MAX plus the newline. A split line
+     * would be read as a mask that differs from the one written. */
+    char line[512];
     while (fgets(line, sizeof line, f)) {
         if (line[0] == '#') {
             char c[80];
             if (sscanf(line, "# bennett: %79s", c) == 1)
                 snprintf(g->commit, sizeof g->commit, "%s", c);
+            /* `%[^\n]` and not `%s`: the mask is a SENTENCE, and reading it a
+             * word at a time would compare the first word only — which is
+             * "ALL-QUANTUM" in ten of the twelve files and so would agree with
+             * every mask this check exists to tell apart. */
+            else if (sscanf(line, "# measured-at: %255[^\n]", got_mask) == 1) {
+                rstrip(got_mask);
+                saw_mask = 1;
+            }
             continue;
         }
 
@@ -105,7 +147,7 @@ int cq_gold_open(cq_gold *g, const char *path, const char *title,
 
         r.x = x; r.cx = cx; r.ccx = ccx;
         cq_gold_row *slot = push_row(g);
-        if (!slot) { fclose(f); return 0; }
+        if (!slot) { fclose(f); return gold_abandon(g); }
         *slot = r;
     }
     fclose(f);
@@ -129,9 +171,28 @@ int cq_gold_open(cq_gold *g, const char *path, const char *title,
                   "is now %s (risk R3). Re-derive the counts against the new "
                   "snapshot, then regenerate with CQOPS_UPDATE_GOLDENS=1",
                   path, g->commit[0] ? g->commit : "(no commit line)", want);
-        return 0;
+        return gold_abandon(g);
     }
     if (g->updating && want[0]) snprintf(g->commit, sizeof g->commit, "%s", want);
+
+    /* THE MASK CLAIM, WITH THE SAME TEETH (bd 2r5). A count is a function of
+     * (W, operand mask), so the mask a file was taken at is the other half of
+     * what its rows mean — and until this check existed it was a literal in
+     * the writer that no file could contradict, false in four of the twelve.
+     *
+     * The suite's declaration is the source of truth and the file is the
+     * output, so a disagreement means the header is stale: the counts were
+     * pinned under one description and are now being read under another. An
+     * UPDATE run is exempt for the same reason the commit check is — it is
+     * the act that makes the two agree again, honestly, by re-measuring. */
+    if (mask && !g->updating && (!saw_mask || strcmp(got_mask, mask) != 0)) {
+        cq_h_fail(__FILE__, __LINE__,
+                  "goldens: %s says it was measured at \"%s\" but the suite "
+                  "declares \"%s\" (bd 2r5). A count is a function of (W, "
+                  "operand mask); regenerate with CQOPS_UPDATE_GOLDENS=1",
+                  path, saw_mask ? got_mask : "(no measured-at line)", mask);
+        return gold_abandon(g);
+    }
 
     return 1;
 }
@@ -184,6 +245,21 @@ int cq_gold_close(cq_gold *g)
     int ok = 1;
 
     if (g->updating) {
+        /* NO MASK, NO FILE. cq_gold_open's NULL is a READER's escape hatch;
+         * letting it reach the writer would mint exactly the unlabelled golden
+         * bd 2r5 is about, and would do it silently. */
+        if (!g->mask || !g->mask[0] ||
+            strlen(g->mask) >= CQ_GOLD_MASK_MAX || strchr(g->mask, '\n')) {
+            cq_h_fail(__FILE__, __LINE__,
+                      "goldens: refusing to write %s — its `mask` is absent, "
+                      "longer than %d bytes, or not one line. A golden that "
+                      "does not name the operand mask it was measured at pins "
+                      "nothing, and one whose mask does not round-trip fails "
+                      "its own cross-check next run (bd 2r5)",
+                      g->path, CQ_GOLD_MASK_MAX - 1);
+            return gold_abandon(g);
+        }
+
         FILE *f = fopen(g->path, "w");
         if (!f) {
             cq_h_fail(__FILE__, __LINE__, "goldens: cannot write %s", g->path);
@@ -196,14 +272,24 @@ int cq_gold_close(cq_gold *g)
                 "# non-demotion, neither of which changes the circuit.\n"
                 "#\n"
                 "# bennett: %s\n"
+                "# measured-at: %s\n"
                 "#\n"
-                "# Measured at operand mask ALL-QUANTUM on BOTH operands, and\n"
-                "# at ctrl_depth 0. The mask is not arbitrary: operand folds\n"
-                "# still fire (a^0 and x&0 legitimately emit fewer gates,\n"
-                "# which is what L5 proves), so a count is a function of\n"
-                "# (W, operand mask). All-quantum is the FIXED POINT — with no\n"
-                "# demotion (D6) a mask can only drift towards Q — and is the\n"
-                "# one mask where forward and unc agree.\n"
+                "# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open\n"
+                "# reads them back, and a checking run fails if either\n"
+                "# disagrees with the snapshot on disk or with what the suite\n"
+                "# declares. The mask matters because operand folds still fire\n"
+                "# (a^0 and x&0 legitimately emit fewer gates, which is what L5\n"
+                "# proves), so a count is a function of (W, operand mask) — and\n"
+                "# a golden that does not say which mask it was taken at pins\n"
+                "# nothing. The line above is per-file for the reason bd 2r5\n"
+                "# records: as a literal in the writer it was false in four of\n"
+                "# the twelve files and nothing could contradict it.\n"
+                "#\n"
+                "# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with\n"
+                "# no demotion (D6) a mask can only drift TOWARDS Q, so it is\n"
+                "# the FIXED POINT, and the one mask where forward and unc\n"
+                "# agree. A file measured anywhere else says so above, and owes\n"
+                "# the reader a note saying why.\n"
                 "#\n"
                 "# forward and unc are pinned SEPARATELY and their equality is\n"
                 "# NOT an invariant (Rule 14, PRD §10): _unc may legitimately\n"
@@ -216,7 +302,7 @@ int cq_gold_close(cq_gold *g)
                 "# --args to test binaries, so the env var is the mechanism;\n"
                 "# --update-goldens works when running the binary directly.)\n"
                 "#\n",
-                g->title, g->commit[0] ? g->commit : "(unknown)");
+                g->title, g->commit[0] ? g->commit : "(unknown)", g->mask);
             if (g->notes) fputs(g->notes, f);
             fputs("# kernel   pass      W   NOT  CNOT  Toffoli\n", f);
 

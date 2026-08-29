@@ -186,9 +186,10 @@ CQ_TEST(l4_goldens)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/divrem_s.counts",
                       "M20 kernels/divrem_s.c — K12 sdiv/srem (sign-magnitude "
-                      "over M19, sandwiched, all-quantum operands). SELF-PINNED "
-                      "and FIRST EXECUTED AT STEP 17: K12.md §6.1 listed the "
-                      "whole signed path as derived-but-not-run",
+                      "over M19, sandwiched). SELF-PINNED and FIRST EXECUTED AT "
+                      "STEP 17: K12.md §6.1 listed the whole signed path as "
+                      "derived-but-not-run",
+                      "ALL-QUANTUM on both operands, at ctrl_depth 0",
                       CQOPS_BENNETT_COMMIT))
         return;
 

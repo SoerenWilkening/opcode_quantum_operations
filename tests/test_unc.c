@@ -519,7 +519,11 @@ CQ_TEST(every_golden_pins_a_second_pass_beside_its_forward)
         int file_forward = 0;
 
         snprintf(path, sizeof path, "%s/%s", CQOPS_GOLDEN_DIR, G[i].file);
-        if (!cq_gold_open(&g, path, "step 21 pass-pairing audit",
+        /* NULL mask: this suite READS eleven goldens it did not measure, so
+         * it has no mask of its own to declare and must not assert one of
+         * theirs. cq_gold_close refuses to WRITE without a mask, and `updating`
+         * is cleared below anyway, so the escape hatch cannot mint a file. */
+        if (!cq_gold_open(&g, path, "step 21 pass-pairing audit", NULL,
                           CQOPS_BENNETT_COMMIT))
             continue;
         opened++;

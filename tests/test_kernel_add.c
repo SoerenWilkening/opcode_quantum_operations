@@ -230,7 +230,9 @@ CQ_TEST(l4_goldens)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/add.counts",
                       "M14 kernels/add.c — K6 add, K7 sub (ripple-carry, "
-                      "sandwiched, all-quantum operands)", CQOPS_BENNETT_COMMIT))
+                      "sandwiched)",
+                      "ALL-QUANTUM on both operands, at ctrl_depth 0",
+                      CQOPS_BENNETT_COMMIT))
         return;
 
     for (size_t i = 0; i < sizeof WS / sizeof WS[0]; i++) {

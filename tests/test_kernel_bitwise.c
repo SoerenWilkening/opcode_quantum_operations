@@ -134,6 +134,7 @@ CQ_TEST(l4_goldens)
 
     if (!cq_gold_open(&g, CQOPS_GOLDEN_DIR "/bitwise.counts",
                       "M10 kernels/bitwise.c — K1 xor, K2 and, K3 or",
+                      "ALL-QUANTUM on both operands, at ctrl_depth 0",
                       CQOPS_BENNETT_COMMIT))
         return;
 
