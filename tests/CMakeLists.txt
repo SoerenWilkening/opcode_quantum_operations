@@ -130,6 +130,17 @@ add_cqops_test(test_kernel_sdivrem)   # M20 — K12 sdiv/srem. The signed path w
 ## goes near third_party/bennett/COMMIT, which is read-only in the bytes and in
 ## the pin (Rule 1, and the Step 10 near-miss it records).
 add_cqops_test(test_goldens)          # tests/support/goldens.c
+                                      # + tests/test_goldens_update.inc
+
+## bd 7ew adds the other three claims that had never been seen to fire: the R3
+## REMEDY (an update run adopts the snapshot's SHA — the half that was itself a
+## bug at Step 10, where the mismatch aborted BEFORE the writer, so the only way
+## to obey the printed message was to hand-edit the pin), a MISSING golden
+## (refused by a checking run, minted by an update run inheriting the pin), and
+## mutation survivor G02, cq_gold_close's unvisited-row sweep. G02's instrument
+## is a PROVOCATION, not a mutant: mutating an assertion cannot fail on a
+## correct library, so the case builds a golden holding a row nothing checks.
+## The seam `the REFUSAL <-> the REMEDY` is recorded in IMPLEMENTATION_PLAN §2.2.
 
 ## The driver's own assertions, made falsifiable — test_harness_negative's
 ## argument one level up. A mutation battery found five of the Phase-B pool

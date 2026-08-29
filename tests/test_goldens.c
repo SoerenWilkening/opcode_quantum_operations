@@ -111,12 +111,13 @@ static void close_as_reader(cq_gold *g)
  * does not disarm it, and why the checking-run cases that follow are unaffected
  * — and an update run is deliberately exempt from BOTH cross-checks, since it
  * is the act that makes a stale header honest again by re-measuring. */
-static int open_updating(cq_gold *g, const char *path, const char *mask)
+static int open_updating(cq_gold *g, const char *path, const char *mask,
+                         const char *commit_file)
 {
     int rc;
 
     setenv("CQOPS_UPDATE_GOLDENS", "1", 1);
-    rc = cq_gold_open(g, path, "a fixture", mask, NULL);
+    rc = cq_gold_open(g, path, "a fixture", mask, commit_file);
     unsetenv("CQOPS_UPDATE_GOLDENS");
 
     CHECK(rc);
@@ -227,100 +228,7 @@ CQ_TEST(a_null_mask_is_a_readers_escape_hatch_and_skips_the_comparison)
 }
 
 /* ------------------------------------------------------------------------- *
- * 2. The writer states the mask, and refuses to write without one.
- * ------------------------------------------------------------------------- */
-
-CQ_TEST(the_writer_emits_the_suites_own_mask_and_the_file_round_trips)
-{
-    tmpf t;
-    cq_gold g;
-    char body[4096];
-
-    /* A file with the OLD boilerplate, which is what a real regeneration finds:
-     * the header is stale, the counts are not necessarily. */
-    if (!tmpf_write(&t, golden_with(
-            "# Measured at operand mask ALL-QUANTUM on BOTH operands, and\n"
-            "# at ctrl_depth 0.\n"))) return;
-
-    if (!open_updating(&g, t.path, MASK_B)) { tmpf_drop(&t); return; }
-    CHECK(cq_gold_check(&g, "mux", "forward", 8, 0, 4, 4));
-    CHECK(cq_gold_close(&g));
-
-    CHECK(tmpf_read(&t, body, sizeof body));
-    CHECK(strstr(body, "# measured-at: " MASK_B "\n") != NULL);
-
-    /* THE CLAIM THAT MATTERS: the old literal is gone, not merely joined. A
-     * writer that emitted both would still be asserting "BOTH operands" into a
-     * three-source kernel's golden. */
-    CHECK(strstr(body, "ALL-QUANTUM on BOTH operands") == NULL);
-
-    /* And it reads back clean under the same declaration — the round trip is
-     * what makes the cross-check usable rather than a permanent red. */
-    CHECK_EQ(failures_from_open(&g, t.path, MASK_B, NULL), 0);
-    close_as_reader(&g);
-
-    tmpf_drop(&t);
-}
-
-CQ_TEST(an_update_run_with_no_mask_writes_nothing_and_says_so)
-{
-    tmpf t;
-    cq_gold g;
-    char body[4096];
-
-    if (!tmpf_write(&t, "# untouched\n")) return;
-
-    if (!open_updating(&g, t.path, NULL)) { tmpf_drop(&t); return; }
-
-    (void)cq_h_take_failures();
-    cq_h_mute(1);
-    int rc = cq_gold_close(&g);
-    cq_h_mute(0);
-    CHECK_EQ(cq_h_take_failures(), 1);
-    CHECK_EQ(rc, 0);
-
-    /* NOT WRITTEN, not written-then-blamed. A refusal that had already
-     * truncated the file would have destroyed the golden it declined to
-     * label. */
-    CHECK(tmpf_read(&t, body, sizeof body));
-    CHECK_STR_EQ(body, "# untouched\n");
-
-    tmpf_drop(&t);
-}
-
-/* A mask that cannot round-trip is refused at the WRITER rather than truncated,
- * because a truncated one would fail its own cross-check on the next run and
- * read as a stale golden — a real bug reported as the wrong bug. */
-CQ_TEST(an_over_long_or_multi_line_mask_is_refused_rather_than_truncated)
-{
-    tmpf t;
-    cq_gold g;
-    char big[CQ_GOLD_MASK_MAX + 8];
-
-    memset(big, 'q', sizeof big - 1);
-    big[sizeof big - 1] = '\0';
-
-    if (!tmpf_write(&t, "# untouched\n")) return;
-
-    if (!open_updating(&g, t.path, big)) { tmpf_drop(&t); return; }
-    (void)cq_h_take_failures();
-    cq_h_mute(1);
-    CHECK_EQ(cq_gold_close(&g), 0);
-    cq_h_mute(0);
-    CHECK_EQ(cq_h_take_failures(), 1);
-
-    if (!open_updating(&g, t.path, "two\nlines")) { tmpf_drop(&t); return; }
-    (void)cq_h_take_failures();
-    cq_h_mute(1);
-    CHECK_EQ(cq_gold_close(&g), 0);
-    cq_h_mute(0);
-    CHECK_EQ(cq_h_take_failures(), 1);
-
-    tmpf_drop(&t);
-}
-
-/* ------------------------------------------------------------------------- *
- * 3. Risk R3's commit check, which had no test either.
+ * 2. Risk R3's commit check, which had no test either.
  * ------------------------------------------------------------------------- */
 
 CQ_TEST(a_re_pinned_snapshot_invalidates_a_golden_that_was_not_regenerated)
@@ -363,6 +271,94 @@ CQ_TEST(the_commit_sha_is_read_off_the_commit_line_not_the_first_line)
     tmpf_drop(&gold);
 }
 
+/* ------------------------------------------------------------------------- *
+ * 3. Presence and coverage — what the file must have, and what must look at it.
+ * ------------------------------------------------------------------------- */
+
+/* "An unpinned gate count is not a passing one." A checking run that quietly
+ * started from an empty set on a missing file would turn every L4 assertion in
+ * the project into a no-op — cq_gold_check would find no row, and in a checking
+ * run that path is itself a failure, so the visible symptom would be a suite
+ * that reddens for a second reason and gets "fixed" by regenerating. */
+CQ_TEST(a_missing_golden_is_not_a_passing_one)
+{
+    tmpf t;
+    cq_gold g;
+
+    if (!tmpf_write(&t, golden_with("# measured-at: " MASK_A "\n"))) return;
+
+    /* The negative control: present and well-formed, the same call loads it. */
+    CHECK_EQ(failures_from_open(&g, t.path, MASK_A, NULL), 0);
+    close_as_reader(&g);
+
+    /* Now the file, and only the file, goes away. */
+    tmpf_drop(&t);
+    CHECK_EQ(failures_from_open(&g, t.path, MASK_A, NULL), 1);
+}
+
+/* THE UNVISITED-ROW SWEEP — mutation survivor G02 from the Step 10 battery.
+ * Deleting cq_gold_close's sweep left every test in the project green then, and
+ * still did when this case was written: no shipped suite leaves a row
+ * unchecked, so the assertion has never once been observed to fire. Per
+ * `bd remember assertions-need-provocation-not-mutation`, mutating an assertion
+ * cannot fail on a correct library, so the instrument is a PROVOCATION — a
+ * golden holding a row nothing checks — and not a mutant.
+ *
+ * close_as_reader IS DELIBERATELY NOT USED HERE. It marks every row visited,
+ * which is the exact input the sweep reads, so it would mask this case
+ * precisely — the same shape as `a-guard-is-untested-if-a-later-copy-of-itself-
+ * catches-it`, with the masking layer sitting in the suite's own scaffolding
+ * rather than in the module.
+ *
+ * Two rows, one checked: so the claim is per-ROW and not merely "something was
+ * unvisited". A sweep that reported the visited row too would give 2, and one
+ * that reported unconditionally would fail the control below. */
+CQ_TEST(a_pinned_row_that_nothing_checked_is_reported_at_close)
+{
+    static const char *two_rows =
+        "# a fixture\n"
+        "# bennett: deadbeef\n"
+        "# measured-at: " MASK_A "\n"
+        "# kernel   pass      W   NOT  CNOT  Toffoli\n"
+        "xor       forward    8     0     8        0\n"
+        "xor       unc        8     0     8        0\n";
+    tmpf t;
+    cq_gold g;
+    int rc;
+
+    if (!tmpf_write(&t, two_rows)) return;
+
+    /* THE NEGATIVE CONTROL FIRST: both rows checked, close is green and silent.
+     * Without it a sweep that reported every row — or reported unconditionally
+     * — would pass the provocation below. */
+    CHECK_EQ(failures_from_open(&g, t.path, MASK_A, NULL), 0);
+    CHECK_EQ((int)g.n, 2);
+    CHECK(cq_gold_check(&g, "xor", "forward", 8, 0, 8, 0));
+    CHECK(cq_gold_check(&g, "xor", "unc",     8, 0, 8, 0));
+    CHECK_EQ(cq_gold_close(&g), 1);
+    CHECK_EQ(cq_h_take_failures(), 0);
+
+    /* THE PROVOCATION: the `unc` row is pinned and nothing looks at it. */
+    CHECK_EQ(failures_from_open(&g, t.path, MASK_A, NULL), 0);
+    CHECK(cq_gold_check(&g, "xor", "forward", 8, 0, 8, 0));
+
+    (void)cq_h_take_failures();
+    cq_h_mute(1);
+    rc = cq_gold_close(&g);
+    cq_h_mute(0);
+    CHECK_EQ(cq_h_take_failures(), 1);
+    CHECK_EQ(rc, 0);
+
+    tmpf_drop(&t);
+}
+
+/* ------------------------------------------------------------------------- *
+ * 4. The remedy every one of those refusals prints. See the .inc's header for
+ *    the seam; it needs this file's fixtures, so the include goes here.
+ * ------------------------------------------------------------------------- */
+
+#include "test_goldens_update.inc"
+
 CQ_TEST_MAIN(
     /* FIRST, and the ordering is load-bearing: it clears the env var every
      * case below depends on being absent. */
@@ -371,9 +367,14 @@ CQ_TEST_MAIN(
     CQ_CASE(the_whole_mask_sentence_is_compared_not_its_first_word),
     CQ_CASE(a_golden_with_no_measured_at_line_at_all_is_refused),
     CQ_CASE(a_null_mask_is_a_readers_escape_hatch_and_skips_the_comparison),
+    CQ_CASE(a_re_pinned_snapshot_invalidates_a_golden_that_was_not_regenerated),
+    CQ_CASE(the_commit_sha_is_read_off_the_commit_line_not_the_first_line),
+    CQ_CASE(a_missing_golden_is_not_a_passing_one),
+    CQ_CASE(a_pinned_row_that_nothing_checked_is_reported_at_close),
+    /* tests/test_goldens_update.inc — the remedy half. */
     CQ_CASE(the_writer_emits_the_suites_own_mask_and_the_file_round_trips),
     CQ_CASE(an_update_run_with_no_mask_writes_nothing_and_says_so),
     CQ_CASE(an_over_long_or_multi_line_mask_is_refused_rather_than_truncated),
-    CQ_CASE(a_re_pinned_snapshot_invalidates_a_golden_that_was_not_regenerated),
-    CQ_CASE(the_commit_sha_is_read_off_the_commit_line_not_the_first_line)
+    CQ_CASE(an_update_run_adopts_a_re_pinned_sha_and_then_checks_green),
+    CQ_CASE(an_update_run_mints_a_missing_golden_and_inherits_the_pin)
 )
