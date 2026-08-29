@@ -1,0 +1,55 @@
+# L7 Grover, PRD §12(3) — QUANTUM mode (theta = pi/2)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+#
+# Measured at operand mask ALL-QUANTUM on BOTH operands, and
+# at ctrl_depth 0. The mask is not arbitrary: operand folds
+# still fire (a^0 and x&0 legitimately emit fewer gates,
+# which is what L5 proves), so a count is a function of
+# (W, operand mask). All-quantum is the FIXED POINT — with no
+# demotion (D6) a mask can only drift towards Q — and is the
+# one mask where forward and unc agree.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# THIS IS A PROGRAM-SCALE GOLDEN, NOT A KERNEL ONE, SO THREE
+# SENTENCES ABOVE DO NOT APPLY AND THE COLUMN LINE BELOW IS
+# ONLY HALF RIGHT. There is no `forward`/`unc` split here (the
+# program contains both), the operand mask is not a parameter
+# (the rail is all-quantum because a general Ry put it there),
+# and the three key columns mean:
+#
+#     kernel = the program        pass = the METRIC FAMILY
+#     W      = the ITERATION COUNT, not a width (it is 8)
+#
+#     gates    -> (NOT, CNOT, Toffoli)   the counter sink
+#     rot+pool -> (ry,  rz,   peak)      rotations, and
+#                                        cq_qubits_peak()
+#
+# The bennett line IS load-bearing: the oracle's mul, add and
+# compare are Bennett constructions, so re-pinning the snapshot
+# invalidates these rows exactly as it invalidates a kernel's.
+#
+# Regenerate with -R grover, not -R kernel.
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+grover    gates      0     0     0        0
+grover    rot+pool   0     8     0        8
+grover    gates      1    18  1210      472
+grover    rot+pool   1    16     9       96
+grover    gates      2    36  2420      944
+grover    rot+pool   2    24    18       96
+grover    gates      3    54  3630     1416
+grover    rot+pool   3    32    27       96

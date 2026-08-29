@@ -40,6 +40,7 @@ typedef struct {
     size_t       n, cap;
     const char  *path;
     const char  *title;     /* one line, written into the regenerated header */
+    const char  *notes;     /* optional extra header block; see below */
     char         commit[80];
     int          updating;
     int          loaded;
@@ -53,7 +54,21 @@ typedef struct {
  * that survives ctest. Both are documented in CLAUDE.md's Build & Test. */
 int cq_gold_updating(void);
 
-/* Loads `path`, or starts an empty set if it is missing AND this is an update
+/* `g->notes` — SET IT AFTER cq_gold_open AND BEFORE cq_gold_close, or leave the
+ * NULL cq_gold_open puts there. Every line must already begin with `# `; it is
+ * written verbatim between the fixed preamble and the column line.
+ *
+ * IT EXISTS BECAUSE THE FIXED PREAMBLE IS A CLAIM, NOT DECORATION. It says the
+ * counts were taken at the ALL-QUANTUM operand mask and that `forward` and `unc`
+ * are pinned separately, and it labels the three columns `NOT CNOT Toffoli` —
+ * all true of a KERNEL golden and none of it true of L7's program-scale one,
+ * whose `pass` column names a metric FAMILY and whose second family is
+ * `(ry, rz, peak)`. A reader who takes the column line at face value there reads
+ * a peak qubit count as a Toffoli count. Correcting the preamble per caller is
+ * the alternative and is worse: it would let a kernel golden quietly drop the
+ * mask claim.
+ *
+ * Loads `path`, or starts an empty set if it is missing AND this is an update
  * run (a missing golden in a checking run is a hard failure — an unpinned
  * count is not a passing one).
  *

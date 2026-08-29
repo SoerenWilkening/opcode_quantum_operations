@@ -416,6 +416,32 @@ add_library(cqops::cqops ALIAS cqops)
 add_subdirectory(tests)
 
 ## ---------------------------------------------------------------------------
+## tools/qtg — the Quantum Tree Generator of arXiv:2310.06623 (Box 1), state
+## preparation only, for the paper's own KP_4(p, w; 7) example.
+##
+## A PLAIN TARGET, NOT A ctest ENTRY, and not part of `make test`. It is a
+## worked example of driving libcqops BEYOND the frozen cqrt_* ABI — a per-qubit
+## controlled Ry and a single-flag-controlled add, neither of which the grid
+## exposes as one call — so it links the internal headers the way tests/ does
+## rather than the public one. It is excluded from ALL so a build of this repo
+## never depends on it:  cmake --build <dir> --target qtg
+## ---------------------------------------------------------------------------
+
+## GUARDED ON THE SOURCE EXISTING, because `tools/qtg/` is presently
+## .gitignore'd: `add_executable` on a missing source is a hard CONFIGURE
+## error, so an unguarded block would break every fresh clone of this repo
+## while working fine in the tree it was written in. Drop the guard when the
+## directory gets a bead and starts being tracked.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/qtg/qtg.c")
+    add_executable(qtg EXCLUDE_FROM_ALL tools/qtg/qtg.c)
+    target_include_directories(qtg PRIVATE src tools/qtg)
+    target_link_libraries(qtg PRIVATE cqops)
+    if(CQOPS_LIBM)
+        target_link_libraries(qtg PRIVATE ${CQOPS_LIBM})
+    endif()
+endif()
+
+## ---------------------------------------------------------------------------
 ## The 300-line guard (Rule 12). Also reachable from the repo root as
 ## `make lint`; both spellings run the one script.
 ## ---------------------------------------------------------------------------

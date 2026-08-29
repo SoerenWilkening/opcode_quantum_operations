@@ -18,3 +18,9 @@ compile_commands.json
 # registration also sets PYTHONDONTWRITEBYTECODE=1; this catches a bare run.
 __pycache__/
 *.pyc
+
+# tools/qtg — the arXiv:2310.06623 Quantum Tree Generator demo. Untracked for
+# now: it drives libcqops' INTERNAL surface (kernels, M06, M22) rather than the
+# frozen cqrt_* ABI, it is registered in no CMake file, and it is named in
+# none of the three planning docs. Track it when it gets a bead and a home.
+tools/qtg/

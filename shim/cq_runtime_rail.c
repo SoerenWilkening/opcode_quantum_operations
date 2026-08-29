@@ -240,24 +240,33 @@ static void rec(cq_rop op, int32_t h0, int32_t h1, int32_t h2,
     cq_trace_op((name), (i0), (i1), (i2), (o0), CQ_REG_NONE)
 #define CQ_TRACE_OP2 cq_trace_op   /* cqrt_cswap alone writes two rails */
 
-/* THE ANNOTATION BRACKET IS OPENED AFTER THE MINT AND CLOSED IMMEDIATELY, which
- * is legal precisely because THIS entry point emits nothing: by I4 a rail whose
- * bits are all constants owns zero qubits, and `cq_reg_alloc_const` takes the
- * TABLE and not the context, so it structurally cannot allocate one (reg.h). No
- * `qec_*` call happens between the two lines, which is handoff §1's only
- * placement rule ("whole lines, only BETWEEN qec_* calls"), and the payoff is
- * that `out=` can name the handle instead of being omitted.
+/* THIS IS THE ONE ENTRY POINT THAT OPENS NO ANNOTATION BRACKET, and the
+ * exemption is STATIC rather than a runtime "did it emit?" test — which is what
+ * keeps cq_shim_trace.h's coverage rule checkable. By I4 a rail whose bits are
+ * all constants owns zero qubits, and `cq_reg_alloc_const` takes the TABLE and
+ * not the context (reg.h), so `cqrt_alloc_i<W>` structurally cannot allocate a
+ * qubit or reach a `qec_*` call — at ANY value and ANY width. Contrast
+ * `cqrt_addc`, which emits nothing on an all-classical rail and `6W-5` gates on
+ * a poisoned one: that one is contingent and must stay bracketed.
  *
- * A ZERO-GATE BRACKET IS ORDINARY, NOT A CORNER: handoff §6 rule 1 requires even
- * a zero-round `qec_idle(q, 0)` to sit inside one. */
+ * IT USED TO BRACKET (Step 26 / bd 76r) AND THE BRACKET WAS CONFORMANT — handoff
+ * §6 rule 1 wants even a zero-round `qec_idle(q, 0)` inside one. It was dropped
+ * 2026-08-28 on the user's call because an empty OP unit is noise in the
+ * algorithm view: it carries no gate, and everything it said is already in the
+ * `#REGISTER` header.
+ *
+ * NOTHING IS LOST FROM THE HEADER. `cq_trace_op` snapshots its named handles, so
+ * the question is whether a rail can reach the header only through its alloc —
+ * and it cannot: the snapshot taken here was necessarily EMPTY (I4), and a rail
+ * that later owns a lane is named by whatever op materialised it. A rail named
+ * by nothing else stays all-constant, and an all-constant rail gets no
+ * `#REGISTER` line either way. */
 #define CQ_RAIL_ALLOC(W, CT, UT)                                              \
     int32_t cqrt_alloc_i##W(CT value)                                         \
     {                                                                         \
         int32_t h = cq_reg_alloc_const(&cq_shim_ctx()->regs, W##u,            \
                                        (uint64_t)(UT)value, 0u);              \
         cq_rec_mint(h, W##u, (uint64_t)(UT)value, 0u, 0);                     \
-        CQ_TRACE_OP("alloc", CQ_REG_NONE, CQ_REG_NONE, CQ_REG_NONE, h);       \
-        cq_trace_end();                                                       \
         return h;                                                             \
     }
 

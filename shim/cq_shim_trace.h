@@ -72,9 +72,29 @@
  * symbols, `cqrt_free`'s cleanup, `cqrt_addc`'s transients and D7b's copy are
  * all inside one too. The rule this file is written to, and the reason it is
  * stated as a rule rather than applied case by case, is that it is CHECKABLE:
- * every `cqrt_*` and `cq_shim_*` entry point opens exactly one bracket. "Bracket
- * the ones that emit" is not checkable — `cqrt_addc` on an all-classical rail
- * emits nothing and on a poisoned one emits `6W−5` gates.
+ *
+ *     every `cqrt_*` and `cq_shim_*` entry point opens exactly one bracket,
+ *     EXCEPT the five `cqrt_alloc_i<W>`, which open none.
+ *
+ * THE EXEMPTION IS ONE NAMED FAMILY, DECIDED STATICALLY, AND THAT IS WHAT KEEPS
+ * THE RULE A RULE. "Bracket the ones that emit" is NOT checkable and is still
+ * rejected — `cqrt_addc` emits nothing on an all-classical rail and `6W−5` gates
+ * on a poisoned one, so no reader can tell from the source which sites qualify.
+ * `cqrt_alloc_i<W>` is different in kind: by I4 an all-constant rail owns zero
+ * qubits and `cq_reg_alloc_const` takes the register TABLE rather than the
+ * context, so it cannot reach a `qec_*` call at any value or any width. The
+ * bracket it used to open (Step 26) was conformant and empty; it was dropped
+ * 2026-08-28 because an OP unit carrying no gate is noise in the algorithm view
+ * and says nothing the `#REGISTER` header does not. See `cq_runtime_rail.c`'s
+ * `CQ_RAIL_ALLOC` for why the header loses nothing.
+ *
+ * ONE CONSEQUENCE, AND IT IS BENIGN: a program of NOTHING BUT allocs now opens
+ * zero brackets, so `trace_header`'s package-rule refusal (brackets but no
+ * `#REGISTER`) no longer fires for it and an empty trace ships. That trace has
+ * no gate lines and no annotations, so it is not opted in to the contract at all
+ * and the viewer reads it as an ordinary v2 physical trace. Any program that
+ * does anything — `cqrt_free` included — still opens a bracket and still hits
+ * the refusal when every rail stayed classical.
  */
 #ifndef CQ_SHIM_TRACE_H
 #define CQ_SHIM_TRACE_H

@@ -69,14 +69,39 @@ fi
 # -fsanitize=undefined, and the sanitizer runtime is pulled in by the DRIVER at
 # link time, not by the archive. Without it the link fails on ___ubsan_handle_*.
 # Empty for Release, which is the default.
+#
+# $CQOPS_L6_LDLIBS IS THE ARCHIVE'S OWN DEPENDENCIES AND IT GOES AFTER IT, WHICH
+# IS A DIFFERENT JOB FROM $LDX. Measured 2026-08-28 at Step 25: an archive
+# configured with -DCQOPS_QEC_DIR= carries M25's `sink_qec.c.o`, whose
+# `qec_create` / `qec_cx` / `qec_rz` / … are undefined until libqec.a,
+# libtommath.a and libcjson.a are on the line — so EVERY L6 fixture stops at the
+# LINK stage against a QEC-enabled build, with an error that names libcqops
+# rather than the missing archives. It is empty for a build without the library,
+# which is why nothing saw it at Step 24 and why the two steps disagree about
+# whether this line works. CMake fills it from ${CQOPS_QEC_LIBS}; the order is
+# load-bearing (a static archive resolves what precedes it), so these go LAST.
+#
+# $CQOPS_L6_LINK_CC IS THE COMPILER THAT BUILT THE ARCHIVE, AND IT IS NOT
+# NECESSARILY $CLANG. Stages 1-2 must use CQ_LANG's clang — it owns `CQ.h` and
+# the pass plugin — but stage 3 links against OUR archive, and a sanitizer
+# runtime is pulled in by the DRIVER. Measured 2026-08-28: since `bd 6wg` gave
+# Debug its own ASan-capable compiler, linking a Debug archive with CQ_lang's
+# clang-19 produces a binary that dies with SIGILL (rc 132) before `main` —
+# CLAUDE.md's "a Debug binary that SIGILLs at startup is the ASan runtime, not
+# our code", arriving here as a MIXED runtime rather than a broken one. Defaults
+# to $CLANG, which is what Release wants and what every earlier run used; CMake
+# points it at ${CMAKE_C_COMPILER}. The newer clang emits `-Woverride-module`
+# on CQ_lang's triple and compiles the LLVM-19 textual IR fine.
 LDX=${CQOPS_L6_LDFLAGS:-}
+LDLIBS=${CQOPS_L6_LDLIBS:-}
+LINKCC=${CQOPS_L6_LINK_CC:-$CLANG}
 set -f
 # shellcheck disable=SC2086  # $LDX is an intentional word-split
-"$CLANG" -c $LDX "$TMP/s2.ll" -o "$TMP/s2.o"
+"$LINKCC" -c $LDX "$TMP/s2.ll" -o "$TMP/s2.o" 2>> "$OUT.link"
 # shellcheck disable=SC2086
-"$CLANG" $LDX "$TMP/s2.o" "$OBJDIR/cq_intrinsic_templates.c.o" \
-         "$OBJDIR/cq_libm_templates.c.o" "$CQOPS" \
-         -Wl,-map,"$OUT.map" -o "$OUT.bin" 2> "$OUT.link"
+"$LINKCC" $LDX "$TMP/s2.o" "$OBJDIR/cq_intrinsic_templates.c.o" \
+         "$OBJDIR/cq_libm_templates.c.o" "$CQOPS" $LDLIBS \
+         -Wl,-map,"$OUT.map" -o "$OUT.bin" 2>> "$OUT.link"
 set +f
 
 # THE PROVENANCE ARM (item 20). The map turns "it linked" into "it linked

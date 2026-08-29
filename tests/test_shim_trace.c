@@ -148,17 +148,30 @@ CQ_TEST(a_representative_program_produces_a_conformant_annotated_trace)
      * when the bracket opened — D7b's copy emits before the mint, so the
      * bracket must open before it — and this is where that prediction is
      * checked against the handle the call actually returned. */
-    CHECK_EQ(c.n_ops, 11);
-    CHECK_STR_EQ(c.op[0], "name=alloc, out=h0");
-    CHECK_STR_EQ(c.op[1], "name=ry, out=h0");
-    CHECK_STR_EQ(c.op[3], "name=cnot, in=h0, out=h1");
-    CHECK_STR_EQ(c.op[5], "name=xorc, in=h2, out=h2");
-    CHECK_STR_EQ(c.op[6], "name=xor, in=h0|h1, out=h3");
-    CHECK_STR_EQ(c.op[7], "name=xor_unc, in=h0|h1, out=h3");
-    CHECK_STR_EQ(c.op[8], "name=copy, in=h0, out=h3");
-    CHECK_STR_EQ(c.op[9], "name=measure, in=h3, out=h3");
-    CHECK_STR_EQ(c.op[10], "name=free, in=h2");
+    CHECK_EQ(c.n_ops, 8);
+    CHECK_STR_EQ(c.op[0], "name=ry, out=h0");
+    CHECK_STR_EQ(c.op[1], "name=cnot, in=h0, out=h1");
+    CHECK_STR_EQ(c.op[2], "name=xorc, in=h2, out=h2");
+    CHECK_STR_EQ(c.op[3], "name=xor, in=h0|h1, out=h3");
+    CHECK_STR_EQ(c.op[4], "name=xor_unc, in=h0|h1, out=h3");
+    CHECK_STR_EQ(c.op[5], "name=copy, in=h0, out=h3");
+    CHECK_STR_EQ(c.op[6], "name=measure, in=h3, out=h3");
+    CHECK_STR_EQ(c.op[7], "name=free, in=h2");
     CHECK_EQ((long long)s, 3);
+
+    /* THE ALLOC EXEMPTION, PINNED AS AN ABSENCE. Three `cqrt_alloc_i<W>` calls
+     * ran above and none may have opened a bracket: `cqrt_alloc` cannot reach a
+     * `qec_*` call at any value or width (I4 + `cq_reg_alloc_const` taking the
+     * table, not the context), so its bracket was an empty OP unit and is gone.
+     * A count alone would not say this — restoring the bracket and deleting an
+     * unrelated one keeps `n_ops` at 8 — so the NAME is what is searched for,
+     * across every payload rather than at a fixed index. */
+    {
+        int i, seen_alloc = 0;
+        for (i = 0; i < c.n_ops; i++)
+            if (strncmp(c.op[i], "name=alloc,", 11) == 0) seen_alloc = 1;
+        CHECK_EQ(seen_alloc, 0);
+    }
 }
 
 /* -------------------------------------------------------------------------
@@ -375,7 +388,10 @@ CQ_TEST(the_annotation_layer_is_inert_under_every_other_sink)
     cq_shim_ctx_reset();
     unsetenv("CQOPS_SINK");
 
-    CHECK_EQ(under_qec, 2);
+    /* ONE, not two: `cqrt_xorc_i8` brackets and `cqrt_alloc_i8` is the named
+     * static exemption (cq_shim_trace.h). The pairing still has teeth — the qec
+     * arm has to be non-zero for the printf arm's zero to mean anything. */
+    CHECK_EQ(under_qec, 1);
     CHECK_EQ(under_printf, 0);
     CHECK_EQ(cq_trace_open(), 0);
 }

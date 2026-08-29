@@ -1728,9 +1728,101 @@ if(CQOPS_CQLANG_DIR AND CQOPS_PY3 AND EXISTS
                      --gate --min-ok "${CQOPS_L6_MIN_OK}")
     ## The whole corpus is minutes, not seconds — it is 250 four-stage compile /
     ## lower / link / run pipelines, not a unit suite.
-    set_tests_properties(l6_cqlang_fixtures PROPERTIES TIMEOUT 3600)
+    ##
+    ## CQOPS_L6_LDLIBS IS THE ARCHIVE'S OWN DEPENDENCIES AND IT IS NOT OPTIONAL
+    ## ON A QEC-ENABLED BUILD. Measured 2026-08-28 at Step 25: with
+    ## -DCQOPS_QEC_DIR= the archive carries M25's `sink_qec.c.o`, so every L6
+    ## fixture stops at the LINK stage on undefined `qec_create` / `qec_cx` /
+    ## `qec_rz` — a Step 26 change that no Step 24 run could have seen, because
+    ## the variable is EMPTY without the library and the two steps therefore
+    ## disagree about whether that link line works. Read
+    ## `tools/l6/run_slice_cqops.sh` for why it goes after $CQOPS and not before.
+    ## JOINED WITH SPACES, NOT LEFT AS A CMAKE LIST: ctest's ENVIRONMENT
+    ## property is itself a semicolon-separated list, so an unjoined
+    ## ${CQOPS_QEC_LIBS} would become three env entries, two of them nonsense.
+    ## The same join is why the two variables below are built before the call.
+    string(JOIN " " CQOPS_L6_LDLIBS ${CQOPS_QEC_LIBS})
+    ## AND THE SANITIZER FLAGS, WHICH THE RUNNER HAS ALWAYS TAKEN AND NOTHING HAS
+    ## EVER SUPPLIED. `run_slice_cqops.sh` documents $CQOPS_L6_LDFLAGS as "how
+    ## the DEBUG archive is linked" — it is built with -fsanitize=, and the
+    ## runtime is pulled in by the DRIVER at link time, not by the archive — but
+    ## no CMake entry set it, so the Debug registration could only ever have been
+    ## run by hand with the variable exported. Measured 2026-08-28: without it
+    ## the Debug link dies on ___asan_handle_no_return. Empty in Release, which
+    ## is where the corpus is normally run.
+    string(JOIN " " CQOPS_L6_LDFLAGS ${CQOPS_SANITIZER_FLAGS})
+    set_tests_properties(l6_cqlang_fixtures PROPERTIES
+        TIMEOUT 3600
+        ENVIRONMENT "CQOPS_L6_LDLIBS=${CQOPS_L6_LDLIBS};CQOPS_L6_LDFLAGS=${CQOPS_L6_LDFLAGS};CQOPS_L6_LINK_CC=${CMAKE_C_COMPILER}")
 else()
     message(STATUS "cqops: L6 (Step 24) not registered — "
                    "configure with -DCQOPS_CQLANG_DIR=<a built CQ_lang> to run "
                    "CQ_lang's e2e fixtures against this archive")
+endif()
+
+## ---------------------------------------------------------------------------
+## L7 — Step 25. PRD §12, AS AMENDED BY §15 D22 (`bd ye7`, closed 2026-08-28).
+##
+## THE THREE §12 CLAIMS DO NOT SHARE A MODE, and that is the whole of D22:
+##
+##   (1) compiles through `cqc`, links, and emits a NON-EMPTY gate stream
+##          -> needs CQ_lang. `tools/l7/`, registered below behind
+##             -DCQOPS_CQLANG_DIR=, NOT in this binary.
+##   (2) classical mode: the value equals plain C, at ZERO gates and ZERO qubits
+##          -> `test_grover`, always registered.
+##   (3) quantum mode: Toffoli count + `cq_qubits_peak()`, pinned as goldens;
+##       T-count from M25's `qec_count(QEC_GATE_T)`, NOT from `cq_count_t`
+##          -> the pinned half in `test_grover`, the T half in
+##             `test_grover_qec`, registered only with the QEC library.
+##
+## A STEP WRITTEN TO §12 AS PRINTED PINS (3) AGAINST A CLASSICAL RUN, which emits
+## zero gates — a tuple of zeroes and a vacuously green acceptance gate. That is
+## the mistake D22 exists to prevent and the reason these three entries are
+## separate rather than one.
+add_cqops_test(test_grover)
+
+## The T-count's rotation term. OPT-IN for `test_sink_qec`'s reason: this
+## repository neither pins nor can build the QEC library, so a suite registered
+## without it would be a green run claiming a link it never made. The config is
+## handed down as a define rather than hunted for, so a red run names the exact
+## file it ran against (Rule 17).
+if(CQOPS_HAVE_QEC)
+    add_cqops_test(test_grover_qec)
+    target_compile_definitions(test_grover_qec PRIVATE
+        CQOPS_QEC_TEST_CONFIG="${CQOPS_QEC_DIR}/examples/config_ccx.json")
+else()
+    message(STATUS "cqops: L7's T-count arm not registered — configure with "
+                   "-DCQOPS_QEC_DIR=<a built qec/> to measure the rotation "
+                   "term §12(3) needs (bd qi9: cq_count_t is a LOWER BOUND)")
+endif()
+
+## §12(1) — the program through CQ_lang's own front end and lowering pass.
+##
+## IT IS NOT SUBSUMED BY L6, and the extra clause is the reason: D18's gate is
+## LINK, RUN, DO NOT ABORT, all three of which a program that folded entirely
+## away also satisfies. L7(1) additionally requires a NON-EMPTY gate stream, as a
+## MIX (x, cx, ccx, ry, rz, mz all present) rather than a line count.
+##
+## NO GOLDEN HERE, and that is not an oversight: the count pin lives in
+## `test_grover`, against a program whose shape this repo controls. CQ_lang is
+## not pinned here and its lowering moves, so a count pinned against its output
+## would churn on every upstream commit — risk R5, one layer up.
+if(CQOPS_CQLANG_DIR AND CQOPS_PY3 AND EXISTS
+   "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/runtime/libcq_templates.a")
+    add_test(NAME l7_grover_cqlang
+             COMMAND ${CQOPS_PY3} "${CMAKE_SOURCE_DIR}/tools/l7/l7_run.py"
+                     --cqlang "${CQOPS_CQLANG_DIR}"
+                     --cqbuild "${CQOPS_CQLANG_BUILD}"
+                     --archive "$<TARGET_FILE:cqops>"
+                     --out "${CMAKE_CURRENT_BINARY_DIR}/l7"
+                     --json "${CMAKE_CURRENT_BINARY_DIR}/l7.json")
+    ## Same archive dependency as L6 — see that block for why it is not optional
+    ## on a QEC-enabled build and why it goes AFTER the archive.
+    set_tests_properties(l7_grover_cqlang PROPERTIES
+        TIMEOUT 600
+        ENVIRONMENT "CQOPS_L6_LDLIBS=${CQOPS_L6_LDLIBS};CQOPS_L6_LDFLAGS=${CQOPS_L6_LDFLAGS};CQOPS_L6_LINK_CC=${CMAKE_C_COMPILER}")
+else()
+    message(STATUS "cqops: L7 §12(1) not registered — configure with "
+                   "-DCQOPS_CQLANG_DIR=<a built CQ_lang> to compile PRD §12's "
+                   "Grover through cqc and link it against this archive")
 endif()

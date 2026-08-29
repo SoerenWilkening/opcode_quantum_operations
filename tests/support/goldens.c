@@ -64,7 +64,7 @@ int cq_gold_open(cq_gold *g, const char *path, const char *title,
     char want[80];
 
     g->v = NULL; g->n = g->cap = 0;
-    g->path = path; g->title = title;
+    g->path = path; g->title = title; g->notes = NULL;
     g->commit[0] = '\0';
     g->updating = cq_gold_updating();
     g->loaded = 0;
@@ -215,9 +215,10 @@ int cq_gold_close(cq_gold *g)
                 "# build-release -R kernel   (ctest does NOT forward trailing\n"
                 "# --args to test binaries, so the env var is the mechanism;\n"
                 "# --update-goldens works when running the binary directly.)\n"
-                "#\n"
-                "# kernel   pass      W   NOT  CNOT  Toffoli\n",
+                "#\n",
                 g->title, g->commit[0] ? g->commit : "(unknown)");
+            if (g->notes) fputs(g->notes, f);
+            fputs("# kernel   pass      W   NOT  CNOT  Toffoli\n", f);
 
             for (size_t i = 0; i < g->n; i++) {
                 cq_gold_row *r = &g->v[i];
