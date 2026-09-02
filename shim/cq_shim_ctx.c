@@ -11,10 +11,13 @@
 #include "bit.h"
 #include "controlled.h"
 #include "reg.h"
+#include "qubits.h"
 #include "sink.h"
 #include "sink_count.h"
 #include "sink_printf.h"
 #include "sink_qec.h"
+
+#include "cqops/cqops.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -117,6 +120,59 @@ void cq_shim_ctx_reset(void)
     if (!g_live) return;
     cq_ctx_dispose(&g_ctx);
     g_live = 0;
+}
+
+/* --- D15 §3's residue, read from outside the archive (`bd c55`) ----------- */
+
+/* THE PUBLIC READ. Its contract, and the reason it is six fields at two grains
+ * rather than one number, is in include/cqops/cqops.h; what belongs here is why
+ * it lives in M26 at all and why it does not touch g_live.
+ *
+ * IT LIVES HERE BECAUSE THE COUNTERS ARE PER CONTEXT AND THIS FILE OWNS THE ONE
+ * CONTEXT. src/reg.c already exports all four, and cqops_set_free_abort sits
+ * there because the flag it sets is a file-static of that module. The residue
+ * is not: it is state of a `cq_ctx`, and the only cq_ctx a caller outside this
+ * repository can ever reach is g_ctx — the frozen ABI has no context parameter,
+ * so there is nowhere for a second one to come from (see the header). A
+ * cqops_* function in src/ would have to reach UP into shim/ to find it.
+ *
+ * IT DOES NOT CALL cq_shim_ctx(), AND THAT IS THE WHOLE OF "IT IS A READ".
+ * cq_shim_ctx() is a lazy CONSTRUCTOR: it registers the built-in sinks, resolves
+ * CQOPS_SINK, builds the pool and binds the annotation layer. Reaching for it
+ * here would make asking how much leaked into a call that installs a sink — and
+ * `CQOPS_SINK=nonesuch` would turn the question into a hard error, which is the
+ * opposite of what a diagnostic read is for. With no context there has been no
+ * free, so every field is zero and that is the truth rather than a placeholder.
+ *
+ * THE POOL TOTAL IS READ FROM THE POOL, NEVER SUMMED FROM THE TWO ROWS ABOVE
+ * IT. src/reg.h states that the qubit pair sums to cq_qubits_stranded() as an
+ * ASSERTION about the free path — every increment sits beside the strand it
+ * describes — and a caller must be able to check it. Computing the field as
+ * `dirty + unproven` here would make that check a tautology and hide exactly
+ * the drift it exists to catch: a qubit stranded by something that did not go
+ * through cq_reg_free. */
+void cqops_read_residue(cqops_residue *out)
+{
+    /* The house shape wants a handle and a number and there is neither here, so
+     * the `(h0, 0)` this prints names nothing — the text is what identifies the
+     * refusal. Kept in the shape anyway so every shim abort greps alike. */
+    if (!out)
+        cq_shim_die("cqops_read_residue with nowhere to put the answer", 0, 0);
+
+    out->stranded_dirty    = 0;
+    out->stranded_unproven = 0;
+    out->frees_dirty       = 0;
+    out->frees_unproven    = 0;
+    out->stranded_qubits   = 0;
+    out->strand_reports    = 0;
+    if (!g_live) return;
+
+    out->stranded_dirty    = cq_reg_stranded_dirty(&g_ctx);
+    out->stranded_unproven = cq_reg_stranded_unproven(&g_ctx);
+    out->frees_dirty       = cq_reg_frees_dirty(&g_ctx);
+    out->frees_unproven    = cq_reg_frees_unproven(&g_ctx);
+    out->stranded_qubits   = cq_qubits_stranded(&g_ctx.pool);
+    out->strand_reports    = cq_reg_strand_reports(&g_ctx);
 }
 
 /* --- The one PRD §9 region bracket in the shim (bd d6m fix (a)) ----------- */

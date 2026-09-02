@@ -1198,6 +1198,8 @@ endif()
 ## tests/test_gen_bodies.py writes for itself.
 add_cqops_test(test_shim_ctx)
 
+add_cqops_test(test_shim_residue)
+
 add_cqops_death_test(test_shim_ctx_death CASES
     the_v1_boundary_terminates
     a_control_flag_wider_than_one_bit
@@ -1208,6 +1210,7 @@ add_cqops_death_test(test_shim_ctx_death CASES
     a_nested_region
     a_tombstoned_control_flag
     a_reset_with_a_region_still_open
+    a_residue_read_with_nowhere_to_put_it
 )
 
 ## WHICH LAYER ABORTED, and the UBSan tripwire (bd u76), composed into ONE
@@ -1259,6 +1262,15 @@ set_tests_properties(test_shim_ctx_death.the_no_region_sentinel_is_not_a_control
                      test_shim_ctx_death.a_tombstoned_control_flag
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")
+
+## `bd c55`. The refusal must be the SHIM's own — the read takes no handle and
+## builds no context, so nothing else has anything to say about it. Named
+## negatively, which is what composes with the exit-code check:
+## PASS_REGULAR_EXPRESSION would displace it (tests/CMakeLists.txt's standing
+## note), and the UBSan tripwire is `bd u76`'s.
+set_tests_properties(test_shim_ctx_death.a_residue_read_with_nowhere_to_put_it
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;qubit pool:;reg:;sink:;not implemented")
 
 ## And this one must be M06's, reached THROUGH cq_ctx_dispose: it is the only
 ## detector for cq_shim_ctx_reset actually disposing rather than dropping the

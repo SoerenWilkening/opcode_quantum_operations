@@ -37,6 +37,8 @@ set -euo pipefail
 CLANG=$1 OPT=$2 LLVMLINK=$3 PASS=$4 INC=$5 SRC=$6 LIBSRCS=$7 CQOPS=$8 OBJDIR=$9
 OUT=${10}
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+HERE=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+REPO=$(CDPATH='' cd -- "$HERE/../.." && pwd)
 
 # Stage 1 — frontend. The companion TUs are compiled WITHOUT `-include CQ.h`,
 # exactly as run_slice_multi.sh does it.
@@ -98,9 +100,17 @@ LINKCC=${CQOPS_L6_LINK_CC:-$CLANG}
 set -f
 # shellcheck disable=SC2086  # $LDX is an intentional word-split
 "$LINKCC" -c $LDX "$TMP/s2.ll" -o "$TMP/s2.o" 2>> "$OUT.link"
+# `bd c55`. THE HARNESS'S OWN RESIDUE READER, and it is OURS rather than the
+# library's: cqops_read_residue is a pure read, and registering an atexit dump
+# is the CALLER's decision to take. See tools/l6/l6_residue.c. It is inert
+# unless $CQOPS_L6_RESIDUE names a path at RUN time, which is why it is on every
+# link line here and costs the L7 entry that shares this runner nothing.
+# shellcheck disable=SC2086
+"$LINKCC" -c $LDX -I"$REPO/include" "$HERE/l6_residue.c" \
+         -o "$TMP/l6_residue.o" 2>> "$OUT.link"
 # shellcheck disable=SC2086
 "$LINKCC" $LDX "$TMP/s2.o" "$OBJDIR/cq_intrinsic_templates.c.o" \
-         "$OBJDIR/cq_libm_templates.c.o" "$CQOPS" $LDLIBS \
+         "$OBJDIR/cq_libm_templates.c.o" "$TMP/l6_residue.o" "$CQOPS" $LDLIBS \
          -Wl,-map,"$OUT.map" -o "$OUT.bin" 2>> "$OUT.link"
 set +f
 
@@ -123,8 +133,13 @@ fi
 # Recording the run's own status separately is what lets the caller tell "did
 # not link" from "ran and aborted" — and the second is the one outcome this gate
 # exists to detect.
+#
+# $CQOPS_L6_RESIDUE IS SET HERE AND NOWHERE ELSE, so the residue file sits
+# beside the run's other artefacts and `--reuse` re-reads it with them. A
+# fixture that ABORTS writes none — abort() runs no destructor — and that
+# absence is the honest report for a program that never reached its end.
 set +e
-"$OUT.bin" > "$OUT.out" 2> "$OUT.err"
+CQOPS_L6_RESIDUE="$OUT.residue" "$OUT.bin" > "$OUT.out" 2> "$OUT.err"
 rc=$?
 set -e
 echo "$rc" > "$OUT.rc"

@@ -215,6 +215,25 @@ static void a_reset_with_a_region_still_open(void)
     CQ_EXPECT_ABORT(cq_shim_ctx_reset());
 }
 
+/* --- `bd c55`: the residue read's one refusal. --------------------------- */
+
+/* A NULL DESTINATION IS A HARD ERROR, NEVER A SILENT NO-OP, and the failure
+ * direction is why. cqops_read_residue is a DIAGNOSTIC: a caller that asked how
+ * much leaked and was quietly handed nothing back would report "no residue" for
+ * a program that stranded its whole pool, and would do so with every other
+ * check green. Loud here costs the caller a fixed null check they should have
+ * anyway; silent costs the one sentence D15 §3 exists to make.
+ *
+ * IT NEEDS NO CONTEXT AND DELIBERATELY DOES NOT OPEN ONE. The refusal is about
+ * the argument, not about the state, so this case reaches it in the window
+ * where no context exists — which also asserts the check runs BEFORE the
+ * g_live early return rather than after it. */
+static void a_residue_read_with_nowhere_to_put_it(void)
+{
+    cq_shim_ctx_reset();
+    CQ_EXPECT_ABORT(cqops_read_residue(NULL));
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(the_v1_boundary_terminates),
     CQ_DEATH_CASE(a_control_flag_wider_than_one_bit),
@@ -224,5 +243,6 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(a_region_body_that_pops_more_than_it_pushed),
     CQ_DEATH_CASE(a_nested_region),
     CQ_DEATH_CASE(a_tombstoned_control_flag),
-    CQ_DEATH_CASE(a_reset_with_a_region_still_open)
+    CQ_DEATH_CASE(a_reset_with_a_region_still_open),
+    CQ_DEATH_CASE(a_residue_read_with_nowhere_to_put_it)
 )

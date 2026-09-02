@@ -97,6 +97,78 @@ void cqops_set_sink(const cq_sink *s);
  * to the environment's choice, which is what NULL does for the sink. */
 void cqops_set_free_abort(int on);
 
+/* --- D15 §3's RESIDUE, from outside the archive (`bd c55`) ---------------
+ *
+ * WHAT A LINKED FIXTURE COULD SEE BEFORE THIS EXISTED: one line on stderr,
+ * `libcqops: STRANDED: qubit qN of handle hM is …`, and nothing else. The
+ * report is one-shot BY DESIGN — the residue spans a great many frees and a
+ * line per stranded qubit buries the one line that matters — so the strongest
+ * thing an L6 report could say about a fixture was a BOOLEAN: the line fired,
+ * or it did not. That is a weaker sentence than D15 §3 shipped the machinery
+ * to make, and closing the gap by making the report per-qubit is the forbidden
+ * fix, not the missing one.
+ *
+ * SO THE RESIDUE IS READ, NEVER PRINTED. Modelled on cqops_set_sink and
+ * cqops_set_free_abort — one process-wide function, no handle, no context — and
+ * it is a pure READ: it adds no state, releases nothing, and cannot launder
+ * anything onto the free list. It does not even MINT the process context; with
+ * no context yet built, every field is zero, which is the truth (nothing has
+ * been freed) rather than a placeholder.
+ *
+ * THE REJECTED ALTERNATIVE WAS AN atexit DUMP BEHIND AN ENVIRONMENT VARIABLE,
+ * and it fails on TWO counts that are recorded on disk rather than reasoned
+ * from. (i) It would write bytes into a stream the CALLER owns — and this
+ * repository's own L6 driver classifies every fixture from that fixture's
+ * stdout and stderr, so the library would be contaminating the artefacts its
+ * harness reads. The posture is src/sink_printf.h's: installation is an
+ * EXPLICIT ACT and deliberately not automatic. (ii) The natural spelling —
+ * arming it from a constructor — is unreliable here for the reason
+ * shim/cq_shim_ctx.c measured on this toolchain: libcqops is a STATIC library,
+ * an object file nothing references is dropped at link time, and an
+ * unreferenced archive member's constructor does not run, so the dump would
+ * vanish silently on some link lines and not others. A caller that wants one
+ * registers it itself, out of its OWN translation unit, where the linker cannot
+ * drop it; tools/l6/l6_residue.c is where this repository does that for its own
+ * harness.
+ *
+ * SIX FIELDS AND NOT ONE NUMBER, BECAUSE THE GRAINS GENUINELY DISAGREE
+ * (`bd 06t`: "an implementation that reports a single residue figure has not
+ * yet decided which row each free lands on"). Under D15 §4 proven-dirty and
+ * unproven take the SAME ACT — never released, never on the free list, counted
+ * — so the pool cannot tell them apart and `stranded_qubits` is one total by
+ * construction. What survives the collapse is the VERDICT, at two grains:
+ *
+ *   - the QUBIT pair is D15 §3's residue, one entry per qubit that never came
+ *     back;
+ *   - the RAIL pair is one entry per free, by the rail's own verdict.
+ *
+ * NEITHER IS DERIVABLE FROM THE OTHER. A MIXED rail carrying one unproven
+ * qubit and one convicted qubit adds to BOTH qubit rows and to the rail-level
+ * DIRTY row ALONE, because the disposition's lattice makes dirty absorbing.
+ * Collapsing the grains discards exactly that rail — which is the shape the
+ * disposition fold's no-early-return was written to reach.
+ *
+ * THE QUBIT ROWS SUM TO `stranded_qubits`, AND THAT IS AN ASSERTION RATHER
+ * THAN A COINCIDENCE: every increment sits beside the strand it describes. A
+ * drift means a qubit stranded somewhere that did not go through the free
+ * path. THE RAIL ROWS SUM TO NOTHING — a clean free is counted nowhere, since
+ * an all-constant rail (I4) never reaches the proof at all, and a denominator
+ * that silently included those would report the coverage inflation D15 §2
+ * warns about. */
+typedef struct {
+    uint32_t stranded_dirty;     /* qubits CONVICTED, then stranded          */
+    uint32_t stranded_unproven;  /* qubits merely unproven, then stranded    */
+    uint32_t frees_dirty;        /* frees whose RAIL verdict was proven dirty*/
+    uint32_t frees_unproven;     /* frees whose RAIL verdict was unproven    */
+    uint32_t stranded_qubits;    /* the POOL's own total; == the qubit pair  */
+    uint32_t strand_reports;     /* 0 before any strand, 1 for ever after    */
+} cqops_residue;
+
+/* Fills `out` from the process context. A NULL destination is a hard error,
+ * never a silent no-op: a caller that asked for the residue and got nothing
+ * back would report "no residue" for a program that leaked. */
+void cqops_read_residue(cqops_residue *out);
+
 #ifdef __cplusplus
 }
 #endif

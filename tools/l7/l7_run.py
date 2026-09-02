@@ -148,7 +148,12 @@ def main():
     print("  CQ_lang @", cq_revision(a.cqlang))
     print("  archive  ", archive)
 
-    for ext in (".rc", ".bin", ".err", ".out", ".link", ".map", ".prov"):
+    # `.residue` is written by the l6_residue.c object the shared runner puts on
+    # every link line (`bd c55`). L7 does not read it — the residue is L6's
+    # corpus-scale observation — but a stale one left beside a fresh run would
+    # be a stale artefact claiming to describe it.
+    for ext in (".rc", ".bin", ".err", ".out", ".link", ".map", ".prov",
+                ".residue"):
         if os.path.exists(stem + ext):
             os.remove(stem + ext)          # a stale .rc reports a stale run
 
