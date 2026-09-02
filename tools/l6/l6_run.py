@@ -26,6 +26,8 @@ CQ_lang 134e625, the four reasons that actually fire are `fp is v2`, `qram is
 v2`, `tape is v2`, and `cqrt_alloc_handle` -- the last being D16's refusal to
 mint a register-less handle, which is what stops the purely-INTEGER
 intrinsic-bearing fixtures. Not one casualty was an integer `_inv` body.
+`tape is v2` STOPPED FIRING on 2026-09-02 (PRD 15 D23 put the tape in scope);
+if it ever appears again, a shim file has regressed, not the corpus.
 
 THE RESIDUE IS READ ALONGSIDE THE GATE AND IS NEVER A GATE (PRD 15 D18). Until
 `bd c55` the only thing observable from outside a fixture was whether D15 3's

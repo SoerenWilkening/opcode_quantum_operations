@@ -74,21 +74,37 @@ static const cq_reg *cq_reg_slot(const cq_reg_table *t, int32_t h)
     if (h < 0 || h >= t->n) cq_reg_die("handle out of range", h, t->n);
     const cq_reg *r = &t->slot[h];
     if (r->state != CQ_SLOT_LIVE && r->state != CQ_SLOT_DEAD &&
-        r->state != CQ_SLOT_MEASURED)
-        cq_reg_die("slot state is not LIVE/DEAD/MEASURED — poison?", h, r->state);
+        r->state != CQ_SLOT_MEASURED && r->state != CQ_SLOT_TOKEN)
+        cq_reg_die("slot state is not LIVE/DEAD/MEASURED/TOKEN — poison?", h, r->state);
     return r;
+}
+
+/* THE ONE TOKEN REFUSAL, AT THE TWO FUNNELS (PRD §15 D23, plan §0.5). Every
+ * read goes through cq_reg_readable and every write, free and measure through
+ * cq_reg_slot_mut, so a token handed to ANY rail entry point in the shim lands
+ * here with no per-entry-point code — and no per-entry-point copy to mask it.
+ * cq_reg_width, cq_reg_state and cq_reg_is_live deliberately stay permissive:
+ * that is what lets the I2 sweep and the D21 snapshot skip a token as they
+ * skip a tombstone, and what lets the shim ask "is this a token?" at all. */
+static void cq_reg_refuse_token(const cq_reg *r, int32_t h)
+{
+    if (r->state == CQ_SLOT_TOKEN)
+        cq_reg_die("a classical token (a tape or qram handle) is not a rail", h, 0);
 }
 
 /* The one const cast in the module. The table is never itself const; the
  * accessors above are const-qualified so a reader cannot mutate by accident. */
 static cq_reg *cq_reg_slot_mut(cq_reg_table *t, int32_t h)
 {
-    return (cq_reg *)cq_reg_slot(t, h);
+    const cq_reg *r = cq_reg_slot(t, h);
+    cq_reg_refuse_token(r, h);
+    return (cq_reg *)r;
 }
 
 static const cq_reg *cq_reg_readable(const cq_reg_table *t, int32_t h)
 {
     const cq_reg *r = cq_reg_slot(t, h);
+    cq_reg_refuse_token(r, h);
     if (r->state == CQ_SLOT_DEAD)
         cq_reg_die("use of a freed handle (tombstone)", h, 0);
     return r;
@@ -150,6 +166,28 @@ int32_t cq_reg_alloc_const(cq_reg_table *t, uint32_t width,
 int32_t cq_reg_alloc_zero(cq_reg_table *t, uint32_t width)
 {
     return cq_reg_alloc_const(t, width, 0u, 0u);
+}
+
+/* A token is NOT a width-0 register, and cq_reg_mint refusing width 0 is why
+ * this is its own path rather than a special case there: a zero-width RAIL
+ * would free CLEAN and measure to 0, where a token must be a hard error at
+ * both. The counter clause is shared on purpose — see reg.h's enum. */
+int32_t cq_reg_alloc_token(cq_reg_table *t)
+{
+    if (t->n == INT32_MAX)
+        cq_reg_die("handle counter exhausted", t->n, 0);
+    cq_reg_grow(t, t->n + 1);
+
+    cq_reg *r = &t->slot[t->n];
+    r->bits  = NULL;
+    r->width = 0u;
+    r->state = CQ_SLOT_TOKEN;
+    return t->n++;
+}
+
+int cq_reg_is_token(const cq_reg_table *t, int32_t h)
+{
+    return h >= 0 && h < t->n && t->slot[h].state == CQ_SLOT_TOKEN;
 }
 
 /* --- Accessors. --------------------------------------------------------- */

@@ -120,9 +120,9 @@ static void v2_sweep(void)
     g_swept = 1;
 }
 
-/* EVERY ONE OF THE 109 ABORTS, AND NAMES ITSELF. The abort is the cheap half;
+/* EVERY ONE OF THE 98 ABORTS (109 before D23), AND NAMES ITSELF. The abort is the cheap half;
  * the name is what a death suite could never have checked, and with 12 macro
- * bodies covering 109 symbols a single wrong literal would ship 4 or 9 wrong
+ * bodies covering 98 symbols a single wrong literal would ship 4 or 9 wrong
  * messages at once.
  *
  * OBSERVED FAILING (2026-08-27, both configurations): a body rewritten to

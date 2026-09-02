@@ -52,10 +52,11 @@
  * this file from `cq_shim_reduce.[ch]` — which PINNED ARTEFACT a line answers
  * to — read one level finer: a row answers to `cq_runtime.h`, a stream detail
  * answers to nothing but itself. TRIGGER 240, the house figure. What would take
- * it is v2: the 63 `qram` and 11 `tape` rows are aborts today and each needs a
- * row here first.
+ * it is v2: the 63 `qram` rows are aborts today and each needs a row here
+ * first (the 11 `tape` symbols took TWO rows on 2026-09-02, PRD §15 D23 —
+ * one per shape, as `cqrt_copy` has — and did not move the count much).
  *
- * WHAT IS DELIBERATELY *NOT* IN THE TABLE. The 63 qram, 11 tape, 34 fp-width
+ * WHAT IS DELIBERATELY *NOT* IN THE TABLE. The 63 qram, 34 fp-width
  * and `cqrt_alloc_handle` symbols are `cq_shim_unsupported` aborts in v1
  * (PRD §15 D16), so a call can never reach the recorder — which is why the
  * recorder cannot be WRONG about them, and why their notoriously misleading
@@ -97,6 +98,15 @@ typedef enum {
     CQ_ROP_RY_CTRL_INV, CQ_ROP_RZ_CTRL, CQ_ROP_RZ_CTRL_INV,
     CQ_ROP_COPY, CQ_ROP_COPY_CTRL,
     CQ_ROP_CSWAP,
+    /* PRD §15 D23 (v1.1): `cqrt_tape_write_<W>(tape, src) -> out` and its
+     * controlled twin. `cqrt_copy`'s two rows with the destination MINTED
+     * rather than named: the write READS `src` and writes the kept rail from
+     * birth 0. The TAPE TOKEN IS NOT AN OPERAND SLOT — it has no history, no
+     * mint marker, and `cq_rec_hist(token)` is NULL; it is represented in this
+     * layer by its absence, because a token is never written and never read.
+     * Every pairing flag is 0: a second write mints a DIFFERENT `out`, so
+     * `self_adjoint` would be a lie, and CQ_lang never frees the kept rail. */
+    CQ_ROP_TAPE_WRITE, CQ_ROP_TAPE_WRITE_CTRL,
     CQ_ROP_ADDC, CQ_ROP_XORC,
     CQ_ROP_TPL_FWD, CQ_ROP_TPL_UNC,
     CQ_ROP__N

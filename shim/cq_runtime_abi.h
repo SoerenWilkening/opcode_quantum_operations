@@ -257,7 +257,7 @@ void cqrt_qram_store_f32_controlled_unc(int32_t pred, int32_t arr, int32_t idx, 
 void cqrt_qram_store_f64_controlled_unc(int32_t pred, int32_t arr, int32_t idx, int32_t val);
 void cqrt_qram_store_f80_controlled_unc(int32_t pred, int32_t arr, int32_t idx, int32_t val);
 
-/* --- Deferred to v2 — tape (11) — `cq_runtime_v2.c` (Step 23.5) --- */
+/* --- v1.1 — tape (11) — `cq_runtime_tape.c` (PRD §15 D23; aborts in `cq_runtime_v2.c` until 2026-09-02) --- */
 int32_t cqrt_tape_alloc(void);
 int32_t cqrt_tape_write_i1 (int32_t tape, int32_t src);
 int32_t cqrt_tape_write_i8 (int32_t tape, int32_t src);

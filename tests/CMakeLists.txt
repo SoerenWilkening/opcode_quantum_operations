@@ -1329,12 +1329,57 @@ set_tests_properties(test_shim_cert_death.an_unmodelled_opcode_is_a_hard_error
 add_cqops_test(test_runtime_gate)
 
 ## The V1 BOUNDARY (Step 23 landing 1 step 5). NOT a death suite, and the
-## reason is the whole design: with 109 macro-expanded abort bodies the
+## reason is the whole design: with 98 macro-expanded abort bodies (109 until
+## PRD §15 D23 took the 11 tape symbols into scope) the
 ## interesting failure is not a missing abort but one that NAMES THE WRONG
 ## SYMBOL or carries the WRONG BUCKET, and a FAIL_REGULAR_EXPRESSION cannot see
-## either. Every one of the 109 is forked and its stderr compared byte for
+## either. Every one of the 98 is forked and its stderr compared byte for
 ## byte, against an enumeration read out of shim/cq_runtime_abi.h.
 add_cqops_test(test_runtime_v2)
+
+## Step 28 — v1.1, THE TAPE SURFACE (PRD §15 D23, bd 1za): shim/cq_runtime_tape.c,
+## the 11 cqrt_tape_* symbols that were loud aborts until 2026-09-02. A tape
+## write is cqrt_copy into a KEPT rail; what is new is the TOKEN (plan §0.5,
+## M07's fourth slot state) and the record row, which must say the write READS
+## its source — the sweep frees the source across the write and that free is
+## clean only under the right row.
+add_cqops_test(test_runtime_tape)
+
+add_cqops_death_test(test_runtime_tape_death CASES
+    a_rail_handed_as_the_tape
+    a_freed_rail_handed_as_the_tape
+    a_tape_write_of_a_rail_of_the_wrong_width
+    a_token_handed_to_cqrt_x
+    a_token_handed_to_cqrt_free
+    a_token_handed_to_cqrt_measure
+    a_token_as_the_source_of_a_tape_write
+    a_token_as_the_control_flag_of_a_controlled_write
+    a_token_as_a_template_operand
+)
+## THE SHIM's OWN: a rail (or a tombstone) in the tape slot. M07 has no opinion
+## about which slot a rail was passed in, so `FATAL: reg:` must be absent — and
+## so must the tape file's OTHER message, the width one, which is the shape
+## this project has recorded for two strings masking each other.
+set_tests_properties(test_runtime_tape_death.a_rail_handed_as_the_tape
+                     test_runtime_tape_death.a_freed_rail_handed_as_the_tape
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;not the width its cqrt_tape;kernel:;distinctness")
+set_tests_properties(test_runtime_tape_death.a_tape_write_of_a_rail_of_the_wrong_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;not a tape token;kernel:;distinctness")
+## M07's, REACHED THROUGH THE SHIM: a token at any rail entry point lands on
+## the two funnels (plan §0.5). `FATAL: shim:` must be absent — a shim that
+## re-implemented the refusal per entry point would be the masking layer —
+## and so must M07's GENERIC refusals: a token must be named as a token, never
+## reported as out of range, as a tombstone, as "not live", or as poison.
+set_tests_properties(test_runtime_tape_death.a_token_handed_to_cqrt_x
+                     test_runtime_tape_death.a_token_handed_to_cqrt_free
+                     test_runtime_tape_death.a_token_handed_to_cqrt_measure
+                     test_runtime_tape_death.a_token_as_the_source_of_a_tape_write
+                     test_runtime_tape_death.a_token_as_the_control_flag_of_a_controlled_write
+                     test_runtime_tape_death.a_token_as_a_template_operand
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:;handle out of range;tombstone;not live;not a live rail;poison;kernel:;distinctness")
 
 add_cqops_death_test(test_runtime_rail_death CASES
     measure_of_a_rail_wider_than_its_symbol

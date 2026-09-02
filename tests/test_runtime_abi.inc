@@ -80,9 +80,9 @@ static uint32_t census_v1_names(char out[][48], uint32_t cap)
     if (!f) { cq_h_fail(__FILE__, __LINE__, "cannot open %s", path); return 0u; }
 
     while (fgets(line, sizeof line, f)) {
-        if (strstr(line, "The 65 v1 symbols, verbatim:")) { inside = 1; continue; }
+        if (strstr(line, "The 76 v1 symbols, verbatim:")) { inside = 1; continue; }
         if (!inside) continue;
-        if (strstr(line, "NOTE the 65")) break;
+        if (strstr(line, "NOTE the 76")) break;
         for (const char *p = line; (p = strstr(p, "cqrt_")) != NULL; ) {
             size_t k = 0u;
             while (p[k] && (p[k] == '_' || (p[k] >= 'a' && p[k] <= 'z')
@@ -101,11 +101,11 @@ static int name_in(char set[][48], uint32_t n, const char *want)
     return 0;
 }
 
-/* fp width, qram and tape are the three v2 populations the census's 65 excludes. */
+/* fp width and qram are the two deferred populations the census's 76 excludes;
+ * tape was the third until PRD §15 D23 (2026-09-02). */
 static int is_v1_name(const char *s)
 {
     if (strncmp(s, "cqrt_qram", 9) == 0) return 0;
-    if (strncmp(s, "cqrt_tape", 9) == 0) return 0;
     return !(strstr(s, "_f16") || strstr(s, "_f32") ||
              strstr(s, "_f64") || strstr(s, "_f80"));
 }
@@ -124,7 +124,8 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
      *   21 rail contents (5 copy + 5 copy_controlled + cswap + 5 addc + 5 xorc)
      *   30 gate          (5 discrete + 5 ry + 5 ry_controlled_inv + 5 rz
      *                                + 5 rz_controlled + 5 rz_controlled_inv)
-     *   34 fp widths, 63 qram, 11 tape, 1 alloc_handle   -> 109, cq_runtime_v2.c
+     *   11 tape (v1.1 since PRD §15 D23 — its OWN group, cq_runtime_tape.c)
+     *   34 fp widths, 63 qram, 1 alloc_handle            -> 98, cq_runtime_v2.c
      *    2 cqrt_h / cqrt_h_controlled, DELIBERATELY UNDEFINED (PRD §15 D16) */
     unsigned per[9] = { 0u }, g = 0u, total = 0u;
     FILE *f = fopen(path, "r");
@@ -147,7 +148,7 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
     CHECK_EQ(per[3], 30);   /* gate            */
     CHECK_EQ(per[4], 34);   /* v2: fp widths   */
     CHECK_EQ(per[5], 63);   /* v2: qram        */
-    CHECK_EQ(per[6], 11);   /* v2: tape        */
+    CHECK_EQ(per[6], 11);   /* v1.1: tape      */
     CHECK_EQ(per[7], 1);    /* v2: alloc_handle*/
     CHECK_EQ(per[8], 2);    /* undefined       */
     CHECK_EQ(per[1] + per[2], 32);
@@ -160,8 +161,8 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
         }
     const uint32_t n_cen = census_v1_names(cen, 128u);
 
-    CHECK_EQ(n_cen, 65);
-    CHECK_EQ(n_v1, 65);
+    CHECK_EQ(n_cen, 76);
+    CHECK_EQ(n_v1, 76);
     for (uint32_t i = 0; i < n_cen; i++)
         if (!name_in(v1, n_v1, cen[i]))
             cq_h_fail(__FILE__, __LINE__,

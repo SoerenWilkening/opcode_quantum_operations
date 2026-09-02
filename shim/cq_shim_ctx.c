@@ -353,7 +353,7 @@ void cq_shim_region(int32_t ctrl_flag, void (*body)(void *), void *arg)
  * `reason` is the CALLER's string and is not validated. Two buckets reach here
  * from the generated bodies today — PRD §1's "fp is v2" (884 symbols) and
  * D14's `_inv` (603) — and bd vxk and bd ck6 are expected to add a third from
- * cq_runtime_v2.c for the qram / tape / alloc_handle refusals, so nothing here
+ * cq_runtime_v2.c for the qram / alloc_handle refusals (tape is v1.1, D23), so nothing here
  * may be written against a fixed set of two.
  *
  * THE NULL SUBSTITUTES FOLLOW src/sink.c's PRECEDENT — cq_sink_die writes "-"

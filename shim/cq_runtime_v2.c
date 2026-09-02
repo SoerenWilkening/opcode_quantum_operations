@@ -1,6 +1,8 @@
 /* shim/cq_runtime_v2.c — M26's V1 BOUNDARY, Step 23 landing 1 step 5. The 109
  * `cqrt_*` symbols libcqops COULD serve but v1 defers: 34 fp-width core
- * symbols, 63 `qram`, 11 `tape`, and `cqrt_alloc_handle`.
+ * symbols, 63 `qram`, ~~11 `tape`~~ and `cqrt_alloc_handle`. **98 since
+ * 2026-09-02** — the 11 tape bodies moved into scope (PRD §15 D23,
+ * shim/cq_runtime_tape.c); every "109" and "74" below is the 2026-08-27 figure.
  *
  * PRD §15 D16 (bd vxk, bd r3y, bd ck6), and the discriminator is CAPABILITY
  * rather than liveness. libcqops DEFINES every `cqrt_*` it could serve —
@@ -80,15 +82,14 @@
 
 #include <stdint.h>
 
-/* The four reason strings. `"fp is v2"` is VERBATIM the bucket string M28's
- * generated bodies already use (shim/cq_shim.h), because it is the same reason;
- * the other three are new and are what `bd vxk`'s "a third reason string"
- * asked for. They are pinned literally, per symbol, in tests/test_runtime_v2.c. */
+/* The reason strings — three since D23 retired `tape is v2`. `"fp is v2"` is
+ * VERBATIM the bucket string M28's generated bodies already use (shim/cq_shim.h),
+ * because it is the same reason; the other two are what `bd vxk`'s "a third
+ * reason string" asked for. They are pinned literally, per symbol, in
+ * tests/test_runtime_v2.c. */
 static const char *const V2_FP     = "fp is v2";
 static const char *const V2_QRAM   = "qram is v2: libcqops models no "
                                      "addressable quantum array at any width";
-static const char *const V2_TAPE   = "tape is v2: libcqops models no "
-                                     "measurement tape at any width";
 static const char *const V2_HANDLE = "a CQ_lang intrinsic or libm template "
                                      "minted a handle; libcqops cannot mint a "
                                      "register-less handle without diverging "
@@ -181,25 +182,13 @@ CQ_V2_QRAM_WIDTH(f32)
 CQ_V2_QRAM_WIDTH(f64)
 CQ_V2_QRAM_WIDTH(f80)
 
-/* --- The 11 tape symbols -------------------------------------------------- */
+/* --- The 11 tape symbols: GONE, 2026-09-02 (PRD §15 D23) ------------------ */
 
-int32_t cqrt_tape_alloc(void)
-{ cq_shim_unsupported("cqrt_tape_alloc", V2_TAPE); }
-
-#define CQ_V2_TAPE_WIDTH(W)                                                   \
-    int32_t cqrt_tape_write_##W(int32_t tape, int32_t src)                    \
-    { (void)tape; (void)src;                                                  \
-      cq_shim_unsupported("cqrt_tape_write_" #W, V2_TAPE); }                  \
-    int32_t cqrt_tape_write_##W##_controlled(int32_t ctrl, int32_t tape,      \
-                                             int32_t src)                     \
-    { (void)ctrl; (void)tape; (void)src;                                      \
-      cq_shim_unsupported("cqrt_tape_write_" #W "_controlled", V2_TAPE); }
-
-CQ_V2_TAPE_WIDTH(i1)
-CQ_V2_TAPE_WIDTH(i8)
-CQ_V2_TAPE_WIDTH(i16)
-CQ_V2_TAPE_WIDTH(i32)
-CQ_V2_TAPE_WIDTH(i64)
+/* They live in shim/cq_runtime_tape.c as v1.1. §1's "no consumer until printf
+ * on tainted data" was measured false at Step 24 — six shipped fixtures ARE
+ * that consumer — and the cost was the copy's: a tape write is `cqrt_copy`
+ * into a kept rail, and the tape handle is a zero-qubit token (plan §0.5).
+ * This file's population is 98. */
 
 /* --- cqrt_alloc_handle, which is not an ordinary member of this file ------- */
 

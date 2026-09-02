@@ -346,11 +346,12 @@ D4. SCOPE PARTITION AGAINST PRD §"Out of scope for v1"
     v1 IN SCOPE  (int widths + width-agnostic) ....  65
     fp-width, v1 = loud abort .....................  34
     cqrt_qram_*  (out of scope) ...................  63
-    cqrt_tape_*  (out of scope) ...................  11
+    cqrt_tape_*  (out of scope) ...................  11   <-- IN SCOPE since 2026-09-02
+                                                          (PRD §15 D23, v1.1): 65 + 11 = 76
                                                     ---
                                                     173
 
-  The 65 v1 symbols, verbatim:
+  The 76 v1 symbols, verbatim: (the 65 of 2026-08 plus the 11 tape, PRD §15 D23)
 
     cqrt_addc_i1   cqrt_addc_i8   cqrt_addc_i16   cqrt_addc_i32   cqrt_addc_i64
     cqrt_alloc_i1  cqrt_alloc_i8  cqrt_alloc_i16  cqrt_alloc_i32  cqrt_alloc_i64
@@ -375,8 +376,14 @@ D4. SCOPE PARTITION AGAINST PRD §"Out of scope for v1"
     cqrt_h         cqrt_h_controlled
     cqrt_cnot      cqrt_cnot_controlled
     cqrt_toffoli   cqrt_cswap     cqrt_free       cqrt_alloc_handle
+    cqrt_tape_alloc
+    cqrt_tape_write_i1  cqrt_tape_write_i8  cqrt_tape_write_i16
+    cqrt_tape_write_i32 cqrt_tape_write_i64
+    cqrt_tape_write_i1_controlled   cqrt_tape_write_i8_controlled
+    cqrt_tape_write_i16_controlled  cqrt_tape_write_i32_controlled
+    cqrt_tape_write_i64_controlled
 
-  NOTE the 65 includes cqrt_h/cqrt_h_controlled and cqrt_alloc_handle. They are
+  NOTE the 76 includes cqrt_h/cqrt_h_controlled and cqrt_alloc_handle. They are
   in the LINK surface (must be defined) even though the pass never emits them.
 
 D5. PREFIX -> SYMBOL EXPANSION (reconciles Part A's 18 against Part D's 173)

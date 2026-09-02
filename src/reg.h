@@ -59,7 +59,7 @@ enum {
     CQ_SLOT_DEAD     = 2,  /* tombstone (D5): qubits returned, bits freed,
                             * the slot kept forever so numbering stays
                             * monotonic                                      */
-    CQ_SLOT_MEASURED = 3   /* terminal (PRD §7): CQ_lang emits no adjoint and
+    CQ_SLOT_MEASURED = 3,  /* terminal (PRD §7): CQ_lang emits no adjoint and
                             * no free, so the qubits are DELIBERATELY never
                             * reclaimed. Measured over the 239 goldens: 255
                             * measures, 0 later freed, 0 later referenced.
@@ -67,6 +67,16 @@ enum {
                             * contract violation; distinct from DEAD because
                             * its qubits still exist and must still be swept
                             * by cq_reg_audit.                               */
+    CQ_SLOT_TOKEN    = 4   /* a CLASSICAL RESOURCE TOKEN — `cqrt_tape_alloc`'s
+                            * t<N>, and qram's a<N> when it lands (PRD §15 D23,
+                            * plan §0.5). NOT A RAIL: width 0, bits NULL, owns
+                            * nothing, is never tainted, freed or measured. It
+                            * takes a slot ONLY so that it draws from this
+                            * table's D5 counter — `tape` and `src` are both
+                            * int32_t, and a token numbered elsewhere would
+                            * collide with a rail. Every rail accessor refuses
+                            * it through the two funnels in reg.c; the sweep
+                            * and the D21 snapshot skip it as they skip DEAD. */
 };
 
 /* PRD §2.2 with `live` widened to `state`. `bits` is a right-sized heap array,
@@ -106,6 +116,13 @@ int32_t cq_reg_count(const cq_reg_table *t);
  * own next_handle++ is UB there; a library whose defence is failing loud does
  * not inherit that). */
 int32_t cq_reg_alloc_zero(cq_reg_table *t, uint32_t width);
+
+/* PRD §15 D23 / plan §0.5: mint a CLASSICAL TOKEN — a handle out of the D5
+ * counter that is not a rail. Takes the TABLE and not the context, exactly as
+ * cq_reg_alloc_const does, and for the same reason it matters to D21: it cannot
+ * reach a qubit or a gate. Zero gates, zero qubits, at every call. */
+int32_t cq_reg_alloc_token(cq_reg_table *t);
+int     cq_reg_is_token(const cq_reg_table *t, int32_t h);
 
 /* `cqrt_alloc_<W>(value)`. TWO WORDS, NOT ONE, and that is not an I5
  * violation: I5 forbids a packed scalar in the REPRESENTATION, and these

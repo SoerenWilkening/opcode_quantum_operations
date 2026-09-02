@@ -322,10 +322,15 @@ add_library(cqops STATIC
                                # x / cnot / toffoli / x_controlled /
                                # cnot_controlled / ry / rz / rz_controlled[_inv]
                                # / ry_controlled_inv
+    shim/cq_runtime_tape.c     # v1.1, PRD §15 D23 (bd 1za, 2026-09-02) — the 11
+                               # cqrt_tape_* symbols: a zero-qubit TOKEN out of
+                               # M07's counter, and a write that is cqrt_copy
+                               # into a KEPT rail. Aborts in cq_runtime_v2.c
+                               # until this landed
     shim/cq_runtime_v2.c       # M26, Step 23 — the V1 BOUNDARY: the 109 cqrt_*
                                # symbols v1 defers, as loud cq_shim_unsupported
-                               # bodies (PRD §15 D16 — 34 fp core, 63 qram, 11
-                               # tape, cqrt_alloc_handle). DEFINED rather than
+                               # bodies (PRD §15 D16 — 34 fp core, 63 qram,
+                               # cqrt_alloc_handle; 98 since D23 took tape). DEFINED rather than
                                # omitted because libcq_runtime.a is ONE object
                                # holding all 173 as T, so an undefined
                                # REFERENCED symbol pulls the whole member and

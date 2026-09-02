@@ -45,10 +45,18 @@ static void cq_regchk_die(const char *what, long a, long b)
 void cq_reg_check_operands(const cq_reg_table *t, int32_t out,
                            const int32_t *srcs, uint32_t n)
 {
+    /* A TOKEN IS REFUSED BY NAME, before the liveness test would call it "not
+     * a live rail" — true, and the wrong diagnosis (PRD §15 D23, plan §0.5). */
+    if (out != CQ_REG_NONE && cq_reg_is_token(t, out))
+        cq_regchk_die("operand check: the result handle is a classical token "
+                      "(a tape or qram handle), not a rail", out, 0);
     if (out != CQ_REG_NONE && !cq_reg_is_live(t, out))
         cq_regchk_die("operand check: the result handle is not a live rail", out, 0);
 
     for (uint32_t i = 0; i < n; i++) {
+        if (cq_reg_is_token(t, srcs[i]))
+            cq_regchk_die("operand check: a source handle is a classical token "
+                          "(a tape or qram handle), not a rail", srcs[i], (long)i);
         if (!cq_reg_is_live(t, srcs[i]))
             cq_regchk_die("operand check: a source handle is not a live rail",
                           srcs[i], (long)i);
@@ -84,10 +92,12 @@ void cq_reg_audit(const cq_ctx *ctx)
 
     /* MEASURED slots are swept and DEAD ones are not: a measured rail still
      * owns its qubits (they are deliberately never reclaimed), while a
-     * tombstone's bits array is gone. I2 is scoped to live registers. */
+     * tombstone's bits array is gone. I2 is scoped to live registers. A TOKEN
+     * (D23) is skipped for the tombstone's reason — it has no bits at all. */
     int32_t n_slots = cq_reg_count(t);
     for (int32_t h = 0; h < n_slots; h++) {
-        if (cq_reg_state(t, h) == CQ_SLOT_DEAD) continue;
+        const int st = cq_reg_state(t, h);
+        if (st == CQ_SLOT_DEAD || st == CQ_SLOT_TOKEN) continue;
 
         /* THROUGH THE PUBLIC ACCESSORS, not reg.c's static slot reader, and
          * that is an improvement rather than a concession to the split: they

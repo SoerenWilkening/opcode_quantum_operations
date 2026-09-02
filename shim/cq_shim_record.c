@@ -41,6 +41,8 @@ static const cq_reff EFF[CQ_ROP__N] = {
 [CQ_ROP_COPY]        = {R(0),           R(1),         0,          0,     0, 1, 0, 0, 0, 0},
 [CQ_ROP_COPY_CTRL]   = {R(0)|R(1),      R(2),         R(0),       0,     0, 1, 0, 0, 0, 0},
 [CQ_ROP_CSWAP]       = {R(0),           R(1)|R(2),    R(0),       0,     0, 1, 0, 0, 0, 0},
+[CQ_ROP_TAPE_WRITE]  = {R(0),           R(1),         0,          0,     0, 0, 0, 0, 0, 0},
+[CQ_ROP_TAPE_WRITE_CTRL] = {R(0)|R(1),  R(2),         R(0),       0,     0, 0, 0, 0, 0, 0},
 [CQ_ROP_ADDC]        = {0,              R(0),         0,          R(1),  0, 0, 0, 1, 0, 0},
 [CQ_ROP_XORC]        = {0,              R(0),         0,          R(1),  0, 1, 0, 0, 0, 0},
 [CQ_ROP_TPL_FWD]     = {R(1)|R(2),      R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_TPL_UNC},
@@ -64,9 +66,10 @@ static const cq_reff EFF[CQ_ROP__N] = {
 #define EFF_CR_RZ_CTRL_INV (R(0) & ~(R(0)))
 #define EFF_CR_COPY_CTRL   (R(0) & ~(R(0)|R(1)))
 #define EFF_CR_CSWAP       (R(0) & ~(R(0)))
+#define EFF_CR_TAPE_WRITE_CTRL (R(0) & ~(R(0)|R(1)))
 CQ_CR(CNOT); CQ_CR(TOFFOLI); CQ_CR(X_CTRL); CQ_CR(CNOT_CTRL);
 CQ_CR(RY_CTRL_INV); CQ_CR(RZ_CTRL); CQ_CR(RZ_CTRL_INV);
-CQ_CR(COPY_CTRL); CQ_CR(CSWAP);
+CQ_CR(COPY_CTRL); CQ_CR(CSWAP); CQ_CR(TAPE_WRITE_CTRL);
 
 /* AND THE TABLE MUST BE COMPLETE. A row left implicitly zero is the INERT row,
  * which for a real opcode means "reads nothing, writes nothing" — the widest

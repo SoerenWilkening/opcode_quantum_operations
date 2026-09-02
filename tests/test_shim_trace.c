@@ -307,6 +307,64 @@ CQ_TEST(a_multi_lane_register_lists_its_lanes_in_bit_order)
     CHECK_STR_EQ(c.reg_line[1], "#REGISTER name=h1 type=i2 qubits=1,2");
 }
 
+/* PRD §15 D23: THE KEPT RAIL IS A REGISTER AND THE TOKEN IS NOT. A tape write
+ * mints a rail CQ_lang receives back, so it gets a `#REGISTER` line like any
+ * other; the tape handle owns zero qubits and gets none (I4 made visible), and
+ * `cqrt_tape_alloc` joins `cqrt_alloc_i<W>`'s named static exemption and opens
+ * NO bracket — pinned as an ABSENCE, by name, exactly as the alloc exemption
+ * is above. The write's payload names the SOURCE (and the flag) in and the
+ * kept rail out, and never the token: `in=` would spell it `h<N>`, a lie.
+ * Handles are asserted too, because the token consumes a number from the same
+ * D5 counter as the rails — `t0`, then `h1` — which is what the goldens show. */
+CQ_TEST(a_controlled_tape_write_registers_the_kept_rail_and_names_no_token)
+{
+    const char *path = "test_shim_trace_tape.out";
+    cq_conf c;
+    int32_t t, f, a, o;
+    int i, seen = 0;
+
+    trace_begin(path);
+    t = cqrt_tape_alloc();                              /* h0: a token      */
+    f = a_quantum_bit(0.3);                             /* h1 -> q0         */
+    a = a_quantum_bit(0.6);                             /* h2 -> q1         */
+    o = cqrt_tape_write_i1_controlled(f, t, a);         /* h3 -> q2, KEPT   */
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the controlled tape write");
+    CHECK_EQ((long long)t, 0);
+    CHECK_EQ((long long)f, 1);
+    CHECK_EQ((long long)a, 2);
+    CHECK_EQ((long long)o, 3);
+    CHECK_EQ(c.n_reg, 3);                    /* f, a, the kept rail; no t */
+    CHECK_STR_EQ(c.reg_line[2], "#REGISTER name=h3 type=i1 qubits=2");
+    CHECK_EQ(c.n_ops, 3);
+    CHECK_STR_EQ(c.op[2], "name=tape_write_ctrl, in=h1|h2, out=h3");
+    for (i = 0; i < c.n_ops; i++)
+        if (strncmp(c.op[i], "name=tape_alloc", 15) == 0) seen = 1;
+    CHECK_EQ(seen, 0);
+}
+
+CQ_TEST(an_uncontrolled_tape_write_names_the_source_in_and_the_kept_rail_out)
+{
+    const char *path = "test_shim_trace_tape_plain.out";
+    cq_conf c;
+    int32_t t, a, o;
+
+    trace_begin(path);
+    t = cqrt_tape_alloc();                              /* h0               */
+    a = a_quantum_bit(0.6);                             /* h1 -> q0         */
+    o = cqrt_tape_write_i1(t, a);                       /* h2 -> q1         */
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the tape write");
+    CHECK_EQ((long long)o, 2);
+    CHECK_EQ(c.n_reg, 2);
+    CHECK_STR_EQ(c.reg_line[1], "#REGISTER name=h2 type=i1 qubits=1");
+    CHECK_STR_EQ(c.op[c.n_ops - 1], "name=tape_write, in=h1, out=h2");
+}
+
 /* -------------------------------------------------------------------------
  * 4. The oracle's own instrument, and the disjoint-stream claim.
  * ------------------------------------------------------------------------- */
@@ -402,6 +460,8 @@ CQ_TEST_MAIN(
     CQ_CASE(a_constant_flag_cswap_leaves_the_register_map_a_partition),
     CQ_CASE(an_aliased_template_call_names_the_handle_it_will_mint),
     CQ_CASE(a_multi_lane_register_lists_its_lanes_in_bit_order),
+    CQ_CASE(a_controlled_tape_write_registers_the_kept_rail_and_names_no_token),
+    CQ_CASE(an_uncontrolled_tape_write_names_the_source_in_and_the_kept_rail_out),
     CQ_CASE(the_conformance_reader_catches_what_it_is_written_to_catch),
     CQ_CASE(the_annotation_layer_is_inert_under_every_other_sink)
 )

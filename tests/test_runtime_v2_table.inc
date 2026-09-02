@@ -1,5 +1,6 @@
 /* tests/test_runtime_v2_table.inc — one no-argument thunk per deferred symbol,
- * and the table that drives the sweep. 109 rows.
+ * and the table that drives the sweep. 98 rows (109 until PRD §15 D23 moved the
+ * 11 tape symbols into scope on 2026-09-02).
  *
  * A LARGE STATIC TEST TABLE, which is exactly what Rule 12's `.inc` escape
  * hatch is for (IMPLEMENTATION_PLAN §2.3). Included by tests/test_runtime_v2.c
@@ -61,19 +62,6 @@ CQ_V2_T_QRAM(f32)
 CQ_V2_T_QRAM(f64)
 CQ_V2_T_QRAM(f80)
 
-static void t_tape_alloc(void) { (void)cqrt_tape_alloc(); }
-
-#define CQ_V2_T_TAPE(W)                                                       \
-    static void t_tw_##W(void)  { (void)cqrt_tape_write_##W(0, 0); }          \
-    static void t_twc_##W(void)                                               \
-    { (void)cqrt_tape_write_##W##_controlled(0, 0, 0); }
-
-CQ_V2_T_TAPE(i1)
-CQ_V2_T_TAPE(i8)
-CQ_V2_T_TAPE(i16)
-CQ_V2_T_TAPE(i32)
-CQ_V2_T_TAPE(i64)
-
 static void t_alloc_handle(void) { (void)cqrt_alloc_handle(); }
 
 #define CQ_V2_ROW_FP(W)                                                       \
@@ -83,8 +71,6 @@ static void t_alloc_handle(void) { (void)cqrt_alloc_handle(); }
 #define CQ_V2_ROW_QRAM(W)                                                     \
     t_qa_##W, t_ql_##W, t_qlu_##W, t_qs_##W, t_qsu_##W, t_qsc_##W, t_qscu_##W
 
-#define CQ_V2_ROW_TAPE(W)  t_tw_##W, t_twc_##W
-
 static void (*const CQ_V2_THUNKS[])(void) = {
     CQ_V2_ROW_FP(16), CQ_V2_ROW_FP(32), CQ_V2_ROW_FP(64), CQ_V2_ROW_FP(80),
     t_ryci_f32, t_ryci_f64,
@@ -92,10 +78,6 @@ static void (*const CQ_V2_THUNKS[])(void) = {
     CQ_V2_ROW_QRAM(i1),  CQ_V2_ROW_QRAM(i8),  CQ_V2_ROW_QRAM(i16),
     CQ_V2_ROW_QRAM(i32), CQ_V2_ROW_QRAM(i64), CQ_V2_ROW_QRAM(f16),
     CQ_V2_ROW_QRAM(f32), CQ_V2_ROW_QRAM(f64), CQ_V2_ROW_QRAM(f80),
-
-    t_tape_alloc,
-    CQ_V2_ROW_TAPE(i1), CQ_V2_ROW_TAPE(i8), CQ_V2_ROW_TAPE(i16),
-    CQ_V2_ROW_TAPE(i32), CQ_V2_ROW_TAPE(i64),
 
     t_alloc_handle
 };
