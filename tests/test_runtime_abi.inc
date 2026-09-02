@@ -80,9 +80,9 @@ static uint32_t census_v1_names(char out[][48], uint32_t cap)
     if (!f) { cq_h_fail(__FILE__, __LINE__, "cannot open %s", path); return 0u; }
 
     while (fgets(line, sizeof line, f)) {
-        if (strstr(line, "The 76 v1 symbols, verbatim:")) { inside = 1; continue; }
+        if (strstr(line, "The 139 v1 symbols, verbatim:")) { inside = 1; continue; }
         if (!inside) continue;
-        if (strstr(line, "NOTE the 76")) break;
+        if (strstr(line, "NOTE the 139")) break;
         for (const char *p = line; (p = strstr(p, "cqrt_")) != NULL; ) {
             size_t k = 0u;
             while (p[k] && (p[k] == '_' || (p[k] >= 'a' && p[k] <= 'z')
@@ -101,18 +101,18 @@ static int name_in(char set[][48], uint32_t n, const char *want)
     return 0;
 }
 
-/* fp width and qram are the two deferred populations the census's 76 excludes;
- * tape was the third until PRD §15 D23 (2026-09-02). */
+/* fp width is the ONE deferred population the census's 139 excludes; tape was
+ * a second until PRD §15 D23 and qram a third until D24 (both 2026-09-02). */
 static int is_v1_name(const char *s)
 {
-    if (strncmp(s, "cqrt_qram", 9) == 0) return 0;
+    if (strncmp(s, "cqrt_qram_", 10) == 0) return 1;   /* every width: D24 */
     return !(strstr(s, "_f16") || strstr(s, "_f32") ||
              strstr(s, "_f64") || strstr(s, "_f80"));
 }
 
 CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
 {
-    static char hdr[256][48], cen[128][48], v1[128][48];
+    static char hdr[256][48], cen[160][48], v1[160][48];
     char path[512], line[512];
     unsigned groups = 0u;
 
@@ -125,7 +125,8 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
      *   30 gate          (5 discrete + 5 ry + 5 ry_controlled_inv + 5 rz
      *                                + 5 rz_controlled + 5 rz_controlled_inv)
      *   11 tape (v1.1 since PRD §15 D23 — its OWN group, cq_runtime_tape.c)
-     *   34 fp widths, 63 qram, 1 alloc_handle            -> 98, cq_runtime_v2.c
+     *   63 qram (v1.2 since PRD §15 D24 — cq_runtime_qram.c)
+     *   34 fp widths, 1 alloc_handle                     -> 35, cq_runtime_v2.c
      *    2 cqrt_h / cqrt_h_controlled, DELIBERATELY UNDEFINED (PRD §15 D16) */
     unsigned per[9] = { 0u }, g = 0u, total = 0u;
     FILE *f = fopen(path, "r");
@@ -147,7 +148,7 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
     CHECK_EQ(per[2], 21);   /* rail, contents  */
     CHECK_EQ(per[3], 30);   /* gate            */
     CHECK_EQ(per[4], 34);   /* v2: fp widths   */
-    CHECK_EQ(per[5], 63);   /* v2: qram        */
+    CHECK_EQ(per[5], 63);   /* v1.2: qram      */
     CHECK_EQ(per[6], 11);   /* v1.1: tape      */
     CHECK_EQ(per[7], 1);    /* v2: alloc_handle*/
     CHECK_EQ(per[8], 2);    /* undefined       */
@@ -156,13 +157,13 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
     /* (b) THE NAMES, both directions, over the v1 subset. */
     uint32_t n_v1 = 0u;
     for (uint32_t i = 0; i < n_hdr; i++)
-        if (is_v1_name(hdr[i]) && n_v1 < 128u) {
+        if (is_v1_name(hdr[i]) && n_v1 < 160u) {
             memcpy(v1[n_v1], hdr[i], sizeof v1[0]); n_v1++;
         }
-    const uint32_t n_cen = census_v1_names(cen, 128u);
+    const uint32_t n_cen = census_v1_names(cen, 160u);
 
-    CHECK_EQ(n_cen, 76);
-    CHECK_EQ(n_v1, 76);
+    CHECK_EQ(n_cen, 139);
+    CHECK_EQ(n_v1, 139);
     for (uint32_t i = 0; i < n_cen; i++)
         if (!name_in(v1, n_v1, cen[i]))
             cq_h_fail(__FILE__, __LINE__,

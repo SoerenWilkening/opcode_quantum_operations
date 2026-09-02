@@ -1,0 +1,109 @@
+# M30 kernels/qstore.c — K14 shadow store at a quantum index (tree sandwiched, sweeps in place; key qstore_L<count>)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+# measured-at: ALL-QUANTUM on every cell lane, every index lane and every val lane; the index is the ABI's i32; at ctrl_depth 0
+#
+# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open
+# reads them back, and a checking run fails if either
+# disagrees with the snapshot on disk or with what the suite
+# declares. The mask matters because operand folds still fire
+# (a^0 and x&0 legitimately emit fewer gates, which is what L5
+# proves), so a count is a function of (W, operand mask) — and
+# a golden that does not say which mask it was taken at pins
+# nothing. The line above is per-file for the reason bd 2r5
+# records: as a literal in the writer it was false in four of
+# the twelve files and nothing could contradict it.
+#
+# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with
+# no demotion (D6) a mask can only drift TOWARDS Q, so it is
+# the FIXED POINT, and the one mask where forward and unc
+# agree. A file measured anywhere else says so above, and owes
+# the reader a note saying why.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+qstore_L1 push       1     0     3        0
+qstore_L1 pop        1     0     3        0
+qstore_L1 push       8     0    24        0
+qstore_L1 pop        8     0    24        0
+qstore_L1 push      16     0    48        0
+qstore_L1 pop       16     0    48        0
+qstore_L1 push      32     0    96        0
+qstore_L1 pop       32     0    96        0
+qstore_L1 push      64     0   192        0
+qstore_L1 pop       64     0   192        0
+qstore_L1 push      80     0   240        0
+qstore_L1 pop       80     0   240        0
+qstore_L2 push       1     2     4        8
+qstore_L2 pop        1     2     4        8
+qstore_L2 push       8     2     4       50
+qstore_L2 pop        8     2     4       50
+qstore_L2 push      16     2     4       98
+qstore_L2 pop       16     2     4       98
+qstore_L2 push      32     2     4      194
+qstore_L2 pop       32     2     4      194
+qstore_L2 push      64     2     4      386
+qstore_L2 pop       64     2     4      386
+qstore_L2 push      80     2     4      482
+qstore_L2 pop       80     2     4      482
+qstore_L3 push       1     2    12       15
+qstore_L3 pop        1     2    12       15
+qstore_L3 push       8     2    12       78
+qstore_L3 pop        8     2    12       78
+qstore_L3 push      16     2    12      150
+qstore_L3 pop       16     2    12      150
+qstore_L3 push      32     2    12      294
+qstore_L3 pop       32     2    12      294
+qstore_L3 push      64     2    12      582
+qstore_L3 pop       64     2    12      582
+qstore_L3 push      80     2    12      726
+qstore_L3 pop       80     2    12      726
+qstore_L4 push       1     2    12       18
+qstore_L4 pop        1     2    12       18
+qstore_L4 push       8     2    12      102
+qstore_L4 pop        8     2    12      102
+qstore_L4 push      16     2    12      198
+qstore_L4 pop       16     2    12      198
+qstore_L4 push      32     2    12      390
+qstore_L4 pop       32     2    12      390
+qstore_L4 push      64     2    12      774
+qstore_L4 pop       64     2    12      774
+qstore_L4 push      80     2    12      966
+qstore_L4 pop       80     2    12      966
+qstore_L8 push       1     2    28       38
+qstore_L8 pop        1     2    28       38
+qstore_L8 push       8     2    28      206
+qstore_L8 pop        8     2    28      206
+qstore_L8 push      16     2    28      398
+qstore_L8 pop       16     2    28      398
+qstore_L8 push      32     2    28      782
+qstore_L8 pop       32     2    28      782
+qstore_L8 push      64     2    28     1550
+qstore_L8 pop       64     2    28     1550
+qstore_L8 push      80     2    28     1934
+qstore_L8 pop       80     2    28     1934
+qstore_L16 push       1     2    60       78
+qstore_L16 pop        1     2    60       78
+qstore_L16 push       8     2    60      414
+qstore_L16 pop        8     2    60      414
+qstore_L16 push      16     2    60      798
+qstore_L16 pop       16     2    60      798
+qstore_L16 push      32     2    60     1566
+qstore_L16 pop       32     2    60     1566
+qstore_L16 push      64     2    60     3102
+qstore_L16 pop       64     2    60     3102
+qstore_L16 push      80     2    60     3870
+qstore_L16 pop       80     2    60     3870

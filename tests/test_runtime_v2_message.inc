@@ -203,45 +203,7 @@ CQ_TEST(each_body_carries_its_own_buckets_reason)
     }
 }
 
-/* AND THE ONE ROW A FIXTURE-LEVEL TEST WOULD GET WRONG, stated on its own and
- * as LITERAL BYTES rather than through `bucket_of`.
- *
- * WHY IT IS NOT A SECOND COPY OF THE CASE ABOVE, MEASURED RATHER THAN ARGUED
- * (2026-08-27, a PAIRED mutation — the only way to establish that a case which
- * shares a subject with another is not redundant). Move the shim's whole qram
- * bucket into `fp is v2` AND move `bucket_of`'s qram row to match it:
- * `each_body_carries_its_own_buckets_reason` goes GREEN, because the classifier
- * and the shim now agree with each other, and THIS case goes red. A case whose
- * oracle is a classifier can always be neutralised by editing the classifier;
- * one that spells the expected message out cannot.
- *
- * THE FIXTURE-LEVEL TRAP `bd vxk` RECORDS is why the row matters at all: 21 of
- * the 33 corpus fixtures that reach qram before any fp call hit
- * `cqrt_qram_alloc_f{32,64,80}` FIRST — simultaneously qram AND fp — so at the
- * fixture level the same line dies either way and only the reason string
- * changes. This asserts the symbol-level answer directly, and pairs it with an
- * INTEGER-width qram symbol, where fp could never have been the reason.
- *
- * A RIDER ON HOW THAT WAS MEASURED, because the first attempt reported the
- * opposite. Rewriting the shim's qram CALL SITES to `V2_FP` leaves `V2_QRAM`
- * unreferenced, which is `-Wunused-const-variable` and therefore a BUILD
- * FAILURE under `-Werror` — and a hand-run with the build output redirected to
- * /dev/null then runs the PREVIOUS binary and reports the baseline as the
- * mutant's result. Change the CONSTANT's value instead, and never suppress a
- * build's output while mutating. */
-CQ_TEST(qram_at_an_fp_width_is_qrams_refusal_and_not_fps)
-{
-    char msg[512];
-    int  aborted = 0;
-
-    child_stderr(t_qa_f32, msg, sizeof msg, &aborted);
-    CHECK_EQ(aborted, 1);
-    CHECK_STR_EQ(msg, "cqops: cqrt_qram_alloc_f32 not implemented ("
-                      V2_R_QRAM ")\n");
-
-    child_stderr(t_qa_i32, msg, sizeof msg, &aborted);
-    CHECK_EQ(aborted, 1);
-    CHECK_STR_EQ(msg, "cqops: cqrt_qram_alloc_i32 not implemented ("
-                      V2_R_QRAM ")\n");
-}
+/* The fp-width-qram case that stood here is GONE with PRD §15 D24: the 63
+ * qram symbols are real, and `cqrt_qram_alloc_f32` is an array of 32-bit
+ * bit-pattern cells, tested in tests/test_runtime_qram.c. */
 

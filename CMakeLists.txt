@@ -262,6 +262,13 @@ add_library(cqops STATIC
     src/kernels/divrem_s.c     # M20, Step 17 — K12 sdiv/srem. Sign-magnitude
                                # over M19, with the ONE gate list K12 does not
                                # get from a sibling: _cond_negate_inplace!
+    src/kernels/qrom.c         # M29, Step 27 — K13 QROM read at a quantum index
+                               # (v1.2, PRD §15 D24): the FLAT unary-iteration
+                               # tree, exported as a step block, and the Rule 7
+                               # load over it
+    src/kernels/qstore.c       # M30, Step 27 — K14 shadow store at a quantum
+                               # index over M29's tree. NOT a Rule 7 kernel
+                               # (D17's shape): push/pop, one tape slot
 
     # Layer 4 — the analog surface. Everything above this line is a classical
     # permutation over {X, CX, CCX} (Rule 4), which is the surface the two-bit
@@ -327,6 +334,12 @@ add_library(cqops STATIC
                                # M07's counter, and a write that is cqrt_copy
                                # into a KEPT rail. Aborts in cq_runtime_v2.c
                                # until this landed
+    shim/cq_shim_qram.c        # v1.2, PRD §15 D24 (bd 9zq, Step 27) — the QRAM
+                               # PAYLOAD TABLE: what an array token owns beyond
+                               # identity (width, count, cells, the LIFO tape)
+    shim/cq_runtime_qram.c     # v1.2, PRD §15 D24 — the 63 cqrt_qram_* symbols
+                               # at all nine widths; an fp width is a bit-pattern
+                               # cell. Aborts in cq_runtime_v2.c until then
     shim/cq_runtime_v2.c       # M26, Step 23 — the V1 BOUNDARY: the 109 cqrt_*
                                # symbols v1 defers, as loud cq_shim_unsupported
                                # bodies (PRD §15 D16 — 34 fp core, 63 qram,

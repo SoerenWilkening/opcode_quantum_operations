@@ -47,7 +47,7 @@ static void an_unmodelled_opcode_is_a_hard_error(void)
     fresh();
     (void)cq_shim_ctx();
     memset(&c, 0, sizeof c);
-    c.h[0] = 0; c.h[1] = -1; c.h[2] = -1;
+    c.h[0] = 0; c.h[1] = -1; c.h[2] = -1; c.h[3] = -1;
     c.ctrl = -1;
     /* op left at CQ_ROP_NONE, which is what a memset gives and what a caller
      * who forgot to set it would produce. */
@@ -65,7 +65,7 @@ static void an_opcode_past_the_table_is_a_hard_error(void)
     (void)cq_shim_ctx();
     memset(&c, 0, sizeof c);
     c.op   = (uint16_t)CQ_ROP__N;   /* one past the last modelled row */
-    c.h[0] = 0; c.h[1] = -1; c.h[2] = -1;
+    c.h[0] = 0; c.h[1] = -1; c.h[2] = -1; c.h[3] = -1;
     c.ctrl = -1;
     CQ_EXPECT_ABORT(cq_rec_push(&c));
 }

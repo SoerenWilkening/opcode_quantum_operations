@@ -1381,6 +1381,107 @@ set_tests_properties(test_runtime_tape_death.a_token_handed_to_cqrt_x
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:;handle out of range;tombstone;not live;not a live rail;poison;kernel:;distinctness")
 
+## Step 27 — v1.2, QRAM (PRD §15 D24, bd 9zq): shim/cq_runtime_qram.c over
+## shim/cq_shim_qram.[ch], M29 kernels/qrom.c (K13) and M30 kernels/qstore.c
+## (K14). The kernel suites: K13 through the shared driver with the cells as
+## one carved source, plus real-cell measurements beyond the driver's 128-bit
+## reach; K14 hand-rolled, for K8's reason. The ABI suite: the token, the
+## certificate on a POISONED index (the clause D24 (c) exists for), the
+## unsound face asserted as a strand, LIFO, §9, and the six corpus shapes.
+add_cqops_test(test_kernel_qrom)
+add_cqops_test(test_kernel_qstore)
+add_cqops_test(test_runtime_qram)
+
+add_cqops_death_test(test_kernel_qrom_death CASES
+    an_index_narrower_than_the_tree
+    a_count_of_zero
+    a_count_beyond_the_bound
+    two_cells_that_are_one_register
+    dst_is_a_cell
+    dst_overlaps_the_index
+)
+add_cqops_death_test(test_kernel_qstore_death CASES
+    a_push_onto_a_slot_that_is_not_zero
+    a_push_at_a_padded_index_onto_a_dirty_slot
+    the_value_rail_is_the_slot
+    the_slot_is_a_cell
+    the_index_overlaps_the_value
+)
+## Every kernel-layer refusal is `FATAL: kernel:`, and nothing beneath M29/M30
+## may have spoken — M05's distinctness assert (Debug-only, on qubit INDICES)
+## and the sandwich's fingerprint are the layers that would mask a deleted
+## guard, so their strings are pinned absent.
+set_tests_properties(test_kernel_qrom_death.an_index_narrower_than_the_tree
+                     test_kernel_qrom_death.a_count_of_zero
+                     test_kernel_qrom_death.a_count_beyond_the_bound
+                     test_kernel_qrom_death.two_cells_that_are_one_register
+                     test_kernel_qrom_death.dst_is_a_cell
+                     test_kernel_qrom_death.dst_overlaps_the_index
+                     test_kernel_qstore_death.a_push_onto_a_slot_that_is_not_zero
+                     test_kernel_qstore_death.a_push_at_a_padded_index_onto_a_dirty_slot
+                     test_kernel_qstore_death.the_value_rail_is_the_slot
+                     test_kernel_qstore_death.the_slot_is_a_cell
+                     test_kernel_qstore_death.the_index_overlaps_the_value
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;FATAL: shim:;distinctness;sandwich:;scratch:")
+
+add_cqops_death_test(test_runtime_qram_death CASES
+    a_rail_handed_as_the_array
+    a_tape_token_handed_as_the_array
+    an_array_token_handed_as_a_tape
+    an_array_of_another_element_width
+    a_count_of_zero
+    a_count_beyond_the_bound
+    an_out_of_the_wrong_width
+    a_value_of_the_wrong_width
+    an_index_that_is_not_i32
+    a_pop_on_an_empty_tape
+    a_pop_that_is_not_the_last_push
+    a_controlled_pop_of_an_uncontrolled_push
+    an_array_token_handed_to_cqrt_x
+    an_array_token_handed_to_cqrt_free
+    an_array_token_as_the_index
+)
+## THE SHIM's OWN, each discriminated against the OTHER shim messages in the
+## same file and against the tape file's, so a deleted guard cannot be masked
+## by a neighbouring one printing the same prefix.
+set_tests_properties(test_runtime_qram_death.a_rail_handed_as_the_array
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;TAPE token, not a qram;element width;kernel:;distinctness")
+set_tests_properties(test_runtime_qram_death.a_tape_token_handed_as_the_array
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;not a qram array token: the ABI;element width;kernel:;distinctness")
+set_tests_properties(test_runtime_qram_death.an_array_token_handed_as_a_tape
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;not a tape token: the ABI;kernel:;distinctness")
+set_tests_properties(test_runtime_qram_death.an_array_of_another_element_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;not a qram array token;TAPE token;kernel:;distinctness")
+set_tests_properties(test_runtime_qram_death.a_count_of_zero
+                     test_runtime_qram_death.a_count_beyond_the_bound
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;FATAL: kernel:;distinctness")
+set_tests_properties(test_runtime_qram_death.an_out_of_the_wrong_width
+                     test_runtime_qram_death.a_value_of_the_wrong_width
+                     test_runtime_qram_death.an_index_that_is_not_i32
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;not a qram array token;FATAL: kernel:;distinctness")
+set_tests_properties(test_runtime_qram_death.a_pop_on_an_empty_tape
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;does not match the last;FATAL: kernel:;distinctness")
+set_tests_properties(test_runtime_qram_death.a_pop_that_is_not_the_last_push
+                     test_runtime_qram_death.a_controlled_pop_of_an_uncontrolled_push
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: reg:;no unpopped store;FATAL: kernel:;distinctness")
+## M07's, REACHED THROUGH THE SHIM (plan §0.5's two funnels): `FATAL: shim:`
+## must be absent, and so must M07's GENERIC refusals — a token is named as a
+## token.
+set_tests_properties(test_runtime_qram_death.an_array_token_handed_to_cqrt_x
+                     test_runtime_qram_death.an_array_token_handed_to_cqrt_free
+                     test_runtime_qram_death.an_array_token_as_the_index
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:;handle out of range;tombstone;not live;not a live rail;poison;kernel:;distinctness")
+
 add_cqops_death_test(test_runtime_rail_death CASES
     measure_of_a_rail_wider_than_its_symbol
     copy_between_rails_of_different_widths

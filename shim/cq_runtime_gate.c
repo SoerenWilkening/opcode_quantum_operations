@@ -170,7 +170,7 @@ static void rec(cq_rop op, int32_t h0, int32_t h1, int32_t h2,
     cq_call_rec c;
     memset(&c, 0, sizeof c);
     c.op   = (uint16_t)op;
-    c.h[0] = h0; c.h[1] = h1; c.h[2] = h2;
+    c.h[0] = h0; c.h[1] = h1; c.h[2] = h2; c.h[3] = CQ_REG_NONE;
     c.ctrl = ctrl;
     memcpy(&c.angle, &angle, sizeof c.angle);   /* BITWISE — see the rail copy */
     cq_rec_push(&c);

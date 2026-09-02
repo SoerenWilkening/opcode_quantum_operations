@@ -173,7 +173,7 @@ static void rec_copy(int32_t src, int32_t dst)
     cq_call_rec c;
     memset(&c, 0, sizeof c);
     c.op   = (uint16_t)CQ_ROP_COPY;
-    c.h[0] = src; c.h[1] = dst; c.h[2] = CQ_REG_NONE;
+    c.h[0] = src; c.h[1] = dst; c.h[2] = CQ_REG_NONE; c.h[3] = CQ_REG_NONE;
     c.ctrl = CQ_REG_NONE;
     cq_rec_push(&c);
 }
@@ -344,7 +344,7 @@ static int32_t tpl_binary(tpl_req r)
         cq_call_rec c;
         memset(&c, 0, sizeof c);
         c.op   = (uint16_t)(is_unc ? CQ_ROP_TPL_UNC : CQ_ROP_TPL_FWD);
-        c.h[0] = r.out; c.h[1] = r.a_h; c.h[2] = r.b_h;
+        c.h[0] = r.out; c.h[1] = r.a_h; c.h[2] = r.b_h; c.h[3] = CQ_REG_NONE;
         c.imm  = r.lo ^ r.hi;   /* the `_hl`/`_lh` literal, in the identity */
         c.ctrl = r.ctrl;
         c.tag  = r.tag;
@@ -544,7 +544,7 @@ static int32_t tpl_cast(cq_shim_cast_kind kind, int from_bits, int to_bits,
         cq_call_rec c;
         memset(&c, 0, sizeof c);
         c.op   = (uint16_t)(is_unc ? CQ_ROP_TPL_UNC : CQ_ROP_TPL_FWD);
-        c.h[0] = out; c.h[1] = a_handle; c.h[2] = CQ_REG_NONE;
+        c.h[0] = out; c.h[1] = a_handle; c.h[2] = CQ_REG_NONE; c.h[3] = CQ_REG_NONE;
         c.ctrl = CQ_REG_NONE;
         c.tag  = 0x80000000u + (uint32_t)kind * 65536u + f * 256u + t;
         cq_rec_push(&c);

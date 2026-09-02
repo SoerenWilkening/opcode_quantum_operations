@@ -69,8 +69,6 @@
  * test states them rather than importing them: a shim that swapped two buckets
  * would agree with itself and with any oracle derived from it. */
 #define V2_R_FP   "fp is v2"
-#define V2_R_QRAM "qram is v2: libcqops models no addressable quantum array " \
-                  "at any width"
 #define V2_R_HAND "a CQ_lang intrinsic or libm template minted a handle; "    \
                   "libcqops cannot mint a register-less handle without "      \
                   "diverging the shared D5 counter (bd ck6)"
@@ -79,13 +77,13 @@
 
 /* D16's population, derived from the NAME and from nothing else: qram is a
  * family and is deferred at EVERY width, so it is tested before the fp token
- * (tape was, until D23 put it in scope — a `cqrt_tape_` name is v1.1's now). That order IS the decision `bd vxk` recorded — `cqrt_qram_alloc_f32`
+ * (tape was, until D23 put it in scope, and qram was, until D24 — a `cqrt_tape_` name is v1.1's and a `cqrt_qram_` name is v1.2's now). That order IS the decision `bd vxk` recorded — `cqrt_qram_alloc_f32`
  * is qram's, not fp's — and writing it the other way round is what the case
  * below exists to catch. */
 static const char *bucket_of(const char *name)
 {
     if (strcmp(name, "cqrt_alloc_handle") == 0)  return V2_R_HAND;
-    if (strncmp(name, "cqrt_qram_", 10) == 0)    return V2_R_QRAM;
+    if (strncmp(name, "cqrt_qram_", 10) == 0)    return NULL;   /* v1.2, D24 */
     if (strstr(name, "_f16") || strstr(name, "_f32") ||
         strstr(name, "_f64") || strstr(name, "_f80")) return V2_R_FP;
     return NULL;                                  /* v1 serves it */
@@ -153,9 +151,9 @@ static uint32_t header_deferred(char out[][V2_NAME_MAX], uint32_t cap)
  * The cases.
  * ------------------------------------------------------------------------- */
 
-/* THE COUNT IS 98 AND ITS DECOMPOSITION IS PRD §15 D16's ARITHMETIC AS D23 LEFT IT:
- * 173 declared = 32 rail + 30 gate + 11 tape (v1.1) + 2 cqrt_h* + 34 fp + 63 qram + 1
- * alloc_handle. The counterfactual is what makes it decisive — if either of the
+/* THE COUNT IS 35 AND ITS DECOMPOSITION IS PRD §15 D16's ARITHMETIC AS D24 LEFT IT:
+ * 173 declared = 32 rail + 30 gate + 11 tape (v1.1) + 63 qram (v1.2) + 2 cqrt_h* + 34 fp
+ * + 1 alloc_handle. The counterfactual is what makes it decisive — if either of the
  * rail or gate surfaces took all nine widths of its families it would be 48,
  * not 32 or 30. */
 /* OBSERVED FAILING (2026-08-27, both configurations): one extra deferred
@@ -163,29 +161,27 @@ static uint32_t header_deferred(char out[][V2_NAME_MAX], uint32_t cap)
  * — the case is a claim about the header, not about the shim — which is exactly
  * why it is worth having: it is the tripwire for a re-pin of CQ_lang's ABI
  * quietly widening the population this file is responsible for. */
-CQ_TEST(the_deferred_surface_is_exactly_the_headers_98_declarations)
+CQ_TEST(the_deferred_surface_is_exactly_the_headers_35_declarations)
 {
     char want[128][V2_NAME_MAX];
     const uint32_t nw = header_deferred(want, 128u);
 
-    CHECK_EQ((int)nw, 98);
-    CHECK_EQ((int)CQ_V2_N_THUNKS, 98);
+    CHECK_EQ((int)nw, 35);
+    CHECK_EQ((int)CQ_V2_N_THUNKS, 35);
 
     /* strcmp and not `==`: two occurrences of the same string literal are not
      * required to share an address, so a pointer comparison here is
      * unspecified — and -Wstring-compare says so, which is why it is a build
      * error in this project rather than a latent one. */
-    uint32_t fp = 0u, qram = 0u, hand = 0u;
+    uint32_t fp = 0u, hand = 0u;
     for (uint32_t i = 0; i < nw; i++) {
         const char *b = bucket_of(want[i]);
 
         if (!b)                              continue;
         if (strcmp(b, V2_R_FP) == 0)         fp++;
-        else if (strcmp(b, V2_R_QRAM) == 0)  qram++;
         else if (strcmp(b, V2_R_HAND) == 0)  hand++;
     }
     CHECK_EQ((int)fp, 34);
-    CHECK_EQ((int)qram, 63);
     CHECK_EQ((int)hand, 1);
 }
 
@@ -207,7 +203,8 @@ CQ_TEST(cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim)
 {
     static const char *const files[] = {
         "cq_shim_ctx.c", "cq_shim_proof.c", "cq_runtime_rail.c",
-        "cq_runtime_gate.c", "cq_runtime_v2.c", "cq_runtime_tape.c"
+        "cq_runtime_gate.c", "cq_runtime_v2.c", "cq_runtime_tape.c",
+        "cq_runtime_qram.c", "cq_shim_qram.c"
     };
     char line[512], path[512], ids[8][V2_NAME_MAX];
     int  declared = 0;
@@ -261,10 +258,9 @@ CQ_TEST(cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim)
 #include "test_runtime_v2_message.inc"
 
 CQ_TEST_MAIN(
-    CQ_CASE(the_deferred_surface_is_exactly_the_headers_98_declarations),
+    CQ_CASE(the_deferred_surface_is_exactly_the_headers_35_declarations),
     CQ_CASE(every_deferred_symbol_aborts_with_a_well_formed_message),
     CQ_CASE(the_names_the_bodies_print_are_exactly_the_headers_deferred_set),
     CQ_CASE(each_body_carries_its_own_buckets_reason),
-    CQ_CASE(qram_at_an_fp_width_is_qrams_refusal_and_not_fps),
     CQ_CASE(cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim)
 )

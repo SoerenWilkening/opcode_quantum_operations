@@ -3,6 +3,7 @@
 
 #include "cq_shim_ctx.h"
 
+#include "cq_shim_qram.h"
 #include "cq_shim_record.h"
 #include "cq_shim_trace.h"
 
@@ -116,6 +117,9 @@ void cq_shim_ctx_reset(void)
      * one handle number is an OVERLAPPING #REGISTER rather than a wrong
      * picture. */
     cq_trace_reset();
+    /* And the qram payload table (PRD §15 D24), keyed by token handle, for
+     * the same reason a third subject over. */
+    cq_qram_reset();
 
     if (!g_live) return;
     cq_ctx_dispose(&g_ctx);

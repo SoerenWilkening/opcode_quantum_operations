@@ -41,26 +41,8 @@ CQ_V2_T_FP(80, long double)
 static void t_ryci_f32(void) { cqrt_ry_f32_controlled_inv(0, 0, 0.0); }
 static void t_ryci_f64(void) { cqrt_ry_f64_controlled_inv(0, 0, 0.0); }
 
-#define CQ_V2_T_QRAM(W)                                                       \
-    static void t_qa_##W(void)   { (void)cqrt_qram_alloc_##W(0); }            \
-    static void t_ql_##W(void)   { (void)cqrt_qram_load_##W(0, 0); }          \
-    static void t_qlu_##W(void)  { cqrt_qram_load_##W##_unc(0, 0, 0); }       \
-    static void t_qs_##W(void)   { cqrt_qram_store_##W(0, 0, 0); }            \
-    static void t_qsu_##W(void)  { cqrt_qram_store_##W##_unc(0, 0, 0); }      \
-    static void t_qsc_##W(void)                                               \
-    { cqrt_qram_store_##W##_controlled(0, 0, 0, 0); }                         \
-    static void t_qscu_##W(void)                                              \
-    { cqrt_qram_store_##W##_controlled_unc(0, 0, 0, 0); }
-
-CQ_V2_T_QRAM(i1)
-CQ_V2_T_QRAM(i8)
-CQ_V2_T_QRAM(i16)
-CQ_V2_T_QRAM(i32)
-CQ_V2_T_QRAM(i64)
-CQ_V2_T_QRAM(f16)
-CQ_V2_T_QRAM(f32)
-CQ_V2_T_QRAM(f64)
-CQ_V2_T_QRAM(f80)
+/* The 63 qram thunks: GONE, 2026-09-02 (PRD §15 D24) — the symbols are
+ * real in shim/cq_runtime_qram.c and tests/test_runtime_qram.c drives them. */
 
 static void t_alloc_handle(void) { (void)cqrt_alloc_handle(); }
 
@@ -68,16 +50,9 @@ static void t_alloc_handle(void) { (void)cqrt_alloc_handle(); }
     t_alloc_f##W, t_measure_f##W, t_ry_f##W, t_rz_f##W,                       \
     t_rzc_f##W, t_rzci_f##W, t_copy_f##W, t_copyc_f##W
 
-#define CQ_V2_ROW_QRAM(W)                                                     \
-    t_qa_##W, t_ql_##W, t_qlu_##W, t_qs_##W, t_qsu_##W, t_qsc_##W, t_qscu_##W
-
 static void (*const CQ_V2_THUNKS[])(void) = {
     CQ_V2_ROW_FP(16), CQ_V2_ROW_FP(32), CQ_V2_ROW_FP(64), CQ_V2_ROW_FP(80),
     t_ryci_f32, t_ryci_f64,
-
-    CQ_V2_ROW_QRAM(i1),  CQ_V2_ROW_QRAM(i8),  CQ_V2_ROW_QRAM(i16),
-    CQ_V2_ROW_QRAM(i32), CQ_V2_ROW_QRAM(i64), CQ_V2_ROW_QRAM(f16),
-    CQ_V2_ROW_QRAM(f32), CQ_V2_ROW_QRAM(f64), CQ_V2_ROW_QRAM(f80),
 
     t_alloc_handle
 };

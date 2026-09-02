@@ -62,9 +62,9 @@ static int commutes(uint32_t up, const cq_call_rec *u, uint32_t wp, const cq_cal
     const cq_reff *eu = cq_rec_effect(u->op);
     const cq_reff *ew = cq_rec_effect(w->op);
 
-    for (uint32_t i = 0; i < 3u; i++) {
+    for (uint32_t i = 0; i < CQ_REC_SLOTS; i++) {
         if (!(eu->controls & R(i)) || u->h[i] < 0) continue;
-        for (uint32_t j = 0; j < 3u; j++) {
+        for (uint32_t j = 0; j < CQ_REC_SLOTS; j++) {
             uint32_t lo, hi, n, k;
             uint32_t pos[MAXW];
             if (!(ew->controls & R(j)) || w->h[j] != u->h[i]) continue;
@@ -108,7 +108,7 @@ static int pair_operands_unchanged(const cq_call_rec *c1, uint32_t p1, uint32_t 
      * the ABI DECLARES them classical and the shim consumes them
      * arithmetically. They are still LISTED, so that a future opcode whose
      * immediate is a handle cannot slip through the same door. */
-    for (uint32_t i = 0; i < 3u; i++) {
+    for (uint32_t i = 0; i < CQ_REC_SLOTS; i++) {
         if (!(e->reads & R(i)) || c1->h[i] < 0) continue;
         if (!cq_rec_hist(c1->h[i])) continue;
         if (!reduce(c1->h[i], p1, p2)) return 0;
@@ -151,7 +151,7 @@ static int pair_operands_unchanged(const cq_call_rec *c1, uint32_t p1, uint32_t 
      * then the line would look like dead code. Do not delete it because a
      * battery calls it equivalent; the scope of that verdict is the v1 opcode
      * table, and it is written down here so the next reader knows that. */
-    for (uint32_t i = 0; i < 3u; i++) {
+    for (uint32_t i = 0; i < CQ_REC_SLOTS; i++) {
         int32_t v = c1->h[i];
         uint32_t pos[MAXW], n, kept = 0;
         if (!(e->writes & R(i)) || v < 0 || v == target) continue;

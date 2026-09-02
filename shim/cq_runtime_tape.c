@@ -69,6 +69,7 @@
 #include "cq_runtime_abi.h"
 
 #include "cq_shim_ctx.h"
+#include "cq_shim_qram.h"
 #include "cq_shim_record.h"
 #include "cq_shim_trace.h"
 
@@ -111,6 +112,12 @@ static void tape_slot(const cq_ctx *ctx, int32_t tape, int32_t src)
         cq_tape_die("the tape operand is not a tape token: the ABI's first "
                     "operand is the t<N> cqrt_tape_alloc returned, and this "
                     "handle is a rail (live, freed or measured)", tape, (long)src);
+    /* TWO OWNERS OF ONE STATE (PRD §15 D24, 2026-09-02): a qram ARRAY is the
+     * same CQ_SLOT_TOKEN and passed the check above until qram existed. The
+     * payload table is how the two are told apart. */
+    if (cq_qram_find(tape))
+        cq_tape_die("the tape operand is a qram ARRAY token, not a tape",
+                    tape, (long)src);
 }
 
 /* The source: a rail this symbol only READS. Resolved through `cq_reg_cbits`
@@ -161,7 +168,7 @@ static void rec(cq_rop op, int32_t h0, int32_t h1, int32_t h2, int32_t ctrl)
     cq_call_rec c;
     memset(&c, 0, sizeof c);
     c.op   = (uint16_t)op;
-    c.h[0] = h0; c.h[1] = h1; c.h[2] = h2;
+    c.h[0] = h0; c.h[1] = h1; c.h[2] = h2; c.h[3] = CQ_REG_NONE;
     c.ctrl = ctrl;
     cq_rec_push(&c);
 }

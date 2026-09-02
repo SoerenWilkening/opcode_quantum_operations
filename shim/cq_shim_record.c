@@ -43,6 +43,14 @@ static const cq_reff EFF[CQ_ROP__N] = {
 [CQ_ROP_CSWAP]       = {R(0),           R(1)|R(2),    R(0),       0,     0, 1, 0, 0, 0, 0},
 [CQ_ROP_TAPE_WRITE]  = {R(0),           R(1),         0,          0,     0, 0, 0, 0, 0, 0},
 [CQ_ROP_TAPE_WRITE_CTRL] = {R(0)|R(1),  R(2),         R(0),       0,     0, 0, 0, 0, 0, 0},
+/* D24: slots are (out, arr, idx) for a load and (arr, idx, val, T) for a store.
+ * The pop READS the slot it restores from; the push does not (T is born |0>). */
+[CQ_ROP_QRAM_LOAD]      = {R(1)|R(2),      R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_QRAM_LOAD_UNC},
+[CQ_ROP_QRAM_LOAD_UNC]  = {R(1)|R(2),      R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_QRAM_LOAD},
+[CQ_ROP_QRAM_STORE]     = {R(0)|R(1)|R(2), R(0)|R(3),    0,          0,     0, 0, 0, 0, 1, CQ_ROP_QRAM_STORE_UNC},
+[CQ_ROP_QRAM_STORE_UNC] = {R(0)|R(1)|R(2)|R(3), R(0)|R(3), 0,        0,     0, 0, 0, 0, 1, CQ_ROP_QRAM_STORE},
+[CQ_ROP_QRAM_STORE_CTRL]     = {R(0)|R(1)|R(2), R(0)|R(3), 0,        0,     0, 0, 0, 0, 1, CQ_ROP_QRAM_STORE_CTRL_UNC},
+[CQ_ROP_QRAM_STORE_CTRL_UNC] = {R(0)|R(1)|R(2)|R(3), R(0)|R(3), 0,   0,     0, 0, 0, 0, 1, CQ_ROP_QRAM_STORE_CTRL},
 [CQ_ROP_ADDC]        = {0,              R(0),         0,          R(1),  0, 0, 0, 1, 0, 0},
 [CQ_ROP_XORC]        = {0,              R(0),         0,          R(1),  0, 1, 0, 0, 0, 0},
 [CQ_ROP_TPL_FWD]     = {R(1)|R(2),      R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_TPL_UNC},
@@ -147,7 +155,7 @@ void cq_rec_mint(int32_t h, uint32_t width, uint64_t lo, uint64_t hi,
         cq_call_rec c;
         memset(&c, 0, sizeof c);
         c.op   = (uint16_t)CQ_ROP_MINT;
-        c.h[0] = h; c.h[1] = -1; c.h[2] = -1;
+        c.h[0] = h; c.h[1] = -1; c.h[2] = -1; c.h[3] = -1;
         c.ctrl = -1;
         cq_rec_push(&c);
     }
@@ -202,7 +210,7 @@ void cq_rec_push(const cq_call_rec *c)
     slot = &g_call[g_n++];
     *slot = *c;
 
-    for (uint32_t i = 0; i < 3u; i++) {
+    for (uint32_t i = 0; i < CQ_REC_SLOTS; i++) {
         int32_t h = c->h[i];
         if (h < 0) continue;
         grow_handles(h);
@@ -250,14 +258,14 @@ void cq_rec_push(const cq_call_rec *c)
      * a computational-basis value. It is still recorded as a CALL, because its
      * operands are still reads and its position still bounds an interval. */
     if (!e->diagonal) {
-        for (uint32_t i = 0; i < 3u; i++)
+        for (uint32_t i = 0; i < CQ_REC_SLOTS; i++)
             if ((e->writes & R(i)) && c->h[i] >= 0) note_write(c->h[i], pos);
     }
 
     /* A NON-DIAGONAL ROTATION TAINTS THE RAIL IT WRITES, for the R1 substitute.
      * Only the general `Ry` column reaches here: every `Rz` row is diagonal. */
     if ((c->op == CQ_ROP_RY || c->op == CQ_ROP_RY_CTRL_INV)) {
-        for (uint32_t i = 0; i < 3u; i++)
+        for (uint32_t i = 0; i < CQ_REC_SLOTS; i++)
             if ((e->writes & R(i)) && c->h[i] >= 0 && g_h[c->h[i]].first_rot < 0)
                 g_h[c->h[i]].first_rot = (long)pos;
     }

@@ -365,6 +365,48 @@ CQ_TEST(an_uncontrolled_tape_write_names_the_source_in_and_the_kept_rail_out)
     CHECK_STR_EQ(c.op[c.n_ops - 1], "name=tape_write, in=h1, out=h2");
 }
 
+/* PRD §15 D24: `cqrt_qram_alloc_<W>` joins the alloc exemption — pinned as an
+ * ABSENCE by name — and a load's bracket names the INDEX in and `out` out and
+ * NOTHING else: the array is a token (`in=` would spell it h<N>) and the cells
+ * and the slot are handles CQ_lang never received (rule 3), so the cell the
+ * store wrote has no `#REGISTER` line even though it now owns a qubit, and a
+ * store's bracket has no `out=` at all. One cell and a classical index, because
+ * the trace config's pool ceiling is three logical qubits: `val`, the cell it
+ * is copied into, and `out`. */
+CQ_TEST(a_qram_alloc_opens_no_bracket_and_the_cells_are_unregistered)
+{
+    const char *path = "test_shim_trace_qram.out";
+    cq_conf c;
+    int32_t a, idx, val, out;
+    int i, seen = 0, ops = 0;
+
+    trace_begin(path);
+    a   = cqrt_qram_alloc_i1(1);                        /* h0: token; h1 cell */
+    idx = cqrt_alloc_i32(0);                            /* h2, classical      */
+    val = a_quantum_bit(0.3);                           /* h3 -> q0           */
+    cqrt_qram_store_i1(a, idx, val);                    /* cell h1 -> q1; h4 slot */
+    out = cqrt_qram_load_i1(a, idx);                    /* h5 -> q2           */
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the qram program");
+    CHECK_EQ((long long)a, 0);
+    CHECK_EQ((long long)idx, 2);
+    CHECK_EQ((long long)out, 5);
+    CHECK_EQ(c.n_reg, 2);                               /* val and out only   */
+    for (i = 0; i < c.n_reg; i++)
+        if (strstr(c.reg_line[i], "name=h1 ") || strstr(c.reg_line[i], "name=h4 "))
+            seen++;
+    CHECK_EQ(seen, 0);                                  /* cell, slot: none   */
+    for (i = 0; i < c.n_ops; i++) {
+        if (strncmp(c.op[i], "name=qram_alloc", 15) == 0) seen++;
+        if (strcmp(c.op[i], "name=qram_store, in=h2|h3") == 0) ops++;
+        if (strcmp(c.op[i], "name=qram_load, in=h2, out=h5") == 0) ops++;
+    }
+    CHECK_EQ(seen, 0);
+    CHECK_EQ(ops, 2);
+}
+
 /* -------------------------------------------------------------------------
  * 4. The oracle's own instrument, and the disjoint-stream claim.
  * ------------------------------------------------------------------------- */
@@ -462,6 +504,7 @@ CQ_TEST_MAIN(
     CQ_CASE(a_multi_lane_register_lists_its_lanes_in_bit_order),
     CQ_CASE(a_controlled_tape_write_registers_the_kept_rail_and_names_no_token),
     CQ_CASE(an_uncontrolled_tape_write_names_the_source_in_and_the_kept_rail_out),
+    CQ_CASE(a_qram_alloc_opens_no_bracket_and_the_cells_are_unregistered),
     CQ_CASE(the_conformance_reader_catches_what_it_is_written_to_catch),
     CQ_CASE(the_annotation_layer_is_inert_under_every_other_sink)
 )

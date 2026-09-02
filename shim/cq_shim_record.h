@@ -107,6 +107,26 @@ typedef enum {
      * Every pairing flag is 0: a second write mints a DIFFERENT `out`, so
      * `self_adjoint` would be a lie, and CQ_lang never frees the kept rail. */
     CQ_ROP_TAPE_WRITE, CQ_ROP_TAPE_WRITE_CTRL,
+    /* PRD §15 D24 (v1.2, QRAM). SIX rows, and the shape of each is the whole
+     * of D24 (c). LOAD / LOAD_UNC are TPL_FWD / TPL_UNC's shape with the ARRAY
+     * TOKEN in a source slot: `out, arr, idx`, reads `arr|idx`, writes `out`,
+     * twins. STORE / STORE_UNC name FOUR handles — `arr, idx, val, T` (the
+     * shim's tape slot, a rail CQ_lang never sees) — the forward reads
+     * `arr|idx|val` and writes `arr|T`, the pop reads `T` as well and writes
+     * the same two; twins. The two CTRL rows are the same with `pred` in
+     * `ctrl`. `controls = 0` on all six: no commutation is claimed for a memory
+     * op, which is the DECLINE direction.
+     *
+     * THE ARRAY TOKEN HAS A HISTORY HERE, UNLIKE A TAPE TOKEN, and the reason
+     * is the load pair: `out`'s certificate reduces `pair_operands_unchanged`
+     * over (load, load_unc), which reduces the ARRAY's writes in that window —
+     * and a token with no history would make a store between them INVISIBLE
+     * and RELEASE `out` DIRTY. The CELLS have no history: never an operand of
+     * a recorded call, never freeable by CQ_lang. The tape slot's history is
+     * what releases it CLEAN at the pop, through cq_shim_free_proof. */
+    CQ_ROP_QRAM_LOAD, CQ_ROP_QRAM_LOAD_UNC,
+    CQ_ROP_QRAM_STORE, CQ_ROP_QRAM_STORE_UNC,
+    CQ_ROP_QRAM_STORE_CTRL, CQ_ROP_QRAM_STORE_CTRL_UNC,
     CQ_ROP_ADDC, CQ_ROP_XORC,
     CQ_ROP_TPL_FWD, CQ_ROP_TPL_UNC,
     CQ_ROP__N
@@ -116,14 +136,22 @@ typedef enum {
  * is keyed by handle (D15 §7 — "the certificate is what finally uses the h"),
  * and a qubit index is recycled LIFO (D4) while a handle is monotonic (D5), so
  * an index cannot identify a rail across a free. */
+/* FOUR OPERAND SLOTS SINCE PRD §15 D24 (2026-09-02), THREE BEFORE. A qram
+ * store names `arr, idx, val` AND the tape slot it displaces the old cell onto,
+ * and a twin pair must carry IDENTICAL slots (adjoint_matches compares the
+ * whole array), so the slot the shim mints has to be in the record. Every
+ * producer sets EVERY slot — an unused slot is CQ_REG_NONE, never the 0 a
+ * memset leaves, because handle 0 is a valid live rail (reg.h). */
+#define CQ_REC_SLOTS 4
+
 typedef struct {
     uint16_t op;
-    int32_t  h[3];      /* CQ_REG_NONE for an absent slot                    */
+    int32_t  h[CQ_REC_SLOTS]; /* CQ_REG_NONE for an absent slot              */
     uint64_t imm;       /* addc/xorc immediate, already masked to the width  */
     uint64_t angle;     /* the double's BIT PATTERN — see the .c on why      */
     int32_t  ctrl;      /* the §9 region's flag handle, or CQ_REG_NONE       */
     uint32_t tag;       /* template opcode identity; 0 elsewhere             */
-    uint32_t xpar[3];   /* each operand's cqrt_x parity, FROZEN here         */
+    uint32_t xpar[CQ_REC_SLOTS]; /* each operand's cqrt_x parity, FROZEN     */
 } cq_call_rec;   /* NOT `cq_rec` — tests/support/mock_sink.h already owns that
                   * name for a RECORDED GATE, and the two would collide in any
                   * translation unit that includes both. Only a test including
@@ -144,7 +172,8 @@ typedef struct {
     uint32_t nw, capw;
 } cq_hist;
 
-/* The effect table, one row per cq_rop. Masks are over operand slots 0..2. */
+/* The effect table, one row per cq_rop. Masks are over operand slots
+ * 0..CQ_REC_SLOTS-1. */
 typedef struct {
     uint8_t reads, writes, controls, imms;
     uint8_t diagonal;       /* phase-only: never enters a write history      */

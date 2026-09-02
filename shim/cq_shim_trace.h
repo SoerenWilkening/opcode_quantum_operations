@@ -74,7 +74,8 @@
  * stated as a rule rather than applied case by case, is that it is CHECKABLE:
  *
  *     every `cqrt_*` and `cq_shim_*` entry point opens exactly one bracket,
- *     EXCEPT the five `cqrt_alloc_i<W>` and `cqrt_tape_alloc`, which open none.
+ *     EXCEPT the five `cqrt_alloc_i<W>`, `cqrt_tape_alloc` and the nine
+ *     `cqrt_qram_alloc_<W>`, which open none.
  *
  * THE EXEMPTION IS ONE NAMED FAMILY, DECIDED STATICALLY, AND THAT IS WHAT KEEPS
  * THE RULE A RULE. "Bracket the ones that emit" is NOT checkable and is still
@@ -84,7 +85,9 @@
  * qubits and `cq_reg_alloc_const` takes the register TABLE rather than the
  * context, so it cannot reach a `qec_*` call at any value or any width.
  * `cqrt_tape_alloc` joined it on 2026-09-02 (PRD §15 D23) on the SAME static
- * ground: `cq_reg_alloc_token` takes the table and mints a zero-qubit token. The
+ * ground: `cq_reg_alloc_token` takes the table and mints a zero-qubit token —
+ * and `cqrt_qram_alloc_<W>` later that day (PRD §15 D24), on the same ground
+ * twice over: the token and every cell are minted through the table. The
  * bracket it used to open (Step 26) was conformant and empty; it was dropped
  * 2026-08-28 because an OP unit carrying no gate is noise in the algorithm view
  * and says nothing the `#REGISTER` header does not. See `cq_runtime_rail.c`'s

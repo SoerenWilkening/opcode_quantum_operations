@@ -2,7 +2,9 @@
  * `cqrt_*` symbols libcqops COULD serve but v1 defers: 34 fp-width core
  * symbols, 63 `qram`, ~~11 `tape`~~ and `cqrt_alloc_handle`. **98 since
  * 2026-09-02** — the 11 tape bodies moved into scope (PRD §15 D23,
- * shim/cq_runtime_tape.c); every "109" and "74" below is the 2026-08-27 figure.
+ * shim/cq_runtime_tape.c); **35 since later that day** — PRD §15 D24 moved the
+ * 63 qram bodies into shim/cq_runtime_qram.c. Every "109" and "74" below is the
+ * 2026-08-27 figure.
  *
  * PRD §15 D16 (bd vxk, bd r3y, bd ck6), and the discriminator is CAPABILITY
  * rather than liveness. libcqops DEFINES every `cqrt_*` it could serve —
@@ -82,14 +84,12 @@
 
 #include <stdint.h>
 
-/* The reason strings — three since D23 retired `tape is v2`. `"fp is v2"` is
+/* The reason strings — two since D24 retired `qram is v2` (three after D23). `"fp is v2"` is
  * VERBATIM the bucket string M28's generated bodies already use (shim/cq_shim.h),
  * because it is the same reason; the other two are what `bd vxk`'s "a third
  * reason string" asked for. They are pinned literally, per symbol, in
  * tests/test_runtime_v2.c. */
 static const char *const V2_FP     = "fp is v2";
-static const char *const V2_QRAM   = "qram is v2: libcqops models no "
-                                     "addressable quantum array at any width";
 static const char *const V2_HANDLE = "a CQ_lang intrinsic or libm template "
                                      "minted a handle; libcqops cannot mint a "
                                      "register-less handle without diverging "
@@ -145,42 +145,12 @@ void cqrt_ry_f64_controlled_inv(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
   cq_shim_unsupported("cqrt_ry_f64_controlled_inv", V2_FP); }
 
-/* --- The 63 qram symbols -------------------------------------------------- */
-
-#define CQ_V2_QRAM_WIDTH(W)                                                   \
-    int32_t cqrt_qram_alloc_##W(int32_t count)                                \
-    { (void)count;                                                            \
-      cq_shim_unsupported("cqrt_qram_alloc_" #W, V2_QRAM); }                  \
-    int32_t cqrt_qram_load_##W(int32_t arr, int32_t idx)                      \
-    { (void)arr; (void)idx;                                                   \
-      cq_shim_unsupported("cqrt_qram_load_" #W, V2_QRAM); }                   \
-    void cqrt_qram_load_##W##_unc(int32_t out, int32_t arr, int32_t idx)      \
-    { (void)out; (void)arr; (void)idx;                                        \
-      cq_shim_unsupported("cqrt_qram_load_" #W "_unc", V2_QRAM); }            \
-    void cqrt_qram_store_##W(int32_t arr, int32_t idx, int32_t val)           \
-    { (void)arr; (void)idx; (void)val;                                        \
-      cq_shim_unsupported("cqrt_qram_store_" #W, V2_QRAM); }                  \
-    void cqrt_qram_store_##W##_unc(int32_t arr, int32_t idx, int32_t val)     \
-    { (void)arr; (void)idx; (void)val;                                        \
-      cq_shim_unsupported("cqrt_qram_store_" #W "_unc", V2_QRAM); }           \
-    void cqrt_qram_store_##W##_controlled(int32_t pred, int32_t arr,          \
-                                          int32_t idx, int32_t val)           \
-    { (void)pred; (void)arr; (void)idx; (void)val;                            \
-      cq_shim_unsupported("cqrt_qram_store_" #W "_controlled", V2_QRAM); }    \
-    void cqrt_qram_store_##W##_controlled_unc(int32_t pred, int32_t arr,      \
-                                              int32_t idx, int32_t val)       \
-    { (void)pred; (void)arr; (void)idx; (void)val;                            \
-      cq_shim_unsupported("cqrt_qram_store_" #W "_controlled_unc", V2_QRAM); }
-
-CQ_V2_QRAM_WIDTH(i1)
-CQ_V2_QRAM_WIDTH(i8)
-CQ_V2_QRAM_WIDTH(i16)
-CQ_V2_QRAM_WIDTH(i32)
-CQ_V2_QRAM_WIDTH(i64)
-CQ_V2_QRAM_WIDTH(f16)
-CQ_V2_QRAM_WIDTH(f32)
-CQ_V2_QRAM_WIDTH(f64)
-CQ_V2_QRAM_WIDTH(f80)
+/* --- The 63 qram symbols: GONE, 2026-09-02 (PRD §15 D24) ----------------- */
+/* They live in shim/cq_runtime_qram.c as v1.2 — D23's token plus `count`
+ * registers, Bennett's unary-iteration tree for the read and his shadow store
+ * under it for the write. This file's population is 35: the 34 fp-width core
+ * symbols and `cqrt_alloc_handle`. The `V2_QRAM` reason string is gone with
+ * them, and the ADDRESSABLE-MEMORY side of the recorded seam below is empty. */
 
 /* --- The 11 tape symbols: GONE, 2026-09-02 (PRD §15 D23) ------------------ */
 

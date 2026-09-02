@@ -1,0 +1,109 @@
+# M29 kernels/qrom.c — K13 QROM read at a quantum index (sandwiched; key qload_L<count>)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+# measured-at: ALL-QUANTUM on every cell lane and every index lane; the index is the ABI's i32; at ctrl_depth 0
+#
+# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open
+# reads them back, and a checking run fails if either
+# disagrees with the snapshot on disk or with what the suite
+# declares. The mask matters because operand folds still fire
+# (a^0 and x&0 legitimately emit fewer gates, which is what L5
+# proves), so a count is a function of (W, operand mask) — and
+# a golden that does not say which mask it was taken at pins
+# nothing. The line above is per-file for the reason bd 2r5
+# records: as a literal in the writer it was false in four of
+# the twelve files and nothing could contradict it.
+#
+# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with
+# no demotion (D6) a mask can only drift TOWARDS Q, so it is
+# the FIXED POINT, and the one mask where forward and unc
+# agree. A file measured anywhere else says so above, and owes
+# the reader a note saying why.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+qload_L1  forward    1     0     1        0
+qload_L1  unc        1     0     1        0
+qload_L1  forward    8     0     8        0
+qload_L1  unc        8     0     8        0
+qload_L1  forward   16     0    16        0
+qload_L1  unc       16     0    16        0
+qload_L1  forward   32     0    32        0
+qload_L1  unc       32     0    32        0
+qload_L1  forward   64     0    64        0
+qload_L1  unc       64     0    64        0
+qload_L1  forward   80     0    80        0
+qload_L1  unc       80     0    80        0
+qload_L2  forward    1     2     4        4
+qload_L2  unc        1     2     4        4
+qload_L2  forward    8     2     4       18
+qload_L2  unc        8     2     4       18
+qload_L2  forward   16     2     4       34
+qload_L2  unc       16     2     4       34
+qload_L2  forward   32     2     4       66
+qload_L2  unc       32     2     4       66
+qload_L2  forward   64     2     4      130
+qload_L2  unc       64     2     4      130
+qload_L2  forward   80     2     4      162
+qload_L2  unc       80     2     4      162
+qload_L3  forward    1     2    12        9
+qload_L3  unc        1     2    12        9
+qload_L3  forward    8     2    12       30
+qload_L3  unc        8     2    12       30
+qload_L3  forward   16     2    12       54
+qload_L3  unc       16     2    12       54
+qload_L3  forward   32     2    12      102
+qload_L3  unc       32     2    12      102
+qload_L3  forward   64     2    12      198
+qload_L3  unc       64     2    12      198
+qload_L3  forward   80     2    12      246
+qload_L3  unc       80     2    12      246
+qload_L4  forward    1     2    12       10
+qload_L4  unc        1     2    12       10
+qload_L4  forward    8     2    12       38
+qload_L4  unc        8     2    12       38
+qload_L4  forward   16     2    12       70
+qload_L4  unc       16     2    12       70
+qload_L4  forward   32     2    12      134
+qload_L4  unc       32     2    12      134
+qload_L4  forward   64     2    12      262
+qload_L4  unc       64     2    12      262
+qload_L4  forward   80     2    12      326
+qload_L4  unc       80     2    12      326
+qload_L8  forward    1     2    28       22
+qload_L8  unc        1     2    28       22
+qload_L8  forward    8     2    28       78
+qload_L8  unc        8     2    28       78
+qload_L8  forward   16     2    28      142
+qload_L8  unc       16     2    28      142
+qload_L8  forward   32     2    28      270
+qload_L8  unc       32     2    28      270
+qload_L8  forward   64     2    28      526
+qload_L8  unc       64     2    28      526
+qload_L8  forward   80     2    28      654
+qload_L8  unc       80     2    28      654
+qload_L16 forward    1     2    60       46
+qload_L16 unc        1     2    60       46
+qload_L16 forward    8     2    60      158
+qload_L16 unc        8     2    60      158
+qload_L16 forward   16     2    60      286
+qload_L16 unc       16     2    60      286
+qload_L16 forward   32     2    60      542
+qload_L16 unc       32     2    60      542
+qload_L16 forward   64     2    60     1054
+qload_L16 unc       64     2    60     1054
+qload_L16 forward   80     2    60     1310
+qload_L16 unc       80     2    60     1310
