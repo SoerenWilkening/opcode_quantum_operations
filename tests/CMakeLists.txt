@@ -13,6 +13,7 @@ add_library(cqops_test_support STATIC
     support/death.c
     support/mock_sink.c
     support/refmodel.c      # Step 10 — plain-C semantics, the L1 reference
+    support/refmodel_w.c    # bd zmo — the two-word half, split 2026-09-02 on the header's own seam
     support/bitkinds.c      # Step 10 — (value, quantum-mask) -> register
     support/poolcheck.c     # Step 10 — the automatic L2 and L3 assertions
     support/kerneldrv.c     # Step 10 — the shared Phase-B four-level gate

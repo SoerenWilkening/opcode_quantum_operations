@@ -27,6 +27,13 @@
 
 #include <stdint.h>
 
+/* The one refusal both translation units share: refmodel.c (one-word) owns
+ * it, refmodel_w.c (two-word) calls it. Every reference-side precondition — a
+ * width off the ladder, a negative shift, a cast in the wrong direction — is a
+ * hard error and never a silent truncation, because a reference that quietly
+ * accepted a wrong request would agree with the kernel that made it. */
+void cq_ref_die(const char *what, int W);
+
 /* The low `W` bits set. W is validated: 0 and anything above 64 are hard
  * errors, not a shifted-by-64 undefined behaviour that UBSan would catch only
  * in Debug. */
@@ -71,7 +78,12 @@ uint64_t cq_ref_ashr(uint64_t a, int k, int W);
  *
  * `hi` holds bits 64..127. For W <= 64 `hi` is always 0 and these agree with
  * the one-word functions bit for bit — asserted in the suite rather than
- * assumed, since two models that never meet are two chances to be wrong. */
+ * assumed, since two models that never meet are two chances to be wrong.
+ *
+ * THIS HALF IS ITS OWN TRANSLATION UNIT, tests/support/refmodel_w.c, since
+ * 2026-09-02 (`bd zmo`). The line above is the seam and it is a SUBJECT cut,
+ * not a size cut: below it every function takes or returns a cq_ref_w, above
+ * it none does, and the two halves share exactly one symbol (cq_ref_die). */
 typedef struct { uint64_t lo, hi; } cq_ref_w;
 
 cq_ref_w cq_ref_w_make (uint64_t lo, uint64_t hi, int W);  /* masked to W */
