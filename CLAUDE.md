@@ -810,10 +810,11 @@ the ones whose whole point is that they abort for a different reason, and would 
 out of the reader's sight.
 
 The `tests/support/` harness is hand-rolled (no dependencies beyond libc). **All eight
-files now exist, plus one split.** `harness.[ch]`, `death.[ch]` and `mock_sink.[ch]` from Phase A;
+files now exist, plus two splits.** `harness.[ch]`, `death.[ch]` and `mock_sink.[ch]` from Phase A;
 `refmodel.[ch]`, `bitkinds.[ch]` and `poolcheck.[ch]` at Step 10, as §2.2 budgeted — with
 `refmodel_w.c` split off `refmodel.c` on 2026-09-02 (`bd zmo`) at the one-word ↔ two-word
-seam, the header unchanged in every declaration; and
+seam, the header unchanged in every declaration, and `kernelmeasure.c` + `kernelfix.h` split
+off `kerneldrv.c` the same day (`bd f8c`) at the gate ↔ instrument seam plan §2.2 records; and
 **`kerneldrv.[ch]` and `goldens.[ch]`, both beyond §2.2's list of five** — plan §4's
 Phase B gate assumes a "shared kernel driver" and a `tests/goldens/` and assigns neither
 to a file. `death.[ch]` was the same shape at Step 4.

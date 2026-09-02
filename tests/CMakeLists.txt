@@ -21,6 +21,9 @@ add_library(cqops_test_support STATIC
     support/kernelctrl.c    # Step 20 — the controlled axis: the region mode,
                             # the control rail, §9's gate-tuple transform. Split
                             # from kerneldrv.c when the axis took it to 345/300
+    support/kernelmeasure.c # bd f8c — L4's INSTRUMENT (cq_kd_measure, cq_kd_peak),
+                            # split from kerneldrv.c 2026-09-02 on the GATE <->
+                            # INSTRUMENT seam; the fixture both share is kernelfix.h
     support/goldens.c       # Step 10 — L4's pinned counts, on disk
 )
 

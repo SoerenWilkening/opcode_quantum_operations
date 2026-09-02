@@ -6,13 +6,20 @@
  * every kernel under control by re-driving cq_kd_case, and Steps 12-17 vary
  * the sweep without touching a single assertion.
  *
+ * SPLIT AGAIN AT STEP 20 (the AXIS -> kernelctrl.c) AND A THIRD TIME ON
+ * 2026-09-02 (bd f8c): L4's INSTRUMENT — cq_kd_measure and cq_kd_peak, which
+ * assert nothing — went to kernelmeasure.c, and this file is now exactly what
+ * the paragraph above says: the four levels, every line of them an assertion.
+ * The fixture and the one push site both halves share are declared in
+ * kernelfix.h and defined here.
+ *
  * VALUES ARE TWO WORDS THROUGHOUT. Casts reach i80 and i128 — they are the
  * only way an i128 register exists at all — and a driver capped at 64 could
  * check 30 of the 55 cast pairs CQ_lang ships. cq_kd_case2 is the one-word
  * convenience wrapper, not a second path.
  */
 
-#include "support/kerneldrv.h"
+#include "support/kernelfix.h"
 
 #include "controlled.h"
 #include "reg.h"
@@ -39,7 +46,7 @@ void cq_kd_default_shape(int W, cq_kd_shape *out)
  *
  * THE DEFAULT CALL PATH IS DEFINED ONLY FOR THE ARITY-2, ONE-WIDTH SHAPE, and
  * before Step 13 that was true by coincidence rather than by construction
- * (bd zwh). call_kernel's default branch is
+ * (bd zwh). cq_kd_call_kernel's default branch is
  *
  *     k->kernel(ctx, dst, src[0], src[1], sh->w_dst);
  *
@@ -59,7 +66,7 @@ void cq_kd_default_shape(int W, cq_kd_shape *out)
  * stop agreeing.
  *
  * Provoked, and observed to refuse, in tests/test_kerneldrv.c. */
-static int shape_of(const cq_kd_spec *k, int W, cq_kd_shape *sh)
+int cq_kd_shape_of(const cq_kd_spec *k, int W, cq_kd_shape *sh)
 {
     cq_kd_default_shape(W, sh);
     if (k->shape) k->shape(W, sh);
@@ -83,20 +90,14 @@ static int shape_of(const cq_kd_spec *k, int W, cq_kd_shape *sh)
     return 1;
 }
 
-typedef struct {
-    cq_ctx     ctx;
-    cq_counter cnt;
-    cq_sink    sink;
-} fixture;
-
-static void fx_open(fixture *f)
+void cq_kd_fx_open(cq_kd_fixture *f)
 {
     cq_count_reset(&f->cnt);
     f->sink = cq_sink_counter(&f->cnt);
     cq_ctx_init(&f->ctx, &f->sink);
 }
 
-static void fx_close(fixture *f)
+void cq_kd_fx_close(cq_kd_fixture *f)
 {
     /* Deliberately does NOT free the operand rails. A rail holding a non-zero
      * value on materialised qubits is genuinely not |0> and refusing to free
@@ -163,8 +164,8 @@ static void check_source(const cq_ctx *ctx, int idx, int32_t h, cq_ref_w want,
  * cq_kd_case also controls the L3 uncompute pass, which is required — an
  * uncontrolled uncompute after a controlled forward leaves dst at
  * `ctrl · f(a,b)` and L3 goes red for the wrong reason. */
-static void call_kernel(const cq_kd_spec *k, cq_ctx *ctx, cq_bit *dst,
-                        const cq_bit *const *src, const cq_kd_shape *sh)
+void cq_kd_call_kernel(const cq_kd_spec *k, cq_ctx *ctx, cq_bit *dst,
+                       const cq_bit *const *src, const cq_kd_shape *sh)
 {
     const int32_t ch = cq_kd_ctrl_handle();
 
@@ -186,7 +187,7 @@ static cq_ref_w call_ref(const cq_kd_spec *k, const cq_ref_w *v,
 void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
                 const cq_bk_pair *m)
 {
-    fixture f;
+    cq_kd_fixture f;
     cq_kd_shape sh;
     int32_t h[CQ_KD_MAX_SRC];
     const cq_bit *src[CQ_KD_MAX_SRC];
@@ -194,9 +195,9 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
     int32_t hs[CQ_KD_MAX_SRC + 2];   /* sources, dst, and the control rail */
     int classical = 1;
 
-    /* Before fx_open, so a refused shape allocates nothing to leak. */
-    if (!shape_of(k, W, &sh)) return;
-    fx_open(&f);
+    /* Before cq_kd_fx_open, so a refused shape allocates nothing to leak. */
+    if (!cq_kd_shape_of(k, W, &sh)) return;
+    cq_kd_fx_open(&f);
 
     for (int i = 0; i < sh.n_src; i++) {
         /* The mask pair carries two entries; a third source reuses the first,
@@ -246,7 +247,7 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
     cq_pc_snap before = cq_pc_take(&f.ctx);
     cq_count_reset(&f.cnt);
 
-    call_kernel(k, &f.ctx, dst, src, &sh);
+    cq_kd_call_kernel(k, &f.ctx, dst, src, &sh);
 
     /* ---- L1: the value, against plain C. ---------------------------------
      *
@@ -368,7 +369,7 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
     }
 
     /* ---- L3: uncompute IS the same kernel, then the free. ---------------- */
-    call_kernel(k, &f.ctx, dst, src, &sh);
+    cq_kd_call_kernel(k, &f.ctx, dst, src, &sh);
 
     cq_ref_w after_unc = cq_pc_value_w(&f.ctx, hd);
     if (!cq_ref_w_is_zero(after_unc))
@@ -416,7 +417,7 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
         cq_h_fail(__FILE__, __LINE__, "L2 %s W=%d [%s]: after the FREE",
                   k->name, W, m->name);
 
-    fx_close(&f);
+    cq_kd_fx_close(&f);
 }
 
 void cq_kd_case2(const cq_kd_spec *k, int W, uint64_t va, uint64_t vb,
@@ -429,85 +430,3 @@ void cq_kd_case2(const cq_kd_spec *k, int W, uint64_t va, uint64_t vb,
     v[2] = cq_ref_w_zero();
     cq_kd_case(k, W, v, m);
 }
-
-/* --- L4's measurement, and the peak. ------------------------------------- */
-
-/* Both build the same all-quantum fixture, so it lives once. Returns dst's
- * handle, or -1 for a shape this driver refuses — in which case the fixture was
- * never opened and the caller must not close it. */
-static int32_t measure_setup(fixture *f, const cq_kd_spec *k, int W,
-                             cq_kd_shape *sh, cq_bit **dst,
-                             const cq_bit **src)
-{
-    if (!shape_of(k, W, sh)) return -1;
-    fx_open(f);
-
-    int32_t h[CQ_KD_MAX_SRC];
-
-    for (int i = 0; i < sh->n_src; i++) {
-        cq_ref_w all = cq_ref_w_ones(sh->w[i]);
-        cq_ref_w cls = cq_ref_w_make(sh->classical[i],
-                                     sh->classical[i] ? ~0ull : 0ull, sh->w[i]);
-        /* Values all-ones so no lane can be quiet, masks all-quantum except
-         * where the shape forbids it. */
-        h[i] = cq_bk_reg_w(&f->ctx, (uint32_t)sh->w[i], all,
-                           cq_ref_w_andnot(all, cls));
-    }
-
-    int32_t hd = cq_reg_alloc_zero(&f->ctx.regs, (uint32_t)sh->w_dst);
-    *dst = cq_reg_bits(&f->ctx.regs, hd);
-    cq_kd_ctrl_rail(&f->ctx);
-    for (int i = 0; i < sh->n_src; i++)
-        src[i] = cq_reg_cbits(&f->ctx.regs, h[i]);
-
-    return hd;
-}
-
-void cq_kd_measure(const cq_kd_spec *k, int W, cq_counter *forward,
-                   cq_counter *unc)
-{
-    fixture f;
-    cq_kd_shape sh;
-    cq_bit *dst;
-    const cq_bit *src[CQ_KD_MAX_SRC];
-    int32_t hd = measure_setup(&f, k, W, &sh, &dst, src);
-
-    if (hd < 0) { cq_count_reset(forward); cq_count_reset(unc); return; }
-
-    cq_count_reset(&f.cnt);
-    call_kernel(k, &f.ctx, dst, src, &sh);
-    *forward = f.cnt;
-
-    cq_count_reset(&f.cnt);
-    call_kernel(k, &f.ctx, dst, src, &sh);
-    *unc = f.cnt;
-
-    cq_reg_free(&f.ctx, hd, cq_pc_zero_proof_rotation_free);
-    fx_close(&f);
-}
-
-uint32_t cq_kd_peak(const cq_kd_spec *k, int W, uint32_t *peak_delta)
-{
-    fixture f;
-    cq_kd_shape sh;
-    cq_bit *dst;
-    const cq_bit *src[CQ_KD_MAX_SRC];
-    int32_t hd = measure_setup(&f, k, W, &sh, &dst, src);
-
-    if (hd < 0) { *peak_delta = 0u; return 0u; }
-
-    cq_pc_snap before = cq_pc_take(&f.ctx);
-    call_kernel(k, &f.ctx, dst, src, &sh);
-    cq_pc_snap after = cq_pc_take(&f.ctx);
-
-    /* peak == minted (src/qubits.h), so the high-water mark DURING the call is
-     * exactly `minted` after it — which is what makes a transient scratch
-     * allocation visible even though it was tidily released. L2 looks after
-     * the call and cannot see that at all. */
-    *peak_delta = after.peak - before.peak;
-    uint32_t owned = cq_reg_owned_qubits(&f.ctx.regs, hd);
-
-    fx_close(&f);
-    return owned;
-}
-

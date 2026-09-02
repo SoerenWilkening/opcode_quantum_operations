@@ -138,8 +138,10 @@ buildable at all.
    width on its shipped ladder, over a small constant number of seeded random
    `(bit-kind mask, value)` samples per width — with the all-classical mask (which is
    also the zero-cost claim) and the all-quantum mask forced into every draw.
-3. **Clean.** After every template call the qubit pool contains exactly the result
-   rail's qubits — asserted, not assumed. After `_unc` the rail's **value** is zero but
+3. **Clean.** After every template call the qubit pool holds exactly the qubits the
+   live rails own — the operands' and the result's, as a **set** and never a count —
+   asserted after the forward, after `_unc` and after the free, not assumed. After
+   `_unc` the rail's **value** is zero but
    its qubits are still held: `_unc` reclaims nothing, and `cqrt_free` is the sole
    deallocator (PRD §10). The pool is empty after the **free**, not after the `_unc` —
    and for a rail CQ_lang deliberately never frees, it stays held for good, which is the

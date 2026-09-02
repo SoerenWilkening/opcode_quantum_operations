@@ -66,8 +66,9 @@ enum { CQ_KD_MAX_SRC = 3 };
  *
  * PRD §9's controlled axis is an EMITTER MODE, so a kernel needs no change to
  * become controlled and neither does its spec. What the driver needs is a
- * control rail to push, and one place to push it: `call_kernel`, which is the
- * sole route from all five kernel invocations in this file to a kernel. Setting
+ * control rail to push, and one place to push it: `cq_kd_call_kernel`, which
+ * is the sole route from all five kernel invocations in the driver — two in
+ * cq_kd_case, three in kernelmeasure.c — to a kernel (kernelfix.h). Setting
  * the mode is therefore a driver-scoped SETTER rather than a parameter — there
  * are 71 entry-point call sites across twelve .c files and eight .inc files,
  * and none of them changes.
@@ -215,8 +216,10 @@ uint32_t cq_kd_peak(const cq_kd_spec *k, int W, uint32_t *peak_delta);
  *
  * `body` should be the suite's sweep at its CHEAP widths only. The promotion is
  * a property of the emitter — per gate, and width-independent — so what the
- * axis adds is its interaction with the §3 fold table, which is exhausted where
- * the value cross product is exhaustive. Every shipped width is still covered,
+ * axis adds is its interaction with the §3 fold table — a property of the
+ * bit-KIND space (D6: the table reads kind, never value), densest at narrow
+ * widths, where cq_kd_samples() draws cover most of the mask-pair pool; nothing
+ * has been exhaustive since 2026-08-21. Every shipped width is still covered,
  * by cq_kd_check_promotion below, at two kernel calls apiece. */
 void cq_kd_for_each_region(const char *what, void (*body)(void));
 

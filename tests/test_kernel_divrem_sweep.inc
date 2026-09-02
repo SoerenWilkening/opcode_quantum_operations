@@ -14,19 +14,20 @@
  * The fixed mask set meanwhile grows LINEARLY in W. The uncapped product is
  * quadratic in W on top of a quadratic per-case cost, twice over.
  *
- * WHAT IS CAPPED, ALL OF IT PRINTED, BECAUSE A CAP NOBODY CAN SEE READS AS
- * COVERAGE. Above W = 4: the number of distinct mask pairs and the number of
- * cases per pair are both derived from ONE budget in gate emissions, exactly as
- * K11's are. NO NAMED PAIR IS EVER DROPPED — all-classical (which IS L5),
- * all-quantum (which is what L4 pins), alternating, lsb-only, msb-only and risk
- * R8's six asymmetric rows run at every width, and the top lane is always kept.
- *
- * WHAT IS NOT CAPPED: everything at W <= 4. The FULL value cross product runs
- * against every mask pair at W in {1,2,3,4}, `b = 0` included — which is
- * exactly what K12.md §6.0a's prototype measurement did, and what turns §2.0's
- * "a W-bit remainder never overflows" from a derivation into a measurement.
- * W = 3 is K12.md §2.4b's named R8 witness width (W in {1,2} do NOT witness
- * it), so it is inside the uncapped block deliberately.
+ * THE BUDGET IS THE SHARED CONSTANT AT EVERY WIDTH (2026-08-20), AND THIS
+ * HEADER SAID OTHERWISE UNTIL bd mmv CLOSED ON 2026-09-02. Every width — the
+ * W <= 4 block through dr_sweep_small as much as the wide one through dr_sweep
+ * — draws cq_kd_samples() cases, jointly over the mask pool and the value
+ * space, with the all-classical pair (which IS L5), the all-quantum pair (which
+ * is what L4 pins) and the four value corners taken first, inside the budget;
+ * every width prints its count, its pool and its seed. There is no gate-budget
+ * cap above W = 4 and no exhaustive cross product below it: cq_kd_sweep_at's
+ * `exhaustive` flag is kept in the signature and ignored (kernelsweep.c), and
+ * so are dr_sweep's `per_case`, `region` and `budget` (divrem_common.inc says
+ * why the parameters stayed). W = 3 is K12.md §2.4b's named R8 witness width
+ * (W in {1,2} do NOT witness it) and is on the ladder for that reason; what
+ * turned §2.0's "a W-bit remainder never overflows" into a measurement was
+ * K12.md §6.0a's prototype pass, not this file.
  *
  * WHAT CARRIES i128. The circuit is width-generic with no width switch (I5,
  * Rule 3), so W = 128 is structurally W = 64 with different loop bounds —
@@ -40,11 +41,10 @@
  * over 263,166 qubit acquisitions, which is why it is one and not twelve.
  */
 
-/* ONE KNOB, IN GATE EMISSIONS PER (OPCODE, WIDTH) BLOCK, AND EVERYTHING ELSE IS
- * DERIVED FROM IT — K11's shape, for K11's reason: the per-case cost is known
- * exactly, since I6(b) makes it a function of W alone on the scratch side, so a
- * budget divided by it IS the case count. Raising or lowering coverage is one
- * number, and the run prints what that number bought at every width. */
+/* THE FORMER KNOB. Until 2026-08-20 this was a budget in gate emissions per
+ * (opcode, width) block from which the case count was derived; dr_sweep now
+ * ignores it, and udiv_per_case survives because the i128 case prints it. The
+ * knob that sets coverage is cq_kd_samples() / CQOPS_L1_SAMPLES. */
 enum { DR_GATE_BUDGET = 600000 };
 
 static uint64_t udiv_per_case(int W, int want_q)
@@ -119,16 +119,20 @@ CQ_TEST(k12_unsigned_sweep)
 /* Step 20 — the same four levels under PRD §9's four regions, plus §9's
  * gate-tuple transform at every shipped width. The sweep body is this suite's
  * OWN, at its cheap widths only: the promotion is per gate and width-
- * independent, so what the axis adds is its interaction with the §3 fold table,
- * which is exhausted where the value cross product is. Every shipped width is
- * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+ * independent, so what the axis adds is its interaction with the §3 fold table
+ * — a property of the bit-KIND space (D6: the table reads kind, never value),
+ * densest at narrow widths, where cq_kd_samples() draws cover most of the
+ * mask-pair pool. Nothing has been exhaustive since 2026-08-21 (bd p3z). Every
+ * shipped width is still covered by cq_kd_check_promotion, at two kernel calls
+ * apiece. */
 static void udivrem_narrow(void)
 {
     /* W <= 3, not 5. K12 IS THE MOST EXPENSIVE THING THE SUITE RUNS — one udiv
      * case is 2(34W^2+5W) gate emissions over 2(8W^2+4W-1) qubit acquisitions —
      * and the promotion multiplies that by up to three. bd mmv's discipline is
      * to budget it up front rather than after measuring, which is what this is.
-     * L1 is still EXHAUSTIVE over every (a,b) including b = 0 at these widths. */
+     * L1 is cq_kd_samples() cases per width here as everywhere (2026-08-20),
+     * with `b = 0` reached through the all-zero value corner. */
     for (int W = 1; W <= 3; W++) {
         dr_sweep_small(&UDIV, W);
         dr_sweep_small(&UREM, W);

@@ -184,9 +184,12 @@ CQ_TEST(k9_signed_family_sweep)
 /* Step 20 — the same four levels under PRD §9's four regions, plus §9's
  * gate-tuple transform at every shipped width. The sweep body is this suite's
  * OWN, at its cheap widths only: the promotion is per gate and width-
- * independent, so what the axis adds is its interaction with the §3 fold table,
- * which is exhausted where the value cross product is. Every shipped width is
- * still covered by cq_kd_check_promotion, at two kernel calls apiece. */
+ * independent, so what the axis adds is its interaction with the §3 fold table
+ * — a property of the bit-KIND space (D6: the table reads kind, never value),
+ * densest at narrow widths, where cq_kd_samples() draws cover most of the
+ * mask-pair pool. Nothing has been exhaustive since 2026-08-21 (bd p3z). Every
+ * shipped width is still covered by cq_kd_check_promotion, at two kernel calls
+ * apiece. */
 static void cmp_narrow(void)
 {
     /* ALL TEN PREDICATES, because a derived row differs from its primitive by

@@ -8,8 +8,8 @@
  * The public surface — cq_kd_set_ctrl, cq_kd_for_each_region and
  * cq_kd_check_promotion — is declared in kerneldrv.h with the rest of the
  * driver, because a suite should see one driver rather than two. This header is
- * the internal joint between the two translation units and nothing else
- * includes it.
+ * the internal joint between the driver's translation units — kerneldrv.c and,
+ * since bd f8c's third split, kernelmeasure.c — and nothing else includes it.
  */
 #ifndef CQOPS_TEST_KERNELCTRL_H
 #define CQOPS_TEST_KERNELCTRL_H
