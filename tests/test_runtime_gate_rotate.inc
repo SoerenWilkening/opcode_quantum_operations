@@ -186,11 +186,20 @@ CQ_TEST(rz_controlled_inv_is_the_forward_call_at_a_negated_angle)
 }
 
 /* THE Ry SIDE OF THE SAME CLAIM, and it is a DIFFERENT claim rather than a
- * repetition. There is NO plain `cqrt_ry_<W>_controlled` at any width — the ABI
- * says the prep itself is unconditional and only its inverse is controlled — so
- * the Ry axis is 5 integer symbols with no forward twin to compare against.
- * What stands in for one is `cq_rotate_ry` at the negated angle under the same
- * region, reached through the uncontrolled symbol with a CQ_BIT_ONE flag. */
+ * repetition — but for a DIFFERENT REASON than it was until 2026-09-10. This
+ * block used to open *"there is NO plain `cqrt_ry_<W>_controlled` at any width
+ * … so the Ry axis is 5 integer symbols with no forward twin to compare
+ * against"*, which was a true reading of the ABI as vendored and is now false:
+ * CQ_lang `f92d95e` (2026-09-02) added the family at all nine widths and
+ * `bd w9i` re-vendored it at `170ede1`. The forward twin EXISTS, and the case
+ * below this one is the direct comparison that could not be written before.
+ *
+ * THIS CASE IS KEPT AS IT WAS, AND IT IS NOT SUBSUMED. Its flag is CQ_BIT_ONE,
+ * so §9 row 0 emits the region UNCONTROLLED and verbatim, and what it pins is
+ * that `_inv` at +0.4 is bit-for-bit the uncontrolled rotation at -0.4 — a
+ * claim about M22, reached through the shim, with no promotion in it at all.
+ * The forward-twin case below pins the promoted four-gate path instead. Delete
+ * either and the surviving one cannot see what the other saw. */
 CQ_TEST(ry_controlled_inv_is_the_rotation_at_a_negated_angle)
 {
     cq_mock a, b; cq_sink sa, sb;
@@ -227,6 +236,113 @@ CQ_TEST(ry_controlled_inv_is_the_rotation_at_a_negated_angle)
         CHECK(cq_pc_live_is_exactly(ctx, (const int32_t[]){ on, h }, 2u));
         cq_reg_audit(ctx);
         close_with(&b);
+    }
+}
+
+/* THE FORWARD TWIN, WHICH THE ABI DID NOT HAVE UNTIL 2026-09-10 (`bd w9i`).
+ *
+ * WHAT IT PINS THAT NOTHING ELSE DOES: that `cqrt_ry_<W>_controlled` and its
+ * `_inv` differ in the ANGLE and in NOTHING ELSE — same opcodes, same operands,
+ * same order, through §9's promoted four-gate general row. `_inv` means negate
+ * theta (PRD §15 D14) and the implementation is literally the forward body
+ * without its `-angle`, so this is the assertion that the one delta is the one
+ * intended: a transposition of the two `R(±θ/2)` gates, or a body that forgot
+ * to negate, moves this stream and moves no count.
+ *
+ * ANGLES COMPARE BITWISE HERE, which is what makes "exactly negated" testable
+ * at all — `cq_mock_matches` is an ordered (op, operands, angle) comparison and
+ * `0.0` and `-0.0` are different gates to emit even though C calls them equal.
+ *
+ * ALL-QUANTUM AND A GENERAL ANGLE, both forced. A quantum flag makes every
+ * FOLDING row of §7 hit D11's refusal (see the characterisation case below), so
+ * the angle must miss the π-lattice; and a constant lane would take the Ry
+ * general row through `cq_materialise` first, which §15 D13 leaves UNPROMOTED,
+ * putting a gate in the stream that has nothing to do with this claim. */
+CQ_TEST(ry_controlled_inv_is_ry_controlled_at_a_negated_angle)
+{
+    cq_mock fwd, inv; cq_sink sf, si;
+    cq_rec captured[64];                 /* eight lanes x §9's four gates */
+    size_t n = 0u;
+
+    {
+        cq_ctx *ctx = open_with(&fwd, &sf);
+        const int32_t flag = wire(ctx, 1u, 1u);
+        const int32_t h    = cq_bk_reg(ctx, 8u, 0x5u, 0xFFu);
+        cq_mock_reset(&fwd);
+        cqrt_ry_i8_controlled(flag, h, -0.4);
+        n = cq_mock_count(&fwd);
+        /* PINNED, NOT BOUNDED, for the reason the case above states: a stream
+         * comparison against an empty capture is trivially true. */
+        CHECK_EQ(n, 32);                 /* not merely "some": 4 per lane */
+        for (size_t i = 0; i < n && i < 64u; i++) captured[i] = *cq_mock_at(&fwd, i);
+        CHECK(cq_pc_live_is_exactly(ctx, (const int32_t[]){ flag, h }, 2u));
+        cq_reg_audit(ctx);
+        close_with(&fwd);
+    }
+    {
+        cq_ctx *ctx = open_with(&inv, &si);
+        const int32_t flag = wire(ctx, 1u, 1u);
+        const int32_t h    = cq_bk_reg(ctx, 8u, 0x5u, 0xFFu);
+        cq_mock_reset(&inv);
+        cqrt_ry_i8_controlled_inv(flag, h, 0.4);
+        CHECK_EQ(cq_mock_count(&inv), n);
+        CHECK(cq_mock_matches(&inv, captured, n));
+        CHECK(cq_pc_live_is_exactly(ctx, (const int32_t[]){ flag, h }, 2u));
+        cq_reg_audit(ctx);
+        close_with(&inv);
+    }
+}
+
+/* AND THE FORWARD TAINTS THE RAIL IT WRITES, which is a claim about the RECORD
+ * layer rather than about the gate stream and has its own way of going wrong.
+ * `cq_shim_record.c` marks `first_rot` for the non-diagonal Ry rows only, by
+ * naming them; a new row added to the effect table but not to that list would
+ * leave a controlled forward Ry looking diagonal to the certificate, so a rail
+ * it rotated could be released as CLEAN. The `_inv` sibling is the control:
+ * both must taint, and `cqrt_rz_i8_controlled` must NOT (PRD §15 D12).
+ *
+ * READ THROUGH THE DISPOSITION rather than through `first_rot` directly: the
+ * shadow is what a rotation poisons, and `cq_pc_zero_proof_rotation_free` is
+ * exact on the rotation-free surface, so CLEAN-before / UNPROVEN-after is the
+ * observable form of "this rail was rotated". */
+CQ_TEST(a_controlled_ry_taints_its_target_and_a_controlled_rz_does_not)
+{
+    static const struct { const char *what; int ry; } row[] = {
+        { "ry_controlled",     1 },
+        { "ry_controlled_inv", 1 },
+        { "rz_controlled",     0 },
+    };
+
+    for (size_t i = 0; i < sizeof row / sizeof row[0]; i++) {
+        cq_mock m; cq_sink sk;
+        cq_ctx *ctx = open_with(&m, &sk);
+        const int32_t flag = wire(ctx, 1u, 1u);
+        /* VALUE ZERO, MASK ALL-QUANTUM, and the value half is not cosmetic:
+         * `cq_pc_zero_proof_rotation_free` reads the SHADOW, so the 0x5 the
+         * two stream cases above use is PROVEN DIRTY (-1) before any rotation
+         * arrives, and a before/after comparison against it would compare two
+         * convictions and see nothing. The claim needs a rail that starts
+         * CLEAN, which is what makes the poisoning observable. */
+        const int32_t h    = cq_bk_reg(ctx, 8u, 0x0u, 0xFFu);
+
+        CHECK_EQ(cq_reg_disposition(ctx, h, cq_pc_zero_proof_rotation_free),
+                 CQ_PROOF_CLEAN);
+        cq_mock_reset(&m);
+
+        if (i == 0u)      cqrt_ry_i8_controlled(flag, h, -0.4);
+        else if (i == 1u) cqrt_ry_i8_controlled_inv(flag, h, 0.4);
+        else              cqrt_rz_i8_controlled(flag, h, 0.4);
+
+        const int got =
+            cq_reg_disposition(ctx, h, cq_pc_zero_proof_rotation_free);
+        if (got != (row[i].ry ? CQ_PROOF_UNPROVEN : CQ_PROOF_CLEAN))
+            cq_h_fail(__FILE__, __LINE__,
+                      "%s: expected the target to be %s and it is not",
+                      row[i].what, row[i].ry ? "poisoned" : "still clean");
+
+        CHECK(cq_pc_live_is_exactly(ctx, (const int32_t[]){ flag, h }, 2u));
+        cq_reg_audit(ctx);
+        close_with(&m);
     }
 }
 

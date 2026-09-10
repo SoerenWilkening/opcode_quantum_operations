@@ -114,11 +114,15 @@ typedef struct {
  * `cq_theta(v, pi)` is Ry(π) on EVERY BIT of the rail, and on a bit that is
  * already a definite classical constant Ry(π) is `X` up to a GLOBAL sign, which
  * is unobservable — so the bit flips and stays classical (PRD §7, Rule 15).
- * W bits flipping is `~v`. `cq_phi(·, pi)` is diagonal on a definite value, so
- * it is a global phase and does nothing at all. The oracle is computed and its
- * flag is consumed only by that phase, so classically it moves nothing — but it
- * is written out rather than elided, because the point of the reference is to be
- * the same PROGRAM, independently derived, not the same shortcut. */
+ * W bits flipping is `~v`. `cq_phi(pi)` is a BRANCH phase (CQ_lang's `bd
+ * test_C_libtooling-3qlq` Inc 1, 2026-09-05: it takes no register and lowers by
+ * kickback onto the minted flag, which is why the program below spells it
+ * `cqrt_rz_i1(hit, ·)` and not a tensored `cqrt_rz_i8(x, ·)`), and on a branch
+ * taken CLASSICALLY it is a global phase and does nothing at all. The oracle is
+ * computed and its flag is consumed only by that phase, so classically it moves
+ * nothing — but it is written out rather than elided, because the point of the
+ * reference is to be the same PROGRAM, independently derived, not the same
+ * shortcut. */
 static uint8_t ref_grover(int iters)
 {
     uint8_t x = 0u;
@@ -129,7 +133,7 @@ static uint8_t ref_grover(int iters)
         uint8_t y   = (uint8_t)(x * 3u + 1u);          /* the oracle          */
         int     hit = (y == (uint8_t)GROVER_TARGET);
         (void)hit;                                     /* cq_phi: a phase     */
-        /* cq_phi(x, pi): nothing on a constant rail. */
+        /* cq_phi(pi): a global phase on a classical branch. */
         x = (uint8_t)~x;                               /* cq_theta(x, pi)     */
     }
     return x;

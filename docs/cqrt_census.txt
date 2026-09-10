@@ -237,15 +237,31 @@ C3. THE PER-FAMILY WIDTH GUARDS (why families differ in width coverage)
 
 
 ================================================================================
-PART D — THE TRUE EXPANDED cqrt_* SURFACE: 173 SYMBOLS
+PART D — THE TRUE EXPANDED cqrt_* SURFACE: 182 SYMBOLS
 ================================================================================
 
 Source of truth : /Users/sorenwilkening/Desktop/CQ_lang/runtime/cq_runtime.h
-Cross-checks    : (a) definitions in runtime/cq_runtime.c -> 173, set-identical
-                      (0 declared-not-defined, 0 defined-not-declared)
+
+RE-MEASURED 2026-09-10 AT CQ_lang `170ede1` (bd w9i). 173 -> 182, PURELY
+ADDITIVE: the nine cqrt_ry_<W>_controlled, added upstream by f92d95e
+(2026-09-02) at all nine widths. NOT ONE of the existing 173 changed signature —
+the declaration diff is nine pure insertions — and tools/opcode_table.yaml is
+BYTE-IDENTICAL at this revision (sha256 6245117d...a3e82426), so the 2,479
+cq_template_* grid of Part F did not move.
+
+  The 173-era figures below are kept where they are DATED MEASUREMENTS and are
+  marked as such. Where a figure was a LIVE claim about the current ABI it has
+  been corrected in place — D2 above all, which asserted the family does not
+  exist.
+
+Cross-checks    : (a) definitions in runtime/cq_runtime.c -> set-identical at
+                      the vendored revision (0 declared-not-defined, 0
+                      defined-not-declared); measured at 173 in 2026-08.
                   (b) tools/core_abi_link_check.py:22 states, in CQ_lang's own
                       words: "Measured at introduction: 173 declared / 173
-                      defined / 0 mismatch either way". Independent agreement.
+                      defined / 0 mismatch either way". Independent agreement,
+                      AT THE REVISION IT WAS WRITTEN AT — it is a dated upstream
+                      measurement, not a live count, and reads 173 today.
 
 D1. FAMILY x AXIS x WIDTH GRID
     Widths in column order:  i1 i8 i16 i32 i64 | f16 f32 f64 f80
@@ -260,6 +276,7 @@ D1. FAMILY x AXIS x WIDTH GRID
   cqrt_addc           (fwd)                X  X  X   X   X   .   .   .   .      5
   cqrt_xorc           (fwd)                X  X  X   X   X   .   .   .   .      5
   cqrt_ry             (fwd)                X  X  X   X   X   X   X   X   X      9
+  cqrt_ry             _controlled          X  X  X   X   X   X   X   X   X      9   <-- NEW 2026-09
   cqrt_ry             _controlled_inv      X  X  X   X   X   .   X   X   .      7   <-- GAP
   cqrt_rz             (fwd)                X  X  X   X   X   X   X   X   X      9
   cqrt_rz             _controlled          X  X  X   X   X   X   X   X   X      9
@@ -274,7 +291,7 @@ D1. FAMILY x AXIS x WIDTH GRID
   cqrt_qram_store     _controlled          X  X  X   X   X   X   X   X   X      9
   cqrt_qram_store     _controlled_unc      X  X  X   X   X   X   X   X   X      9
   ------------------------------------------------------------------------------
-                                                          width-carrying subtotal 162
+                                                          width-carrying subtotal 171
 
   Width-agnostic (11):
     cqrt_x            cqrt_x_controlled
@@ -286,16 +303,32 @@ D1. FAMILY x AXIS x WIDTH GRID
     cqrt_tape_alloc
     cqrt_alloc_handle                            <-- runtime-INTERNAL helper
   ------------------------------------------------------------------------------
-  TOTAL                                                                        173
+  TOTAL                                                                        182
+                                            (173 before the 2026-09-10 re-vendor)
 
 D2. THE ONE IRREGULARITY — cqrt_ry_*_controlled_inv IS 7 WIDTHS, NOT 9
 
   Present : i1 i8 i16 i32 i64 f32 f64        Absent : f16 f80
 
-  This is deliberate, not an oversight. cq_runtime.h:191-193 states there is NO
-  plain `cqrt_ry_<W>_controlled` twin at all ("the prep itself is unconditional,
-  only its inverse is controlled") and pins THIS family at "7 widths" — which is
-  correct, because :191-193 is the RY block.
+  This is deliberate, not an oversight, and it SURVIVES the 2026-09 widening:
+  the FORWARD half went to nine widths, the inverse half is still seven.
+
+  ITS ORIGINAL EXPLANATION IS NOW WRONG, AND THAT MATTERS MORE THAN THE GAP.
+  Until 2026-09-10 this section read: "cq_runtime.h:191-193 states there is NO
+  plain `cqrt_ry_<W>_controlled` twin at all ('the prep itself is unconditional,
+  only its inverse is controlled') and pins THIS family at '7 widths'." That was
+  a faithful reading of the ABI AS VENDORED and it is FALSE of the ABI as it
+  now stands: CQ_lang `f92d95e` (2026-09-02) added
+  cqrt_ry_{i1,i8,i16,i32,i64,f16,f32,f64,f80}_controlled at :229-237, and the
+  quoted note went with it. Nothing downstream had drawn a wrong conclusion —
+  the grid always carried the family's true width count — but the ACTION note at
+  the end of this section had to be rewritten, and libcqops shipped a comment in
+  shim/cq_runtime_gate.c saying the family does not exist.
+
+  WHAT MADE IT VISIBLE WAS THE LINKER, NOT A READING. 23 of CQ_lang's 324 L6
+  fixtures, all of the slice_control_*_ry_* family, failed at the LINK stage on
+  an undefined _cqrt_ry_i32_controlled — 3 of them on 2026-09-02, 10 by
+  2026-09-10 morning, 23 by that afternoon. bd w9i is the record.
 
   CITATION CORRECTED 2026-08-22 (bd tso). This note used to add "cq_runtime.h:5
   independently describes the controlled surface as 'cqrt_rz_<W>_controlled[_inv]
@@ -303,9 +336,13 @@ D2. THE ONE IRREGULARITY — cqrt_ry_*_controlled_inv IS 7 WIDTHS, NOT 9
   stale line applying the RY figure to RZ, and following the citation gets you 7
   for a family that has 9. Read the DECLARATIONS, which are what the ABI is:
 
+  Line numbers below are AT `170ede1` and moved with the insertion; the
+  2026-08-22 reading against the older header had ry at :125-133, its
+  controlled_inv at :196-202 and the rz triple at :140-148 / :162-170 / :172-180.
+
     cqrt_ry_<W>                  :125-133   9   i1 i8 i16 i32 i64 f32 f64 f16 f80
-    cqrt_ry_<W>_controlled       —          0   does not exist (:191 says so)
-    cqrt_ry_<W>_controlled_inv   :196-202   7   i1 i8 i16 i32 i64 f32 f64   <-- GAP
+    cqrt_ry_<W>_controlled       :229-237   9   (all)                      <-- NEW
+    cqrt_ry_<W>_controlled_inv   :256-262   7   i1 i8 i16 i32 i64 f32 f64  <-- GAP
     cqrt_rz_<W>                  :140-148   9   (all)
     cqrt_rz_<W>_controlled       :162-170   9   (all)
     cqrt_rz_<W>_controlled_inv   :172-180   9   (all)
@@ -323,12 +360,13 @@ D2. THE ONE IRREGULARITY — cqrt_ry_*_controlled_inv IS 7 WIDTHS, NOT 9
   7/9/9, and PRD §15 D11 was written against the grid rather than the prose.
 
   ACTION FOR M26, NOT M27 — the two surfaces are constantly confused, so name it.
-  `cqrt_*` is the 173-symbol CORE runtime ABI, hand-written in M26 at Step 23; it
+  `cqrt_*` is the 182-symbol CORE runtime ABI, hand-written in M26 at Step 23; it
   appears nowhere in opcode_table.yaml and M27 never emits one. Whoever writes M26
-  must NOT emit a uniform 9-width cross product for the ry controlled axis:
-  `cqrt_ry_f16_controlled_inv` and `cqrt_ry_f80_controlled_inv` mint symbols the
-  frozen ABI does not declare, and `cqrt_ry_<W>_controlled` (no `_inv`) exists at
-  no width at all.
+  must STILL NOT emit a uniform 9-width cross product for the ry controlled axis
+  — the reason has changed and the prohibition has not. `cqrt_ry_<W>_controlled`
+  is now all nine widths, but `cqrt_ry_f16_controlled_inv` and
+  `cqrt_ry_f80_controlled_inv` still mint symbols the frozen ABI does not
+  declare. The axis is 9 + 9 + 7 = 25, against rz's 9 + 9 + 9 = 27.
 
 D3. WIDTHS ABSENT FROM THE ENTIRE cqrt_* SURFACE: i128 and i80
 
@@ -341,19 +379,36 @@ D3. WIDTHS ABSENT FROM THE ENTIRE cqrt_* SURFACE: i128 and i80
 D4. SCOPE PARTITION AGAINST PRD §"Out of scope for v1"
 
   PRD excludes cqrt_tape_* ("no consumer"), cqrt_qram_* ("stretch, Increment 8"),
-  and all fp widths ("v2, loud abort"). Applying that partition to the 173:
+  and all fp widths ("v2, loud abort"). Applying that partition to the 182:
 
     v1 IN SCOPE  (int widths + width-agnostic) ....  65
-    fp-width, v1 = loud abort .....................  34
+    fp-width, v1 = loud abort .....................  38   <-- 34 until the
+                                                          2026-09-10 re-vendor
+                                                          (bd w9i) added the four
+                                                          cqrt_ry_f<W>_controlled
     cqrt_qram_*  (out of scope) ...................  63   <-- IN SCOPE since 2026-09-02
                                                           (PRD §15 D24, v1.2): 76 + 63 = 139
     cqrt_tape_*  (out of scope) ...................  11   <-- IN SCOPE since 2026-09-02
                                                           (PRD §15 D23, v1.1): 65 + 11 = 76
+    cqrt_ry_i<W>_controlled .......................   5   <-- IN SCOPE 2026-09-10
+                                                          (PRD §15 D16 by CAPABILITY,
+                                                          family first): 139 + 5 = 144
                                                     ---
-                                                    173
+                                                    182
 
-  The 139 v1 symbols, verbatim: (the 65 of 2026-08, plus the 11 tape of PRD §15
-  D23, plus the 63 qram of PRD §15 D24 — an fp-width qram cell is a bit pattern)
+  The 144 v1 symbols, verbatim: (the 65 of 2026-08, plus the 11 tape of PRD §15
+  D23, plus the 63 qram of PRD §15 D24 — an fp-width qram cell is a bit pattern —
+  plus the 5 integer controlled-Ry forwards of the 2026-09-10 re-vendor. NOTE
+  FOR ANYONE EDITING THIS PARAGRAPH: tests/test_runtime_abi.inc scans every line
+  from the one BELOW this marker to the NOTE below the list, so ANY occurrence of
+  the symbol prefix written in this prose is read as a NAME and the
+  both-directions check goes red against the header. Measured THREE TIMES on this
+  very sentence: the first draft spelled the prefix out inside the prose, the
+  second quoted it in backticks, and the third wrote it while explaining that
+  the second had failed. All three were rejected identically, with the header
+  told it was missing a symbol whose whole name is the prefix. The scanner does
+  not read markup and does not read intent — so this paragraph now names the
+  prefix nowhere at all, and that is the only spelling that works.)
 
     cqrt_addc_i1   cqrt_addc_i8   cqrt_addc_i16   cqrt_addc_i32   cqrt_addc_i64
     cqrt_alloc_i1  cqrt_alloc_i8  cqrt_alloc_i16  cqrt_alloc_i32  cqrt_alloc_i64
@@ -363,6 +418,9 @@ D4. SCOPE PARTITION AGAINST PRD §"Out of scope for v1"
     cqrt_copy_i64_controlled
     cqrt_measure_i1 cqrt_measure_i8 cqrt_measure_i16 cqrt_measure_i32 cqrt_measure_i64
     cqrt_ry_i1     cqrt_ry_i8     cqrt_ry_i16     cqrt_ry_i32     cqrt_ry_i64
+    cqrt_ry_i1_controlled         cqrt_ry_i8_controlled
+    cqrt_ry_i16_controlled        cqrt_ry_i32_controlled
+    cqrt_ry_i64_controlled
     cqrt_ry_i1_controlled_inv     cqrt_ry_i8_controlled_inv
     cqrt_ry_i16_controlled_inv    cqrt_ry_i32_controlled_inv
     cqrt_ry_i64_controlled_inv
@@ -412,7 +470,7 @@ D4. SCOPE PARTITION AGAINST PRD §"Out of scope for v1"
     cqrt_qram_store_f80 cqrt_qram_store_f80_unc
     cqrt_qram_store_f80_controlled cqrt_qram_store_f80_controlled_unc
 
-  NOTE the 139 includes cqrt_h/cqrt_h_controlled and cqrt_alloc_handle. They are
+  NOTE the 144 includes cqrt_h/cqrt_h_controlled and cqrt_alloc_handle. They are
   in the LINK surface (must be defined) even though the pass never emits them.
 
 D5. PREFIX -> SYMBOL EXPANSION (reconciles Part A's 18 against Part D's 173)

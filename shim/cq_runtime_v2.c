@@ -131,12 +131,45 @@ CQ_V2_FP_WIDTH(32, float)
 CQ_V2_FP_WIDTH(64, double)
 CQ_V2_FP_WIDTH(80, long double)
 
-/* THE Ry AXIS IS 2 HERE AND NOT 4, AND IT IS NOT AN OMISSION. There is no plain
- * `cqrt_ry_<W>_controlled` at ANY width — the prep is unconditional and only its
- * inverse is controlled — and `cqrt_ry_*_controlled_inv` exists at f32 and f64
- * only, missing f16 and f80. A uniform 9 x {controlled, controlled_inv} rotation
- * cross product is WRONG and would mint symbols the frozen ABI does not declare:
- * Ry is 9 forward + 7 controlled_inv = 16, Rz is 9 + 9 + 9 = 27. */
+/* THE Ry AXIS IS 6 HERE AND NOT 8, AND IT IS STILL NOT AN OMISSION. It was 2
+ * until 2026-09-10: `cqrt_ry_<W>_controlled` did not exist upstream at any width
+ * until CQ_lang `f92d95e` (2026-09-02), re-vendored at `170ede1` (`bd w9i`).
+ * The FORWARD half is now all four fp widths; the `_inv` half is still f32 and
+ * f64 ONLY, missing f16 and f80. A uniform 9 x {controlled, controlled_inv}
+ * cross product is STILL WRONG and would mint two symbols the frozen ABI does
+ * not declare: measured from the declarations at `170ede1`, Ry is
+ * 9 forward + 9 controlled + 7 controlled_inv = 25, Rz is 9 + 9 + 9 = 27.
+ *
+ * WHY THE FOUR FORWARDS ARE ABORTS WHILE THE FIVE INTEGER ONES ARE IMPLEMENTED
+ * — PRD §15 D16's capability rule, family first and width second. The family
+ * `ry` is in v1 scope, so the five integer widths are real bodies in
+ * `cq_runtime_gate.c`. The width is what defers these four, exactly as it
+ * defers `cqrt_ry_f<W>` one block up.
+ *
+ * AND HERE THE DEFERRAL IS UNREACHABILITY, NOT PREFERENCE, WHICH IS THE PART
+ * WORTH WRITING DOWN. `cqrt_alloc_f<W>` aborts, so no fp rail handle can exist
+ * at runtime in v1 — there is nothing to hand these. An implemented body would
+ * call `cq_rotate_ry`, which resolves the handle through M07 and would land on
+ * M07's GENERIC handle error instead of `cq_shim_unsupported`'s named-symbol
+ * one: strictly worse diagnostics, a forward implemented where its own `_inv`
+ * is not, and the only implemented fp rotation of any kind. The abort's reason
+ * string is `"fp is v2"`, which is precisely the claim. */
+void cqrt_ry_f32_controlled(int32_t ctrl, int32_t handle, double angle)
+{ (void)ctrl; (void)handle; (void)angle;
+  cq_shim_unsupported("cqrt_ry_f32_controlled", V2_FP); }
+
+void cqrt_ry_f64_controlled(int32_t ctrl, int32_t handle, double angle)
+{ (void)ctrl; (void)handle; (void)angle;
+  cq_shim_unsupported("cqrt_ry_f64_controlled", V2_FP); }
+
+void cqrt_ry_f16_controlled(int32_t ctrl, int32_t handle, double angle)
+{ (void)ctrl; (void)handle; (void)angle;
+  cq_shim_unsupported("cqrt_ry_f16_controlled", V2_FP); }
+
+void cqrt_ry_f80_controlled(int32_t ctrl, int32_t handle, double angle)
+{ (void)ctrl; (void)handle; (void)angle;
+  cq_shim_unsupported("cqrt_ry_f80_controlled", V2_FP); }
+
 void cqrt_ry_f32_controlled_inv(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
   cq_shim_unsupported("cqrt_ry_f32_controlled_inv", V2_FP); }

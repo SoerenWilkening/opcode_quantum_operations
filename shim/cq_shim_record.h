@@ -95,6 +95,14 @@ typedef enum {
     CQ_ROP_X, CQ_ROP_CNOT, CQ_ROP_TOFFOLI,
     CQ_ROP_X_CTRL, CQ_ROP_CNOT_CTRL,
     CQ_ROP_RY, CQ_ROP_RZ,
+    /* `CQ_ROP_RY_CTRL` ARRIVED WITH THE ABI, NOT WITH A DESIGN CHANGE (`bd w9i`,
+     * re-vendored 2026-09-10 at CQ_lang `170ede1`): `cqrt_ry_<W>_controlled` did
+     * not exist upstream until `f92d95e`. Its row is BYTE-IDENTICAL to
+     * `CQ_ROP_RY_CTRL_INV`'s, which is the same relationship `CQ_ROP_RZ_CTRL`
+     * and `CQ_ROP_RZ_CTRL_INV` already have — the forward/inverse distinction
+     * lives in the CALLER passing `-angle`, never in this table, and `neg_angle`
+     * on both rows is what says they pair with each other. */
+    CQ_ROP_RY_CTRL,
     CQ_ROP_RY_CTRL_INV, CQ_ROP_RZ_CTRL, CQ_ROP_RZ_CTRL_INV,
     CQ_ROP_COPY, CQ_ROP_COPY_CTRL,
     CQ_ROP_CSWAP,

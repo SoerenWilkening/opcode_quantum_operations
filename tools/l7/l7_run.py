@@ -32,6 +32,23 @@ WHAT IT ASSERTS, and each clause is here because something else cannot make it:
                        test_grover.c` makes the same claim about a bigger
                        program; this one makes it about a program CQ_lang
                        compiled, which no unit test can.
+  6. NO PHASE LANDS ON THE MEASURED RAIL.   Added 2026-09-10 (`bd 2tm`), and it
+                       is here because clauses 1-5 WERE ALL GREEN against a
+                       circuit that was the IDENTITY on the marked branch. The
+                       retired `cq_phi(x, θ)` spelling emitted a TENSORED
+                       `cqrt_rz_<W>` -- Rz on every qubit of the data register
+                       -- whose marked phase is (-1)^popcount(target) and which,
+                       being diagonal per bit, FIXES |0..0>, so the reflection
+                       about |0> could never put -1 there (CQ_lang's own
+                       finding, `include/CQ.h` at `cq_phi`). A tensored Rz emits
+                       MORE `rz` lines than the kickback form, not fewer, so
+                       clause 4's MIX cannot see the difference and neither can
+                       any count: an assertion that COUNTS is not an assertion
+                       that IDENTIFIES. What separates the two circuits is WHICH
+                       QUBIT, and the robust form of that is a DISJOINTNESS --
+                       every `rz` target must be outside the set of `mz`
+                       targets. It reads no golden and survives any amount of
+                       upstream re-lowering that keeps the phase on a flag.
 
 THE TWO RUNS SHARE ONE LOWERED ARTEFACT. The angle is read off `argc`, so
 "replace M_PI/2 with M_PI" is two runs of one binary rather than two
@@ -60,6 +77,13 @@ SOURCE = os.path.join(HERE, "grover.cq.c")
 # qubit index it can only print as q<N> (PRD §8; CLAUDE.md's M23 callout).
 GATE = re.compile(r"^(x|cx|ccx|ry|rz|mz)\(", re.M)
 REQUIRED = ("x", "cx", "ccx", "ry", "rz", "mz")
+
+# Clause 6's two operand readings. `rz` carries `(q<N>, <angle>)` and `mz` a bare
+# `(q<N>)`; both are M23's spelling, and the qubit INDEX is all a sink is ever
+# handed (PRD §8) -- which is exactly enough here, because the claim is a
+# disjointness between two index sets and not an identification of a rail.
+RZ_TARGET = re.compile(r"^rz\((q\d+),", re.M)
+MZ_TARGET = re.compile(r"^mz\((q\d+)\)", re.M)
 
 
 def cq_revision(cqdir):
@@ -198,6 +222,27 @@ def main():
             fails.append(f"QUANTUM STREAM has no `{g}` — §12(1)'s "
                          f"'emits a gate stream' is not satisfied by a program "
                          f"that folded away")
+
+    # Clause 6 — the phase is on a FLAG, not on the register that gets measured.
+    #
+    # Stated as a disjointness rather than as "rz appears twice" on purpose: the
+    # count is what a re-lowering legitimately moves, and the placement is what a
+    # semantic regression moves. Under kickback the phase rides a minted i1 flag
+    # the compare's `_unc` returns to |0> and `cqrt_free` reclaims, so no `rz`
+    # target can also be an `mz` target; under the retired tensored spelling
+    # EVERY `rz` target was one.
+    #
+    # PROVOKED 2026-09-10, both directions, because an assertion nobody has seen
+    # fail is an assertion nobody has tested: silent on the real stream (`rz` on
+    # {q22, q23}, `mz` on {q0..q7}), and firing and naming `q0` on the same
+    # stream with one `rz` target rewritten to a measured lane.
+    rz_on, mz_on = set(RZ_TARGET.findall(q_out)), set(MZ_TARGET.findall(q_out))
+    if rz_on & mz_on:
+        fails.append("PHASE ON THE MEASURED RAIL " +
+                     repr(sorted(rz_on & mz_on)) + " — a branch phase lowers by "
+                     "KICKBACK onto a minted flag; an `rz` on a rail that is "
+                     "later measured is the TENSORED spelling, which is the "
+                     "identity on |0…0> and marks nothing")
 
     # Clause 5 — the classical arm, same binary, one argument.
     c = subprocess.run([stem + ".bin", "classical"], capture_output=True,

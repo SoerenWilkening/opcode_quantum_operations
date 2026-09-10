@@ -359,19 +359,46 @@ CQ_GATE_ROT(64)
  * prints. Where D11's phases are ever emitted the parity becomes load-bearing
  * and this comment stops being true.
  *
- * THERE IS NO PLAIN `cqrt_ry_<W>_controlled` AT ANY WIDTH, so the Ry axis is
- * five symbols with no forward twin — the prep itself is unconditional and only
- * its inverse is controlled. Do not "complete" the grid: a uniform
- * 9 x {controlled, controlled_inv} cross product mints symbols the frozen ABI
- * does not declare.
+ * THE PLAIN `cqrt_ry_<W>_controlled` FAMILY EXISTS SINCE CQ_lang `f92d95e`
+ * (2026-09-02), RE-VENDORED HERE 2026-09-10 AT `170ede1` (`bd w9i`). This block
+ * said the opposite until then — *"there is no plain `cqrt_ry_<W>_controlled` at
+ * any width, the prep itself is unconditional and only its inverse is
+ * controlled"* — and that was true of the ABI as vendored, quoting
+ * `cq_runtime.h`'s own note. It is now false, and the 23 L6 fixtures of the
+ * `slice_control_*_ry_*` family are what made it visible: every one failed at
+ * the LINK stage on an undefined `_cqrt_ry_i32_controlled`.
+ *
+ * THE AXIS IS STILL NOT A UNIFORM CROSS PRODUCT, so do not "complete" the grid
+ * from the shape of this macro. Measured from the declarations at `170ede1`:
+ * Ry is 9 forward + **9 controlled** + 7 controlled_inv = 25 (the `_inv` half
+ * still lacks f16 and f80), against Rz's 9 + 9 + 9 = 27. The five bodies here
+ * are the five INTEGER widths; the four fp widths are `cq_runtime_v2.c`'s.
+ *
+ * THE FORWARD IS THE `_inv` BODY WITHOUT ITS NEGATION, and that is the whole
+ * delta — same `gate_rot_width` guard, same `cq_shim_region` bracket, same
+ * `gate_ry_body`, same refusal surface below. `_inv` passes `-angle` twice (to
+ * M22 and to the record) because the ABI's `_inv` names the FORWARD angle; the
+ * forward passes `angle` to both.
  *
  * THE REFUSAL SURFACE IS REAL AND IS NOT ATOMIC. Under a quantum flag, §7's Rz
  * row folds on the CONSTANT column, so M22 emits the full four-gate promotion
  * for every WIRE below the first constant lane and then hard-errors — 4*j
  * gates, characterised in tests/test_runtime_gate.c because nothing in the tree
  * could see it before. By I4 a freshly allocated rail owns zero qubits, so a
- * rail with a constant lane is the ordinary case rather than a corner. Measured
- * demand today: zero controlled rotations of any kind in the 247 goldens. */
+ * rail with a constant lane is the ordinary case rather than a corner.
+ *
+ * **AND THE CORPUS'S DEMAND IS NO LONGER ZERO** — this comment read *"measured
+ * demand today: zero controlled rotations of any kind in the 247 goldens"* until
+ * 2026-09-10. Re-measured at CQ_lang `170ede1` over its e2e goldens: **39 calls,
+ * across 23 fixtures, every one a `cqrt_ry_i32_controlled`** and not one of any
+ * other controlled-rotation family. All 23 RUN TO COMPLETION through L6, which
+ * they could not if any reached the refusal — and the reason is the ANGLES:
+ * the four distinct values are ±0.6, 0.7 and 0.9 radians, all far from the
+ * π-lattice, so every call takes §7's GENERAL row and promotes rather than
+ * folding. **The refusal surface is therefore still entirely untested by the
+ * corpus and entirely covered by the unit suite**, which is the same position as
+ * before with one fewer assumption in it. PRD §9 row B also still holds on the
+ * new traffic: the control handle differs from the target in all 39. */
 typedef struct { int32_t h; double angle; } gate_rot_args;
 
 static void gate_rz_body(void *p)
@@ -405,6 +432,15 @@ static void gate_ry_body(void *p)
         cq_shim_region(ctrl, gate_rz_body, &a);                               \
         cq_trace_end();                                                       \
         rec(CQ_ROP_RZ_CTRL_INV, ctrl, handle, CQ_REG_NONE, -angle, ctrl);     \
+    }                                                                         \
+    void cqrt_ry_i##W##_controlled(int32_t ctrl, int32_t handle, double angle)\
+    {                                                                         \
+        gate_rot_args a = { handle, angle };                                  \
+        gate_rot_width(cq_shim_ctx(), handle, W##u);                          \
+        CQ_TRACE_OP("ry_ctrl", ctrl, CQ_REG_NONE, handle);                    \
+        cq_shim_region(ctrl, gate_ry_body, &a);                               \
+        cq_trace_end();                                                       \
+        rec(CQ_ROP_RY_CTRL, ctrl, handle, CQ_REG_NONE, angle, ctrl);          \
     }                                                                         \
     void cqrt_ry_i##W##_controlled_inv(int32_t ctrl, int32_t handle,          \
                                        double angle)                          \

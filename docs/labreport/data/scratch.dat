@@ -1,5 +1,5 @@
 # cq_kd_peak (high-water mark during the call) and
-# cq_divrem_region, measured against build-release/libcqops.a at 3464bf5 (dirty).
+# cq_divrem_region, measured against build-release/libcqops.a at 0389705 (dirty).
 #
 W mulpeak divpeak divregion
 2 10 41 39

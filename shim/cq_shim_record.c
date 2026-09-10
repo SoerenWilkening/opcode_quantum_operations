@@ -35,6 +35,7 @@ static const cq_reff EFF[CQ_ROP__N] = {
 [CQ_ROP_CNOT_CTRL]   = {R(0)|R(1),      R(2),         R(0)|R(1),  0,     0, 1, 0, 0, 0, 0},
 [CQ_ROP_RY]          = {0,              R(0),         0,          0,     0, 0, 1, 0, 0, 0},
 [CQ_ROP_RZ]          = {0,              R(0),         0,          0,     1, 0, 1, 0, 0, 0},
+[CQ_ROP_RY_CTRL]     = {R(0),           R(1),         R(0),       0,     0, 0, 1, 0, 0, 0},
 [CQ_ROP_RY_CTRL_INV] = {R(0),           R(1),         R(0),       0,     0, 0, 1, 0, 0, 0},
 [CQ_ROP_RZ_CTRL]     = {R(0),           R(1),         R(0),       0,     1, 0, 1, 0, 0, 0},
 [CQ_ROP_RZ_CTRL_INV] = {R(0),           R(1),         R(0),       0,     1, 0, 1, 0, 0, 0},
@@ -264,7 +265,8 @@ void cq_rec_push(const cq_call_rec *c)
 
     /* A NON-DIAGONAL ROTATION TAINTS THE RAIL IT WRITES, for the R1 substitute.
      * Only the general `Ry` column reaches here: every `Rz` row is diagonal. */
-    if ((c->op == CQ_ROP_RY || c->op == CQ_ROP_RY_CTRL_INV)) {
+    if ((c->op == CQ_ROP_RY || c->op == CQ_ROP_RY_CTRL ||
+         c->op == CQ_ROP_RY_CTRL_INV)) {
         for (uint32_t i = 0; i < CQ_REC_SLOTS; i++)
             if ((e->writes & R(i)) && c->h[i] >= 0 && g_h[c->h[i]].first_rot < 0)
                 g_h[c->h[i]].first_rot = (long)pos;

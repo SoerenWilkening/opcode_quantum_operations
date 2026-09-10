@@ -58,7 +58,7 @@
 # TWO DEVIATIONS FROM bd 216's STEP 8 AS WRITTEN, both measured rather than
 # chosen:
 #
-#  * "table 2 over the 171 `cqrt_*` from docs/cqrt_census.txt" IS NOT SATISFIABLE
+#  * "table 2 over the 180 `cqrt_*` from docs/cqrt_census.txt" IS NOT SATISFIABLE
 #    AS WRITTEN. Measured: the census contains 98 distinct `cqrt_*` TOKENS, most
 #    of them prefixes, plus a verbatim list of the SIXTY-FIVE v1 symbols — it
 #    never spells the 173 expanded names, which is exactly what its Part C says
@@ -122,8 +122,12 @@ function(cqops_add_link_witness)
     # `cqrt_h_controlled` are excluded BY NAME because PRD §15 D16 leaves them
     # deliberately undefined — Rule 4 means libcqops could not serve an `H` at
     # any point, nothing references them, and listing them here would turn D16's
-    # decision into a link failure. That is 173 - 2 = 171, which is D16's
-    # arithmetic checked rather than restated.
+    # decision into a link failure. That is 182 - 2 = 180, which is D16's
+    # arithmetic checked rather than restated. (171 until the 2026-09-10
+    # re-vendor at CQ_lang `170ede1` widened the ABI to 182 — `bd w9i`. THIS IS
+    # A FIFTH POPULATION PIN AND THE BEAD'S RECIPE NAMES ONLY FOUR: it is
+    # generated, so it goes red at BUILD time rather than at test time, and it
+    # is the only one whose failure names neither the count's owner nor a test.)
     file(STRINGS ${_abi} _cdecls REGEX "^[A-Za-z_].*cqrt_[a-z0-9_]+[ \t]*\\(")
     set(_c_rows "")
     set(_c_n 0)
@@ -178,7 +182,7 @@ _Static_assert(sizeof cq_link_smoke_cqrt / sizeof *cq_link_smoke_cqrt
                == CQ_LINK_C_ROWS,
                \"every cqrt_* libcqops defines\");
 _Static_assert(CQ_LINK_T_ROWS == 2479, \"PRD 1 and 15 D14: 992 + 603 + 884\");
-_Static_assert(CQ_LINK_C_ROWS == 171,  \"PRD 15 D16: 173 minus the two cqrt_h*\");
+_Static_assert(CQ_LINK_C_ROWS == 180,  \"PRD 15 D16: 182 minus the two cqrt_h*\");
 
 /* THE READ IS INDEXED BY A RUNTIME VALUE, and that is the whole difference
  * between a witness with teeth and one that is green four ways. With a constant

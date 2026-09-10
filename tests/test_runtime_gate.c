@@ -355,5 +355,7 @@ CQ_TEST_MAIN(
     CQ_CASE(a_controlled_rz_leaves_a_target_freeable_under_a_POISONED_flag),
     CQ_CASE(rz_controlled_inv_is_the_forward_call_at_a_negated_angle),
     CQ_CASE(ry_controlled_inv_is_the_rotation_at_a_negated_angle),
+    CQ_CASE(ry_controlled_inv_is_ry_controlled_at_a_negated_angle),
+    CQ_CASE(a_controlled_ry_taints_its_target_and_a_controlled_rz_does_not),
     CQ_CASE(the_d11_rz_refusal_emits_four_gates_per_wire_below_the_first_constant)
 )

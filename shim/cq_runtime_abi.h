@@ -1,4 +1,4 @@
-/* shim/cq_runtime_abi.h — CQ_lang's 173 `cqrt_*` declarations, VERBATIM.
+/* shim/cq_runtime_abi.h — CQ_lang's 182 `cqrt_*` declarations, VERBATIM.
  *
  * WHY A HEADER OF OUR OWN RATHER THAN CQ_lang's. Nothing in this repository
  * includes anything from the CQ_lang tree, and Step 22 already answered the
@@ -30,13 +30,15 @@
  *
  * PROVENANCE, and the drift check that is NOT here.
  *   source        : CQ_lang runtime/cq_runtime.h (hand-written, not generated)
- *   sha256        : 41e1e20f2536759063bf5e850093f160b7c3f7761a43d98e9877324af32dcac7
- *   last commit to that file : 591f478ce7e1d12b3dd8d8e1babfe6adb63f32df (2026-07-28)
- *   CQ_lang HEAD when vendored : 34b799521a4d69324f77787b4759cc9356d430c1 (2026-08-23)
+ *   sha256        : f7c44636d1adea8a094aac7cd87bbb8e38e5875074ed25c809d3fd5e67792da1
+ *   last commit to that file : f92d95ea6996b54333a6bfe86ead3a3d60e4f14e (2026-09-02)
+ *   CQ_lang HEAD when vendored : 170ede1a0170dfeb9ec6aba5fceeeeda3d61f494 (2026-09-10)
  *   extraction    : comment-stripped identifier extraction, NOT a line-anchored
  *                   grep — that header is column-aligned and the obvious regex
- *                   silently drops 49 of its 173 declarations
- *                   (docs/cqrt_census.txt records the trap).
+ *                   silently drops declarations (49 of 173 as measured at the
+ *                   2026-08-23 vendor and recorded in docs/cqrt_census.txt;
+ *                   re-measured at this one, `^void cqrt_|^int32_t cqrt_`
+ *                   returns 174 of 182).
  *   verified      : the extraction was compiled TOGETHER WITH the source header
  *                   and produced zero `conflicting types`; a negative control
  *                   (one parameter widened from int8_t to int16_t) produced one.
@@ -60,6 +62,20 @@
  * covers (`bd 216` step 8, "table 2 over the 171 `cqrt_*` from
  * docs/cqrt_census.txt"). A re-vendoring must move the four provenance lines
  * above with the bytes.
+ *
+ * RE-VENDORED 2026-09-10 AT CQ_lang `170ede1`, AND THE DELTA IS PURELY ADDITIVE
+ * (`bd w9i`). 173 -> 182: the nine `cqrt_ry_<W>_controlled`, added upstream by
+ * `f92d95e` (2026-09-02) — five integer widths, four fp. **Not one of the
+ * existing 173 changed signature**, measured as nine pure insertions in the
+ * declaration diff, and `third_party/cq_lang/opcode_table.yaml` is BYTE-
+ * IDENTICAL at this revision (sha256 `6245117d…a3e82426`), so the 2,479
+ * `cq_template_*` grid did not move and `third_party/` was not touched. The
+ * disposition is PRD §15 D16's capability rule: the five integer widths are
+ * IMPLEMENTED in `cq_runtime_gate.c` exactly as `cqrt_ry_<W>_controlled_inv`
+ * is (the same body without its `-angle`), and the four fp widths join the fp
+ * abort bucket — where `cqrt_ry_f<W>`, `cqrt_ry_f{32,64}_controlled_inv` and
+ * `cqrt_rz_f<W>_controlled` already sit, and which `cqrt_alloc_f<W>`'s own
+ * abort makes UNREACHABLE rather than merely deferred.
  *
  * IT MAKES `_Float16` AND `long double` A BUILD REQUIREMENT, and that is new.
  * Four of the deferred declarations use them, unguarded, exactly as CQ_lang's
@@ -145,6 +161,11 @@ void cqrt_rz_i8_controlled_inv (int32_t ctrl, int32_t handle, double angle);
 void cqrt_rz_i16_controlled_inv(int32_t ctrl, int32_t handle, double angle);
 void cqrt_rz_i32_controlled_inv(int32_t ctrl, int32_t handle, double angle);
 void cqrt_rz_i64_controlled_inv(int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_i1_controlled (int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_i8_controlled (int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_i16_controlled(int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_i32_controlled(int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_i64_controlled(int32_t ctrl, int32_t handle, double angle);
 void cqrt_ry_i1_controlled_inv (int32_t ctrl, int32_t handle, double angle);
 void cqrt_ry_i8_controlled_inv (int32_t ctrl, int32_t handle, double angle);
 void cqrt_ry_i16_controlled_inv(int32_t ctrl, int32_t handle, double angle);
@@ -156,7 +177,7 @@ void cqrt_toffoli(int32_t c1, int32_t c2, int32_t tgt);
 void cqrt_x_controlled (int32_t ctrl, int32_t q);
 void cqrt_cnot_controlled(int32_t ctrl, int32_t target_ctrl, int32_t tgt);
 
-/* --- Deferred to v2 — fp widths (34) — `cq_runtime_v2.c` (Step 23.5) --- */
+/* --- Deferred to v2 — fp widths (38) — `cq_runtime_v2.c` (Step 23.5) --- */
 int32_t cqrt_alloc_f32(float value);
 int32_t cqrt_alloc_f64(double value);
 int32_t cqrt_alloc_f16(_Float16 value);
@@ -181,6 +202,10 @@ void cqrt_rz_f32_controlled_inv(int32_t ctrl, int32_t handle, double angle);
 void cqrt_rz_f64_controlled_inv(int32_t ctrl, int32_t handle, double angle);
 void cqrt_rz_f16_controlled_inv(int32_t ctrl, int32_t handle, double angle);
 void cqrt_rz_f80_controlled_inv (int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_f32_controlled(int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_f64_controlled(int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_f16_controlled(int32_t ctrl, int32_t handle, double angle);
+void cqrt_ry_f80_controlled (int32_t ctrl, int32_t handle, double angle);
 void cqrt_ry_f32_controlled_inv(int32_t ctrl, int32_t handle, double angle);
 void cqrt_ry_f64_controlled_inv(int32_t ctrl, int32_t handle, double angle);
 void cqrt_copy_f16(int32_t src, int32_t dst);

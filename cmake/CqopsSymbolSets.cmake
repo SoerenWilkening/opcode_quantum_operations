@@ -11,7 +11,9 @@
 # the same two archives in opposite orders both exit 0 and return 7 and -1.
 #
 # AND A COUNT IS NOT A SET. Renaming one definition keeps the archive at exactly
-# 2479 defined `cq_template_*` symbols and at exactly 171 `cqrt_*`; only the
+# 2479 defined `cq_template_*` symbols and at exactly 180 `cqrt_*` (171 until the
+# 2026-09-10 re-vendor of the ABI at CQ_lang `170ede1` — `bd w9i` — which is
+# 182 declared minus the two `cqrt_h*` PRD §15 D16 leaves undefined); only the
 # set difference sees it. Both directions are asserted, and each failure NAMES
 # the symbol rather than reporting a total.
 #

@@ -151,23 +151,26 @@ static uint32_t header_deferred(char out[][V2_NAME_MAX], uint32_t cap)
  * The cases.
  * ------------------------------------------------------------------------- */
 
-/* THE COUNT IS 35 AND ITS DECOMPOSITION IS PRD §15 D16's ARITHMETIC AS D24 LEFT IT:
- * 173 declared = 32 rail + 30 gate + 11 tape (v1.1) + 63 qram (v1.2) + 2 cqrt_h* + 34 fp
- * + 1 alloc_handle. The counterfactual is what makes it decisive — if either of the
- * rail or gate surfaces took all nine widths of its families it would be 48,
- * not 32 or 30. */
+/* THE COUNT IS 39 AND ITS DECOMPOSITION IS PRD §15 D16's ARITHMETIC AS THE
+ * 2026-09-10 RE-VENDOR LEFT IT (`bd w9i`, CQ_lang `170ede1`):
+ * 182 declared = 32 rail + 35 gate + 11 tape (v1.1) + 63 qram (v1.2) + 2 cqrt_h* + 38 fp
+ * + 1 alloc_handle. It was 35 and 173 = … + 30 gate + … + 34 fp until the nine
+ * `cqrt_ry_<W>_controlled` arrived upstream at `f92d95e`; D16's capability rule
+ * split them 5 integer (implemented, cq_runtime_gate.c) / 4 fp (here). The
+ * counterfactual is what makes it decisive — if either of the rail or gate
+ * surfaces took all nine widths of its families it would be 48, not 32 or 35. */
 /* OBSERVED FAILING (2026-08-27, both configurations): one extra deferred
  * declaration added to the ABI header. That is the only thing that CAN move it
  * — the case is a claim about the header, not about the shim — which is exactly
  * why it is worth having: it is the tripwire for a re-pin of CQ_lang's ABI
  * quietly widening the population this file is responsible for. */
-CQ_TEST(the_deferred_surface_is_exactly_the_headers_35_declarations)
+CQ_TEST(the_deferred_surface_is_exactly_the_headers_39_declarations)
 {
     char want[128][V2_NAME_MAX];
     const uint32_t nw = header_deferred(want, 128u);
 
-    CHECK_EQ((int)nw, 35);
-    CHECK_EQ((int)CQ_V2_N_THUNKS, 35);
+    CHECK_EQ((int)nw, 39);
+    CHECK_EQ((int)CQ_V2_N_THUNKS, 39);
 
     /* strcmp and not `==`: two occurrences of the same string literal are not
      * required to share an address, so a pointer comparison here is
@@ -181,7 +184,7 @@ CQ_TEST(the_deferred_surface_is_exactly_the_headers_35_declarations)
         if (strcmp(b, V2_R_FP) == 0)         fp++;
         else if (strcmp(b, V2_R_HAND) == 0)  hand++;
     }
-    CHECK_EQ((int)fp, 34);
+    CHECK_EQ((int)fp, 38);
     CHECK_EQ((int)hand, 1);
 }
 
@@ -258,7 +261,7 @@ CQ_TEST(cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim)
 #include "test_runtime_v2_message.inc"
 
 CQ_TEST_MAIN(
-    CQ_CASE(the_deferred_surface_is_exactly_the_headers_35_declarations),
+    CQ_CASE(the_deferred_surface_is_exactly_the_headers_39_declarations),
     CQ_CASE(every_deferred_symbol_aborts_with_a_well_formed_message),
     CQ_CASE(the_names_the_bodies_print_are_exactly_the_headers_deferred_set),
     CQ_CASE(each_body_carries_its_own_buckets_reason),

@@ -35,9 +35,11 @@
  * parameters is still invisible here and always will be, because C ignores
  * parameter names; that one is pinned behaviourally by the copy case below.
  *
- * THE NAME SET IS COMPARED BOTH WAYS over the v1 subset, which is the 65 the
- * census lists verbatim and is exactly the header minus its fp widths, its qram
- * and its tape — 173 - 34 - 63 - 11 = 65. A name in the header and not the
+ * THE NAME SET IS COMPARED BOTH WAYS over the v1 subset, which is what the
+ * census lists verbatim and is exactly the header minus its fp widths —
+ * 182 - 38 = 144 since the 2026-09-10 re-vendor (`bd w9i`); it was
+ * 173 - 34 = 139, and 173 - 34 - 63 - 11 = 65 before D23 and D24 brought tape
+ * and qram into scope. A name in the header and not the
  * census is an invention; a name in the census and not the header is a
  * declaration we have lost. */
 
@@ -80,9 +82,9 @@ static uint32_t census_v1_names(char out[][48], uint32_t cap)
     if (!f) { cq_h_fail(__FILE__, __LINE__, "cannot open %s", path); return 0u; }
 
     while (fgets(line, sizeof line, f)) {
-        if (strstr(line, "The 139 v1 symbols, verbatim:")) { inside = 1; continue; }
+        if (strstr(line, "The 144 v1 symbols, verbatim:")) { inside = 1; continue; }
         if (!inside) continue;
-        if (strstr(line, "NOTE the 139")) break;
+        if (strstr(line, "NOTE the 144")) break;
         for (const char *p = line; (p = strstr(p, "cqrt_")) != NULL; ) {
             size_t k = 0u;
             while (p[k] && (p[k] == '_' || (p[k] >= 'a' && p[k] <= 'z')
@@ -122,11 +124,15 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
     /* (a) THE COUNTS, per owning group, from PART D's grid:
      *   11 rail lifetime (5 alloc + 5 measure + free)
      *   21 rail contents (5 copy + 5 copy_controlled + cswap + 5 addc + 5 xorc)
-     *   30 gate          (5 discrete + 5 ry + 5 ry_controlled_inv + 5 rz
-     *                                + 5 rz_controlled + 5 rz_controlled_inv)
+     *   35 gate          (5 discrete + 5 ry + 5 ry_controlled + 5 ry_controlled_inv
+     *                                + 5 rz + 5 rz_controlled + 5 rz_controlled_inv)
+     *                    — 30 until the 2026-09-10 re-vendor at CQ_lang
+     *                      `170ede1` added the five integer `ry_*_controlled`
      *   11 tape (v1.1 since PRD §15 D23 — its OWN group, cq_runtime_tape.c)
      *   63 qram (v1.2 since PRD §15 D24 — cq_runtime_qram.c)
-     *   34 fp widths, 1 alloc_handle                     -> 35, cq_runtime_v2.c
+     *   38 fp widths, 1 alloc_handle                     -> 39, cq_runtime_v2.c
+     *                    — 34 until the same re-vendor added the four fp
+     *                      `ry_*_controlled`; PRD §15 D16 defers them BY WIDTH
      *    2 cqrt_h / cqrt_h_controlled, DELIBERATELY UNDEFINED (PRD §15 D16) */
     unsigned per[9] = { 0u }, g = 0u, total = 0u;
     FILE *f = fopen(path, "r");
@@ -141,13 +147,13 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
         }
         (void)fclose(f);
     }
-    CHECK_EQ(total, 173);
-    CHECK_EQ(n_hdr, 173);
+    CHECK_EQ(total, 182);
+    CHECK_EQ(n_hdr, 182);
     CHECK_EQ(groups, 8);
     CHECK_EQ(per[1], 11);   /* rail, lifetime  */
     CHECK_EQ(per[2], 21);   /* rail, contents  */
-    CHECK_EQ(per[3], 30);   /* gate            */
-    CHECK_EQ(per[4], 34);   /* v2: fp widths   */
+    CHECK_EQ(per[3], 35);   /* gate            */
+    CHECK_EQ(per[4], 38);   /* v2: fp widths   */
     CHECK_EQ(per[5], 63);   /* v1.2: qram      */
     CHECK_EQ(per[6], 11);   /* v1.1: tape      */
     CHECK_EQ(per[7], 1);    /* v2: alloc_handle*/
@@ -162,8 +168,8 @@ CQ_TEST(the_vendored_abi_header_declares_the_whole_frozen_surface)
         }
     const uint32_t n_cen = census_v1_names(cen, 160u);
 
-    CHECK_EQ(n_cen, 139);
-    CHECK_EQ(n_v1, 139);
+    CHECK_EQ(n_cen, 144);
+    CHECK_EQ(n_v1, 144);
     for (uint32_t i = 0; i < n_cen; i++)
         if (!name_in(v1, n_v1, cen[i]))
             cq_h_fail(__FILE__, __LINE__,

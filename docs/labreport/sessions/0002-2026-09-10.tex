@@ -1,0 +1,146 @@
+% labreport entry 2 — 2026-09-10
+% labreport-to: 0389705
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{2}{field}.
+
+\entry{2}{2026-09-10}{the frozen ABI re-vendored at 182}
+
+\begin{generated}
+  \gitem{Range}{\texttt{3464bf5..0389705}}
+  \gitem{Tree}{\emph{dirty at capture} --- 19 path(s) uncommitted}
+  \gitem{Tests}{Release \textbf{358}, Debug \textbf{359} registered
+         (\texttt{ctest -N}); pass counts are in \emph{Verified}}
+  \gitem{LOC}{OK — 203 file(s), limit 300, largest 297 (tests/test\_kernel\_add.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{0389705} bd j75: D20's scratch figure was the remainder tape,
+          not the region; and the lab report \emph{(entry 1's work, committed
+          after it was written --- this entry's own work is uncommitted at
+          capture, so the extracted Beads rows below describe that commit and
+          not this session)}
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{fxz} M18: mul at i128 needs 16,640 scratch qubits — document the loud failure at the D2 pool ceiling, \bead{j75} PRD §15 D20 cites 79 scratch qubits for K12 at W=8; cq\_divrem\_region says 543}
+  \gitem{Beads filed}{\bead{cxp} [bug] PRD §12's listing and §15 D22 carry the retired two-argument cq\_phi, which is now a compile error upstream, \bead{2tm} L7: tools/l7/grover.cq.c calls the retired two-argument cq\_phi and no longer compiles, \bead{y1i} PRD §15 D20 says cq\_kernel\_xor at W=4 is 4 CX; the L4 golden says 8, \bead{j75} PRD §15 D20 cites 79 scratch qubits for K12 at W=8; cq\_divrem\_region says 543}
+  \gitem{Diff}{\texttt{14 files changed, 1929 insertions(+), 2 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Take \bead{w9i} --- the last red gate not caused by anything in this repo ---
+now that CQ\_lang has committed the ABI widening it was filed against. Confirm
+first that the previous session's uncommitted work passes its gate, which had
+never been run to completion.
+
+\field{What landed}
+\textbf{The frozen \texttt{cqrt\_*} ABI is re-vendored at CQ\_lang
+\texttt{170ede1}, 173 $\to$ 182 declarations}, and \textbf{L6 is green for the
+first time since \bead{w9i} was filed} --- all 23 build failures gone, none
+replaced. The nine new symbols are one family, \texttt{cqrt\_ry\_<W>\_controlled},
+which \textbf{PRD~§15~D16} splits 5 integer \emph{implemented}
+(\texttt{shim/cq\_runtime\_gate.c}, the \texttt{\_controlled\_inv} body without
+its \texttt{-angle}) and 4 fp \emph{deferred}
+(\texttt{shim/cq\_runtime\_v2.c}). Six prose sites that asserted
+\emph{``there is no plain \texttt{cqrt\_ry\_<W>\_controlled} at any width''} are
+corrected in place, each carrying what it used to say.
+
+\field{Measured}
+\begin{figures}
+\fig{182}{comment-stripped identifier extraction over both headers; \textbf{nine pure insertions, no existing signature moved}}{---}
+\fig{0}{\texttt{diff} of normalised declarations, excluding the nine --- signature drift}{---}
+\fig{123/201/0}{\texttt{l6.json} OK / DEFERRED / \textbf{BUILD\_FAIL}, was 100/201/23}{Release}
+\fig{180}{\texttt{nm -g} on \texttt{libcqops.a}, defined \texttt{cqrt\_*} --- 182 less the two \texttt{cqrt\_h*}}{Release}
+\fig{39}{\texttt{cqrt\_ry\_i32\_controlled} calls in CQ\_lang's e2e goldens, over 23 fixtures}{---}
+\end{figures}
+
+\noindent\textbf{\texttt{opcode\_table.yaml} did not move} --- sha256
+\texttt{6245117d\dots a3e82426} at both revisions --- so the 2{,}479
+\texttt{cq\_template\_*} grid is untouched and \textbf{nothing under
+\texttt{third\_party/} was written}. \bead{w9i}'s recipe says to re-pin
+\texttt{third\_party/cq\_lang/COMMIT} as well; that would have been wrong, since
+the artefact it pins is byte-identical and re-pinning would claim a re-vendor
+that did not happen.
+
+\medskip
+\noindent\textbf{The population pins went red on purpose in FIVE places and the
+bead names four.} The fifth is
+\texttt{cmake/CqopsLinkWitness.cmake}'s \emph{generated}
+\texttt{\textbackslash{}\_Static\_assert(CQ\_LINK\_C\_ROWS == 171)}, which fails at
+\emph{build} time rather than test time and whose message names neither a test
+nor the count's owner.
+
+\medskip
+\noindent\textbf{And a shipped comment's corpus claim went false in the same
+motion.} \texttt{cq\_runtime\_gate.c} read \emph{``measured demand today: zero
+controlled rotations of any kind''}. Re-measured: \textbf{39}, all
+\texttt{ry\_i32}, across the same 23 fixtures. They all \emph{run}, because their
+four distinct angles ($\pm0.6$, $0.7$, $0.9$~rad) are far from the
+$\pi$-lattice and take §7's general row --- so \textbf{D11's refusal surface is
+still reached by the corpus zero times}, which is the same position as before
+with one fewer assumption in it. PRD~§9~row~B also holds on the new traffic:
+control $\neq$ target in all 39.
+
+\field{Decided}
+\textbf{PRD~§15~D16} gains its second worked example and it runs the
+\emph{opposite} way from the first: where \texttt{cqrt\_qram\_alloc\_f32} shows a
+family overriding an fp token, \texttt{cqrt\_ry\_f32\_controlled} shows an fp token
+deferring a family that is otherwise in scope. D16 is amended, not re-resolved,
+and takes no new D-number. \textbf{PRD~§2.1}'s controlled row and
+\textbf{§15~D11}'s demand figure are corrected.
+
+\field{Not taken}
+\textbf{Implementing all nine widths uniformly} --- asked for, and declined on a
+fact that was not on the table when it was asked: \texttt{cqrt\_alloc\_f<W>} is
+itself an abort, so \emph{no fp rail handle can exist at runtime in v1}. An
+implemented body would resolve its handle through M07 and take M07's
+\emph{generic} error instead of \texttt{cq\_shim\_unsupported}'s named one ---
+worse diagnostics on a path nothing can reach, a forward implemented where its
+own \texttt{\_inv} is not, and the only implemented fp rotation of any kind. The
+abort's reason string is \texttt{"fp is v2"}, which \emph{is} the capability
+claim, and is what those four bodies become when fp lands.
+\textbf{Leaving L6 red by design} --- weighed: the blast radius had gone
+3~$\to$~10~$\to$~23 fixtures in eight days, so waiting was not free either.
+\textbf{Re-running L6 in Debug} --- $\sim$25~min under sanitizers, and the claim
+it makes is a LINK claim that does not vary by configuration.
+
+\field{Verified}
+Rule 17, literally. \texttt{make lint} OK (203 files, largest 297).
+\textbf{Release 357/357 and Debug 358/358} with \texttt{l6\_cqlang\_fixtures}
+excluded, both after the change; \texttt{l7\_grover\_cqlang} is inside those
+counts and passed. \textbf{L6 was then run once, clean, in Release only}:
+\textbf{passed}, 563~s, 324 fixtures, \textbf{0 build failures}. The
+\texttt{--gate} clause is what had been failing --- a \texttt{BUILD\_FAIL} is
+neither OK nor DEFERRED --- and the floor (\texttt{CQOPS\_L6\_MIN\_OK}=43) was
+never in play.
+
+\medskip
+\noindent The re-vendored copy was verified the way its own banner prescribes:
+compiled \emph{together with} upstream's header, zero \texttt{conflicting types},
+with a one-parameter-widened negative control producing exactly one. Residue over
+the 123 completing fixtures: \textbf{992 qubits unproven over 58 unproven frees,
+0 convicted, 0 dirty}, 20 fixtures reporting --- unchanged in kind.
+
+\medskip
+\noindent\textbf{Two new cases, because the forward twin is a comparison the
+tree could not make before.}
+\texttt{ry\_controlled\_inv\_is\_ry\_controlled\_at\_a\_negated\_angle} pins the
+promoted four-gate general row as an \emph{ordered, bitwise} stream comparison
+--- a transposed $R(\pm\theta/2)$ or a forgotten negation moves it and moves no
+count. \texttt{a\_controlled\_ry\_taints\_its\_target\_and\_a\_controlled\_rz\_does\_not}
+is a claim about the \emph{record} layer:
+\texttt{cq\_shim\_record.c} marks \texttt{first\_rot} for the non-diagonal Ry rows
+\emph{by naming them}, so a row added to the effect table but not to that list
+would leave a controlled forward Ry looking diagonal to D15's certificate and a
+rail it rotated could be released CLEAN.
+
+\field{Left open}
+\bead{w9i} is ready to close. \bead{cxp} and \bead{2tm} landed in the previous
+session and their gate is now confirmed. The staleness family --- \bead{y1i},
+\bead{0a7}, \bead{18f}, \bead{dtb}, \bead{eh9}, \bead{wf8} --- is untouched and
+remains the obvious next batch; \bead{0a7} is \emph{worse} for this session's
+work, since the PRD gained roughly thirty lines above the K-doc citation targets.
+\textbf{The standing hazard is unchanged}: this repo neither pins nor can build
+CQ\_lang, so L6 tracks a moving target by design and today's green is a
+measurement, not a property.
