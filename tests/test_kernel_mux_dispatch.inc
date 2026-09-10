@@ -14,7 +14,8 @@
  *     input, and L5's "zero gates AND zero qubits" is a conjunction.
  *   - with it, a constant condition costs W CX instead of 7W CX + 2W CCX, and
  *     `cqrt_cswap` with a constant control is already specified at zero gates
- *     (PRD-v1.md:201), so the shape is precedented rather than invented.
+ *     (PRD §2.1, "swap the two `cq_bit` arrays, 0 gates" —
+ *     PRD-v1.md:265 @ 961905f), so the shape is precedented, not invented.
  */
 
 /* One mux call with an explicit (value, quantum-mask) per operand, including

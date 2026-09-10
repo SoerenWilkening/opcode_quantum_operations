@@ -460,13 +460,18 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/qtg/qtg.c")
 endif()
 
 ## ---------------------------------------------------------------------------
-## The 300-line guard (Rule 12). Also reachable from the repo root as
-## `make lint`; both spellings run the one script.
+## The lint guards. Also reachable from the repo root as `make lint`; both
+## spellings run the same scripts, in the same order.
+##
+##   check_loc.sh    the 300-line guard (Rule 12)
+##   check_cites.sh  the citation guard (bd 0a7): a line number into a living
+##                   document is legal only when pinned to a commit SHA
 ## ---------------------------------------------------------------------------
 
 add_custom_target(lint
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_loc.sh"
+    COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_cites.sh"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    COMMENT "check_loc.sh: no hand-written .c/.h/.py over 300 lines"
+    COMMENT "check_loc.sh + check_cites.sh: the 300-line and citation guards"
     VERBATIM
 )

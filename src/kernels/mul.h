@@ -7,11 +7,12 @@
  *
  * THE HEADLINE DELTA: multiplier.jl:29 calls the OUT-OF-PLACE ripple
  * `lower_add!`, and we substitute the IN-PLACE Cuccaro accumulator K8 (M15,
- * src/kernels/addacc.c) into that slot. Decided 2026-08-14, recorded in
- * PRD-v1.md:550-560 and K11.md §2 / §5 delta 4. It is a derived composition,
- * not a port: the string `cuccaro` does not occur in multiplier.jl, no upstream
- * dispatch path composes shift-add with Cuccaro, and no Bennett test exercises
- * it. What that buys is the scratch region — `W² + 2W` against ripple's
+ * src/kernels/addacc.c) into that slot. Decided 2026-08-14, recorded in PRD §6,
+ * "K11 uses Cuccaro, and this is a deliberate delta from upstream"
+ * (PRD-v1.md:645 @ 961905f), and in K11.md §2 / §5 delta 4. It is a derived
+ * composition, not a port: the string `cuccaro` does not occur in multiplier.jl,
+ * no upstream dispatch path composes shift-add with Cuccaro, and no Bennett test
+ * exercises it. What that buys is the scratch region — `W² + 2W` against ripple's
  * `3W² + W`, i.e. 1088 qubits at i32 rather than 3104 — plus `2W` fewer
  * Toffolis. What it costs is the upstream cross-check: K11's L4 golden is
  * SELF-PINNED and there is no published figure to reconcile it against.

@@ -5,6 +5,17 @@ baselines" without a path. This file supplies the paths, resolves which of the t
 competing upstream `x+1 @ i8` figures Step 12 must pin against, and states the closed
 forms.
 
+> **Citation form — converted 2026-09-10 (`bd 0a7`).** This file's citations into
+> *living* documents (`PRD-v1.md`) are now `§` + a `grep -nF`-unique quoted phrase +
+> `file:line @ <sha>`. Measured: a re-measured `PRD-v1.md` line number survives about
+> three commits, and four earlier re-measure cycles across the K-docs all went stale
+> again. **Verify by grepping the phrase in the current file**; recover the exact
+> original with `git show <sha>:<file> | sed -n <N>p`. Citations into `third_party/`
+> keep bare line numbers — that tree is pinned and never moves — but the three refs that
+> named Bennett's own operating manual by bare basename, and so read as **this repo's**
+> `CLAUDE.md` when they are not, are now spelled `third_party/bennett/CLAUDE.md:27` in
+> full.
+
 | | |
 |---|---|
 | Upstream | `https://github.com/tobiasosborne/Bennett.jl` |
@@ -178,7 +189,8 @@ W = 32:  6 + 160 +  60 = 226  ✓
 W = 64:  6 + 320 + 124 = 450  ✓
 ```
 
-**Doubling rules from `CLAUDE.md:27` / `CHANGELOG.md:21`, checked against the forms:**
+**Doubling rules from `third_party/bennett/CLAUDE.md:27` / `CHANGELOG.md:21`, checked
+against the forms:**
 
 ```
 total(2W) = 7(2W) + 2 = 14W + 2
@@ -288,7 +300,8 @@ just a 4-tuple quoted against a 3-tuple. Settle it in `PRD-v1.md` (Step 0.5), no
 > Toffoli with one control known false degenerates to a CNOT or vanishes. That is
 > exactly why the totals are "~2× smaller" (`test_gate_count_regression.jl:35-39`).
 >
-> **libcqops K6 is `add(dst, a, b)` over two live registers** (`PRD-v1.md:270`). Its
+> **libcqops K6 is `add(dst, a, b)` over two live registers** — PRD §6,
+> "| K6 | `add(dst,a,b)`" (PRD-v1.md:625 @ 961905f). Its
 > carry chain does **not** collapse. Pinning K6 against 58 would silently under-count.
 
 **How far apart they are.** The general out-of-place ripple adder is
@@ -352,7 +365,8 @@ i.e. by more than half the T-count — at i8 alone.
 - **`x + 3`** (`total = 64`, `test_gate_count_regression.jl:86`) — a *different*
   constant. `popcount(3) = 2`, so its NOT count differs. Constant-increment baselines
   are per-constant, not a family.
-- **Anything at `add=:cuccaro`.** K8 is the in-place accumulator (`PRD-v1.md:272`) and
+- **Anything at `add=:cuccaro`.** K8 is the in-place accumulator — PRD §6,
+  "| K8 | `addacc(acc,b)` in-place" (PRD-v1.md:627 @ 961905f) — and
   is self-cleaning — **not** sandwiched. Its own formulas are in §5.
 
 ### Collision trap — two different circuits both total 114
@@ -372,7 +386,9 @@ on `total` alone.**
 ## 5. Baseline index for K1–K12
 
 `✔` = kernel is direct-emission (no sandwich); `sandwich` = Bennett-in-the-small
-applies. Kernel roles from `PRD-v1.md:265-276`.
+applies. Kernel roles from PRD §6, "## 6. Kernel catalogue" (PRD-v1.md:616 @ 961905f);
+the catalogue table itself is PRD §6, "| # | Kernel | Bennett source | Clean? | Notes |"
+(PRD-v1.md:618-631 @ 961905f).
 
 | K | Kernel | Upstream baseline | `file:line` | Kind | Notes |
 |---|---|---|---|---|---|
@@ -380,15 +396,15 @@ applies. Kernel roles from `PRD-v1.md:265-276`.
 | K2 | `and` | — none | — | ✔ | PRD predicts `W CCX`. |
 | K3 | `or` | — none | — | ✔ | PRD predicts `2W CNOT + W CCX`. |
 | K4 | shifts | — none | — | ✔ | Index shuffle; `src/lowering/arith.jl:310-329` is pure CNOT. |
-| K5 | casts | — none | — | ✔ | `src/lowering/arith.jl:352+`, pure CNOT. |
+| K5 | casts | — none | — | ✔ | `src/lowering/arith.jl:536+`, pure CNOT. Cited `arith.jl:352+` until 2026-09-10 (`bd wf8` / `bd 0a7`) — a **wrong pinned line**, not rot: `:352` is `_shift_stages` / `lower_var_lshr!`, and `function lower_cast!` is at `:536`. |
 | **K6** | **`add`** | **none end-to-end**; `5W − 2` compute half **[DERIVED]** | `src/adder.jl:1-18`, comment `:6` | sandwich | §4. Sandwiched `11W − 4`. |
 | K7 | `sub` | none; two's complement via K6 | `src/adder.jl:152-154` | sandwich | Comment: `~7W` total incl. `2W` for `~b` + 1 NOT carry-in. |
 | **K8** | **`addacc` (Cuccaro)** | **`Toffoli 2W−3, CNOT 4W−2, NOT 0, total 6W−5`** | `test/test_op6a_cuccaro_gate_count.jl:38-41`; docstring `src/adder.jl:33-40` | ✔ self-cleaning | **Best baseline in the repo** — see below. |
-| K9 | `eq/ult/slt` | — none | — | sandwich | 7 of 10 predicates derive (`PRD-v1.md:280`). |
+| K9 | `eq/ult/slt` | — none | — | sandwich | 7 of 10 predicates derive — PRD §6, "**K9 derives 7 of 10 predicates for free**" (PRD-v1.md:635 @ 961905f). |
 | K10 | `mux` | — none | — | sandwich | — |
 | K11 | `mul` | `x*y @ i32 = 6860 / 2856 Toffoli` | `test/test_5kio_sizehint_arithmetic.jl:55-56` | sandwich | Defaults. **Full-wrap**; not a kernel-local figure. |
 | K11 | `mul` | `x*x @ i8 Toffoli 144, depth 62`; `@ i16 Toffoli 664, depth 208` | `test/test_gate_count_regression.jl:105-108` | sandwich | Explicit `mul=:shift_add, fold_constants=true`. |
-| K12 | `divrem` | — none | — | sandwich | "Not a circuit" — branchless Julia kernel (`PRD-v1.md:283-285`). |
+| K12 | `divrem` | — none | — | sandwich | "Not a circuit" — branchless Julia kernel; PRD §6, "**K12 is not a circuit.**" (PRD-v1.md:638 @ 961905f). |
 
 ### K8 is the one pristine compute-half baseline upstream publishes
 
@@ -423,7 +439,7 @@ is not. `W = 1` falls back to `lower_add!` and the formulas do **not** apply (`:
 ### Where the baselines live, ranked by authority
 
 1. **`test/test_gate_count_regression.jl`** — executable, explicit strategy kwargs.
-   The contract. `CLAUDE.md:27` names it as the pin site.
+   The contract. `third_party/bennett/CLAUDE.md:27` names it as the pin site.
 2. **`test/test_5kio_sizehint_arithmetic.jl`** — executable; the **only** source giving
    the full `(total, NOT, CNOT, Toffoli)` 4-tuple at all four widths. Uses *defaults*,
    so it doubles as proof of what today's defaults produce.
@@ -431,7 +447,8 @@ is not. `W = 1` falls back to `lower_add!` and the formulas do **not** apply (`:
    compute-half** pin (K8).
 4. **`benchmark/regression_baselines.jsonl`** — machine-checked by
    `benchmark/regression_check.jl`; adds **wires** and compile-time canaries.
-5. **`CLAUDE.md:27` / `CHANGELOG.md:21`** — prose statements of the same baselines.
+5. **`third_party/bennett/CLAUDE.md:27` / `CHANGELOG.md:21`** — prose statements of the
+   same baselines.
 6. **`README.md:114-117`, `docs/src/**`** — doc-comment echoes; ~14 files repeat
    `58/6/40/12`. Consistent, but derivative.
 7. **`BENCHMARKS.md`** — **STALE, and orphaned from its generator.** Do not pin against

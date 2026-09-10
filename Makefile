@@ -47,6 +47,7 @@ all: test
 
 lint:
 	@tools/check_loc.sh
+	@tools/check_cites.sh
 
 # A BUILD DIRECTORY REMEMBERS ITS GENERATOR AND CMAKE REFUSES TO CHANGE IT, so
 # `-G` on an existing tree of the other kind is a hard error telling you to

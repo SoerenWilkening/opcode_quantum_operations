@@ -399,7 +399,11 @@ channel and a real miscompile signature.
 
 **Rule 12 — ≤ 300 lines per hand-written module, enforced by CI, not by discipline.**
 Counted as non-blank, non-comment lines in any hand-written `.c` / `.h` / `.py`
-(`src/`, `include/`, `shim/*.py`, `tests/`). Exempt: generated `*.gen.c` and
+(`src/`, `include/`, `tests/`, `shim/`, `tools/` — the five roots `check_loc.sh`'s
+`for d in ...` loop scans; it read "`src/`, `include/`, `shim/*.py`, `tests/`" until
+2026-09-10 and was narrow twice over, since `shim/` is scanned for `.c`/`.h` as well
+and `tools/` has been in the loop since **Step 1**, counting since the Step 24 L6 harness
+put the first `.py` under it — `bd dtb`). Exempt: generated `*.gen.c` and
 `third_party/`. **Every module over ~200 lines in plan §3's Layer 0–3 tables already
 has its split seam recorded** — hitting the limit is a scheduled split, never a
 surprise refactor. Two gaps to close before they are written: **M26**
@@ -1095,8 +1099,9 @@ ctest --test-dir build-release -R l7
   DOES NOT**, so pinning "the message says D11" the obvious way TRADES AWAY the death test's
   own contract. Express the discriminator negatively instead — name the layers that must NOT
   have spoken (`"rotate:;qubit pool:;distinctness"`) — which composes with the exit code
-  rather than replacing it. `tests/CMakeLists.txt:193-195` already said this and it is easy
-  to reach for the wrong one anyway.
+  rather than replacing it. `tests/CMakeLists.txt`, "displaces the exit-code check"
+  (tests/CMakeLists.txt:241 @ 961905f), already said this and it is easy to reach for the
+  wrong one anyway.
 
 - **`set_tests_properties` OVERWRITES A PROPERTY, IT DOES NOT ADD TO IT — SO A SECOND
   BLOCK SILENTLY DISARMS THE FIRST, AND EVERY TEST STAYS GREEN.** Measured at Step 19: a later
@@ -1287,7 +1292,8 @@ ctest --test-dir build-release -R l7
   sentence — *"the ABI's integer widths are 8/16/32/64 and `i128` never reaches a `divrem`
   signature"* — is false: `third_party/cq_lang/opcode_table.yaml:187-190` gives all four of
   `sdiv`/`udiv`/`srem`/`urem` as `widths: [i1,i8,i16,i32,i64,i128]` with the **full
-  15-variant grid, bare `qq` shape included**, and `docs/cqrt_census.txt:498-501` counts them
+  15-variant grid, bare `qq` shape included**, and `docs/cqrt_census.txt`, "sdiv  int_arith"
+  through "urem  int_arith" (docs/cqrt_census.txt:683-686 @ 961905f), counts them
   `6 × 15 = 90` each on that basis. The true fact it was probably remembering is a different
   one: **i128 has no `cqrt_*` CORE symbol** (no `alloc`, `measure`, `copy`) and `__int128`
   itself appears only in an `_hl` parameter list — but the *register* is 128 bits and **the
@@ -1349,7 +1355,9 @@ ctest --test-dir build-release -R l7
 
 - **K8 IS THE ONE KERNEL WHOSE PRECONDITION IS A REFUSAL RATHER THAN A FOLD, AND THE GUARD
   K08.md NAMES FOR IT DOES NOT EXIST.** K08.md §2 says "the Debug scratch-extent assertion
-  carries the whole burden here". It carries nothing: `check_target` (`src/emit.c:39-48`) is
+  carries the whole burden here". It carries nothing: `check_target` — `src/emit.c`,
+  "static void check_target(const cq_ctx *ctx, const cq_bit *t)"
+  (src/emit.c:42-50 @ 961905f) — is
   inside `#if CQOPS_DEBUG_INVARIANTS`, so it is **absent from Release**, and it fires only when
   `ctx->scratch_lo` is non-NULL, which `sw_arm` sets for a `cq_sandwich` compute half — and K8
   has no sandwich. A bare K8 call writing into a register with classical bits therefore
@@ -1496,8 +1504,12 @@ ctest --test-dir build-release -R l7
   oracle is the register's **value** (`cq_pc_value`). And an operand register with any
   `CQ_BIT_Q` bit owns live qubits that are nobody's leak, so L2's real claim is the union form:
   **no index is live that no named register owns**, as a SET — a count is strictly weaker.
-  PRD §11 and plan §4 carry the corrected wording; `NORTH_STAR.md:139-140` still has the old
-  one, filed. `bd remember l1-l2-oracle-formulations`.
+  PRD §11 and plan §4 carry the corrected wording. **This callout filed `NORTH_STAR.md` as
+  still carrying the old wording until 2026-09-10 (`bd 0a7`), and that claim is now false**
+  — condition 2 carries the corrected sampling wording and condition 3,
+  "live rails own — the operands' and the result's, as a **set** and never a count"
+  (NORTH_STAR.md:142 @ 961905f), carries the corrected L2 wording. The filed defect is
+  fixed. `bd remember l1-l2-oracle-formulations`.
 
 - **A BIT-KIND MASK IS A PAIR, ONE PER OPERAND.** Every normative sentence in the PRD,
   the plan and the beads says "masks" in the singular, and risk R8's own *mandated* fixed
@@ -1522,8 +1534,9 @@ ctest --test-dir build-release -R l7
   FIGURES, AND BENNETT FOLDS BY DEFAULT** (`third_party/bennett/src/Bennett.jl:146`, applied at
   `src/lowering/driver.jl:375-377`). The pass drops CNOTs with known-false controls, rewrites
   known-true ones to NOTs, drops Toffolis with a known-false control and reduces a
-  one-known-true-control Toffoli to a CNOT. So K02's advertised "Bennett pays 4 NOT + 8
-  Toffoli, libcqops pays zero Toffoli" is not the win it looks like. **The headline formulas
+  one-known-true-control Toffoli to a CNOT. So K02 advertised — until 2026-09-10 (`bd o63`),
+  which put the correction into `K02.md` §5 itself — "Bennett pays 4 NOT + 8 Toffoli, libcqops
+  pays zero Toffoli", which is not the win it looks like. **The headline formulas
   are unaffected** and the L4 goldens are correct, because they are pinned at all-quantum
   operands where the fold pass provably does nothing. Do not repeat the comparison numbers.
 
@@ -1811,6 +1824,12 @@ ctest --test-dir build-release -R l7
   CQ_lang owns the format — otherwise they churn on unrelated D4 free-list and D6
   non-demotion changes (risk R5). Goldens carry the Bennett commit in a header
   comment (risk R3).
+- **A line citation into a LIVING document carries a pinned SHA** — `§` + a
+  `grep -nF`-unique quoted phrase + `file:line @ <sha>`, converted 2026-09-10 (`bd 0a7`).
+  Measured: a re-measured `PRD-v1.md` line number survives about three commits, and four
+  earlier re-measure cycles in the K-docs all went stale again. Verify by grepping the
+  phrase; recover the exact original with `git show <sha>:<file> | sed -n <N>p`. Citations
+  into `third_party/` keep bare line numbers — that tree is pinned and never moves.
 - **Non-interactive shell flags always** (`cp -f`, `mv -f`, `rm -f`, `rm -rf`) —
   `cp`/`mv`/`rm` may be aliased to interactive `-i` and hang the agent. See
   [`AGENTS.md`](AGENTS.md).

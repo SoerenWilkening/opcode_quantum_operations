@@ -472,10 +472,14 @@ int cq_reg_sources_alias(const int32_t *srcs, uint32_t n);
  * performs tens of thousands of frees against a peak in the low thousands of
  * simultaneously live rails, so auditing per free would be on the order of 10^9
  * bit visits at Step 24 and the likely "fix" would be deleting the check. (No
- * exact figure here on purpose: the CQ_lang corpus is UNPINNED and moved four
- * times on 2026-08-22 alone -- PRD §15 D15 §0. A count in a shipped header is a
- * count nothing will ever re-check.) Callers place it: the suites here at Step 7,
- * the poolcheck harness on every L1 case from Step 10.
+ * exact figure here on purpose: the CQ_lang corpus is UNPINNED and its GOLDEN
+ * SET moved three times on 2026-08-22 alone, inside a tests/e2e directory that
+ * moved four -- PRD §15 D15 §0, which now carries the per-revision table. This
+ * line read "moved four times on 2026-08-22 alone" until 2026-09-10 (bd 1ti);
+ * four was the count of COMMITS touching that directory, and the fourth of them
+ * edited a .c fixture and left every golden byte-identical. A count in a shipped
+ * header is a count nothing will ever re-check.) Callers place it: the suites
+ * here at Step 7, the poolcheck harness on every L1 case from Step 10.
  *
  * IT ASSERTS ONLY THE WEAK FORM. `pool.live == sum of owned` is true today and
  * becomes FALSE at Step 8, because I6(b) pre-materialises the whole sandwich

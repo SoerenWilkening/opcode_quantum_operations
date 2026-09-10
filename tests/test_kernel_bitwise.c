@@ -265,15 +265,22 @@ CQ_TEST(l5_or_lane_with_a_constant_zero)
  * 8. THREE QUARTERS OF THE REGISTER NEVER BECOMES QUANTUM, which is the whole
  * claim of the per-bit design and is what this pins.
  *
- * DO NOT re-add the upstream comparison K02.md prints here. Measured
- * 2026-08-15: that comparison ("Bennett pays 4 NOT + 8 Toffoli") is a
+ * DO NOT re-add the upstream comparison K02.md prints here -- `bd o63`.
+ * Measured 2026-08-15: that comparison ("Bennett pays 4 NOT + 8 Toffoli") is a
  * fold_constants=false figure, and Bennett runs `_fold_constants` BY DEFAULT
  * (src/Bennett.jl:146 `fold_constants::Bool = true`, applied at
  * src/lowering/driver.jl:375-377), which drops the clear-bit Toffolis and
  * reduces the set-bit ones to CNOTs. At default options upstream also pays
  * zero Toffoli. The per-bit win over upstream is real but smaller than the
- * K-doc says; our own numbers below are unaffected, and they are what L5 is
- * for. */
+ * K-doc said; our own numbers below are unaffected, and they are what L5 is
+ * for.
+ *
+ * K01.md, K02.md and K03.md were corrected on 2026-09-10 under `bd o63`, each
+ * carrying the retired figure and the default-options walk beside it, so the
+ * K-doc and this comment no longer disagree. What is pinned below is the only
+ * side of that comparison anything in this repo EXECUTES: the upstream half is
+ * a reading of the pinned snapshot (Julia is not installed here), which is
+ * exactly why it went stale unnoticed for four weeks. */
 CQ_TEST(l5_and_against_a_partial_constant)
 {
     lane_fx f;

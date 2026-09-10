@@ -805,8 +805,18 @@ F3. WHERE 1455 AND 878 CAME FROM — a correct snapshot, now stale by two increm
 
 F4. WHERE 1474 CAME FROM — nowhere. It is a phantom.
 
-    PRD-v1.md:470  "Generated shim over the full 1474-symbol integer grid"
-    PRD-v1.md:486  "shim/cq_templates_impl.c  generated dispatch (1474 thin wrappers)"
+    PRD §13, "Generated shim over the full 1474-symbol integer grid"
+        (PRD-v1.md:444 @ 8514ecb)
+    PRD §14, "generated dispatch (1474 thin wrappers)"
+        (PRD-v1.md:460 @ 8514ecb)
+
+    THE PIN IS 8514ecb AND NOT HEAD BECAUSE BOTH PHRASES HAVE SINCE BEEN
+    DELETED from the PRD — it now carries the phantom struck through instead:
+    PRD §1, "A transcription slip from 1455" (PRD-v1.md:173 @ 961905f). And the
+    line numbers this entry used to give, 470 and 486, resolved at NO committed
+    revision: 8514ecb is the EARLIEST commit whose PRD contains either phrase
+    (its successor a443c7e carries the same bytes), and there they sit at 444
+    and 460 (bd 0a7, re-anchored 2026-09-10).
 
     1474 appears at NO revision of opcode_table.yaml, as neither a total nor an
     integer count — see the full 13-revision table in F2, which contains no 1474.

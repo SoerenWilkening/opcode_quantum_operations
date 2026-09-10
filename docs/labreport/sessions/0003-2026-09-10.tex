@@ -1,0 +1,232 @@
+% labreport entry 3 — 2026-09-10
+% labreport-to: 961905f
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{3}{field}.
+
+\entry{3}{2026-09-10}{the stale-claims batch: eight beads sorted three ways}
+
+\begin{generated}
+  \gitem{Range}{\texttt{0389705..961905f}}
+  \gitem{Tree}{\emph{dirty at capture} --- 27 path(s) uncommitted}
+  \gitem{Tests}{Release \textbf{358}, Debug \textbf{359} (\texttt{ctest -N})}
+  \gitem{LOC}{OK — 203 file(s), limit 300, largest 297 (tests/test\_kernel\_add.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{961905f} bd w9i: re-vendor the frozen cqrt\_* ABI at CQ\_lang 170ede1 (173->182); cqrt\_ry\_<W>\_controlled 5 int implemented / 4 fp deferred per D16; L6 100->123 OK, 0 BUILD\_FAIL \emph{(entry 2's work, committed after it was
+          written --- this session's own work is uncommitted at capture, so
+          the Range and Diff rows describe THAT commit, and the Beads rows
+          below are every bead closed or filed anywhere on 2026-09-10, which
+          is all three of today's sessions and not this one)}
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{cxp} [bug] PRD §12's listing and §15 D22 carry the retired two-argument cq\_phi, which is now a compile error upstream, \bead{2tm} L7: tools/l7/grover.cq.c calls the retired two-argument cq\_phi and no longer compiles, \bead{w9i} CQ\_lang's dirty tree widens the frozen ABI: cqrt\_ry\_<W>\_controlled is emitted by three untracked fixtures and declared by nothing we vendor, \bead{1ti} The corpus 'moved four times on 2026-08-22' is asserted in four places; D15 section 0 enumerates two transitions per series, \bead{fxz} M18: mul at i128 needs 16,640 scratch qubits — document the loud failure at the D2 pool ceiling, \bead{o63} K01/K02 section 5 delta-2 upstream comparisons are fold\_constants=false figures; Bennett folds BY DEFAULT, \bead{y1i} PRD §15 D20 says cq\_kernel\_xor at W=4 is 4 CX; the L4 golden says 8, \bead{j75} PRD §15 D20 cites 79 scratch qubits for K12 at W=8; cq\_divrem\_region says 543, \bead{dtb} check\_loc.sh scans tools/ but its own header and three documents say four roots, \bead{18f} K06.md and K07.md still say UNVERIFIED-BY-EXECUTION; Step 12 measured them and only CLAUDE.md records it, \bead{wf8} K05.md carries two stale self-assessments that are Rule 16 traps, \bead{eh9} PRD section 13 increment 2 asks only for L1/L2/L5 on K1-K5; plan section 4 Phase B applies L1-L4 at every kernel step, \bead{0a7} K01-K03 line-number citations into PRD-v1.md and IMPLEMENTATION\_PLAN.md are stale by 95-183 lines}
+  \gitem{Beads filed}{\bead{cxp} [bug] PRD §12's listing and §15 D22 carry the retired two-argument cq\_phi, which is now a compile error upstream, \bead{2tm} L7: tools/l7/grover.cq.c calls the retired two-argument cq\_phi and no longer compiles, \bead{j5v} check\_cites.sh's target set stops at the four planning docs: 20 living-target line cites INTO K-docs and BASELINES.md remain bare (src/, tests/, plan, K12->K09), \bead{16q} D15's carve-out witnesses have moved out from under it at CQ\_lang HEAD: the ckd.18 shape counts ZERO and slice\_loop\_break* is five -> four, \bead{aei} tests/test\_kernel\_cast.c:83-85 says the small-width sweep is exhaustive; every width has been a 32-case sample since 2026-08-21, \bead{iwn} tests/test\_kernel\_add.c is at 297/300 with no recorded seam beyond the \_upstream.inc split, \bead{65q} D20's per-gate physical costs (CX 1,830 / CCX 562,564 at d=3) are pinned by no test and by no QEC revision, \bead{wgi} tools/l6/l6\_run.py is at 281/300 and past plan §3 Layer 6's recorded split trigger (240), \bead{y1i} PRD §15 D20 says cq\_kernel\_xor at W=4 is 4 CX; the L4 golden says 8, \bead{j75} PRD §15 D20 cites 79 scratch qubits for K12 at W=8; cq\_divrem\_region says 543, \bead{bz8} K06/K07 follow-ups from bd 18f: evaluated tables stop at W=64 (goldens run to 128); 'does CQ\_lang ever pass a constant register to cq\_template\_add\_*' is now measurable off L6, \bead{bpw} K05 §5 item 5 says a cast with T == F should be refused; src/kernels/cast.c:15-20 accepts it as an identity copy -- decide which, \bead{a9e} check\_loc.sh's printed file COUNT is box-local: it walks the filesystem, not the git index, and tools/qtg/ is gitignored}
+  \gitem{Diff}{\texttt{24 files changed, 805 insertions(+), 115 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Eight beads of one kind: a claim in a document or a shipped comment that was
+true when it was written and is false now, or a citation that has rotted. The
+method is \bead{cxp}'s three-way sorting --- \emph{protected source intent},
+\emph{live present-tense claim now false}, \emph{dated measurement} --- and the
+\emph{sorting} is the deliverable, not the edit count: a batch that changes
+eight numbers and sorts them wrongly is worse than one that changes three and
+records why the other five stay. Re-measure every figure against the artefact,
+never against a remembered formula. Serialize the PRD editors; take \bead{0a7}
+last and alone.
+
+\field{What landed}
+\textbf{Eight beads closed, and every site now carries the category it was
+sorted into rather than only its new value.}
+
+\begin{itemize}[leftmargin=1.5em,itemsep=2pt,topsep=4pt,parsep=0pt]
+\item \bead{o63} --- K01/K02/K03 §5's \emph{deltas from upstream}: all three
+      sites \textbf{category 2}, corrected in place carrying the old figure
+      qualified as a \texttt{fold\_constants=false} number. K02's advertised win
+      is \emph{retracted} --- see \emph{Measured}.
+\item \bead{1ti} --- the ``corpus moved four times on 2026-08-22'' claim, in five
+      places, resolved as the bead's own reading (b). §0's blanket sentence is
+      \textbf{category 2}; §0's enumeration is \textbf{category 3}, verbatim
+      under a dated amendment carrying the per-revision table. The pin itself was
+      also wrong --- see \emph{Decided}.
+\item \bead{y1i} --- \textbf{PRD~§15~D20}(2)'s parenthetical: \textbf{category
+      3}, verbatim with a dated amendment, the shape \bead{j75} established one
+      session earlier; the neighbouring \texttt{add} figure re-measured
+      \emph{right}.
+\item \bead{18f} --- K06.md and K07.md: the \textsc{unverified-by-execution}
+      subsections are \textbf{category 3} and stay verbatim under a dated banner
+      in K09's Step-13 shape, over four \textbf{category 2} corrections. Pure
+      insertions, zero deletions.
+\item \bead{wf8} --- K05.md, 15 sites: the two the bead named plus 13 of the same
+      class in the same file. \textsc{unverified-by-execution} is \textbf{category
+      1} here --- \texttt{which julia} is still empty, so the label is true and it
+      was its \emph{explanation} that was false.
+\item \bead{eh9} --- \textbf{PRD~§13}'s increment 2 against \textbf{plan~§4}'s
+      Phase~B gate: a head note plus rows 2 and 7 corrected under strikethrough.
+      Rows 3--6 were true as written and were left alone.
+\item \bead{dtb} --- \texttt{tools/check\_loc.sh} has scanned \emph{five} roots
+      since Step~1 (\texttt{0cc70e3}) while its header, \textbf{CLAUDE.md
+      Rule~12} and \textbf{plan~§2.3} all said four. All \textbf{category 2}; the
+      ``harmless today'' that excused it is dead.
+\item \bead{0a7} --- every citation from a living document into a living document
+      now carries a section, a quoted phrase and a line number \emph{pinned to a
+      commit}, and \texttt{tools/check\_cites.sh} is in \texttt{make lint} and the
+      CMake \texttt{lint} target so the bare form cannot come back. The form, its
+      scope and the guard's timing are the maintainer's --- recorded in the bead
+      and in the guard's own header.
+\end{itemize}
+
+\noindent\textbf{No compiled line changed.} The eight source files in the diff
+are comment-only; the only executable additions are the guard and the two lines
+that wire it in.
+
+\field{Measured}
+\begin{figures}
+\fig{3 of 4}{\texttt{git ls-tree} plus a \texttt{cqrt\_free(} line count over
+     CQ\_lang's history for 2026-08-22: golden-set moves against commits touching
+     \texttt{tests/e2e}}{--- (read-only)}
+\fig{240 / 51{,}698}{the same at \texttt{397c67c}; \textbf{D15~§0's pin says
+     241 / 51{,}705} --- \texttt{7385c4d}'s pair}{--- (read-only)}
+\fig{8 CX}{\texttt{tests/goldens/bitwise.counts}, \texttt{xor} at $W=4$, forward
+     and \texttt{\_unc}; D20 says 4}{Release goldens, all-quantum}
+\fig{8 CNOT + 8 NOT}{a hand-walk of \texttt{\_fold\_constants} at Bennett's
+     \emph{default} for \texttt{x \^{} 0x0f}, $W=8$ --- a \textbf{reading},
+     \textbf{Julia absent}}{---}
+\fig{16/16, 16/16, 20/20}{\texttt{add.counts} against K06's and K07's closed
+     forms (eight widths $\times$ \{forward, \texttt{\_unc}\}), and
+     \texttt{cast.counts} against K05~§3e}{Release goldens}
+\fig{203 = 60+1+102+24+16}{\texttt{tools/check\_loc.sh} per root; the fifth is
+     \texttt{tools/}, largest \texttt{l6\_run.py} at 281}{---}
+\fig{101 $\to$ 0}{\texttt{tools/check\_cites.sh}: bare living-target line cites
+     over 296 files, before conversion and after}{---}
+\fig{142}{pins written --- \textbf{130} mechanically (phrase unique in the tree
+     \emph{and} inside the pinned range at the SHA), \textbf{12} by hand as
+     extractor artefacts}{---}
+\fig{53 / 6}{section labels machine-checked against the heading map @
+     \texttt{961905f} / how many were wrong}{---}
+\end{figures}
+
+\noindent Two survey figures that decided the \bead{0a7} form rather than
+measuring its result: \textbf{277 of 277} pinned \texttt{.jl} citations into
+\texttt{third\_party/bennett/} resolve, against \textbf{2 of 29} plan citations
+and \textbf{0 of 53} PRD citations; and the guard flagged \textbf{7 of 18}
+crafted provocation cases, exactly the right seven.
+
+\medskip
+\noindent\textbf{The K02 win does not exist at Bennett's default, and that
+retraction is the whole of \bead{o63}.} K02~§5 advertised \emph{``Bennett pays
+4~NOT + 8~Toffoli, libcqops pays zero Toffoli''} for \texttt{x \& 0x0f}; walked
+at default options the pass emits \textbf{4 CNOT + 4 NOT + 0 Toffoli}, and
+zero-Toffoli against zero-Toffoli is not a delta. All three examples give one
+uniform result --- upstream's folded cost exceeds ours by exactly
+$p = \mathrm{popcount}(k)$ NOTs, the end-of-circuit re-materialisation --- and
+\texttt{\_fold\_constants} deletes gates \emph{without} renumbering or releasing
+wires, so upstream still stands up $2W$ non-input wires where we allocate $p$.
+\textbf{The headline formulas and the L4 goldens are unaffected}: they are pinned
+at the all-quantum mask, where the fold pass provably does nothing.
+
+\medskip
+\noindent\textbf{And one document was right about its symptom and wrong about
+its cause.} K05 explained its stale cast grid by ``the live tree may be ahead of
+the PRD''. Re-measured: \texttt{opcode\_table.yaml}'s sha256 is byte-identical to
+CQ\_lang's live copy at \texttt{170ede1}, last touched \texttt{4d5ba4e}
+(2026-07-15) --- the PRD simply lacked i80 then. A correct symptom with a
+fabricated cause survives a re-read, because the half a reader checks is true.
+
+\medskip
+\noindent\textbf{The review round caught something on seven of the eight beads,
+and the recurring shape is ``the anchor half right, the human half wrong''.} A
+\emph{silent re-partition} of K05~§6's ``Inferred'' list --- claimed kept, in
+fact re-split with one clause deleted unquoted, restored verbatim from
+\texttt{HEAD} with dated verdicts hung off each item; a citation outside its
+scope in all three \bead{o63} sites; an \texttt{awk} hex-float coercion that read
+\texttt{-0x1.921fb54442d18p+0} as 0 and so made every float-born rail look
+born-zero, producing a population figure that did not exist; six wrong
+\emph{section} labels among \bead{0a7}'s pins, whose line numbers and quoted
+phrases were all correct; and the guard's own worked example citing a line its
+phrase is not on --- a pin failing its own check, inside the message printed on
+every failure. Two shell traps came out of it: zsh applies the \texttt{:P}
+history modifier inside \texttt{"\$c:FILE"}, so \texttt{git show} answers ``the
+text never existed'' rather than failing; and \texttt{git log -{}- FILE} answers
+about commits that \emph{touched} a file, not commits where the file merely
+\emph{holds} the content --- so ``never there'' and ``never edited'' come back as
+the same silence.
+
+\field{Decided}
+\bead{0a7}'s three answers are the maintainer's, asked rather than guessed: the
+hybrid citation form, its full scope, and the guard now rather than later. They
+are recorded in the bead and in \texttt{tools/check\_cites.sh}'s header and are
+not restated here. \bead{eh9} was a routine orchestrator call --- \emph{both} of
+the two fixes the bead offered, not one. \bead{1ti} resolved as its own reading
+(b), and \textbf{PRD~§15~D15~§0} gains a dated amendment: its pin was off by one
+commit, and \textbf{D15~§4}'s \texttt{ckd.18} shape identifies the revision the
+decision was measured at independently of the corpus counts. D15 is amended in
+its figures only --- not re-resolved, and it takes no new D-number.
+
+\field{Not taken}
+\textbf{Re-measuring the line numbers and leaving them bare} --- the measured rot
+rate puts a re-anchored line out of date again in about three commits, and this
+had been tried and had failed four times, K08, K09, K11 and K12 each recording a
+cycle. \textbf{Anchor-only, dropping the line} --- loses the literal
+reproducibility \texttt{git show <sha>:FILE | sed -n Np} is exactly what buys.
+\textbf{Dropping \texttt{tools/} from \texttt{check\_loc.sh}} to make the
+documents true --- would un-guard 16 files, one at 281/300; the documents were
+corrected instead. \textbf{Reconciling D15~§2's four-way decomposition by running
+L6} --- three of its four terms are runtime classifications, so the figure stands
+with a dated note saying it was not re-run. \textbf{Re-measuring D20's per-gate
+physical cost} --- no QEC revision is pinned here, so the 2026-08-28 trace-driver
+numbers were reused \emph{as recorded} and the gap filed as \bead{65q}.
+\textbf{Widening PRD~§13's rows 3--5} --- true as written, and editing a true row
+to look consistent is the failure this batch was set up to avoid.
+
+\field{Verified}
+Rule 17, literally. \texttt{make lint} \textbf{OK} at every step --- 203 files,
+limit 300, largest 297 (\texttt{tests/test\_kernel\_add.c}) --- and from
+\bead{0a7} onward the same invocation carries the second guard:
+\texttt{check\_cites: OK --- 296 file(s) scanned, 0 bare living-target line
+citations}, under both \texttt{make lint} and the CMake \texttt{lint} target.
+\textbf{The full gate ran three times} --- after the source edits were final,
+after the guard landed, and after the review fixes --- and every one of the three
+was \textbf{Release 357/357 and Debug 358/358}, with
+\texttt{l6\_cqlang\_fixtures} excluded in both, which is the whole difference
+between those and the 358 / 359 \emph{registered} in the header above. Single
+suites were also run directly against the prebuilt binaries while the evidence
+was being gathered: \texttt{test\_kernel\_bitwise} 11/11 and
+\texttt{test\_kernel\_shift} 13/13 in \textbf{Release},
+\texttt{test\_kernel\_cast} 10/10 and \texttt{test\_kernel\_add} 13/13 --- plus
+its two death cases --- in \textbf{both} configurations.
+
+\medskip
+\noindent\textbf{L6 was not run, and the reason is what it claims.} It is a LINK
+claim, $\sim$9~min in Release and $\sim$25 in Debug, and every source edit here is
+a comment. It was green at \texttt{961905f} --- \textbf{123 OK / 201 DEFERRED /
+0 BUILD\_FAIL} against CQ\_lang \texttt{170ede1} --- and CQ\_lang's HEAD moved
+twice more \emph{during} this session (\texttt{170ede1} $\to$ \texttt{a34cd22}
+$\to$ \texttt{8a8f8cf}, 323 $\to$ 332 goldens), so that green already describes a
+revision behind the one a re-run would meet.
+\textbf{Julia is absent} (\texttt{which julia} empty), so every Bennett-side
+figure in \bead{o63}, \bead{18f} and \bead{wf8} is a transcription or a hand-walk
+of the pass, and each document says so where it stands.
+
+\field{Left open}
+\textbf{Nine beads filed, none claimed.} \bead{j5v} --- 20 living-target line
+cites \emph{into} the K-docs and \texttt{BASELINES.md} (from \texttt{src/},
+\texttt{tests/}, the plan, and K12 into K09) stay bare, because the guard's
+target set stops at the four planning docs; that is the next increment of
+\bead{0a7}'s form. \bead{16q} --- \textbf{D15}'s carve-out witnesses have moved
+out from under it at CQ\_lang HEAD, where the \texttt{ckd.18} population is now
+zero; whether to re-pin the decision at a newer revision is a decision, not a
+measurement, and is left to the maintainer. \bead{bpw} --- K05~§5 says a cast
+with $T = F$ should be refused where \texttt{src/kernels/cast.c} accepts it as an
+identity copy; unreachable from the shipped grid, so it is a call about which
+document is right. \bead{65q}, \bead{aei}, \bead{iwn}, \bead{wgi}, \bead{bz8}
+and \bead{a9e} are the smaller residue: an unpinned QEC per-gate cost, a false
+``exhaustive'' comment, a box-local file count, two files near the 300-line limit
+(\texttt{test\_kernel\_add.c} at 297 with no recorded seam, \texttt{l6\_run.py} at
+281 and past plan~§3's recorded split trigger of 240), and the K06/K07
+follow-ups. \textbf{Nothing is committed}: the working tree carries 26 modified
+files (1{,}207 insertions, 190 deletions) plus the new
+\texttt{tools/check\_cites.sh}, and the commit awaits approval.

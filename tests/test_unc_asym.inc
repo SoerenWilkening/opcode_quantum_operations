@@ -49,8 +49,12 @@
  * `cqrt_toffoli`; the CNOT-rooted share is roughly a seventh of frees, the
  * target is a one-bit flag rail rather than a data lane, and there is not one
  * pair of ADJACENT identical `cqrt_cnot` lines anywhere in the corpus. (Ratios,
- * not counts: the CQ_lang corpus is unpinned and moved four times on
- * 2026-08-22 — PRD §15 D15 §0. Re-measure before quoting a figure.) What the
+ * not counts: the CQ_lang corpus is unpinned and its GOLDEN SET moved three
+ * times on 2026-08-22 alone, inside a tests/e2e directory that moved four —
+ * PRD §15 D15 §0 has the per-revision table. This line read "moved four times
+ * on 2026-08-22" until 2026-09-10 (bd 1ti); four was the count of COMMITS
+ * touching that directory, and the fourth of them edited a .c fixture and left
+ * every golden byte-identical. Re-measure before quoting a figure.) What the
  * corpus actually ships is a bracket
  * re-applied in reverse with work in between —
  * `slice_control_select_compound.expected.log:6-8` builds a flag with

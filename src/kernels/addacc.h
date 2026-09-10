@@ -37,8 +37,9 @@
  * statements in this header were written when K11 was the only caller and are
  * corrected below where they occur. The one to carry: with no sandwich there is
  * no I6(b), so that caller materialises every operand and the ancilla itself,
- * and disposes them itself. PRD-v1.md:534-541 records the decision to substitute Cuccaro into
- * the multiplier as a deliberate delta from upstream, since `multiplier.jl:29`
+ * and disposes them itself. PRD §6, "K11 uses Cuccaro, and this is a deliberate
+ * delta from upstream" (PRD-v1.md:645 @ 961905f), records the decision to
+ * substitute Cuccaro into the multiplier, since `multiplier.jl:29`
  * calls the ripple `lower_add!` and no upstream construction composes shift-add
  * with Cuccaro. K08.md §5 D2 still presents that as an OPEN fork; it is not,
  * and the PRD is the authority.

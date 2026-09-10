@@ -77,8 +77,10 @@ static void copyout(cq_ctx *ctx, void *env, int i)
  * against the sandwich's 7W CX + 2W CCX.
  *
  * PRECEDENTED ON BOTH SIDES. PRD §2.1 already specifies `cqrt_cswap` with a
- * constant control as ZERO gates (PRD-v1.md:201, and named as a v1 obligation
- * at :56), and Bennett itself dispatches
+ * constant control as ZERO gates — "swap the two `cq_bit` arrays, 0 gates"
+ * (PRD-v1.md:265 @ 961905f) — and §0's provenance table names it as a v1
+ * obligation, "incl. the 0-gate constant-control case"
+ * (PRD-v1.md:56 @ 961905f). Bennett itself dispatches
  * constant vs. variable shifts at arith.jl:185-198. It is a dispatch on operand
  * KIND at kernel entry — not a peephole, not gate-level fusion, and not
  * something the emitter could do for us: the fold table sees each gate alone

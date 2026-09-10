@@ -57,13 +57,24 @@ argument on the reverse pass, so a step undoes itself only if it is an **involut
 and a multi-gate block generally is not. Two independent worked witnesses, both in the
 ported construction specs:
 
-- `K06.md:566-586` — re-running the 5-gate ripple-carry block from its post-state leaves
-  `c_{i+1} = c·(a ⊕ b ⊕ 1)`, i.e. **dirty whenever `c_i = 1` and `a_i = b_i`**. The correct
-  reverse is `g5,g4,g3,g2,g1`, which one-gate-per-step makes the driver's index reversal
-  *be*.
-- `K10.md:153-171` — the natural 4-gate mux block leaves `r = c·(t ⊕ f)` after two
+- K06 §5, "**D1 — CRITICAL: the sandwich step function must be ONE GATE PER STEP.**"
+  (K06.md:569-589 @ 961905f), deriving at "(0, c·(a⊕b⊕1))   -- NOT clean"
+  (K06.md:578 @ 961905f) — re-running the 5-gate ripple-carry block from its post-state
+  leaves `c_{i+1} = c·(a ⊕ b ⊕ 1)`, i.e. **dirty whenever `c_i = 1` and `a_i = b_i`**. The
+  correct reverse is `g5,g4,g3,g2,g1`, which one-gate-per-step makes the driver's index
+  reversal *be*.
+- K10 §2.0, "### 2.0 A driver constraint this kernel forces — ONE GATE PER STEP"
+  (K10.md:161-172 @ 961905f), deriving at "after a SECOND block: d = 0, r = c·(t⊻f)"
+  (K10.md:171 @ 961905f) — the natural 4-gate mux block leaves `r = c·(t ⊕ f)` after two
   applications. (K01's 2-gate block *is* self-inverse — two commuting CXs into one target
   — which is why the trap does not show up there.)
+
+> **Citation form — converted 2026-09-10 (`bd 0a7`).** These are this document's only two
+> line citations into a file that still moves, and both were off by 3-8 lines when measured.
+> They are now `§` + a `grep -nF`-unique quoted phrase + `file:line @ <sha>`: verify by
+> grepping the phrase in the current file, and recover the exact original with
+> `git show <sha>:<file> | sed -n <N>p`. Citations into `third_party/` keep bare line
+> numbers — that tree is pinned and never moves.
 
 I6(b) does **not** rescue a multi-gate step: pre-materialisation fixes *which* gates a step
 emits and says nothing about their *order*. If M09 ever grows a multi-gate step API it must
@@ -531,12 +542,26 @@ No dependencies beyond libc (PRD §14), so hand-rolled:
 ### 2.3 The 300-line guard
 
 ```
-tools/check_loc.sh          fail if any hand-written src/shim file exceeds 300
+tools/check_loc.sh          fail if any hand-written .c/.h/.py file exceeds 300
 ```
 
 Counts non-blank, non-comment lines. Runs in CI and as `make lint`.
 
-- **Applies to:** everything hand-written — `src/`, `shim/*.py`, `include/`, and `tests/`.
+- **Applies to:** everything hand-written under the five roots `check_loc.sh`'s
+  `for d in ...` loop names — `src/`, `include/`, `tests/`, `shim/` and `tools/`.
+  **Corrected 2026-09-10 (`bd dtb`).** Two different old claims are superseded here
+  and neither was the other. THIS LINE, and both of the other two statements of the
+  rule (the script's own header, CLAUDE.md Rule 12), said "`src/`, `shim/*.py`,
+  `include/`, and `tests/`" from Step 1 — FOUR roots, narrow twice over: `shim/` is
+  scanned for `.c`/`.h` as well as `.py`, and `tools/` has been in the loop since
+  Step 1 too, which §3's Layer 6 table below already states in as many words
+  ("`tools/` IS linted"). THE SCHEMATIC above was narrower again — "fail if any
+  hand-written `src/shim` file exceeds 300", TWO roots — and now names the extensions
+  instead, leaving the root list to this bullet. All of it was harmless while
+  `tools/` held only the script itself, a `.sh` the `find` never matches; the Step 24
+  L6 harness ended that. **The loop is the only definition of the root set** —
+  nothing in `tests/` and nothing in CMake pins it, which is how three documents
+  drifted from it with every gate green.
 - **Exempt:** generated `*.gen.c` (the shim emits one file per opcode family, so no
   single generated unit is unwieldy anyway) and `third_party/`.
 - **When a module hits the limit:** split along the seam already named in §3's table.
