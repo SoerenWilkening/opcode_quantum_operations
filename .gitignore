@@ -24,3 +24,12 @@ __pycache__/
 # frozen cqrt_* ABI, it is registered in no CMake file, and it is named in
 # none of the three planning docs. Track it when it gets a bead and a home.
 tools/qtg/
+
+# The lab report PDF is a build product; the .tex under docs/labreport/ is
+# the artefact. Regenerate with `make labreport`.
+docs/labreport/*.pdf
+docs/labreport/*.aux
+docs/labreport/*.log
+docs/labreport/*.out
+docs/labreport/*.toc
+docs/labreport/data/.probe_scratch

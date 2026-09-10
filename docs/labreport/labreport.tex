@@ -1,0 +1,90 @@
+%% libcqops — LAB REPORT
+%%
+%% APPEND-ONLY. One file per session under sessions/, \input in order below.
+%% A committed entry is NEVER edited; a correction is a NEW entry carrying
+%% \supersedes. Build with `make labreport` (the PDF is gitignored — the .tex
+%% is the artefact, the PDF is a build product).
+%%
+%% To add an entry:  python3 tools/labreport/new_entry.py --title "..."
+%%                   then add one \input line at the END of the list below.
+
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+
+\begin{document}
+
+%% ==========================================================================
+%% MASTHEAD — read this before citing anything out of this document.
+%% ==========================================================================
+\thispagestyle{empty}
+\begin{center}
+  \vspace*{18mm}
+  {\Huge\bfseries\color{cqaccent} libcqops}\\[3mm]
+  {\LARGE Lab Report}\\[10mm]
+  {\large\color{cqsoft} CQ\_lang's quantum backend --- a running record}\\[3mm]
+  {\color{cqsoft}\small compiled \today}
+\end{center}
+
+\vspace{14mm}
+
+\noindent\colorbox{cqbg}{%
+\begin{minipage}{\dimexpr\linewidth-2\fboxsep}
+\vspace{3mm}
+{\bfseries This is a RECORD, not a SOURCE OF RECORD.}
+
+\medskip
+Authoritative status lives in \texttt{NORTH\_STAR.md}, \texttt{PRD-v1.md},
+\texttt{IMPLEMENTATION\_PLAN.md} and the \texttt{bd} tracker. Nothing here
+supersedes them, and a decision's \emph{content} is never restated here --- an
+entry names the decision and points at it, because two copies of a decision
+means one of them goes stale.
+
+\medskip
+{\bfseries Every figure in this document is scoped to the SHA in its own
+entry's header}, and says which instrument produced it and in which build
+configuration. A figure is what was true on that date. To learn what is true
+\emph{now}, run the instrument again --- the entry names it for exactly that
+reason.
+
+\medskip
+{\bfseries The document is append-only.} An entry is never edited after the
+session it records. A later correction is a new entry carrying a
+\textsc{supersedes} banner, so that the original claim and its correction are
+both legible. This is deliberate: a rendered PDF is not something anyone diffs,
+so an in-place edit would be invisible drift --- the exact failure mode
+\texttt{CLAUDE.md} records for its own retired step narratives.
+\vspace{3mm}
+\end{minipage}}
+
+\vspace{10mm}
+
+\noindent{\small\color{cqsoft}
+Conventions. \textbf{Generated header:} the block opening each entry ---
+SHA range, commits, beads, \texttt{ctest} counts, LOC, diffstat --- is
+\emph{extracted} by \texttt{tools/labreport/new\_entry.py}, never typed.
+\textbf{Data figures} are plotted from \texttt{docs/labreport/data/}, emitted by
+\texttt{tools/labreport/gen\_data.py} from the goldens on disk and from probes
+\emph{run} against the built archive. \textbf{Structural figures} are drawn by
+hand and live inside the entry that uses them, never shared between entries ---
+a shared figure would silently change an old entry when it was updated.
+\textbf{Verification claims are literal} (Rule 17): an entry names the layers
+and configurations that actually ran, and says plainly when nothing ran.}
+
+\clearpage
+\pagestyle{fancy}
+\markboth{Contents}{Contents}
+\tableofcontents
+
+%% ==========================================================================
+%% PROLOGUE — Steps 0–26, reconstructed. Not a session record; see its own
+%% caveat. This is the ONLY part of the document that may be revised, and only
+%% to correct the reconstruction itself.
+%% ==========================================================================
+\input{prologue}
+
+%% ==========================================================================
+%% ENTRIES — append below, never reorder, never edit an existing line.
+%% ==========================================================================
+\input{sessions/0001-2026-09-10}
+
+\end{document}

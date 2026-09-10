@@ -40,7 +40,8 @@ endif
 # timings comparable across a generator switch.
 BUILD_JOBS ?= 6
 
-.PHONY: all lint configure build test test-debug test-release clean
+.PHONY: all lint configure build test test-debug test-release clean \
+        labreport labreport-data labreport-entry
 
 all: test
 
@@ -71,3 +72,40 @@ test: lint test-debug test-release
 
 clean:
 	rm -rf $(BUILD_DEBUG) $(BUILD_RELEASE)
+
+# ---- The lab report ------------------------------------------------------
+#
+# An APPEND-ONLY record of what each session did: docs/labreport/, one .tex per
+# session, never edited after it lands. The .tex is the artefact and is tracked;
+# the PDF is a build product and is gitignored.
+#
+# pdflatex is PROBED, NOT ASSUMED — the same rule this build already applies to
+# ninja, to each sanitizer and to the Debug compiler. A box without TeX should
+# be told what is missing, not handed an obscure failure, and must not have
+# `make test` broken by a documentation target it cannot run.
+LATEX ?= $(shell command -v pdflatex 2>/dev/null)
+LABREPORT_DIR := docs/labreport
+
+# Figure data comes out of the goldens on disk and out of probes RUN against the
+# built archive. NEVER from a formula typed into a document: `bd j75` is what
+# that costs. A missing input is a loud skip naming what is absent.
+labreport-data:
+	@python3 tools/labreport/gen_data.py || 	  echo "labreport: some figure data is stale — build build-release for the rest"
+
+labreport: labreport-data
+ifeq ($(LATEX),)
+	@echo "labreport: pdflatex not found — install a TeX distribution"
+	@echo "labreport: (macOS: brew install --cask mactex-no-gui; Debian: texlive-latex-recommended texlive-pictures)"
+	@echo "labreport: the .tex sources under $(LABREPORT_DIR) are the artefact and are unaffected."
+	@exit 1
+else
+	@cd $(LABREPORT_DIR) && 	  $(LATEX) -interaction=nonstopmode -halt-on-error labreport.tex >/dev/null && 	  $(LATEX) -interaction=nonstopmode -halt-on-error labreport.tex >/dev/null
+	@echo "labreport: $(LABREPORT_DIR)/labreport.pdf"
+endif
+
+# Start the next entry. Writes the GENERATED header — SHA range, commits, beads,
+# ctest counts, LOC, diffstat — and leaves the prose fields blank, because the
+# only part worth reading is the part no script can supply. Refuses to overwrite
+# an existing entry: a correction is a NEW entry carrying \supersedes.
+labreport-entry:
+	@python3 tools/labreport/new_entry.py $(if $(TITLE),--title "$(TITLE)")

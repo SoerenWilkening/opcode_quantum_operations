@@ -1,0 +1,120 @@
+%% libcqops lab report — shared preamble.
+%%
+%% Everything here is presentation. NOTHING in this file may carry a project
+%% fact: a figure, a count, a status. Facts live in the entries, each scoped to
+%% the SHA in its own generated header.
+
+\usepackage[a4paper,margin=28mm,headsep=8mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+%% `\caption*` is the caption package's, not the article class's — without it
+%% LaTeX numbers the float and typesets a literal `*`. Every figure here is
+%% unnumbered on purpose: an entry is short, and a cross-reference into another
+%% entry would break append-only anyway.
+\usepackage[font=small,labelformat=empty,skip=6pt]{caption}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+%% [H] — figures stay where they are written. A floated figure in a two-page
+%% entry lands on a page of its own and reads as belonging to nothing.
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{positioning,fit,backgrounds}
+
+\definecolor{cqrule}{gray}{0.62}
+\definecolor{cqsoft}{gray}{0.35}
+\definecolor{cqbg}{gray}{0.955}
+\definecolor{cqaccent}{HTML}{1F4E79}
+
+\hypersetup{colorlinks=false,pdftitle={libcqops lab report}}
+
+%% ---- Page furniture ------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancyhead[L]{\footnotesize\color{cqsoft}\textsc{libcqops lab report}}
+\fancyhead[R]{\footnotesize\color{cqsoft}\leftmark}
+\fancyfoot[C]{\footnotesize\color{cqsoft}\thepage}
+
+\titleformat{\section}{\large\bfseries\color{cqaccent}}{}{0pt}{}
+\titlespacing*{\section}{0pt}{20pt}{6pt}
+
+%% ---- An entry ------------------------------------------------------------
+%% \entry{number}{date}{title}
+\newcommand{\entry}[3]{%
+  \clearpage
+  \section*{Entry~#1 \,\textcolor{cqrule}{\textbar}\, #2 \,\textcolor{cqrule}{\textbar}\, #3}%
+  \markboth{Entry~#1 \textperiodcentered\ #2}{Entry~#1 \textperiodcentered\ #2}%
+  \addcontentsline{toc}{section}{Entry~#1 \textperiodcentered\ #2 \textperiodcentered\ #3}%
+  \vspace{-2pt}\textcolor{cqrule}{\hrule height 0.8pt}\vspace{10pt}%
+}
+
+%% A correction to an earlier entry. NEVER edit the entry itself — a rendered
+%% PDF is not something anyone diffs, so a silent change is invisible drift.
+%% \supersedes{entry number}{which field}
+\newcommand{\supersedes}[2]{%
+  \par\noindent\colorbox{cqbg}{%
+    \begin{minipage}{\dimexpr\linewidth-2\fboxsep}
+      \small\textbf{Supersedes Entry~#1, \emph{#2}.}\ %
+      That entry stands as written; this is the correction.
+    \end{minipage}}\par\vspace{8pt}%
+}
+
+%% ---- The generated header ------------------------------------------------
+%% Extracted by tools/labreport/new_entry.py. Nothing typed from memory.
+\newenvironment{generated}{%
+  \par\noindent\begin{minipage}{\linewidth}%
+  \color{cqsoft}\small
+  \textcolor{cqrule}{\hrule height 0.4pt}\vspace{5pt}
+  \begin{list}{}{%
+    \setlength{\leftmargin}{25mm}\setlength{\labelwidth}{23mm}%
+    \setlength{\labelsep}{2mm}\setlength{\itemsep}{2pt}%
+    \setlength{\parsep}{0pt}\setlength{\topsep}{0pt}%
+    \renewcommand{\makelabel}[1]{\textsc{##1}\hfill}}%
+}{%
+  \end{list}\vspace{4pt}\textcolor{cqrule}{\hrule height 0.4pt}%
+  \end{minipage}\par\vspace{12pt}%
+}
+\newcommand{\gitem}[2]{\item[#1]#2}
+\newenvironment{commitlist}{%
+  \begin{list}{}{\setlength{\leftmargin}{0pt}\setlength{\itemsep}{1pt}%
+                 \setlength{\parsep}{0pt}\setlength{\topsep}{2pt}}%
+}{\end{list}}
+\newcommand{\bead}[1]{\texttt{\textbf{#1}}}
+
+%% ---- A hand-written field ------------------------------------------------
+\newcommand{\field}[1]{\par\vspace{9pt}\noindent\textbf{\textsf{#1.}}\quad\ignorespaces}
+
+%% ---- The measured-figures table ------------------------------------------
+%% \fig{value}{instrument}{configuration}. A number without an instrument does
+%% not go in — that rule is `bd j75`, where a figure quoted from a remembered
+%% formula turned out to name a COMPONENT of the thing it claimed to measure.
+\newenvironment{figures}{%
+  \par\vspace{6pt}\small
+  \begin{tabular}{@{}p{0.20\linewidth}p{0.46\linewidth}p{0.24\linewidth}@{}}
+  \toprule
+  \textsc{figure} & \textsc{instrument} & \textsc{configuration}\\
+  \midrule
+}{%
+  \bottomrule\end{tabular}\par\vspace{8pt}\normalsize%
+}
+\newcommand{\fig}[3]{#1 & #2 & #3\\}
+
+%% ---- Figure caption discipline -------------------------------------------
+%% Every DATA figure states where its numbers came from and at which SHA.
+\newcommand{\datasource}[1]{%
+  \par\vspace{1pt}\noindent{\footnotesize\color{cqsoft}\raggedright\textsc{source:}\ #1\par}%
+}

@@ -1855,6 +1855,52 @@ approval** — do not commit or push without clear authority from the current us
 required sync or push is blocked, stop and report the exact command and error. Hand off with a
 summary of changes, validation, issue status, and any blocked step.
 
+**AND WRITE THE LAB-REPORT ENTRY — `docs/labreport/`, APPEND-ONLY.** One entry per
+session, so the user can read what happened without reading `bd`. It is a **RECORD, NOT A
+SOURCE OF RECORD**: authority stays in the three planning docs and `bd`, and an entry
+**names** a decision and points at it rather than restating its content — two copies of a
+decision means one of them goes stale, which is exactly how this file accumulated ~109KB
+of step narratives.
+
+```bash
+make labreport-entry TITLE="what the session was about"   # writes the GENERATED header
+#   ... fill in the prose fields, add one \input line at the END of labreport.tex ...
+make labreport                                            # pdflatex; the PDF is gitignored
+```
+
+**Six rules, and the first three are what keep it from becoming the next `bd j75`.**
+
+1. **APPEND-ONLY, AND THE REASON IS THAT NOBODY DIFFS A PDF.** A committed entry is never
+   edited. A later correction is a **new** entry carrying `\supersedes{n}{field}`, so the
+   original claim and its correction are both legible — an in-place edit would be invisible
+   drift. The same rule forbids a **shared** figure file: an `\input` shared between entries
+   silently changes an old entry when it is updated, so figures live **inside** the entry
+   that uses them and the duplication is the price.
+2. **THE HEADER IS EXTRACTED, NEVER TYPED.** SHA range, commits, beads, `ctest -N` counts,
+   LOC, diffstat all come from `tools/labreport/new_entry.py`. Figure data comes from
+   `tools/labreport/gen_data.py` — the goldens on disk, and probes **run** against the built
+   archive. **A number that reaches the document through your memory is the defect this
+   whole apparatus exists to prevent**, and `bd j75` is what it costs: a figure quoted from
+   a remembered formula that named a *component* of the thing it claimed to measure, wrong
+   in the direction that flattered its own argument.
+3. **EVERY FIGURE CARRIES ITS INSTRUMENT AND ITS CONFIGURATION** — the `figures`
+   environment's three columns, and `\datasource` under every plot. Rule 17 is literal here
+   too: the *Verified* field names the layers and configurations that actually **ran**, and
+   says plainly when nothing did.
+4. **LENGTH FOLLOWS THE SESSION — 1–3 pages, and a paragraph when the work was a
+   paragraph.** There is no quota, deliberately: a quota manufactures narrative, and
+   inflated significance in a document future sessions mine is worse than no document. Of
+   the seven fields, only *The ask*, *What landed* and *Verified* are never omitted.
+5. **`Not taken` IS NOT OPTIONAL WHEN SOMETHING WAS REFUSED.** What was rejected or
+   deferred, and why. Without it the next session re-proposes it and the analysis is paid
+   for twice — this repo already carries that cost in PRD §15's *not adopted* clauses.
+6. **NO STATUS CLAIMS.** "K12 is done", "Layer 3 complete" belong to `bd ready` and
+   `git log`. An entry says what happened on a date.
+
+`pdflatex` is **probed, not assumed** (`make labreport` says what is missing and exits
+non-zero); `make test` does not depend on it. The `.tex` is the artefact and is tracked —
+the PDF and the LaTeX aux files are gitignored.
+
 ---
 
 ## Where Things Live
@@ -1881,6 +1927,13 @@ controlled §9, uncompute §10, tests §11, decisions §15) ·
 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) (how — §0 design decisions, §3
 module map, §4 schedule, §5 critical path, §6 risks, §7 definition of done) ·
 [`AGENTS.md`](AGENTS.md) (shell hygiene + beads) · `bd ready` (the live work queue).
+
+**The lab report lives at `docs/labreport/`** — `labreport.tex` (master + masthead),
+`preamble.tex`, `prologue.tex` (Steps 0–26, reconstructed and flagged as such), one
+`sessions/NNNN-YYYY-MM-DD.tex` per session, and `data/*.dat` regenerated from the goldens
+and from probes. Its two generators are `tools/labreport/` (`new_entry.py`, `gen_data.py`,
+`probe_scratch.c` — the probe is registered in no CMake file and is not a test). Rules in
+*Session Completion*.
 
 **Two opt-in harnesses live outside `tests/`:** `tools/l6/` (Step 24 — CQ_lang's own e2e
 corpus against this archive) and `tools/l7/` (Step 25 — PRD §12's Grover as a CQ

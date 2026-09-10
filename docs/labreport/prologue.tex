@@ -1,0 +1,153 @@
+%% PROLOGUE — Steps 0–26, reconstructed from the record on 2026-09-10.
+%%
+%% This is the one part of the document that is NOT a session record, and the
+%% only part that may be revised — and then only to correct the reconstruction.
+%% Everything after it is append-only.
+
+\clearpage
+\section*{Prologue \,\textcolor{cqrule}{\textbar}\, Steps 0--26, reconstructed}
+\markboth{Prologue}{Prologue}
+\addcontentsline{toc}{section}{Prologue \textperiodcentered\ Steps 0--26, reconstructed}
+\vspace{-2pt}\textcolor{cqrule}{\hrule height 0.8pt}\vspace{10pt}
+
+\noindent\colorbox{cqbg}{%
+\begin{minipage}{\dimexpr\linewidth-2\fboxsep}
+\vspace{2mm}
+\small{\bfseries Reconstructed, not recorded.} The lab report began on
+2026-09-10, after Steps 0--26 had already landed. This prologue is assembled
+from \texttt{git log}, \texttt{PRD-v1.md}~§15 and
+\texttt{IMPLEMENTATION\_PLAN.md}~§4 --- it is a \emph{reading of the record},
+not a contemporaneous account, and it deliberately carries no figure that was
+not extracted from one of those three. Where it is thin, the commit and the
+decision it names are not.
+\vspace{2mm}
+\end{minipage}}
+
+\vspace{10pt}
+
+\noindent What this repository is, in one paragraph. \textbf{libcqops} is a
+linkable C library that turns every placeholder call CQ\_lang's IR pass emits
+into a stream of logical \texttt{X}\,/\,\texttt{CX}\,/\,\texttt{CCX} (plus
+\texttt{Ry}\,/\,\texttt{Rz}) operations, with provably classical bits costing
+zero qubits and zero gates. It owns exactly one box in the stack: above it
+CQ\_lang decides \emph{what} to compute and when to uncompute; below it the
+error-correction library decides \emph{how many physical qubits} a logical
+\texttt{CX} costs. libcqops decides only which reversible gates realise an
+opcode, on which qubits. The hazard the whole design is built against is the
+\emph{clean-trace dirty-ancilla miscompile}: a kernel that computes the right
+value, prints a plausible trace, passes its differential test, and leaves a
+scratch qubit off $\lvert 0\rangle$.
+
+\vspace{6pt}
+
+%% ---- Structural figure: the layer map. Hand-drawn; encodes a DESIGN, not a
+%% ---- measurement, so it does not go stale unless the design does.
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  font=\footnotesize,
+  layer/.style={draw=cqrule, fill=cqbg, rounded corners=1pt,
+                minimum height=8mm, text width=104mm, align=left, inner sep=2mm},
+  tag/.style={font=\footnotesize\bfseries\color{cqaccent}, anchor=east}]
+  \node[layer] (l5) {\textbf{shim} --- M26 runtime \& templates, M27 generator, M28 generated};
+  \node[layer, below=1.6mm of l5] (l4) {\textbf{analog, sinks} --- M21 angle, M22 rotate, M23--M25 sinks};
+  \node[layer, below=1.6mm of l4] (l3) {\textbf{kernels} --- M10--M20 catalogue, M29/M30 QRAM};
+  \node[layer, below=1.6mm of l3] (l2) {\textbf{registers, sandwich} --- M07 reg, M08 scratch, M09 sandwich};
+  \node[layer, below=1.6mm of l2] (l1) {\textbf{emission} --- M05 emit (the fold table), M06 controlled};
+  \node[layer, below=1.6mm of l1] (l0) {\textbf{primitives} --- M01 bit, M02 shadow, M03 qubits, M04 sink};
+  \foreach \n/\t in {l5/5, l4/4, l3/3, l2/2, l1/1, l0/0}
+    \node[tag] at ([xshift=-2mm]\n.west) {\t};
+  \node[font=\scriptsize\itshape\color{cqsoft}, above=1.5mm of l5.north east, anchor=south east]
+    {CQ\_lang calls in at the top; gates leave through a sink at the bottom};
+\end{tikzpicture}
+\caption*{\small\textbf{The module map.} Layers 0--4 are complete; Layer 5
+carries the frozen \texttt{cqrt\_*} ABI. A structural figure --- it encodes the
+design, not a measurement.}
+\end{figure}
+
+\vspace{4pt}
+
+\subsection*{The steps}
+
+\noindent\small
+Sourced from commit subjects; the \textsc{tests} column reproduces the count
+each commit recorded for itself at landing, and is therefore a figure at
+\emph{that} SHA, not a running total. Decisions are named, never restated.
+
+\vspace{4pt}
+\begin{longtable}{@{}p{15mm}p{17mm}p{72mm}p{24mm}@{}}
+\toprule
+\textsc{step} & \textsc{landed} & \textsc{what} & \textsc{tests}\\
+\midrule
+\endhead
+0     & 2026-08-14 & Bennett.jl and CQ\_lang references pinned on disk; the PRD's internal contradictions resolved & ---\\
+1     & 2026-08-14 & Build skeleton, hand-rolled test harness, the 300-line guard & ---\\
+2     & 2026-08-14 & \textbf{M01} \texttt{bit.h} --- the tri-valued bit (\textbf{I1}) & ---\\
+3     & 2026-08-14 & \textbf{M02} shadow --- the per-qubit \{value, unknown\} table & ---\\
+4     & 2026-08-14 & \textbf{M03} qubits, and the shared death-test harness & ---\\
+5     & 2026-08-14 & \textbf{M04} sink vtable and the recording mock sink & ---\\
+6     & 2026-08-14 & \textbf{M05} emit --- the §3 fold table, the critical path & 159\\
+7     & 2026-08-15 & \textbf{M07} reg --- the handle table, and the D7 aliasing split & 46\\
+8     & 2026-08-15 & \textbf{M08} scratch + \textbf{M09} sandwich --- the \textbf{I6} driver & 67\\
+9     & 2026-08-15 & \textbf{M23} printf sink, \textbf{M24} counting sink & 69\\
+10--11 & 2026-08-15 & K1--K5 and the shared Phase-B kernel gate & 87\\
+12--13 & 2026-08-16 & K6/K7 add--sub; K9's ten compare predicates & 98\\
+14--16 & 2026-08-16 & The barrel shifter, K8's Cuccaro accumulator, K11 \texttt{mul} & 130\\
+17--19 & 2026-08-20 & K12 \texttt{divrem}, \textbf{M21} angle, the first rotation & 175\\
+20    & 2026-08-20 & \textbf{M06} controlled --- the whole catalogue, no kernel touched & 195\\
+21    & 2026-08-21 & The uncompute axis: risk \textbf{R6} had no detector, and now does & 198\\
+22--26 & 2026-08-28 & The shim, the QEC sink, and the trace annotations & 310\\
+25    & 2026-08-29 & \textbf{L7} Grover --- three claims in three places, three modes & 314\\
+\midrule
+\multicolumn{4}{@{}l@{}}{\textit{Since, on the same trunk:}}\\
+---   & 2026-08-29 & A golden's operand mask made a per-file claim that is read back & 315\\
+---   & 2026-09-02 & The free-time residue is read, never printed & 317\\
+---   & 2026-09-02 & \textbf{Plan §7: all five finish-line conditions MET}, measured & 317\\
+---   & 2026-09-02 & \texttt{tape} in scope as v1.1 (\textbf{D23}) & 325\\
+---   & 2026-09-02 & \textbf{QRAM} in scope as v1.2 (\textbf{D24}) --- K13/K14, M29/M30 & 325\\
+\bottomrule
+\end{longtable}
+\normalsize
+
+\vspace{2pt}
+\noindent The shape of it: six weeks, Layers 0--4 complete, the five
+finish-line conditions met on 2026-09-02, and scope since then widening
+deliberately --- \texttt{tape} as v1.1, QRAM as v1.2 --- rather than the
+catalogue deepening.
+
+\subsection*{What the catalogue costs}
+
+\noindent The Toffoli count is the figure that matters, because it is what
+fault tolerance charges for: measured through the QEC library at $d=3$, one
+logical \texttt{CX} is 1{,}830 physical gates and one \texttt{CCX} is
+562{,}564 (\textbf{D20}). Only \texttt{xor} is Toffoli-free at every width;
+\texttt{and} and \texttt{or} cost exactly $W$, and everything carrying a carry
+chain costs more.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{loglogaxis}[
+  width=0.92\linewidth, height=70mm,
+  xlabel={register width $W$}, ylabel={Toffoli count (forward)},
+  xtick={1,2,4,8,16,32,64,128}, xticklabels={1,2,4,8,16,32,64,128},
+  log basis x=2, grid=both, grid style={cqrule!30},
+  legend pos=north west, legend style={font=\scriptsize, draw=cqrule, fill=white},
+  label style={font=\footnotesize}, tick label style={font=\scriptsize},
+  every axis plot/.append style={mark size=1.3pt, thick}]
+  \addplot table[x=W, y=udiv]  {data/toffoli.dat}; \addlegendentry{\texttt{udiv} (K12)}
+  \addplot table[x=W, y=sdiv]  {data/toffoli.dat}; \addlegendentry{\texttt{sdiv}}
+  \addplot table[x=W, y=mul]   {data/toffoli.dat}; \addlegendentry{\texttt{mul} (K11)}
+  \addplot table[x=W, y=add]   {data/toffoli.dat}; \addlegendentry{\texttt{add} (K6)}
+  \addplot table[x=W, y=ult]   {data/toffoli.dat}; \addlegendentry{\texttt{ult} (K9)}
+  \addplot table[x=W, y=mux]   {data/toffoli.dat}; \addlegendentry{\texttt{mux} (K10)}
+\end{loglogaxis}
+\end{tikzpicture}
+\caption*{\small\textbf{Quadratic and linear, two decades apart.} \texttt{divrem}
+and \texttt{mul} are quadratic in $W$; \texttt{add}, \texttt{ult} and
+\texttt{mux} are linear. The gap is why \textbf{D20} bounds what is inspectable
+through the QEC sink to Toffoli-\emph{free} regions at small width.}
+\datasource{\texttt{docs/labreport/data/toffoli.dat}, pivoted from
+\texttt{tests/goldens/*.counts} --- the L4 pins themselves, at the all-quantum
+operand mask. A count is a function of $(W,\text{mask})$.}
+\end{figure}

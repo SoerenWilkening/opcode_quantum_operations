@@ -1,0 +1,15 @@
+# cq_kd_peak (high-water mark during the call) and
+# cq_divrem_region, measured against build-release/libcqops.a at 3464bf5 (dirty).
+#
+W mulpeak divpeak divregion
+2 10 41 39
+3 18 86 83
+4 28 147 143
+5 40 224 219
+6 54 317 311
+7 70 426 419
+8 88 551 543
+12 180 1211 1199
+16 304 2127 2111
+24 648 4727 4703
+32 1120 8351 8319

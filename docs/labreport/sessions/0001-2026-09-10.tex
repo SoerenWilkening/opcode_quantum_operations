@@ -1,0 +1,154 @@
+%% labreport entry 1 — 2026-09-10
+%% labreport-to: 3464bf5
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+%% correction is a NEW entry carrying \supersedes{1}{field}.
+
+\entry{1}{2026-09-10}{D20's scratch figure, and this report}
+
+\begin{generated}
+  \gitem{Range}{\texttt{a78c12b..3464bf5}}
+  \gitem{Tree}{\emph{dirty at capture} --- 12 path(s) uncommitted}
+  \gitem{Tests}{Release \textbf{356/356}, Debug \textbf{357/359} --- the two
+         being \texttt{l6\_cqlang\_fixtures} and \texttt{l7\_grover\_cqlang}, both
+         red from upstream drift (\bead{w9i}, \bead{2tm})}
+  \gitem{LOC}{OK --- 203 file(s), limit 300, largest 297 (\texttt{tests/test\_kernel\_add.c})}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{3464bf5} \bead{fxz}: PRD §15 D25 --- a kernel whose scratch
+          region does not fit the D2 ceiling \emph{(the prior session's work,
+          landed here)}
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{j75} D20 cites 79 scratch qubits for K12 at $W=8$;
+         \texttt{cq\_divrem\_region} says 543}
+  \gitem{Beads filed}{\bead{y1i} D20 says \texttt{cq\_kernel\_xor} at $W=4$ is
+         4 CX; the L4 golden says 8 \quad \bead{2tm} L7's
+         \texttt{grover.cq.c} calls the retired two-argument \texttt{cq\_phi}}
+  \gitem{Beads updated}{\bead{w9i} re-measured: 3 affected fixtures $\to$ 23}
+\end{generated}
+
+\field{The ask}
+Implement \bead{j75}; then design and build a lab report --- an append-only,
+human-readable \LaTeX{} document carrying one entry per session --- and put the
+rule that maintains it into \texttt{CLAUDE.md}.
+
+\field{What landed}
+\textbf{PRD~§15~D20's scratch-qubit citation is corrected} and carries a dated
+note saying what the old figure actually was, so the number cannot quietly
+travel again. \textbf{This document exists}: master file, masthead, a
+reconstructed prologue covering Steps 0--26, two generators
+(\texttt{tools/labreport/new\_entry.py} for an entry's extracted header,
+\texttt{gen\_data.py} for figure data), a \texttt{make labreport} target that
+probes for \texttt{pdflatex} rather than assuming it, and the session rule in
+\texttt{CLAUDE.md}. The PDF is gitignored --- the \texttt{.tex} is the artefact.
+
+\field{Measured}
+D20 read \emph{``K12's \texttt{divrem} at $W=8$ alone takes $W^2+2W-1 = 79$
+scratch qubits before operands''}. That formula is K12's \emph{remainder tape},
+one component of the region --- \texttt{divrem\_u.h} says so in its own header
+comment. The region is $8W^2+4W-1$, and the bound a bounded device actually has
+to meet is higher still: the \emph{peak}, because \texttt{dst}'s lanes are
+materialised by the copyout while the whole region is still live (\textbf{D25}(a)).
+
+\begin{figures}
+\fig{543}{\texttt{cq\_divrem\_region(8,\,1)}, probe linked against the archive}{Release}
+\fig{551}{\texttt{cq\_kd\_peak}, high-water mark during the call}{Release}
+\fig{131{,}583}{\texttt{cq\_divrem\_region(128,\,1)} --- K12 at i128}{Release}
+\fig{79}{\emph{the retired figure} --- K12's remainder tape, not its region}{---}
+\end{figures}
+
+\noindent The error ran in the direction that \emph{weakened D20's own
+argument}: the row is arguing that the pool ceiling is hard against
+\texttt{qec\_n\_logical} values the shipped configs cap at 7, and 543 makes that
+case seven times harder than 79 did. A citation error that flatters its own
+argument is the one nobody re-derives --- which is why the correction is worth
+more than the number.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.92\linewidth, height=66mm,
+  xlabel={register width $W$}, ylabel={scratch qubits},
+  grid=both, grid style={cqrule!30}, xmin=1, xmax=33,
+  legend pos=north west, legend style={font=\scriptsize, draw=cqrule, fill=white},
+  label style={font=\footnotesize}, tick label style={font=\scriptsize},
+  every axis plot/.append style={mark size=1.2pt, thick}]
+  \addplot table[x=W, y=divpeak]   {data/scratch.dat}; \addlegendentry{K12 \texttt{udiv} --- peak}
+  \addplot table[x=W, y=divregion] {data/scratch.dat}; \addlegendentry{K12 \texttt{udiv} --- region}
+  \addplot table[x=W, y=mulpeak]   {data/scratch.dat}; \addlegendentry{K11 \texttt{mul} --- peak}
+  \draw[cqrule, dashed] (axis cs:8,0) -- (axis cs:8,551);
+  \node[font=\scriptsize\color{cqsoft}, anchor=west] at (axis cs:9,700)
+    {$W=8$:\ \ peak 551,\ region 543};
+\end{axis}
+\end{tikzpicture}
+\caption*{\small\textbf{Region is not peak, and neither is the tape.} The two
+K12 curves are close enough to look interchangeable and are not: the copyout
+runs while the region is live, so a device holding exactly the region does not
+run the kernel. The retired figure, 79, is off this chart entirely at $W=8$.}
+\datasource{\texttt{docs/labreport/data/scratch.dat}, written by a probe
+\emph{run} against \texttt{build-release/libcqops.a} --- not from a formula.}
+\end{figure}
+
+\noindent\textbf{And the apparatus found a second one immediately.} Plotting the
+catalogue put the pinned counts next to the prose ones, and the \emph{same row}
+of D20 says \texttt{cq\_kernel\_xor} at $W=4$ is 4~CX where
+\texttt{tests/goldens/bitwise.counts} pins 8 --- K1 is
+\texttt{dst\,\^{}=\,a\,\^{}\,b}, one CX per source per lane, so the count is
+$2W$. Filed as \bead{y1i} rather than fixed in passing, for the reason
+\bead{j75} itself records. Its direction is the \emph{opposite} of
+\bead{j75}'s and D20's conclusion survives either way --- the row argues the cost
+is small enough to draw, and $2\times$ is still far inside the drawer's limits.
+It is the case for generating figure data rather than typing it, made on the
+first day the generator existed.
+
+\field{Decided}
+\textbf{PRD~§15~D20} is amended in its citation only; it is not re-resolved and
+takes no new D-number. \textbf{D25} and \textbf{D9}(a), which the corrected
+sentence now points at, are untouched. The report's own rule goes into
+\texttt{CLAUDE.md} under \emph{Session Completion}.
+
+\field{Not taken}
+\textbf{Backfilled per-session entries for Steps 0--26} --- the prologue is one
+table and is flagged as a reading of the record rather than an account of it;
+inventing 27 retrospective ``sessions'' would put prose in the document that
+nobody lived. \textbf{A shared figures directory} --- rejected because an
+\texttt{\textbackslash input} shared between entries silently changes an old
+entry when it is updated, and nobody diffs a rendered PDF; figures live inside
+the entry that uses them. \textbf{Committing the PDF} --- the user's call, and
+the right one. \textbf{A 2--5 page quota per entry} --- proposed and dropped: a
+quota manufactures narrative, and inflated significance in a document future
+sessions mine is worse than no document.
+
+\field{Verified}
+\bead{j75} itself is docs-only. But the session also \emph{landed} the prior
+session's uncommitted D25 work, so the full gate was run rather than assumed:
+\textbf{Debug 357/359, Release 356/356} (the latter excluding the two entries
+below). \texttt{tools/check\_loc.sh} passes at 203 files, and this document
+compiles under \texttt{pdflatex}. The scratch figures come from two probes built
+against \texttt{build-release/libcqops.a}; \texttt{test\_kernel\_divrem} case~6,
+where the region and the peak are both pinned, is green.
+
+\medskip
+\noindent\textbf{Two entries are RED and are not ours.}
+\texttt{l6\_cqlang\_fixtures} and \texttt{l7\_grover\_cqlang} both fail against
+CQ\_lang \texttt{5a26204}; the last measurement in this repo was against
+\texttt{893b769}, and \textbf{this repo neither pins nor can build CQ\_lang}, so
+these two track a moving target by design. L6: 100 OK, 201 deferred,
+\textbf{23 build failures, all on one undefined symbol} ---
+\texttt{cqrt\_ry\_i32\_controlled}, emitted by CQ\_lang and declared by nothing we
+vendor, which is \bead{w9i} exactly (filed when it hit 3 fixtures). \texttt{nm}
+confirms our archive defines the \texttt{\_inv} sibling and not this one, so it
+was never ours to define; the OK count in fact \emph{rose}, 71 to 100, far clear
+of the floor of 43. L7 is a different cause, newly filed as \bead{2tm}:
+\texttt{cq\_phi} has become a register-free \texttt{void cq\_phi(double)} upstream
+and our fixture still passes it two arguments. \textbf{Neither is caused by
+anything committed here} --- the whole unit, death and shim surface is green in
+both configurations at the same tree.
+
+\field{Left open}
+24 beads open, none claimed; \bead{y1i} and \bead{2tm} filed, \bead{w9i}
+re-measured. Six are now citation/staleness
+bugs of the same family as \bead{j75} --- \bead{y1i}, \bead{0a7}, \bead{18f},
+\bead{dtb}, \bead{eh9}, \bead{wf8} --- and are the obvious next batch, being
+cheap and mutually independent --- and two of the six were found by an
+instrument rather than by reading.
