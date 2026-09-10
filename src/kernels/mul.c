@@ -40,6 +40,15 @@
  * cheaper form that is known — recycling `pp` by uncomputing it after each
  * accumulate, W² + 2W -> 2W + 1 qubits for W(W+1)/2 more Toffolis per half — is
  * a further re-derivation and is deliberately NOT v1.
+ *
+ * PRD §15 D25 IS WHERE "FAIL LOUD" IS STATED AND TESTED (bd fxz, 2026-09-10),
+ * and it corrects one number in the paragraph above: the ceiling a device needs
+ * is W² + 3W, not W² + 2W. `dst`'s lanes are materialised by the COPYOUT, which
+ * runs while the whole region is still live, so a fabric holding exactly the
+ * region does not run this kernel. The refusal itself is cq_qubits_acquire's,
+ * inside cq_sandwich's step 1 and BEFORE the first gate reaches the sink, and
+ * it aborts — there is no unwind and no return path, which is why the region
+ * being half-materialised at that instant is harmless rather than a leak.
  */
 
 #include "kernels/mul.h"

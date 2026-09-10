@@ -24,7 +24,9 @@
  * `1,667`. `divrem` DOES ship at i128 (opcode_table.yaml:187-190, all four
  * opcodes, the full 15-variant grid) and that is the largest object in the v1
  * catalogue by 8x. Where D2's pool ceiling bites, `cq_qubits_acquire` fails hard
- * naming the pool, which is correct behaviour and must not be softened here.
+ * naming the pool, which is correct behaviour and must not be softened here —
+ * PRD §15 D25 states it and tests/test_kernel_divrem_death.c pins it, at the
+ * PRE-MATERIALISATION site, before a single gate of the construction is emitted.
  *
  * NOTHING IN THIS KERNEL MAY BE FREED MID-COMPUTE-HALF. The remainder's dropped
  * top bit is provably `0` mathematically (K12.md §2.0) but the two-bit shadow

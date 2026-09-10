@@ -299,6 +299,40 @@ static void the_classical_fold_above_the_register_cap(void)
     CQ_EXPECT_ABORT(cq_divrem_classical(a, b, CQ_DIVREM_MAX_W + 1, q, r));
 }
 
+/* --- `bd fxz` / PRD §15 D25: D2's ceiling reaches K12's scratch region. ---- */
+
+/* THE LARGEST OBJECT IN THE v1 CATALOGUE MEETS THE CEILING TOO, and `bd fxz`'s
+ * own note says K12 is the kernel it is really about: `udiv` at i128 is
+ * 8W² + 4W − 1 = 131,583 scratch qubits, 8x M18's `mul` and past every
+ * `qec_n_logical` the shipped configs carry (§15 D20). The sibling case in
+ * tests/test_kernel_mul_death.c carries the full instrument — an aborting sink
+ * proving the refusal precedes any emission — and this one carries the claim
+ * that has to be made per kernel: that THIS kernel's region is bounded, not
+ * just M18's.
+ *
+ * THE REGION IS ASKED OF M19, never written down. `cq_divrem_region` is what
+ * divrem_u.c itself passes to `cq_scratch_alloc`, so the ceiling below sits one
+ * qubit under whatever the kernel will actually request; the DEATH_REQUIRE
+ * beside it states K12.md §3.1's closed form independently, so a region that
+ * silently changed shape is a broken fixture (exit 3) rather than a case that
+ * quietly stopped testing the boundary. */
+static void udiv_scratch_exceeds_the_pool_ceiling(void)
+{
+    setup();
+    int32_t ha = cq_bk_reg(&g_ctx, 2u, 0u, 0x3u);
+    int32_t hb = cq_bk_reg(&g_ctx, 2u, 0u, 0x3u);
+    int32_t hd = cq_reg_alloc_zero(&g_ctx.regs, 2u);
+    const uint32_t region = (uint32_t)cq_divrem_region(2, 1);
+
+    CQ_DEATH_REQUIRE(cq_qubits_live(&g_ctx.pool) == 4u);
+    CQ_DEATH_REQUIRE(region == 8u * 2u * 2u + 4u * 2u - 1u);
+    cq_qubits_set_ceiling(&g_ctx.pool, 4u + region - 1u);
+
+    CQ_EXPECT_ABORT(cq_kernel_udiv(&g_ctx, cq_reg_bits(&g_ctx.regs, hd),
+                                   cq_reg_cbits(&g_ctx.regs, ha),
+                                   cq_reg_cbits(&g_ctx.regs, hb), 2));
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(udiv_dst_aliases_a_classical_source),
     CQ_DEATH_CASE(urem_dst_aliases_the_second_source),
@@ -320,5 +354,6 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(ult_step_index_is_negative),
     CQ_DEATH_CASE(divrem_step_index_past_the_end),
     CQ_DEATH_CASE(the_quotient_of_a_remainder_only_block),
-    CQ_DEATH_CASE(the_classical_fold_above_the_register_cap)
+    CQ_DEATH_CASE(the_classical_fold_above_the_register_cap),
+    CQ_DEATH_CASE(udiv_scratch_exceeds_the_pool_ceiling)
 )

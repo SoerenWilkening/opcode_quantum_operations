@@ -549,6 +549,8 @@ CQ_TEST(the_classical_fold_writes_real_gates_into_a_quantum_dst)
  * right cut: everything above tests mul.c, and l1s_oracle tests refmodel.c's
  * cq_ref_w_mul against a fourth derivation. It is also where i128's real value
  * coverage lives, since the sweep can afford only 14 cases there. */
+#include "test_kernel_mul_ceiling.inc"
+
 #include "test_kernel_mul_refmodel.inc"
 
 CQ_TEST_MAIN_ARGV(
@@ -561,6 +563,8 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_stream_is_a_palindrome_around_the_copyout),
     CQ_CASE(w1_is_k2_with_one_toffoli_and_not_the_closed_form),
     CQ_CASE(the_sandwich_takes_its_scratch_and_gives_it_back),
+    CQ_CASE(a_ceiling_at_the_measured_peak_admits_the_kernel_and_is_not_lifted),
+    CQ_CASE(an_all_classical_mul_runs_under_a_ceiling_that_admits_nothing_new),
     CQ_CASE(r9_all_classical_operands_never_enter_the_sandwich),
     CQ_CASE(the_classical_fold_writes_real_gates_into_a_quantum_dst),
     CQ_CASE(l1s_oracle_agrees_with_an_independent_shift_add)

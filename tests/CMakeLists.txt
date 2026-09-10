@@ -882,6 +882,7 @@ add_cqops_death_test(test_kernel_mul_death CASES
     mul_a_width_of_zero
     mul_a_negative_width
     mul_steps_called_directly_with_a_zero_width
+    mul_scratch_exceeds_the_pool_ceiling
 )
 
 ## WHICH LAYER ABORTED — the Step-15 shape, where the masking copy of the guard
@@ -898,6 +899,26 @@ set_tests_properties(test_kernel_mul_death.mul_a_width_of_zero
 set_tests_properties(test_kernel_mul_death.mul_steps_called_directly_with_a_zero_width
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "destination width is not positive")
+
+## bd fxz / PRD §15 D25 — D2's ceiling reaching K11's SCRATCH REGION, which no
+## case anywhere covered: test_qubits_death.ceiling_exceeded pins the pool's own
+## refusal on a bare pool, and says nothing about whether a kernel's W²+2W ever
+## meets it. The case sets the ceiling one short of the region, so the refusal
+## must land in cq_sandwich's step-1 pre-materialisation and must come from M03.
+##
+## THE DISCRIMINATOR IS NEGATIVE, and it has to be: PASS_REGULAR_EXPRESSION
+## DISPLACES the exit-code check and would trade away the death binary's own
+## contract, where FAIL_REGULAR_EXPRESSION composes with it. Two things are
+## being excluded at once. (1) The layers that must NOT have spoken — a kernel
+## guard, M08, M09 or M07 aborting first would mean the ceiling was never
+## reached. (2) `probe:`, which is the case's OWN aborting sink: a death test's
+## native claim is only "it aborted", and this is what turns bd fxz's "fail loud
+## rather than half-allocate" into something checkable — pre-materialisation
+## emits nothing, so a gate reaching the sink before the refusal means the
+## ceiling was consulted too late, and the case would otherwise still exit 0.
+set_tests_properties(test_kernel_mul_death.mul_scratch_exceeds_the_pool_ceiling
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "probe:;kernel:;scratch:;sandwich:;reg:")
 
 ## M19 and M20, Step 17 — plus the two EXPORTS plan §0.4 required of M14 and
 ## M16. The exports are the interesting half: cq_sub_step and cq_ult_step are
@@ -932,7 +953,17 @@ add_cqops_death_test(test_kernel_divrem_death CASES
     divrem_step_index_past_the_end
     the_quotient_of_a_remainder_only_block
     the_classical_fold_above_the_register_cap
+    udiv_scratch_exceeds_the_pool_ceiling
 )
+
+## bd fxz / PRD §15 D25, the K12 half — the same negative discriminator as
+## test_kernel_mul_death.mul_scratch_exceeds_the_pool_ceiling, minus the probe
+## sink that case owns. What must NOT speak is a kernel guard, M08, M09 or M07:
+## any of them aborting first would mean the ceiling was never reached, and the
+## death test alone cannot tell those apart.
+set_tests_properties(test_kernel_divrem_death.udiv_scratch_exceeds_the_pool_ceiling
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "kernel:;scratch:;sandwich:;reg:")
 
 ## WHICH LAYER ABORTED — the Step-15 shape, where the masking copy of the guard
 ## is EARLIER in the call chain, and now in FOUR modules at once. Every entry
@@ -1536,7 +1567,19 @@ add_cqops_death_test(test_template_death CASES
     a_cast_kind_outside_the_abis_enum_is_refused
     a_width_outside_the_abis_range_is_refused
     a_cast_to_a_width_above_the_abis_range_is_refused
+    a_pool_ceiling_refusal_is_not_swallowed_at_the_opcode_surface
 )
+
+## bd fxz (b) / PRD §15 D25 — WHERE a D2 refusal surfaces to CQ_lang. The claim
+## is that M26 does not swallow it and does not translate it: the abort must be
+## the POOL's, at the opcode surface, with no shim-layer refusal in front of it.
+## `shim:` and `template:` are therefore banned alongside the kernel and driver
+## layers — the shim growing its own "that will not fit" check would be the same
+## masking-layer trap this file's D7a block bans, and the pool's own message is
+## the only one a caller can act on.
+set_tests_properties(test_template_death.a_pool_ceiling_refusal_is_not_swallowed_at_the_opcode_surface
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "shim:;template:;kernel:;scratch:;sandwich:;reg:")
 
 ## D7a IS M07'S REFUSAL AND MUST STAY M07'S. The shim resolves the handles and
 ## hands them to `cq_reg_check_operands`; if it ever grew its own copy of the

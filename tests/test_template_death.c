@@ -47,6 +47,7 @@
 
 #include "cqops/cqops.h"
 
+#include "support/bitkinds.h"
 #include "support/death.h"
 
 #include <stdint.h>
@@ -285,6 +286,41 @@ static void a_cast_to_a_width_above_the_abis_range_is_refused(void)
                                        cqrt_alloc_i8(0)));
 }
 
+/* --- `bd fxz` (b) / PRD §15 D25: where a D2 refusal surfaces to CQ_lang. ---- */
+
+/* THE QUESTION `bd fxz` LEFT OPEN WAS NOT "does the pool fail loud" — M03 has
+ * done that since Step 4 — BUT WHERE THAT FAILURE REACHES THE CALLER, and Steps
+ * 23–26 are what make it answerable by measurement instead of by deferral. The
+ * answer is: at the opcode surface, unswallowed, with the abort coming from the
+ * POOL. M26 catches nothing, installs no handler and has no error return to
+ * fall back on — every `cq_template_*` either returns a handle or does not
+ * return — so a device too small for a kernel's scratch region stops the
+ * program at the operation that asked for it, naming the pool, rather than
+ * emitting a circuit nobody can run.
+ *
+ * THE OPERANDS ARE BUILT WITH `cq_bk_reg` AND NOT `cqrt_alloc_i8`, and that is
+ * the difference between testing this and testing nothing: an ABI-allocated
+ * rail is all-constant, I4 gives it zero qubits, and `mul` would take R9's
+ * short-circuit and never ask the pool for anything at all. Every case above
+ * uses the ABI allocator because none of them needs a qubit; this one does.
+ *
+ * i8, NOT i128. The arithmetic is identical and the fixture is 80 qubits rather
+ * than 16,640; the width the bead is about is a statement about `qec_n_logical`
+ * (§15 D20), not about which width can be made to trip the bound. */
+static void a_pool_ceiling_refusal_is_not_swallowed_at_the_opcode_surface(void)
+{
+    cq_ctx *ctx = open_shim();
+    const int32_t a = cq_bk_reg(ctx, 8u, 0u, 0xFFu);
+    const int32_t b = cq_bk_reg(ctx, 8u, 0u, 0xFFu);
+
+    CQ_DEATH_REQUIRE(cq_qubits_live(&ctx->pool) == 16u);
+    CQ_DEATH_REQUIRE(a != b);
+    /* One short of K11's W² + 2W at W = 8, on top of the operands. */
+    cq_qubits_set_ceiling(&ctx->pool, 16u + 80u - 1u);
+
+    CQ_EXPECT_ABORT((void)cq_shim_bin_qq(CQ_SHIM_OP_MUL, 8, a, b));
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(d7a_out_aliases_the_first_source_of_a_qq_unc),
     CQ_DEATH_CASE(d7a_out_aliases_the_second_source_of_a_qq_unc),
@@ -302,5 +338,6 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(a_predicate_outside_the_abis_enum_is_refused),
     CQ_DEATH_CASE(a_cast_kind_outside_the_abis_enum_is_refused),
     CQ_DEATH_CASE(a_width_outside_the_abis_range_is_refused),
-    CQ_DEATH_CASE(a_cast_to_a_width_above_the_abis_range_is_refused)
+    CQ_DEATH_CASE(a_cast_to_a_width_above_the_abis_range_is_refused),
+    CQ_DEATH_CASE(a_pool_ceiling_refusal_is_not_swallowed_at_the_opcode_surface)
 )

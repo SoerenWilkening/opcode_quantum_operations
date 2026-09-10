@@ -46,6 +46,9 @@
 #include "support/bitkinds.h"
 #include "support/death.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+
 static cq_sink g_sink;
 static cq_ctx  g_ctx;
 
@@ -147,6 +150,77 @@ static void mul_steps_called_directly_with_a_zero_width(void)
     CQ_EXPECT_ABORT((void)cq_mul_steps(0));
 }
 
+/* --- `bd fxz` / PRD §15 D25: D2's ceiling reaches K11's scratch region. ---- */
+
+/* A SINK THAT ABORTS ON ANY GATE, and it is the whole instrument. `bd fxz`'s
+ * words are "fail loud rather than half-allocate", and a death test's only
+ * native claim is "it aborted" — which a ceiling check moved anywhere later in
+ * the kernel would satisfy just as well. What makes the site checkable is that
+ * pre-materialisation emits NOTHING: scratch is born CQ_BIT_ZERO, so I6(b)'s
+ * step-1 loop takes W² + 2W qubits for zero gates, and the operands below are
+ * built at value ZERO so `cq_bk_reg` emits none either. So under a correct
+ * library not one gate reaches this sink, and if any does, tests/CMakeLists.txt
+ * fails the case on the message rather than on the exit code — a
+ * FAIL_REGULAR_EXPRESSION composes with the death binary's own contract where a
+ * PASS_REGULAR_EXPRESSION would displace it. */
+static void gate_die(const char *op)
+{
+    fprintf(stderr, "probe: FATAL: a %s was emitted before the ceiling "
+                    "refusal\n", op);
+    abort();
+}
+
+static void dx  (void *u, uint32_t q)                        { (void)u; (void)q; gate_die("x"); }
+static void dcx (void *u, uint32_t c, uint32_t t)            { (void)u; (void)c; (void)t; gate_die("cx"); }
+static void dccx(void *u, uint32_t a, uint32_t b, uint32_t t){ (void)u; (void)a; (void)b; (void)t; gate_die("ccx"); }
+
+/* THE CEILING IS SET ONE SHORT OF THE SCRATCH REGION, so the refusal lands
+ * inside `cq_sandwich`'s step 1 rather than at the copyout's `dst` lanes — the
+ * two are different sites and only the first is the one this bead is about.
+ * W = 4 makes the region 24 and the operands 8, which is 31 against a device
+ * that has 32; at i128 the same arithmetic is 16,640 against a `qec_n_logical`
+ * the shipped configs cap at 7 (§15 D20).
+ *
+ * MEASURED, NOT WRITTEN DOWN, for the reason its positive sibling gives: the
+ * closed form is pinned one file over, and a change to it must not silently
+ * move this case off the boundary it claims to sit on. The measuring run is a
+ * SEPARATE context that is disposed before the bounded one is built. */
+static void mul_scratch_exceeds_the_pool_ceiling(void)
+{
+    uint32_t scratch;
+
+    setup();
+    {
+        int32_t ma = cq_bk_reg(&g_ctx, 4u, 0u, 0x0Fu);
+        int32_t mb = cq_bk_reg(&g_ctx, 4u, 0u, 0x0Fu);
+        int32_t md = cq_reg_alloc_zero(&g_ctx.regs, 4u);
+        uint32_t before = cq_qubits_live(&g_ctx.pool);
+
+        cq_kernel_mul(&g_ctx, cq_reg_bits(&g_ctx.regs, md),
+                      cq_reg_cbits(&g_ctx.regs, ma),
+                      cq_reg_cbits(&g_ctx.regs, mb), 4);
+        scratch = (cq_qubits_peak(&g_ctx.pool) - before)
+                  - cq_reg_owned_qubits(&g_ctx.regs, md);
+        cq_ctx_dispose(&g_ctx);
+    }
+    CQ_DEATH_REQUIRE(scratch == 24u);          /* W² + 2W at W = 4 */
+
+    setup();
+    g_sink.x = dx; g_sink.cx = dcx; g_sink.ccx = dccx;
+    {
+        int32_t ha = cq_bk_reg(&g_ctx, 4u, 0u, 0x0Fu);
+        int32_t hb = cq_bk_reg(&g_ctx, 4u, 0u, 0x0Fu);
+        int32_t hd = cq_reg_alloc_zero(&g_ctx.regs, 4u);
+
+        CQ_DEATH_REQUIRE(cq_qubits_live(&g_ctx.pool) == 8u);
+        cq_qubits_set_ceiling(&g_ctx.pool, 8u + scratch - 1u);
+
+        CQ_EXPECT_ABORT(cq_kernel_mul(&g_ctx, cq_reg_bits(&g_ctx.regs, hd),
+                                      cq_reg_cbits(&g_ctx.regs, ha),
+                                      cq_reg_cbits(&g_ctx.regs, hb), 4));
+    }
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(mul_dst_aliases_a_classical_source),
     CQ_DEATH_CASE(mul_dst_aliases_the_second_source),
@@ -154,5 +228,6 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(mul_the_two_sources_are_the_same_register),
     CQ_DEATH_CASE(mul_a_width_of_zero),
     CQ_DEATH_CASE(mul_a_negative_width),
-    CQ_DEATH_CASE(mul_steps_called_directly_with_a_zero_width)
+    CQ_DEATH_CASE(mul_steps_called_directly_with_a_zero_width),
+    CQ_DEATH_CASE(mul_scratch_exceeds_the_pool_ceiling)
 )

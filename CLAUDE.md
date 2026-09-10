@@ -22,7 +22,7 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | Doc | Role |
 > |---|---|
 > | [`NORTH_STAR.md`](NORTH_STAR.md) | *Why* — the five commitments, the five finish-line conditions, what this repo is **not** |
-> | [`PRD-v1.md`](PRD-v1.md) | *What* — scope §1, the §3 fold table, the kernel contract §4, Bennett-in-the-small §5, the K1–K12 catalogue §6, rotations §7, sinks §8, controlled §9, uncompute §10, tests §11, layout §14, invariants I1–I5 and **decisions §15 (D1–D17)** |
+> | [`PRD-v1.md`](PRD-v1.md) | *What* — scope §1, the §3 fold table, the kernel contract §4, Bennett-in-the-small §5, the K1–K12 catalogue §6, rotations §7, sinks §8, controlled §9, uncompute §10, tests §11, layout §14, invariants I1–I5 and **decisions §15 (D1–D25)** |
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), §3 the M01–M28 module map **with every split seam recorded in advance**, §4 the 28 steps, §5 the critical path, §6 the R1–R9 risk register, §7 definition of done |
 > | `bd` | The tracker (`bd ready`, `bd show <id>`) **and the institutional memory** (`bd remember`, `bd memories <keyword>`) |
 >
