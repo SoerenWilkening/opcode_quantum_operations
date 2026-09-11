@@ -1,0 +1,260 @@
+% labreport entry 4 — 2026-09-11
+% labreport-to: 2d917b6
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{4}{field}.
+
+\entry{4}{2026-09-11}{CI wired up, and three Rule-12 splits measured before they were cut}
+
+\begin{generated}
+  \gitem{Range}{\texttt{961905f..2d917b6}}
+  \gitem{Tests}{Release \textbf{358}, Debug \textbf{359} (\texttt{ctest -N})}
+  \gitem{LOC}{OK — 204 file(s), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{2d917b6} bd kju/wgi/iwn/y0f: CI wired up (ubuntu-latest, clang) + shim-check in make test; l6\_run.py split at the recorded seam -> l6\_report.py; test\_kernel\_add refmodel .inc on mul/divrem's seam; sandwich.c measured close at 117
+    \item \texttt{08dc6f3} bd o63/1ti/y1i/18f/wf8/eh9/dtb/0a7: the stale-claims batch sorted three ways; check\_cites.sh guards living-target line citations
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{kju} Wire up CI once the repo has a git remote, \bead{iwn} tests/test\_kernel\_add.c is at 297/300 with no recorded seam beyond the \_upstream.inc split, \bead{wgi} tools/l6/l6\_run.py is at 281/300 and past plan §3 Layer 6's recorded split trigger (240), \bead{y0f} M09 sandwich.c is 115 lines against a 110 budget}
+  \gitem{Beads filed}{none}
+  \gitem{Diff}{\texttt{34 files changed, 2294 insertions(+), 442 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Four beads: \bead{kju} --- wire up CI, now that the repo has an
+\texttt{origin} --- and the three Rule~12 pressure beads \bead{wgi}, \bead{iwn}
+and \bead{y0f}, each naming a file at or past a recorded split trigger. The
+method is entry~3's, pointed at \emph{seams} instead of claims: re-measure every
+dated figure with the instrument that produced it
+(\texttt{tools/check\_loc.sh}'s rule, \texttt{ctest -N}, the source), record a
+seam \emph{before} cutting it, sort stale claims three ways (\bead{cxp}), and let
+one agent make every planning-document edit last. The gate is \texttt{make lint}
+--- both guards --- plus \texttt{ctest} in both configurations with
+\texttt{l6\_cqlang\_fixtures} excluded.
+
+\field{What landed}
+\begin{itemize}[leftmargin=1.5em,itemsep=4pt,topsep=4pt,parsep=0pt]
+\item \bead{kju} --- \texttt{.github/workflows/ci.yml}, \texttt{ubuntu-latest},
+      \textbf{clang only} (see \emph{Decided}). Debug is configured
+      \texttt{-DCQOPS\_SANITIZERS=ON -DCQOPS\_LEAK\_CHECK=ON -DCQOPS\_PYTHON=ON}
+      so the three \textsc{auto} knobs cannot downgrade in silence, and with an
+      explicit \texttt{-DCMAKE\_C\_COMPILER=} so
+      \texttt{cmake/CqopsDebugToolchain.cmake} does not probe-and-switch out from
+      under the matrix; Release is plain. The job asserts the four
+      \emph{not registered} configure \textsc{status} lines (L6, L7~§12(1), the
+      QEC sink twice) and greps \texttt{ctest -N} both for their absence and for
+      \texttt{test\_gen\_shim}, \texttt{test\_gen\_bodies} and
+      \texttt{test\_lsan\_negative} being present. \textbf{The absence check
+      anchors each name at \texttt{.} or end-of-line}: M25b's
+      \texttt{test\_sink\_qec\_angle} is registered unconditionally, and a bare
+      substring match turned the step red while it was being written. With it, a
+      \texttt{shim-check} target (Makefile and CMake) running
+      \texttt{shim/gen\_shim.py --check} --- which has existed since Step~22 and
+      was invoked by nothing --- in \texttt{make test} and in the workflow,
+      \textbf{hard-failing} without \texttt{python3} or PyYAML rather than
+      skipping. Both its arms were provoked (one byte into a \texttt{.gen.c} $\to$
+      \texttt{stale: cq\_template\_int\_bitwise.gen.c}, \texttt{rc 1}; a stray
+      file $\to$ \texttt{extra}; restored with \texttt{cp -f} plus \texttt{touch},
+      never \texttt{mv}, sha256 identical), as was the
+      \texttt{CQOPS\_SANITIZERS=ON} configure error, on Apple clang~17.
+\item \bead{wgi} --- \texttt{tools/l6/l6\_run.py} split on the seam
+      \textbf{plan~§3's Layer~6 row} recorded on 2026-08-27, when the file was
+      142 lines: \emph{the fixture list $\leftrightarrow$ the verdict}. The cut
+      landed where that row said --- \texttt{classify}, \textsc{deferred},
+      \textsc{strand}, \texttt{residue*} and three text helpers that answer to
+      neither repository and followed their callers into the new
+      \texttt{tools/l6/l6\_report.py}; \texttt{main} stayed, and the row's
+      \emph{rejected} \texttt{run}~$\leftrightarrow$~\texttt{report} cut stayed
+      rejected. \texttt{sys.dont\_write\_bytecode = True} sits before the one-way
+      import: the L6 and L7 ctest registrations do \emph{not} set
+      \texttt{PYTHONDONTWRITEBYTECODE} --- only the shim suites do.
+\item \bead{iwn} --- \texttt{tests/test\_kernel\_add.c} split, and the bead's own
+      two candidates were \emph{measured before} either was chosen. (a) The
+      $x{+}1$ / $x{+}3$ constant-increment cut is \textbf{spent}: all three
+      constant-second-operand cases are already in \texttt{\_upstream.inc}, so it
+      moves zero lines. (b) The R8/R9 mask cut moves 85 lines but strands
+      \texttt{run\_masked}, \texttt{gates\_of} and \texttt{wide\_ref} with every
+      caller in an \texttt{.inc}, and removes two of the three subjects the file
+      header names. Taken instead: \emph{the kernel $\leftrightarrow$ its
+      reference model} --- the moved case runs no kernel, allocates no qubit,
+      emits no gate --- the seam \texttt{mul}'s and \texttt{divrem}'s
+      \texttt{\_refmodel.inc} already took on byte-identical banner text, both of
+      which likewise kept R9 in the parent. Recorded in \bead{iwn} (timestamped)
+      \emph{before} the cut and in \textbf{plan~§3's M14 row}, together with a
+      \emph{reserve} seam (R9's short-circuit into a \texttt{\_classical.inc},
+      reaching 202), because 250 is over the house trigger of 240.
+\item \bead{y0f} --- a \textbf{measured close, no code change}: M09 is over its
+      110 budget and far under the 240 trigger, the bead's dated figure is
+      confirmed at the birth commit, and its recorded seam (the
+      \texttt{\#if CQ\_SW\_DEBUG} fingerprint block) is both larger than assumed
+      and not free-standing --- \texttt{cq\_sw\_die} is a file-static called from
+      both sides of it.
+\item \textbf{Two follow-up commits, both written by CI rather than by us} ---
+      \texttt{662002e} (\texttt{\_DEFAULT\_SOURCE} on
+      \texttt{cqops\_test\_support}) and \texttt{93357fd}
+      (\texttt{LEAK\_EXIT\_NOT\_ABORT} in \texttt{\_cqops\_sanitizer\_env}), each
+      with its \textbf{CLAUDE.md} counterpart: a new \texttt{\_DEFAULT\_SOURCE}
+      paragraph, and the existing LSan bullet's \emph{a leak is a normal non-zero
+      exit, not a crash} corrected as \bead{cxp} \textbf{category 2} --- true on
+      Darwin, false on glibc. The runs are in \emph{Verified}.
+\item \textbf{Documents, one agent, last}: plan~§2.3, the M09, M14 and M27 rows,
+      the Layer~6 rows and their preamble; \textbf{CLAUDE.md}'s CI paragraph and
+      its \emph{Build \& Test} fence; \textbf{PRD~§14}. Every retired sentence is
+      quoted in place with the \bead{cxp} category it was sorted into.
+\end{itemize}
+
+\field{Measured}
+\begin{figures}
+\fig{$281 \to 177 + 143$}{\texttt{tools/check\_loc.sh}'s rule at
+     \texttt{CQOPS\_LOC\_LIMIT=1}: \texttt{l6\_run.py} before and after, plus the
+     new \texttt{l6\_report.py}}{--- (read-only)}
+\fig{$297 \to 250 + 48$}{the same, over \texttt{tests/test\_kernel\_add.c} and
+     the new \texttt{\_refmodel.inc} --- Rule~12 counts \texttt{.c}/\texttt{.h}/%
+     \texttt{.py} only}{--- (read-only)}
+\fig{$117 = 107 + 10$}{the same, over \texttt{src/sandwich.c} and
+     \texttt{sandwich.h}; budget 110, trigger 240}{--- (read-only)}
+\fig{115 @ \texttt{1d9c8a0}, $+2$}{the same rule at M09's birth commit and at
+     \texttt{3f35def} (Step~20) --- \bead{y0f}'s dated figure confirmed; its
+     recorded seam measures \textbf{26}, not $\sim$20}{--- (read-only)}
+\fig{204 / 294, 298 / 0}{\texttt{make lint}: \texttt{check\_loc} files and
+     largest (\texttt{tests/test\_unc.c}); \texttt{check\_cites} files and bare
+     line cites}{box-local count --- \bead{a9e}}
+\fig{357 / 358}{\texttt{ctest -j6 -E '\textasciicircum{}l6\_cqlang\_fixtures\$'},
+     both trees fully relinked}{Release / Debug}
+\fig{348 / 347}{\texttt{ctest} in \bead{kju}'s scratch CI trees (Ninja); the
+     difference is \texttt{test\_lsan\_negative}}{Debug \textsc{on}/\textsc{on},
+     Homebrew clang~22 / Release, \texttt{/usr/bin/cc}}
+\fig{140 / 201 / 1 / 0}{\texttt{tools/l6/l6\_run.py} over 342 registered
+     fixtures: \textsc{ok} / \textsc{deferred} / \textsc{abort} /
+     \textsc{build\_fail}, the \textsc{deferred} splitting 195 fp / 6
+     \texttt{cqrt\_alloc\_handle} / 0 \texttt{qram} / 0 \texttt{tape}}{Release,
+     one run, CQ\_lang \texttt{f8d29e8} \textbf{dirty}}
+\fig{0 / 992, 119 of 139}{\texttt{l6\_report.py}'s residue tally over the same
+     run: convicted and unproven qubits, over 0 dirty and 58 unproven frees; and
+     \textsc{ok} fixtures that stranded nothing}{as above}
+\end{figures}
+
+\noindent\textbf{One \textsc{build\_fail} was an instrument artefact, and it is
+the difference between the two L6 denominators above} --- a link race against a
+concurrent relink of the shared \texttt{build-release} archive; \texttt{nm} shows
+the symbol and a targeted re-run is \textsc{ok}, so the residue tally's 139
+becomes 140. The \texttt{ctest} entry was \textbf{red} for that run on the one
+\textsc{abort} (now \bead{tgx}), not on the race.
+
+\medskip
+\noindent\textbf{\texttt{--reuse} is the evidence that \bead{wgi}'s cut moved no
+behaviour}: JSON and stdout byte-identical before and after the split over one
+artefact set of 342 fixtures, interleaved --- a re-classification of completed
+artefacts, so the pipeline is held fixed and only the classifier changes. For
+\bead{iwn} the equivalent is cheaper and just as literal: the moved block diffs
+byte-identical against \texttt{HEAD} lines 473--554, and still prints as
+\texttt{ok 13}.
+
+\field{Decided}
+The compiler matrix is the maintainer's call, 2026-09-10, recorded in
+\bead{kju} with its reason: \textbf{clang only}. Two conventions settled with it
+live in the beads and in \textbf{plan~§3}, not here --- a \emph{test}-side seam
+is recorded in the module's own plan~§3 row (M22's precedent), and a seam for a
+file plan~§3 does not record is measured before it is cut and written to the bead
+first. Neither split is a new decision: \bead{wgi} is plan~§3's Layer~6 row
+applied, \bead{iwn} follows \texttt{mul}'s and \texttt{divrem}'s existing seam.
+
+\field{Not taken}
+\textbf{A \texttt{gcc} matrix entry} --- it would go red on
+\texttt{tests/test\_skeleton.c}'s \texttt{\_\_has\_feature} sanitizer
+cross-check, a clang spelling gcc~13 does not define; deferred rather than
+refused, being one matrix line plus a \texttt{\_\_SANITIZE\_ADDRESS\_\_} fallback
+in that probe. \textbf{Validating the gcc path in a Docker container} ---
+started, then stopped as over-scope: the library has no OS or compiler
+dependency, and the only compiler-aware line in the tree is test-side.
+\textbf{\bead{iwn}'s candidates (a) and (b)}, for the reasons measured above.
+\textbf{A regenerate-into-scratch plus \texttt{diff -r} shim check} ---
+\texttt{gen\_shim.py --check} already compares full text and writes nothing, so a
+scratch tree would add a copy and no claim. \textbf{Asserting the
+\texttt{check\_loc} file \emph{count} in CI} --- box-local (\bead{a9e}); the
+per-file guard it enforces is asserted. And two things measured while chasing the
+LSan failure and then \emph{not} used: a \texttt{FAIL\_REGULAR\_EXPRESSION} on a
+\texttt{WILL\_FAIL} test is inverted along with the exit code (measured on a
+scratch CMake project), so a \texttt{WILL\_FAIL} binary cannot carry a tripwire;
+and \texttt{tests/support/death.c} uses \texttt{signal} and \texttt{\_Exit}
+only --- no \texttt{fork}/\texttt{waitpid} --- so it compiles clean on glibc
+unaided, contrary to the briefing.
+
+\field{Verified}
+Rule~17, literally. \emph{Both configurations} here means \texttt{build-debug}
+with ASan, UBSan and LSan under Homebrew clang~22 and \texttt{build-release}
+under Apple clang~17.
+
+\begin{itemize}[leftmargin=1.5em,itemsep=2pt,topsep=4pt,parsep=0pt]
+\item \texttt{make lint}: \texttt{check\_loc} \textbf{OK}, 204 files, limit 300,
+      largest 294 (\texttt{tests/test\_unc.c}); \texttt{check\_cites}
+      \textbf{OK}, 298 files, 0 bare. \texttt{make shim-check}: \emph{up to
+      date}, 2479 symbols.
+\item \texttt{ctest --test-dir build-release -j6 -E
+      '\textasciicircum{}l6\_cqlang\_fixtures\$'}: \textbf{357/357}. The same
+      exclusion in \texttt{build-debug}: \textbf{358/358}. Both trees relinked in
+      full, because \texttt{CMakeLists.txt} changed.
+\item \bead{kju}'s scratch CI trees \emph{on the dev box} (Ninja): Debug
+      \textbf{348/348}, Release \textbf{347/347}.
+\item \textbf{One} L6 run, \textbf{Release only}, against CQ\_lang
+      \texttt{f8d29e8fa9b482fc1bb41785ec839c20b4485f56} \textbf{dirty} --- the
+      tallies are in \emph{Measured}. \textbf{L6 was not run in Debug}, and
+      nothing was run on Linux locally.
+\end{itemize}
+
+\noindent\textbf{The first CI run is itself a measurement, and it found something
+no local configuration can.} GitHub run \texttt{34580676994}, job \texttt{clang}:
+lint, \texttt{shim-check}, the Debug configure with sanitizers \emph{active}, and
+all four \textsc{status}-line assertions \textbf{passed} on Linux;
+\emph{Build Debug} \textbf{failed}, on \texttt{setenv} and \texttt{unsetenv}
+being undeclared in \texttt{tests/test\_sink.c} and
+\texttt{tests/test\_reg\_free.inc}. glibc hides POSIX declarations under
+\texttt{-std=c11} --- \texttt{CMAKE\_C\_EXTENSIONS OFF} implies
+\texttt{\_\_STRICT\_ANSI\_\_} --- where macOS declares them regardless.
+\textbf{\texttt{src/}, \texttt{include/} and \texttt{shim/} use no POSIX symbol,
+which is exactly what the strict flag proves about PRD~§14}; 24 test files do. A
+fix is in flight: the tests get \texttt{\_DEFAULT\_SOURCE} and the library stays
+strict C11.
+
+\medskip
+\noindent\textbf{Three runs, all \texttt{ubuntu-latest} / \texttt{clang}, all on
+a push to \texttt{main} --- and each of the first two found a fault the one
+before it could not reach.} The fix landed as \texttt{662002e}:
+\texttt{target\_compile\_definitions(cqops\_test\_support PUBLIC
+\_DEFAULT\_SOURCE)}, the \emph{tests} only. The library keeps strict C11 with no
+feature macro at all, and a glibc cross-compile of all 53 \texttt{src/} and
+\texttt{shim/} translation units with no macro \textbf{compiles clean}
+(\texttt{zig cc}, glibc headers) --- which is a live proof of \textbf{PRD~§14}'s
+\emph{nothing beyond libc} rather than a restatement of it. 22 test TUs needed
+the macro; ninja had reached 2 when the first run died.
+\texttt{\_POSIX\_C\_SOURCE=200809L} was rejected \emph{on measurement}: it hides
+\texttt{M\_PI} on glibc, so \texttt{test\_grover.c} fails, and it lowers
+\texttt{\_\_DARWIN\_C\_LEVEL} on the dev box. Run \texttt{34582398276} on
+\texttt{662002e} then passed \emph{Build Debug} and both registration checks and
+stopped at \textbf{Debug 347/348} --- \texttt{test\_lsan\_negative} alone,
+\emph{Subprocess aborted}: LSan found its deliberate leak and \emph{glibc's}
+runtime turned the report into \texttt{abort()} under
+\texttt{abort\_on\_error=1}, which \texttt{WILL\_FAIL} cannot invert. Darwin
+exits 1 under the same options, which is why \bead{kfi}'s measurement is true
+there and only there. \texttt{93357fd} gives \texttt{\_cqops\_sanitizer\_env} a
+\texttt{LEAK\_EXIT\_NOT\_ABORT} arm, composing \texttt{abort\_on\_error=0} for
+that one binary in the one place the string is written --- 352 tests keep
+\texttt{abort\_on\_error=1}, last-wins parsing was measured in both directions
+against a real ASan use-after-free, and it is \emph{not} implied by
+\texttt{WILL\_FAIL}, because \texttt{test\_harness\_negative} must still
+crash-fail. Run \texttt{34583217277} on \texttt{93357fd} is \textbf{green}:
+\textbf{Debug 348/348, Release 347/347}, 1m15s.
+
+\field{Left open}
+\textbf{Two beads filed}, neither showing in the generated \textsc{beads filed}
+row above. \bead{tgx} --- the single L6 \textsc{abort},
+\texttt{e2e-slice-control-select-bool-round2-window}, dying in M07's operand
+check with \emph{a source handle is not a live rail (2, 0)}: it reproduces
+against a stable archive, its source is untracked upstream, and whether it is
+ours or theirs is undecided. \bead{ss8} --- \texttt{tools/l7/l7\_run.py} at 214
+lines with \emph{no} Layer~6 row of its own, the same shape \bead{wgi} just
+closed one directory over. The immediate next step is not a bead: the in-flight
+\texttt{\_DEFAULT\_SOURCE} fix and the CI run that follows it.

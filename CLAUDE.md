@@ -757,9 +757,18 @@ error. Four things worth knowing:
   `detect_leaks is not supported on this platform`, which is *also* a non-zero exit — so "the
   leaky program failed" is not evidence. The probe requires the leaky program to exit non-zero
   **and name `LeakSanitizer`**, and a clean program to exit **0**.
-- **A LEAK IS A NORMAL NON-ZERO EXIT, NOT A CRASH**, even under `abort_on_error=1`. That is
-  what lets `tests/test_lsan_negative.c` be a plain `WILL_FAIL` binary; `death.h`'s rule that
-  `WILL_FAIL` cannot express a crash is untouched.
+- **A LEAK IS A NORMAL NON-ZERO EXIT ON DARWIN AND A `SIGABRT` ON GLIBC, and this bullet
+  said the first half as a general fact until 2026-09-11.** It read "a leak is a normal
+  non-zero exit, not a crash, even under `abort_on_error=1`" — measured on Homebrew clang
+  22 / Darwin 25 and true there. The workflow's second run (`bd kju`, run 34582398276)
+  measured the other platform: LSan found the deliberate leak and glibc's runtime turned
+  the report into `abort()` under `abort_on_error=1`, so ctest saw `Subprocess aborted` —
+  which `WILL_FAIL` cannot invert (`death.h`'s rule, untouched).
+  `cmake/CqopsSanitizers.cmake`'s probe had already anticipated exactly this and runs
+  under `abort_on_error=0`; the test's registration now does the same for that ONE binary,
+  composed in `_cqops_sanitizer_env`'s one place rather than layered by
+  `set_tests_properties` (which overwrites). `tests/test_lsan_negative.c` stays a plain
+  `WILL_FAIL` binary on both platforms.
 - **DEATH CASES ARE NOT LEAK-CHECKED, BY CONSTRUCTION.** Every exit path in
   `tests/support/death.c` is `_Exit()`, which skips atexit handlers, so LSan's end-of-process
   check never runs for a case that actually died. Do not read a green death case as a leak
@@ -780,6 +789,27 @@ omission would have surfaced only on a glibc CI runner as an undefined `round`. 
 so it propagates to every test binary through `cqops_test_support`. This is **not** a new
 dependency — `<math.h>` is part of the C standard library and PRD §14's "nothing beyond
 libc" is intact; it is a link detail that differs by platform.
+
+**THE TESTS NEED `_DEFAULT_SOURCE` AND THE LIBRARY MUST NEVER GET IT — THE ASYMMETRY IS
+THE PROOF, NOT A WART** (the workflow's first run, 2026-09-11, `bd kju`; fixed in
+`662002e`). `CMAKE_C_EXTENSIONS OFF` makes every TU `-std=c11`, which defines
+`__STRICT_ANSI__`; glibc's `<features.h>` keys on exactly that and hides `setenv`,
+`unsetenv`, `fdopen`, `fileno`, `mkstemp` and `M_PI`, while Darwin's headers declare all
+of it regardless — so the dev box cannot see the fault at all. Measured against glibc
+headers through a cross-compiler: **22 test TUs** fail and ninja reached two of them
+before stopping. The fix is one line in `tests/CMakeLists.txt`,
+`target_compile_definitions(cqops_test_support PUBLIC _DEFAULT_SOURCE)`, which reaches
+every test binary through both registrars and reaches the `cqops` target through none of
+them. **Do not give the library a feature macro "to be consistent"**: all 53 `src/` +
+`shim/` TUs compile clean on glibc with no macro at all, and that is a live proof of PRD
+§14's "nothing beyond libc" — the first POSIX call to creep into `src/` would otherwise be
+found by somebody else's toolchain. `_POSIX_C_SOURCE=200809L` is the wrong macro twice (on
+glibc it still hides `M_PI`, so `test_grover.c` fails; on Darwin it LOWERS
+`__DARWIN_C_LEVEL` and makes the dev box stricter to fix Linux), and `C_EXTENSIONS ON` is
+broader than needed (it changes the language accepted, and `tests/` parses `src/*.h` too).
+The full measurement is the comment above that line. `tools/qtg/` calls `setenv` and is
+unfixed, not unaffected — out of CI's reach only because it is gitignored and
+`EXCLUDE_FROM_ALL`.
 
 C11, `-Wall -Wextra -Werror -Wconversion`. One test binary per module via
 `add_cqops_test(name)` — plus an optional `WILL_FAIL`, used by
