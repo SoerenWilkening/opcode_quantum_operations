@@ -40,7 +40,7 @@ endif
 # timings comparable across a generator switch.
 BUILD_JOBS ?= 6
 
-.PHONY: all lint configure build test test-debug test-release clean \
+.PHONY: all lint shim-check configure build test test-debug test-release clean \
         labreport labreport-data labreport-entry
 
 all: test
@@ -48,6 +48,37 @@ all: test
 lint:
 	@tools/check_loc.sh
 	@tools/check_cites.sh
+
+# THE SHIM DRIFT GATE (bd kju). The shim is GENERATED from CQ_lang's own
+# opcode_table.yaml — never hand-written, never forked — so the symbol grid
+# cannot drift from the frozen ABI it must satisfy. `gen_shim.py --check` has
+# existed since Step 22 and until now no target, no ctest entry and no workflow
+# invoked it, so nothing enforced that.
+#
+# --check IS the check, not an approximation of one: it re-expands the pinned
+# yaml in memory and compares the FULL TEXT of every file it would write against
+# shim/generated/*.gen.c, then reports any *.gen.c on disk the grid no longer
+# names. That is what a regenerate-into-a-scratch-tree plus `diff -r` reports,
+# without the temporary tree — and without the hazard of a regeneration run with
+# the wrong --output-dir writing over the tracked files. It writes NOTHING.
+#
+# IT HARD-FAILS RATHER THAN SKIPPING when the interpreter is missing, unlike the
+# two PyYAML-gated ctest suites: cmake/CqopsPython.cmake declines to REGISTER
+# those, which makes their absence a visible test-count drop next to a warning.
+# A drift gate has no such tell — one that skips is one that is off — so both
+# probes below exit non-zero.
+PYTHON ?= python3
+
+shim-check:
+	@command -v $(PYTHON) >/dev/null 2>&1 || { \
+	  echo "shim-check: no '$(PYTHON)' on PATH."; \
+	  echo "shim-check: this gate HARD-FAILS rather than skipping — see the Makefile."; \
+	  exit 1; }
+	@$(PYTHON) -c 'import yaml' >/dev/null 2>&1 || { \
+	  echo "shim-check: '$(PYTHON)' cannot import yaml — install PyYAML"; \
+	  echo "shim-check: (Debian/Ubuntu: apt-get install python3-yaml; otherwise pip install PyYAML)"; \
+	  exit 1; }
+	@$(PYTHON) shim/gen_shim.py --check
 
 # A BUILD DIRECTORY REMEMBERS ITS GENERATOR AND CMAKE REFUSES TO CHANGE IT, so
 # `-G` on an existing tree of the other kind is a hard error telling you to
@@ -69,7 +100,7 @@ test-release: configure
 	cmake --build $(BUILD_RELEASE) -j $(BUILD_JOBS)
 	ctest --test-dir $(BUILD_RELEASE) -j $(CTEST_JOBS) --output-on-failure
 
-test: lint test-debug test-release
+test: lint shim-check test-debug test-release
 
 clean:
 	rm -rf $(BUILD_DEBUG) $(BUILD_RELEASE)

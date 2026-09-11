@@ -1715,7 +1715,8 @@ internal ones.
 
 The shim is **generated from CQ_lang's own `opcode_table.yaml`**, not hand-written and
 not forked, so the symbol grid cannot drift from the ABI it must satisfy. CI regenerates
-and diffs.
+and diffs — `make shim-check` / `cmake --build <dir> --target shim-check`, i.e.
+`shim/gen_shim.py --check`, wired up 2026-09-10 (`bd kju`).
 
 ---
 

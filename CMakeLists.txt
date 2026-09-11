@@ -475,3 +475,48 @@ add_custom_target(lint
     COMMENT "check_loc.sh + check_cites.sh: the 300-line and citation guards"
     VERBATIM
 )
+
+## ---------------------------------------------------------------------------
+## The shim drift gate (`bd kju`). Also reachable from the repo root as
+## `make shim-check`, and part of `make test`; both spellings run the same
+## command.
+##
+## PRD §14 and CLAUDE.md's Key Prohibitions both say the shim is GENERATED from
+## CQ_lang's own `opcode_table.yaml` — never hand-written, never forked — so the
+## symbol grid cannot drift from the frozen ABI it must satisfy. `--check` has
+## existed in `shim/gen_shim.py` since Step 22 and until now no target, no ctest
+## entry and no workflow invoked it, so nothing enforced that claim.
+##
+## `--check` IS THE CHECK, NOT AN APPROXIMATION OF ONE. It re-expands the pinned
+## yaml in memory and compares the FULL TEXT of every file it would write against
+## `shim/generated/*.gen.c`, then reports any `*.gen.c` on disk the grid no longer
+## names — which is exactly what regenerating into a scratch directory and running
+## `diff -r` would report, minus the temporary tree and minus the hazard that a
+## regeneration run with the wrong `--output-dir` overwrites the tracked files.
+## It writes nothing.
+##
+## IT IS A TARGET AND NOT A ctest ENTRY, on the same reasoning `lint` is: it
+## reads the SOURCE TREE rather than anything this build produced, and a ctest
+## entry for it would be PyYAML-gated like `test_gen_shim` — i.e. it would SKIP
+## on the one host where drift is most likely to arrive unnoticed. A drift gate
+## that skips is a drift gate that is off, so the interpreter is resolved here
+## only as a convenience and a missing one is a failed build step, loudly.
+## ---------------------------------------------------------------------------
+
+find_program(CQOPS_SHIM_CHECK_PY NAMES python3)
+if(NOT CQOPS_SHIM_CHECK_PY)
+    ## DELIBERATELY NOT a configure error and DELIBERATELY NOT a skip: the target
+    ## exists on every host and fails when built, naming what is missing.
+    set(CQOPS_SHIM_CHECK_PY python3)
+    message(STATUS "cqops: no python3 at configure time — the `shim-check` "
+                   "target will resolve it at build time and FAIL if it is "
+                   "still absent (it never skips)")
+endif()
+
+add_custom_target(shim-check
+    COMMAND "${CQOPS_SHIM_CHECK_PY}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/shim/gen_shim.py" --check
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    COMMENT "gen_shim.py --check: the generated shim against third_party/cq_lang/opcode_table.yaml"
+    VERBATIM
+)

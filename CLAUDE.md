@@ -684,11 +684,20 @@ cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
 ctest --test-dir build-debug   -j 8 --output-on-failure
 ctest --test-dir build-release -j 8 --output-on-failure
 
-# The 300-line guard (Rule 12). Both spellings run tools/check_loc.sh.
+# The lint guards (Rule 12 + bd 0a7). Both spellings run tools/check_loc.sh AND
+# tools/check_cites.sh — this comment said "run tools/check_loc.sh", singular,
+# until 2026-09-10 (bd kju), which was true only before the citation guard landed.
 make lint
 cmake --build build-debug --target lint
 
-# Everything at once: lint, then both configurations.
+# The shim drift gate (bd kju): regenerate the 2479-symbol grid from the pinned
+# third_party/cq_lang/opcode_table.yaml and diff it against shim/generated/*.gen.c.
+# `gen_shim.py --check` writes nothing, and HARD-FAILS rather than skipping when
+# python3 or PyYAML is missing — a drift gate that skips is one that is off.
+make shim-check
+cmake --build build-debug --target shim-check
+
+# Everything at once: lint, shim-check, then both configurations.
 make test
 
 # Regenerate the L4 gate-count goldens (Step 10 onward). AN ENVIRONMENT
@@ -856,10 +865,37 @@ the identical total.
 `src/` stays PRIVATE on the `cqops` target itself; the exception lives on the test side
 rather than widening the library.
 
-CI is **in scope** for this project (unlike CQ_lang): it runs `check_loc.sh` and
-regenerates-and-diffs the shim from `opcode_table.yaml`. **Not wired up yet** — this
-repo has no git remote, so there is nowhere for a workflow to run. Filed as its own
-issue; `make test` is the local stand-in (lint, then both configurations).
+CI is **in scope** for this project (unlike CQ_lang) and is **WIRED UP since 2026-09-10
+(`bd kju`)**: `.github/workflows/ci.yml`, `ubuntu-latest`, **clang only** — one compiler
+by the maintainer's decision (2026-09-10): this tree has only ever been built by clang,
+and its one compiler-aware line, `tests/test_skeleton.c`'s `__has_feature` sanitizer
+cross-check, is a clang spelling that gcc 13 does not define. A second compiler remains a
+one-line matrix entry plus that probe's fallback. This paragraph read **"Not wired up yet
+— this repo has no git remote, so there is nowhere for a workflow to run"** until that
+date, and `git remote -v` gaining an `origin` on GitHub is the whole of what changed.
+`make test` is still the local spelling of the same sequence: `make lint`, `make
+shim-check`, then both configurations built and `ctest`ed.
+
+**CI HARDENS THREE `AUTO` KNOBS AND THAT IS THE POINT OF IT.** It configures Debug with
+`-DCQOPS_SANITIZERS=ON -DCQOPS_LEAK_CHECK=ON -DCQOPS_PYTHON=ON`, because all three degrade
+*quietly*: AUTO drops a sanitizer whose runtime does not run, LSan is an `ASAN_OPTIONS`
+setting whose absence changes no green run, and a `python3` without PyYAML leaves M27's
+two suites **unregistered**. On the machine whose report people trust those must be hard
+configure errors instead. It also passes `-DCMAKE_C_COMPILER=`, so
+`cmake/CqopsDebugToolchain.cmake` does not probe and switch away from the compiler the job
+is named for. Release gets none of it: it pins gate counts and has no use for a sanitizer
+runtime (risk R5).
+
+**AND IT ASSERTS WHAT IS *NOT* REGISTERED.** L6, L7 §12(1) and the two QEC-sink suites are
+opt-in behind `-DCQOPS_CQLANG_DIR=` / `-DCQOPS_QEC_DIR=`, which CI cannot supply, so the
+workflow pins their four "not registered" configure STATUS lines and greps `ctest -N` for
+their absence — because a change that dropped a registration outright would otherwise be
+invisible on a runner where the suite never ran. **The absence check anchors the test name at
+`.` or end-of-line**: M25b's `test_sink_qec_angle` is registered *unconditionally*, so a bare
+`grep -F test_sink_qec` matches a suite that SHOULD be there, measured while writing the file.
+**No lint file COUNT is asserted** — `check_loc.sh` walks the filesystem and `tools/qtg/` is
+gitignored, so the figure is box-local (`bd a9e`); CI printing a different count is not a
+regression.
 
 **L7 IS THREE ENTRIES IN THREE PLACES, AND THAT IS PRD §15 D22 RATHER THAN A LAYOUT
 CHOICE.** `test_grover` runs everywhere; `test_grover_qec` needs `-DCQOPS_QEC_DIR=`;

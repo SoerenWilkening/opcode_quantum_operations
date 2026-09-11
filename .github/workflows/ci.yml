@@ -1,0 +1,265 @@
+# CI for libcqops — `bd kju`.
+#
+# WHAT THIS IS. CLAUDE.md's "Build & Test" and IMPLEMENTATION_PLAN §2.3 have said
+# since Step 1 that CI is IN SCOPE for this project (unlike CQ_lang) and that it
+# runs the lint guards and regenerates-and-diffs the shim from CQ_lang's frozen
+# `opcode_table.yaml`. It was not wired up because `git remote -v` was empty and
+# there was nowhere for a workflow to run; there is now.
+#
+# `make test` IS THE SPEC — lint, then both configurations configured and built
+# with -Werror, then ctest under both (Rule 17: a count pinned only in Debug is
+# not pinned). This workflow runs the same things and HARDENS three of them,
+# because a CI green that quietly covered less than it appears to is exactly the
+# failure `bd kju` was filed against:
+#
+#   CQOPS_SANITIZERS=ON    not AUTO. AUTO drops a sanitizer whose runtime does
+#                          not run and carries on with a warning — correct for a
+#                          dev box (the Apple clang 17 SIGILL of `bd 6wg`),
+#                          wrong for the machine whose report people trust.
+#   CQOPS_LEAK_CHECK=ON    same argument one layer down (`bd kfi`): LSan is an
+#                          ASAN_OPTIONS setting rather than a -fsanitize= flag,
+#                          so its absence changes nothing about any green run.
+#   CQOPS_PYTHON=ON        M27's two generator suites are PyYAML-gated and are
+#                          NOT REGISTERED without it (cmake/CqopsPython.cmake).
+#                          On CI a missing interpreter must be a red configure,
+#                          not a test count two smaller than yesterday's.
+#
+# WHAT IT DELIBERATELY DOES NOT RUN. L6, L7 §12(1) and the QEC sink are opt-in
+# behind -DCQOPS_CQLANG_DIR= and -DCQOPS_QEC_DIR=; this repository neither pins
+# nor can build CQ_lang or the QEC library, so a CI job cannot make those links
+# and must not look as though it did. Their ABSENCE is asserted rather than
+# assumed — see the "opt-in suites" step.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: ${{ matrix.cc }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      # Inert at one entry, and kept so that adding a second really is one line.
+      # With two, the default (fail-fast: true) would let the first red hide
+      # whether the other is red for the same reason or a different one.
+      fail-fast: false
+      matrix:
+        # CLANG ONLY — the user's decision, 2026-09-10 (`bd kju`).
+        #
+        # The library has no OS or compiler dependency (C11, libc, -Werror), so a
+        # second compiler buys a second -Werror opinion and nothing else. What it
+        # would also buy is a red: the one compiler-aware line in the tree is
+        # test-side, and it is not portable. tests/test_skeleton.c's
+        # `sanitizer_coverage_is_what_the_build_claims` reads
+        # __has_feature(address_sanitizer) / __has_feature(undefined_behavior_sanitizer)
+        # and falls back to 0 where __has_feature is undefined — which is gcc 13,
+        # Ubuntu 24.04's default — so a gcc Debug job fails there on its first run
+        # with CQ_ASAN_LIVE == 0 against CQOPS_BUILD_ASAN == 1. This tree has only
+        # ever been compiled by clang (Apple clang 17, Homebrew clang 22).
+        #
+        # A gcc entry is still one line here, plus that probe's fallback:
+        # __SANITIZE_ADDRESS__ for ASan, and nothing for UBSan, which gcc gives no
+        # macro for at all.
+        cc: [clang]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ninja, to match the generator `make configure` probes for and picks on a
+      # box that has it. python3-yaml is the DISTRO package on purpose: pip on
+      # Ubuntu 24.04 refuses to install into the system interpreter (PEP 668),
+      # and CQOPS_PYTHON=ON below turns a missing PyYAML into a hard configure
+      # error rather than two silently unregistered suites.
+      - name: Toolchain, ninja, PyYAML
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3-yaml ${{ matrix.cc }}
+          ${{ matrix.cc }} --version
+          cmake --version | head -1
+          ninja --version
+          python3 -c 'import sys, yaml; print("python", sys.version.split()[0], "PyYAML", yaml.__version__)'
+
+      # LeakSanitizer forks a tracer and ptraces its own parent. Ubuntu ships
+      # kernel.yama.ptrace_scope=1, under which that is permitted only because
+      # the sanitizer runtime calls prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY)
+      # first — so this is belt and braces, not the thing that makes LSan work,
+      # and GitHub-hosted ubuntu jobs run on the VM rather than in a container
+      # (a container would additionally need CAP_SYS_PTRACE). It is here because
+      # CQOPS_LEAK_CHECK=ON turns a runtime that cannot stop the world into a
+      # hard CONFIGURE error, which would present as "libcqops does not
+      # configure" rather than as "this runner tightened ptrace".
+      - name: Let LeakSanitizer stop the world
+        run: |
+          set -euo pipefail
+          echo "ptrace_scope before: $(cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || echo 'n/a')"
+          sudo sysctl -w kernel.yama.ptrace_scope=0 || true
+
+      # The two guards `make lint` runs, in that order and by that name so the
+      # local and the CI spelling cannot drift.
+      #
+      # NO COUNT IS ASSERTED HERE. check_loc.sh walks the FILESYSTEM, not the git
+      # index, and tools/qtg/ is gitignored, so its file count is box-local:
+      # measured 2026-09-10 on the dev box it printed 203 and then 204 within one
+      # session (`git ls-files` over the same roots and extensions says 194), and
+      # a fresh CI checkout will differ again. The limit it enforces is per-file
+      # and is unaffected by any of that.
+      - name: make lint
+        run: make lint
+
+      # The shim drift gate. `gen_shim.py --check` re-expands the pinned
+      # opcode_table.yaml in memory and compares the FULL TEXT of every file it
+      # would write against shim/generated/*.gen.c, then reports any *.gen.c on
+      # disk the grid no longer names. It writes nothing.
+      - name: make shim-check
+        run: make shim-check
+
+      # ---------------------------------------------------------------------
+      # Debug — the invariant checks and the sanitizers.
+      # ---------------------------------------------------------------------
+      #
+      # -DCMAKE_C_COMPILER= is what makes the matrix mean anything:
+      # cmake/CqopsDebugToolchain.cmake otherwise probes for an ASan-capable
+      # compiler and may switch away from the one this job is named for. Naming
+      # one disables that search in silence, which is the module's documented
+      # contract ("an explicit choice is always respected").
+      - name: Configure Debug (sanitizers REQUIRED, not AUTO)
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-ci-debug -G Ninja \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+                -DCQOPS_SANITIZERS=ON \
+                -DCQOPS_LEAK_CHECK=ON \
+                -DCQOPS_PYTHON=ON \
+                2>&1 | tee configure-debug.log
+
+      # THE OPT-IN SUITES ARE ABSENT, AND CMAKE SAYS SO — assert that it did.
+      #
+      # This job cannot build CQ_lang or the QEC library, so L6, L7 §12(1) and
+      # the two QEC-sink suites are not registered here. That is correct and is
+      # not what this step is for. It is for the OTHER failure: a future change
+      # that drops one of these registrations outright, or inverts a guard so it
+      # can never fire, would be invisible on a runner where the suite never ran
+      # anyway. Pinning the four STATUS lines makes the shape of the opt-in part
+      # of what CI checks, so "not registered here" stays a decision with a
+      # reason printed next to it rather than an accident.
+      - name: The opt-in suites are absent, and the configure log says so
+        run: |
+          set -euo pipefail
+          expected=(
+            "qec sink (M25, Step 26) not enabled"
+            "L6 (Step 24) not registered"
+            "L7's T-count arm not registered"
+            "Grover through cqc and link it against this archive"
+          )
+          fail=0
+          for s in "${expected[@]}"; do
+              if ! grep -qF -- "$s" configure-debug.log; then
+                  echo "CI: expected configure STATUS line MISSING: $s"
+                  fail=1
+              fi
+          done
+          exit "$fail"
+
+      - name: Build Debug
+        run: cmake --build build-ci-debug -j "$(nproc)"
+
+      # WHAT IS REGISTERED IS PART OF WHAT A GREEN RUN CLAIMS (Rule 17).
+      #
+      #   present: the two PyYAML-gated generator suites — this is what
+      #            CQOPS_PYTHON=ON bought, checked at the far end rather than
+      #            trusted; and test_lsan_negative, which exists only when the
+      #            build claims leak detection and is the only thing in the tree
+      #            that goes red when detect_leaks quietly stops being set.
+      #   absent:  the four opt-in entries. A job that registered one would be
+      #            claiming a link it never made.
+      - name: ctest -N (Debug) — registrations
+        run: |
+          set -euo pipefail
+          ctest --test-dir build-ci-debug -N | tee ctest-N-debug.txt | tail -3
+          # THE NAME MUST END AT A `.` OR AT END OF LINE, AND A BARE SUBSTRING IS
+          # WRONG HERE — measured 2026-09-10 while validating this file. M25b's
+          # `test_sink_qec_angle` is registered UNCONDITIONALLY (it depends on
+          # <math.h> and nothing else, so it is built and tested on a box with no
+          # QEC library), so `grep -F test_sink_qec` matches a suite that SHOULD
+          # be there and would have failed this job on its first run. A death
+          # binary's cases are `<binary>.<case>`, which is why `.` is the other
+          # accepted terminator and why `test_sink_qec_death` is listed by name.
+          pin='^ *Test +#[0-9]+: *'
+          fail=0
+          for t in test_gen_shim test_gen_bodies test_lsan_negative; do
+              if ! grep -qE "${pin}${t}(\.|\$)" ctest-N-debug.txt; then
+                  echo "CI: $t is NOT registered in Debug"; fail=1
+              fi
+          done
+          for t in l6_cqlang_fixtures l7_grover_cqlang test_grover_qec \
+                   test_sink_qec test_sink_qec_death; do
+              if grep -qE "${pin}${t}(\.|\$)" ctest-N-debug.txt; then
+                  echo "CI: $t IS registered — this job cannot have made that link"; fail=1
+              fi
+          done
+          exit "$fail"
+
+      - name: ctest Debug
+        run: ctest --test-dir build-ci-debug -j "$(nproc)" --output-on-failure
+
+      # ---------------------------------------------------------------------
+      # Release — no sanitizer flags, and that is deliberate rather than an
+      # omission. Release is what gets its gate counts pinned (risk R5), it has
+      # no use for a sanitizer runtime, and CQOPS_SANITIZERS is consulted only
+      # under CMAKE_BUILD_TYPE=Debug, so passing it here would be a no-op that
+      # read like a claim.
+      # ---------------------------------------------------------------------
+      - name: Configure Release
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-ci-release -G Ninja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+                -DCQOPS_PYTHON=ON \
+                2>&1 | tee configure-release.log
+
+      - name: Build Release
+        run: cmake --build build-ci-release -j "$(nproc)"
+
+      # Same claim as the Debug step, plus one Release owns on its own:
+      # test_lsan_negative must NOT be here. Its registration is conditional on
+      # the build claiming leak detection, and a Release build claims none — a
+      # WILL_FAIL binary registered without LSan would report a failure that is
+      # a correct description of a configuration we deliberately support.
+      - name: ctest -N (Release) — registrations
+        run: |
+          set -euo pipefail
+          ctest --test-dir build-ci-release -N | tee ctest-N-release.txt | tail -3
+          pin='^ *Test +#[0-9]+: *'
+          fail=0
+          for t in test_gen_shim test_gen_bodies; do
+              if ! grep -qE "${pin}${t}(\.|\$)" ctest-N-release.txt; then
+                  echo "CI: $t is NOT registered in Release"; fail=1
+              fi
+          done
+          for t in test_lsan_negative l6_cqlang_fixtures l7_grover_cqlang \
+                   test_grover_qec test_sink_qec test_sink_qec_death; do
+              if grep -qE "${pin}${t}(\.|\$)" ctest-N-release.txt; then
+                  echo "CI: $t IS registered in Release, and must not be"; fail=1
+              fi
+          done
+          exit "$fail"
+
+      - name: ctest Release
+        run: ctest --test-dir build-ci-release -j "$(nproc)" --output-on-failure

@@ -470,88 +470,13 @@ CQ_TEST(the_sandwich_takes_its_scratch_and_gives_it_back)
     }
 }
 
-/* ---- L1's oracle, crossed against a model that shares nothing with it. --- */
-
-/* THE FIRST VERSION OF THIS CASE COULD NOT FAIL, and the reason is worth
- * keeping because it is the shape this project has now shipped three times.
- * It crossed cq_ref_w_add against a one-word `(a + b) & cq_ref_mask(W)` at
- * widths 1..64 and asserted `.hi == 0`. Both halves are structurally vacuous
- * there: refmodel.c's `hi_mask(W)` returns 0 for every W <= 64, so `.hi` is
- * zeroed whatever the carry does, and `lo_mask` and `cq_ref_mask` are provably
- * the same function on 1..64, so the `.lo` comparison reduces to
- * `(a+b) & m == (a+b) & m`. Deleting the cross-seam carry term from
- * cq_ref_w_add left it green. TWO MODELS THAT SHARE AN IDIOM CROSS-CHECK
- * NOTHING; the one-word pair has been removed rather than kept as decoration.
- *
- * What replaces it is a BIT-SERIAL RIPPLE, and it is deliberately NOT in
- * refmodel.c. L1's oracle must not share the kernel's algorithm — the kernel
- * IS a ripple-carry circuit — so cq_ref_w_add stays word arithmetic and this
- * ripple lives here, as the cross-check only. Between them the two share no
- * operation: one propagates a carry bit by bit, the other adds two 64-bit
- * words and tests for wrap.
- *
- * AND IT SPANS THE SEAM. Widths 63, 64, 65, 80, 100, 127 and 128 put the carry
- * on both sides of bit 64, which is the one thing the old case could not
- * reach and the only place cq_ref_w_add's `(uint64_t)(lo < a.lo)` term does
- * any work. Verified falsifiable: deleting that term turns this case red. */
-static cq_ref_w ripple_ref(cq_ref_w a, cq_ref_w b, int W, int invert_b)
-{
-    cq_ref_w r = cq_ref_w_zero();
-    int carry = invert_b;                  /* the +1 of two's complement */
-
-    for (int i = 0; i < W; i++) {
-        int x = cq_ref_w_bit(a, i);
-        int y = cq_ref_w_bit(b, i) ^ invert_b;
-
-        if (x ^ y ^ carry) r = cq_ref_w_or(r, cq_ref_w_setbit(i));
-        carry = (x & y) | (carry & (x ^ y));
-    }
-    return r;
-}
-
-CQ_TEST(l1s_oracle_agrees_with_an_independent_bit_serial_model)
-{
-    static const int WS[] = { 1, 2, 3, 8, 32, 63, 64, 65, 80, 100, 127, 128 };
-    cq_bk_rng rng;
-
-    cq_bk_rng_init(&rng, 0xADDEDull);
-
-    for (size_t i = 0; i < sizeof WS / sizeof WS[0]; i++) {
-        int W = WS[i];
-        cq_ref_w ones = cq_ref_w_ones(W);
-        cq_ref_w zero = cq_ref_w_zero();
-
-        for (int s = 0; s < 64; s++) {
-            /* The corners first — all-ones + all-ones is the carry chain at
-             * full length, which is where a dropped seam carry shows. */
-            cq_ref_w A = (s < 4) ? ((s & 1) ? ones : zero)
-                                 : cq_ref_w_make(cq_bk_rng_next(&rng),
-                                                 cq_bk_rng_next(&rng), W);
-            cq_ref_w B = (s < 4) ? ((s & 2) ? ones : zero)
-                                 : cq_ref_w_make(cq_bk_rng_next(&rng),
-                                                 cq_bk_rng_next(&rng), W);
-            cq_ref_w got, want;
-
-            got  = cq_ref_w_add(A, B, W);
-            want = ripple_ref(A, B, W, 0);
-            if (!cq_ref_w_eq(got, want))
-                cq_h_fail(__FILE__, __LINE__,
-                          "add W=%d: word model 0x%llx%016llx, ripple "
-                          "0x%llx%016llx", W,
-                          (unsigned long long)got.hi,  (unsigned long long)got.lo,
-                          (unsigned long long)want.hi, (unsigned long long)want.lo);
-
-            got  = cq_ref_w_sub(A, B, W);
-            want = ripple_ref(A, B, W, 1);
-            if (!cq_ref_w_eq(got, want))
-                cq_h_fail(__FILE__, __LINE__,
-                          "sub W=%d: word model 0x%llx%016llx, ripple "
-                          "0x%llx%016llx", W,
-                          (unsigned long long)got.hi,  (unsigned long long)got.lo,
-                          (unsigned long long)want.hi, (unsigned long long)want.lo);
-        }
-    }
-}
+/* THE REFERENCE MODEL'S OWN CROSS-CHECK — no circuit, no qubit, no kernel.
+ * Split out on that seam when this file reached the Rule 12 limit (`bd iwn`,
+ * 2026-09-10), which is the right cut and the one test_kernel_mul.c and
+ * test_kernel_divrem.c already took: everything above tests src/kernels/add.c,
+ * and l1s_oracle tests refmodel.c's two-word cq_ref_w_add / cq_ref_w_sub
+ * against a bit-serial ripple that shares no operation with them. */
+#include "test_kernel_add_refmodel.inc"
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(k6_add_sweep),
