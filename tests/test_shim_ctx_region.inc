@@ -15,7 +15,8 @@
  * wherever the line count happened to fall.
  *
  * Included by tests/test_shim_ctx.c. It is out of check_loc.sh's reach because
- * that script's `find` matches `*.c`, `*.h` and `*.py` only (tools/check_loc.sh:83)
+ * that script's `find` matches `*.c`, `*.h` and `*.py` only (its `find $roots`
+ * line — the bare `:83` written here had already rotted to `n++`, bd a9e)
  * — an EXTENSION rule, not a translation-unit rule, which is what makes "move
  * the big table into an .inc" a real escape hatch rather than a rename that
  * dodges the guard.

@@ -32,7 +32,10 @@
  *
  *   1. ONE GATE PER STEP (ckd.14a). The reverse pass re-calls compute with the
  *      same index, so a multi-gate step must be an involution and generally is
- *      not — K06.md:566-586, K10.md:153-171.
+ *      not — K06 §5, "D1 — CRITICAL: the sandwich step function must be ONE
+ *      GATE PER STEP." (K06.md:569-589 @ 7cca77a) and K10 §2.0, "A driver
+ *      constraint this kernel forces — ONE GATE PER STEP"
+ *      (K10.md:174-196 @ 7cca77a).
  *   2. I6(a), target side. Every compute-half gate target is a scratch bit, so
  *      no source can be materialised behind the driver's back. Enforced by
  *      emit.h's `const cq_bit *` controls and by the extent armed below.

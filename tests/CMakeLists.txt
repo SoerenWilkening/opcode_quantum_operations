@@ -581,6 +581,7 @@ add_cqops_death_test(test_reg_death CASES
     copy_between_mismatched_widths
     d7a_out_aliases_a_source
     operand_use_after_free
+    a_measured_rail_as_the_result_handle
     i2_double_owned
     i2_self_double_owned
     i2_measured_rail_shares_a_qubit_with_a_live_one
@@ -679,6 +680,30 @@ set_tests_properties(test_reg_death.an_unrecognised_free_abort_spelling_is_a_har
 set_tests_properties(test_reg_death.release_of_a_convicted_qubit_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "STRANDED;strand of;free of a rail;UndefinedBehaviorSanitizer")
+
+## THE OPERAND CHECK'S TWO DOORS (bd tgx, 2026-09-11). cq_reg_check_operands
+## tested BOTH slots for liveness until this date, which refused a MEASURED rail
+## read as a source -- one line of CQ_lang @ 0c7380c does exactly that and the
+## fixture aborted at L6. The source slot now tests READABILITY (live or
+## measured) and `out` still tests liveness, so the two failures these cases
+## provoke are ONE FUNCTION APART and a widening that took both at once would
+## leave both green without a discriminator.
+##
+## EACH LIST NAMES THE OTHER SLOT'S STRING AND reg.c's OWN DOORS. The tombstone
+## case must be reg_check's "a freed rail (a tombstone)" and NOT cq_reg_cbits's
+## "use of a freed handle (tombstone)" -- reg.c would print that one a few
+## statements later through the shim, which is why the two strings were made
+## disjoint rather than shared. The measured-`out` case must be reg_check's own
+## refusal and not cq_reg_bits's "write access to a rail that is not live",
+## which is the masking layer that makes the shim-level twin unable to see a
+## widened `out` slot at all.
+set_tests_properties(test_reg_death.operand_use_after_free
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;use of a freed handle;write access to a rail;classical token;D7a;not a live rail")
+
+set_tests_properties(test_reg_death.a_measured_rail_as_the_result_handle
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;write access to a rail;a source handle;use of a freed handle;classical token;D7a")
 
 ## M08 and M09, Step 8. Everything M08 guards is a hard error in BOTH
 ## configurations — a region disposed with a live qubit in it is a leaked

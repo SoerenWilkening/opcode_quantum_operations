@@ -21,6 +21,15 @@
  * one; here a narrower sweep hides a wider one, and prints the same shape of
  * summary line either way.
  *
+ * ⚠ EVERYTHING ABOVE THIS LINE IS HISTORY, NOT THIS FILE'S BEHAVIOUR, and it is
+ * flagged HERE rather than only in the block above the first case (2026-09-11,
+ * bd aei) because a false governing paragraph mis-pins every reader who stops
+ * at it. The bespoke driver went on 2026-08-20 and the exhaustion on
+ * 2026-08-21: every width now gets cq_kd_samples() cases — a small constant,
+ * default 32 — drawn jointly over masks and values. The paragraphs are kept
+ * because the cq_kd_case2 trap they describe is real and is one edit away from
+ * returning; what changed is the driver, not the danger.
+ *
  * THE ARM SWAP IS THE OTHER THING NO COUNT CAN SEE. `mux(c, t, f)` and
  * `mux(c, f, t)` emit the identical tuple at every width and every mask —
  * K10's four gates are symmetric in `t` and `f` up to which one reaches `r`
@@ -111,7 +120,10 @@ static const cq_kd_spec MUX = { "mux", NULL, NULL, mux_shape, call_mux, ref_mux 
  * selected is ~5e-10, and the ARM SWAP the header calls the fault no count can
  * see is caught by any case that selects the arm the kernel wired wrong. */
 
-CQ_TEST(k10_sweep_exhaustive_widths)
+/* Named k10_sweep_exhaustive_widths until 2026-09-11 (bd aei). It never ran an
+ * exhaustive case after 2026-08-21, and a case NAME asserting coverage is worse
+ * than a comment asserting it: the name is printed by every run. */
+CQ_TEST(k10_sweep_narrow_widths)
 {
     for (int W = 1; W <= 5; W++) cq_kd_sample_at(&MUX, W);
 }
@@ -329,7 +341,7 @@ CQ_TEST(the_scratch_is_2w_and_it_all_comes_back)
 #include "test_kernel_mux_dispatch.inc"
 
 CQ_TEST_MAIN_ARGV(
-    CQ_CASE(k10_sweep_exhaustive_widths),
+    CQ_CASE(k10_sweep_narrow_widths),
     CQ_CASE(controlled),
     CQ_CASE(k10_sweep_wide_widths),
     CQ_CASE(l4_goldens),

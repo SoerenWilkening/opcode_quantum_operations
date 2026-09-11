@@ -71,7 +71,8 @@ uint32_t cq_bk_fixed_pairs(uint32_t W, cq_bk_pair *out, uint32_t cap);
  * not a test case. */
 void cq_bk_constrain(cq_bk_pair *p, const cq_ref_w *classical, int n_src);
 
-/* Deterministic sampling for the widths where exhaustion is out of reach.
+/* Deterministic sampling. It was added for the widths where exhaustion was out
+ * of reach; since 2026-08-21 it drives every width (bd aei).
  * xorshift64*, seeded per call site, so a failure is reproducible from the
  * seed printed with it — a time-seeded PRNG would make a red run unrepeatable,
  * which is the one thing a random test must never be. */

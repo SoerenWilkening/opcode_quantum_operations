@@ -45,6 +45,12 @@ static void cq_regchk_die(const char *what, long a, long b)
 void cq_reg_check_operands(const cq_reg_table *t, int32_t out,
                            const int32_t *srcs, uint32_t n)
 {
+    /* THE TWO SLOTS OBEY DIFFERENT PREDICATES, AND THE ASYMMETRY IS THE WHOLE
+     * OF THIS FUNCTION'S HANDLE VALIDATION (reg.h states the contract and why).
+     * `out` is WRITTEN, so it must be LIVE — a measured rail refused here is
+     * measurement's terminality (PRD §7). A source is READ, so it need only be
+     * READABLE: LIVE **or** MEASURED. */
+
     /* A TOKEN IS REFUSED BY NAME, before the liveness test would call it "not
      * a live rail" — true, and the wrong diagnosis (PRD §15 D23, plan §0.5). */
     if (out != CQ_REG_NONE && cq_reg_is_token(t, out))
@@ -54,12 +60,38 @@ void cq_reg_check_operands(const cq_reg_table *t, int32_t out,
         cq_regchk_die("operand check: the result handle is not a live rail", out, 0);
 
     for (uint32_t i = 0; i < n; i++) {
-        if (cq_reg_is_token(t, srcs[i]))
-            cq_regchk_die("operand check: a source handle is a classical token "
-                          "(a tape or qram handle), not a rail", srcs[i], (long)i);
-        if (!cq_reg_is_live(t, srcs[i]))
-            cq_regchk_die("operand check: a source handle is not a live rail",
-                          srcs[i], (long)i);
+        /* ONE RESOLVE PER SOURCE, THEN SORT THE STATE. `cq_reg_state` goes
+         * through reg.c's `cq_reg_slot`, so an out-of-range handle and a
+         * poisoned slot are refused THERE and BY NAME ("handle out of range")
+         * — this loop carries no second copy of a guard that already exists
+         * one layer down, which is the masking shape plan §0 records. So this
+         * loop only has to sort the four states reg.h's enum defines. */
+        const int st = cq_reg_state(t, srcs[i]);
+
+        /* THE PREDICATE IS POSITIVE AND THE DIAGNOSIS IS NESTED INSIDE IT, which
+         * is not a style choice: written as two flat refusals the readable set
+         * would be whatever is left over, so deleting the TOKEN clause would let
+         * a token through to be caught by cq_reg_cbits one layer down with a
+         * message no negative pin forbids — a guard masked by a later copy of
+         * itself, and MEASURED at the first shape of this fix. Nested, a deleted
+         * clause falls to the other message instead of falling through, and both
+         * death cases see it. The tail is also fail-closed for a FIFTH slot
+         * state: it would be REFUSED (mis-named as a tombstone) rather than
+         * silently admitted as readable. */
+        if (st != CQ_SLOT_LIVE && st != CQ_SLOT_MEASURED) {
+            if (st == CQ_SLOT_TOKEN)
+                cq_regchk_die("operand check: a source handle is a classical token "
+                              "(a tape or qram handle), not a rail", srcs[i], (long)i);
+            /* NAMED AS A TOMBSTONE, NOT AS "not a live rail", because that is
+             * what failed: a use-after-free is the fault this clause exists for.
+             * The string is deliberately NOT reg.c's own "use of a freed handle
+             * (tombstone)" — `cq_reg_cbits` prints that one a few statements
+             * later in shim/cq_template_impl.c, so two DISJOINT strings are what
+             * let a death case pin WHICH layer spoke rather than merely that one
+             * did. */
+            cq_regchk_die("operand check: a source handle is a freed rail "
+                          "(a tombstone)", srcs[i], (long)i);
+        }
         /* D7a only. Source-source aliasing is D7b and is LEGAL — CQ_lang ships
          * ten integer-surface fixture lines that do it. See reg.h. */
         if (out != CQ_REG_NONE && srcs[i] == out)

@@ -137,14 +137,24 @@ static uint32_t scratch_of(int prim, int W)
 /* WHAT EACH PREDICATE ACTUALLY GETS, said here and printed by every run,
  * because a cap nobody can see reads as coverage.
  *
- * All ten get the FULL CROSS PRODUCT at W <= 5 — every value pair against
- * every mask pair, which is exhaustive over the space and not over a diagonal
- * of it — plus sampling at each shipped width including i80. The three
- * PRIMITIVES additionally get cq_kd_sweep's W=8 stage: structured arithmetic
- * corners plus seeded sampling, crossed with every mask pair. That stage used
- * to be value-EXHAUSTIVE and was 63% of this suite for no coverage — see
- * kernelsweep.c:structured_pairs, and note the plan §4 row that asked for it
- * was corrected rather than quietly narrowed.
+ * All ten get cq_kd_samples() cases — a small constant, default 32, nothing
+ * scaling in W — at every width on their ladder: W ∈ {1..5} one at a time, then
+ * each shipped width including i80, with the three PRIMITIVES taking the
+ * standard ladder through cq_kd_sweep instead. Each case draws a mask pair AND
+ * a value pair jointly from one seeded RNG; the all-classical pair (which IS
+ * L5), the all-quantum pair (which is what L4 pins) and the four value corners
+ * are forced INSIDE the budget. The WIDTHS are enumerated, and nothing else is.
+ *
+ * THIS PARAGRAPH READ "All ten get the FULL CROSS PRODUCT at W <= 5 — every
+ * value pair against every mask pair, which is exhaustive over the space and
+ * not over a diagonal of it ... The three PRIMITIVES additionally get
+ * cq_kd_sweep's W=8 stage: structured arithmetic corners plus seeded sampling"
+ * UNTIL 2026-09-11 (bd aei). It was accurate when written; 2026-08-21 replaced
+ * both the product and the W=8 stage with the one constant budget, and deleted
+ * kernelsweep.c's structured_pairs — which this paragraph went on citing for
+ * three weeks. The 63%-of-this-suite figure it quoted is why W=8's value
+ * exhaustion went first, on 2026-08-16; IMPLEMENTATION_PLAN §4's L1 row keeps
+ * it, and kernelsweep.c's header keeps the measurement that retired the rest.
  *
  * The seven derived predicates are the SAME CIRCUIT as their primitive: the
  * same step function over the same scratch, differing only in which operand
@@ -157,13 +167,13 @@ static void sweep_pred(const cmp_row *r)
     if (r->primitive) {
         cq_kd_sweep(&r->spec);                     /* {1..5} x {8} x {16,32,64} */
     } else {
-        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(&r->spec, W, 1);
-        cq_kd_sweep_at(&r->spec, 8,  0);
-        cq_kd_sweep_at(&r->spec, 16, 0);
-        cq_kd_sweep_at(&r->spec, 32, 0);
-        cq_kd_sweep_at(&r->spec, 64, 0);
+        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(&r->spec, W);
+        cq_kd_sweep_at(&r->spec, 8);
+        cq_kd_sweep_at(&r->spec, 16);
+        cq_kd_sweep_at(&r->spec, 32);
+        cq_kd_sweep_at(&r->spec, 64);
     }
-    cq_kd_sweep_at(&r->spec, 80, 0);               /* shipped, and above 64 */
+    cq_kd_sweep_at(&r->spec, 80);               /* shipped, and above 64 */
 }
 
 CQ_TEST(k9_eq_family_sweep)
@@ -198,7 +208,7 @@ static void cmp_narrow(void)
      * necessary. Narrowing to the three primitives here would drop exactly the
      * seven rows that are hardest to see. */
     for (int i = 0; i < N_ROWS; i++)
-        for (int W = 1; W <= 4; W++) cq_kd_sweep_at(&ROWS[i].spec, W, 1);
+        for (int W = 1; W <= 4; W++) cq_kd_sweep_at(&ROWS[i].spec, W);
 }
 
 CQ_TEST(controlled)

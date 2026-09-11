@@ -244,7 +244,9 @@ static void k8_sampled(int W)
     fflush(stdout);
 }
 
-CQ_TEST(k8_exhaustive_widths)
+/* Named k8_exhaustive_widths until 2026-09-11 (bd aei) — it calls k8_sampled,
+ * which prints "SAMPLED", and has done since 2026-08-21. */
+CQ_TEST(k8_narrow_widths)
 {
     for (int W = 1; W <= 5; W++) k8_sampled(W);
 }
@@ -382,7 +384,7 @@ CQ_TEST(the_evaluated_table_in_k08_matches_what_is_emitted)
 #include "test_kernel_addacc_sandwich.inc"
 
 CQ_TEST_MAIN_ARGV(
-    CQ_CASE(k8_exhaustive_widths),
+    CQ_CASE(k8_narrow_widths),
     CQ_CASE(k8_wide_widths),
     CQ_CASE(l4_goldens),
     CQ_CASE(the_evaluated_table_in_k08_matches_what_is_emitted),

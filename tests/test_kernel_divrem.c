@@ -231,8 +231,11 @@ static void check_counts(cq_gold *g, const cq_kd_spec *k, int W, int want_q)
  * opcode_table.yaml:187-190 gives all four opcodes at `[i1,i8,i16,i32,i64,i128]`
  * with the full 15-variant grid, and docs/cqrt_census.txt:498-501 counts them
  * 6 x 15 = 90 symbols each on that basis. i80 is NOT a divrem width (yaml :85,
- * :133-135) — the mirror image of `icmp`'s fence. The exhaustive L1 widths are
- * pinned too, so every width the sweep runs is also a golden. */
+ * :133-135) — the mirror image of `icmp`'s fence. The narrow L1 sweep widths
+ * are pinned too, so every width the sweep runs is also a golden. (Read "the
+ * exhaustive L1 widths" until 2026-09-11, bd aei: since 2026-08-21 every width
+ * gets the same constant sample budget, so no width is exhaustive. The widths
+ * themselves are unchanged, which is what this row is about.) */
 CQ_TEST(l4_goldens)
 {
     static const int WS[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };

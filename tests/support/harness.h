@@ -7,8 +7,10 @@
  *
  * A failing CHECK records the failure and lets the case run on, so one run
  * reports every broken assertion in a suite rather than only the first. This
- * matters most for the exhaustive tables (L0's 159 cases, L1's masks), where
- * the shape of the failures is the diagnosis.
+ * matters most for the wide tables (L0's 159 exhaustive cases, L1's sampled
+ * mask pairs — "the exhaustive tables ... L1's masks" until 2026-09-11, bd aei;
+ * L1 has been a constant sample per width since 2026-08-21), where the shape of
+ * the failures is the diagnosis.
  *
  * The other four §2.2 support files land with the modules they need:
  * mock_sink at Step 5 (it needs M04's vtable), and refmodel / bitkinds /

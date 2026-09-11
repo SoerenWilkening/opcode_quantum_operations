@@ -251,7 +251,18 @@ static void double_free(void)
 }
 
 /* Measurement is terminal (PRD §7): 255 measures across the 239 goldens, 0
- * later freed. A measured qubit is also not |0⟩, so this free would launder. */
+ * later freed. A measured qubit is also not |0⟩, so this free would launder.
+ *
+ * AMENDED 2026-09-11 (bd tgx). The figures are kept as what was measured when
+ * this was written rather than overwritten. Re-measured over CQ_lang @
+ * 0c7380c593492f8db9ba380325ed0e4fa739e50f (tracked tree clean) and its 341
+ * goldens: 412 cqrt_measure_* calls, STILL 0 later freed — so the claim this
+ * case rests on survives the re-measure verbatim and only the counts moved.
+ * What moved is a clause this comment never made: exactly ONE measured rail is
+ * later READ, so terminality is exact for the FREE (here) and for the WRITE
+ * (write_to_a_measured_rail, a_measured_rail_as_the_result_handle) and was
+ * never a claim about the READ. reg.h's CQ_SLOT_MEASURED comment and
+ * cq_reg_check_operands carry both halves. */
 static void free_of_a_measured_rail(void)
 {
     open_ctx();
@@ -358,6 +369,34 @@ static void operand_use_after_free(void)
     CQ_EXPECT_ABORT(cq_reg_check_operands(&ctx.regs, out, s, 1));
 }
 
+/* THE WRITE DOOR, AND IT IS THE HALF THAT DID **NOT** WIDEN AT bd tgx (2026-09-11).
+ * A source slot now admits a MEASURED rail because a source is READ; `out` is
+ * WRITTEN, and measurement is terminal for writing exactly as it is for freeing
+ * (PRD §7). The two predicates are one function apart and the tempting "fix" is
+ * to widen both at once, so this is the case that goes red for it.
+ *
+ * IT CALLS cq_reg_check_operands DIRECTLY, and that is the point rather than
+ * convenience. Reached through the shim the refusal is MASKED: tpl_out resolves
+ * `out` with cq_reg_bits a few statements later and prints its own "write access
+ * to a rail that is not live", so a widened `out` slot still aborts and
+ * test_template_death.an_unc_destination_that_has_been_measured_is_a_write_refusal
+ * stays green — a later copy of a guard catching what the deleted one would have,
+ * which is this project's recorded shape for an untested guard. With M07 called
+ * on its own there is no layer below to answer, and the negative list names
+ * reg.c's write-door string so that a pass here is THIS clause and not that one. */
+static void a_measured_rail_as_the_result_handle(void)
+{
+    open_ctx();
+    int32_t m   = cq_reg_alloc_zero(&ctx.regs, 8);
+    int32_t src = cq_reg_alloc_zero(&ctx.regs, 8);
+    int32_t s[1] = { src };
+
+    cq_reg_mark_measured(&ctx.regs, m);
+    CQ_DEATH_REQUIRE(cq_reg_state(&ctx.regs, m) == CQ_SLOT_MEASURED);
+    CQ_DEATH_REQUIRE(cq_reg_is_live(&ctx.regs, src));
+    CQ_EXPECT_ABORT(cq_reg_check_operands(&ctx.regs, m, s, 1));
+}
+
 /* --- I2, by sweep. Debug-only by plan §2.1; SKIP in Release. ------------- */
 
 /* A double-owned qubit can only be built by writing a bits array directly:
@@ -458,6 +497,7 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(copy_between_mismatched_widths),
     CQ_DEATH_CASE(d7a_out_aliases_a_source),
     CQ_DEATH_CASE(operand_use_after_free),
+    CQ_DEATH_CASE(a_measured_rail_as_the_result_handle),
     CQ_DEATH_CASE(i2_double_owned),
     CQ_DEATH_CASE(i2_self_double_owned),
     CQ_DEATH_CASE(i2_measured_rail_shares_a_qubit_with_a_live_one),

@@ -80,8 +80,8 @@ static const cq_kd_spec ASHR = { "ashr", cq_kernel_ashr, NULL,
 static void sweep_shift(const cq_kd_spec *k)
 {
     cq_kd_sweep(k);
-    cq_kd_sweep_at(k, 80, 0);
-    cq_kd_sweep_at(k, 128, 0);
+    cq_kd_sweep_at(k, 80);
+    cq_kd_sweep_at(k, 128);
 }
 
 CQ_TEST(k4_shl_sweep)  { sweep_shift(&SHL);  }
@@ -102,7 +102,7 @@ static const cq_kd_spec *const SHIFTS[] = { &SHL, &LSHR, &ASHR };
 static void shift_narrow(void)
 {
     for (size_t i = 0; i < sizeof SHIFTS / sizeof SHIFTS[0]; i++)
-        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(SHIFTS[i], W, 1);
+        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(SHIFTS[i], W);
 }
 
 CQ_TEST(controlled)

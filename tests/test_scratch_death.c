@@ -13,7 +13,10 @@
  * reads `unknown`, because §3's CX rule makes poison sticky, so a literal
  * Rule-6 shadow check would fire on every legitimate kernel (bd ckd.17 —
  * closed, its unresolved half now PRD §15 D15, whose §2 measures exactly
- * this; K09.md:603, K11.md:677). The kind is the thing M08 can actually see.
+ * this; K09 §5 delta 6, "The shadow cannot prove K9's scratch clean; M08 must
+ * not rely on it." (K09.md:615 @ 7cca77a); and K11 §4, "There is no
+ * `cq_scratch_free`." (K11.md:857 @ 7cca77a)). The kind is the thing M08 can
+ * actually see.
  */
 
 #include "scratch.h"

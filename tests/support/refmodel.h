@@ -13,7 +13,10 @@
  * defines L1 as "compare shadow result against the C operator", which requires
  * a C scalar by construction. Plan §2.2 budgets 150 lines for exactly that.
  * The cap it does impose is real and bounded: W ≤ 64, which covers every width
- * L1 tests ({1,2,4,8} exhaustive, {16,32,64} sampled). An i80 or i128 kernel
+ * on L1's standard ladder ({1,2,3,4,5,8,16,32,64}, each sampled at the same
+ * constant budget — this read "({1,2,4,8} exhaustive, {16,32,64} sampled)"
+ * until 2026-09-11, bd aei, and both halves went stale, the widths on
+ * 2026-08-16 and the exhaustion on 2026-08-21). An i80 or i128 kernel
  * would need a two-word reference, and cq_ref_mask aborts rather than silently
  * truncating if anyone asks for one.
  *

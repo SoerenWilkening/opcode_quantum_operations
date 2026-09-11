@@ -3,9 +3,30 @@
 # applied to prose: enforced by `make lint`, not by discipline.
 #
 # FAILS on a citation into a LIVING document that is a bare line number. The
-# four living targets are PRD-v1.md, IMPLEMENTATION_PLAN.md, NORTH_STAR.md and
-# CLAUDE.md — the documents this repo edits every week, where a line number
-# rots in about three commits.
+# living targets are PRD-v1.md, IMPLEMENTATION_PLAN.md, NORTH_STAR.md,
+# CLAUDE.md, docs/constructions/BASELINES.md and docs/constructions/K??.md —
+# the documents this repo edits every week, where a line number rots in about
+# three commits.
+#
+# THAT SENTENCE READ "the FOUR living targets are PRD-v1.md,
+# IMPLEMENTATION_PLAN.md, NORTH_STAR.md and CLAUDE.md" until 2026-09-11
+# (bd j5v). The narrow set was never a claim that the K-docs are a PINNED class
+# like third_party/ — it was the four documents bd 0a7 happened to measure.
+#
+# THE PINNED-VS-LIVING CALL WAS MEASURED, not taken on taste, at HEAD 7cca77a:
+# `git log --oneline --since=2026-08-01 -- docs/constructions/` is 11 commits,
+# and the single 2026-09-10 commit 08dc6f3 touched TWELVE of the fifteen files
+# there at once, +928/-140 lines. Every file the widened set newly guards moved
+# in that one commit: K05 467 -> 765 lines, K10 521 -> 776, K11 990 -> 1230,
+# K06 868 -> 968, K09 716 -> 766, BASELINES 461 -> 478. A LIVING class, then.
+# third_party/ is pinned because Rule 1 forbids editing it at all; nothing of
+# the sort protects these, and a K-doc line number rots as fast as a PRD one.
+#
+# The widening found 18 bare citations in 9 files — 13 of them in src/ and
+# tests/ citing a K-doc, the same exposure one layer down from the prose. NOT
+# ONE of the 18 resolved exactly at HEAD: the three citing K06's one-gate-per-
+# step delta overlapped it, off by three lines at each end, and the other
+# fifteen landed on unrelated content in a document that had grown under them.
 #
 # Measured 2026-09-10: PRD-v1.md has taken 21 commits and grown 484 -> 2814
 # lines since 2026-08-14; the K-docs make 53 line citations into it, counted at
@@ -37,6 +58,12 @@
 # LIMIT — the ANCHORED form only: a second number written bare, as a lone
 # `:432`, has nothing in front of it to key on and reads as prose. Cite in full.
 #
+# AND THE SCAN IS LINE-BASED, so a citation whose ` @ <sha>` wraps onto the
+# NEXT source line reads as bare and IS a hit — measured 2026-09-11 (bd j5v),
+# where two freshly-converted comment citations in src/ failed exactly this way
+# on their first run. Keep `file:line @ sha` on one line; wrap before the
+# opening parenthesis instead.
+#
 # Scanned: *.md at the repo root, docs/constructions/*.md, docs/*.txt,
 # CMakeLists.txt, cmake/*.cmake, and *.c *.h *.py *.inc *.sh *.cmake under the
 # five roots check_loc.sh walks — WHOLE files, not comments only: a bare
@@ -53,14 +80,14 @@ cd "$root"
 # in both BSD and GNU grep, so an occurrence carrying a prefix or a SHA matches
 # WITH it and is dropped by the two filters below. A lookahead needs PCRE,
 # which BSD grep does not have.
-TARGETS='(PRD-v1|IMPLEMENTATION_PLAN|NORTH_STAR|CLAUDE)\.md'
+TARGETS='(PRD-v1|IMPLEMENTATION_PLAN|NORTH_STAR|CLAUDE|BASELINES|K[0-9][0-9])\.md'
 RANGE='((-|–)[0-9]+)?'   # ASCII hyphen AND en dash; the K-docs use both
 PIN='[[:space:]]*@[[:space:]]*[0-9a-f]{7,40}'
 # `plan:NNN` is the shorthand bd 0a7's own notes use. Measured 2026-09-10 it
 # occurs ZERO times in the scanned set; it is here so it cannot arrive later.
 # (Spelling it with a real number would correctly make this script its own
 # first hit — hence every example above is pinned or has its number elided.)
-CITE="((third_party/)?(bennett/)?${TARGETS}|plan):[0-9]+${RANGE}"
+CITE="((third_party/)?(bennett/)?(docs/constructions/)?${TARGETS}|plan):[0-9]+${RANGE}"
 PAT="${CITE}(${PIN})?"
 
 list_files() {

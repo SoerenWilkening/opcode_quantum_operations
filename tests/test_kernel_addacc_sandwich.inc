@@ -1,8 +1,10 @@
 /* tests/test_kernel_addacc_sandwich.inc — included by test_kernel_addacc.c.
  *
  * K8 IN THE ONLY CONTEXT v1 ACTUALLY USES IT, which no other case here covers.
- * The parent file drives K8 on ordinary registers, which is the right way to
- * get exhaustive value coverage cheaply — but it is not how K8 ships. Every K8
+ * The parent file drives K8 on ordinary registers, which is the cheap way to
+ * get value coverage across the width ladder — it read "exhaustive value
+ * coverage" until 2026-09-11 (bd aei), and the budget has been a constant
+ * sample per width since 2026-08-21 — but it is not how K8 ships. Every K8
  * call in v1 is a run of steps inside K11's compute half, over a scratch region
  * the sandwich driver pre-materialised at step 0. Three things are only true
  * there, and each is a way K8 can be wrong while every value test stays green:

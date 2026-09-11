@@ -226,12 +226,20 @@ static int dr_zero_bit(cq_ref_w v, cq_ref_w q, int i)
 
 enum { DR_MAX_PAIRS = 128 + 12 };
 
-/* THE SIGNATURE IS UNCHANGED AND THREE OF ITS PARAMETERS ARE NOW IGNORED, on
- * cq_kd_sweep_at's precedent. `per_case`, `region` and `budget` were the inputs
- * to a cost model that no longer exists; both callers compute them from
- * udiv_per_case / sdiv_per_case / cq_divrem_region, which are real measurements
- * used elsewhere in those files. Keeping the parameters costs one (void) each
- * and touches neither caller. */
+/* THE SIGNATURE IS UNCHANGED AND THREE OF ITS PARAMETERS ARE NOW IGNORED.
+ * `per_case`, `region` and `budget` were the inputs to a cost model that no
+ * longer exists; both callers compute them from udiv_per_case / sdiv_per_case /
+ * cq_divrem_region, which are real measurements used elsewhere in those files.
+ * Keeping the parameters costs one (void) each and touches neither caller.
+ *
+ * THE PRECEDENT THIS CITED HAS BEEN REVERSED (2026-09-11, bd aei). It read "on
+ * cq_kd_sweep_at's precedent" — and that parameter was removed outright,
+ * because a dead parameter carries a live promise: callers went on passing `1`
+ * for "exhaustive" and writing comments claiming exhaustive coverage that no
+ * test could falsify. These three are a weaker case (they are static, local to
+ * two suites, four call sites, and each argument at the call site is a real
+ * measurement a reader can use) — but they are the same class, and dropping
+ * them is filed rather than assumed to be unwanted. */
 static void dr_sweep(const cq_kd_spec *k, int W, uint64_t per_case, int region,
                      uint64_t budget)
 {
@@ -254,7 +262,7 @@ static void dr_sweep_small(const cq_kd_spec *k, int W)
 {
     clock_t t0 = clock();
 
-    cq_kd_sweep_at(k, W, 1);
+    cq_kd_sweep_at(k, W);
     printf("#   ^ %s W=%d took %.1f s\n", k->name, W,
            (double)(clock() - t0) / CLOCKS_PER_SEC);
     fflush(stdout);

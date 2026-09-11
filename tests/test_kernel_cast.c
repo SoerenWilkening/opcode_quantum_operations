@@ -81,10 +81,26 @@ enum { N_LADDER = 7 };
 
 /* Every widening pair (F < T) and every narrowing pair (T < F), plus the
  * degenerate T == F, which the construction accepts as an identity copy
- * (cast.c records that as a decision rather than an accident). At the small
- * widths the sweep is exhaustive; above 8 it samples — and above 64 the driver
- * carries the values in two words, which is the whole reason it was
- * generalised. */
+ * (cast.c records that as a decision rather than an accident). Above 64 the
+ * driver carries the values in two words, which is the whole reason it was
+ * generalised.
+ *
+ * EVERY PAIR GETS THE SAME BUDGET, AND IT IS A CONSTANT: cq_kd_samples() cases
+ * — default 32 (CQ_KD_SAMPLES_DEFAULT in tests/support/kernelsweep.c; override
+ * with CQOPS_L1_SAMPLES in the ENVIRONMENT) — each drawing a mask pair and the
+ * operand values jointly from one seeded RNG. The all-classical pair (that row
+ * IS L5), the all-quantum pair (what L4 pins) and the four value corners are
+ * taken first, INSIDE the budget rather than on top of it. Nothing scales with
+ * W. The WIDTH PAIRS, by contrast, are ENUMERATED and never sampled — for a
+ * cast they are the case space, and width is the axis that catches faults in a
+ * kernel that is width-generic with no width switch (I5, Rule 3).
+ *
+ * THIS PARAGRAPH READ "At the small widths the sweep is exhaustive; above 8 it
+ * samples" UNTIL 2026-09-11 (bd aei). It was true when written and stopped
+ * being true on 2026-08-21, when cq_kd_sweep_at's `exhaustive` argument — which
+ * this file passed as `F <= 8` — became a (void) cast and every width went to
+ * the constant budget. The argument no longer exists, so the belief is now a
+ * compile error rather than a comment. */
 static void sweep_pairs(const cq_kd_spec *k, int widening)
 {
     int pairs = 0;
@@ -98,7 +114,7 @@ static void sweep_pairs(const cq_kd_spec *k, int widening)
             g_F = F; g_T = T;
             /* The driver's `W` is the source width — the shape overrides both
              * anyway; passing F keeps the sweep's own value spans right. */
-            cq_kd_sweep_at(k, F, F <= 8);
+            cq_kd_sweep_at(k, F);
             pairs++;
         }
 
@@ -137,7 +153,7 @@ static void cast_narrow(void)
 
                 if (widening ? (T < F) : (T > F)) continue;
                 g_F = F; g_T = T;
-                cq_kd_sweep_at(CASTS[i], F, F <= 8);
+                cq_kd_sweep_at(CASTS[i], F);
             }
 }
 

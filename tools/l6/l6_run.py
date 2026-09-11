@@ -77,6 +77,10 @@ def fixtures(cqdir, builddir):
     return out
 
 
+# `tools/l7/l7_run.py` CARRIES A DELIBERATE COPY OF THIS FUNCTION (and of
+# `cq_revision`); `bd ss8` weighed hoisting them and rejected it. The two drifted
+# once, the L7 copy losing the `ar x` verification below (`bd y4o`, restored
+# 2026-09-11). Mirror any edit there.
 def extract_intrinsics(cqdir, builddir, out):
     """`ar x` the two members we DO take, fresh, on every run.
 

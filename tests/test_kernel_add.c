@@ -72,7 +72,7 @@ static const cq_kd_spec SUB = { "sub", cq_kernel_sub, NULL, NULL, NULL, refn_sub
 static void sweep(const cq_kd_spec *k)
 {
     cq_kd_sweep(k);
-    cq_kd_sweep_at(k, 128, 0);
+    cq_kd_sweep_at(k, 128);
 }
 
 CQ_TEST(k6_add_sweep) { sweep(&ADD); }
@@ -92,7 +92,7 @@ static const cq_kd_spec *const ADDS[] = { &ADD, &SUB };
 static void add_narrow(void)
 {
     for (size_t i = 0; i < sizeof ADDS / sizeof ADDS[0]; i++)
-        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(ADDS[i], W, 1);
+        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(ADDS[i], W);
 }
 
 CQ_TEST(controlled)

@@ -205,15 +205,23 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
     fflush(stdout);
 }
 
-void cq_kd_sweep_at(const cq_kd_spec *k, int W, int exhaustive)
+/* THE `exhaustive` PARAMETER IS GONE (2026-09-11, bd aei), AND REMOVING IT IS
+ * THE POINT RATHER THAN A TIDY-UP. From 2026-08-21 it was `(void)`-cast here —
+ * a dead parameter carrying a live promise, which callers went on believing:
+ * tests/test_kernel_cast.c still said "at the small widths the sweep is
+ * exhaustive" three weeks later, and nothing could go red, because no test
+ * reads a comment. A parameter that does not exist makes that belief a COMPILE
+ * error instead — the same instrument `bit.h` uses for `CQ_BIT_ZERO == 0` ("a
+ * renumbering must break a build, not just a comment").
+ *
+ * THE REASON RECORDED FOR KEEPING IT WAS ITSELF A STALE MEASUREMENT, which is
+ * why it stood for three weeks. It read "71 call sites across twelve .c files
+ * and eight .inc files pass it. Removing the parameter would touch every one of
+ * them for no behavioural gain." MEASURED 2026-09-11 at that same commit
+ * (5b57e4f) and at HEAD: 17 calls in 7 files, both times — never 71, and never
+ * twenty files. The removal touched 17 lines. */
+void cq_kd_sweep_at(const cq_kd_spec *k, int W)
 {
-    /* KEPT IN THE SIGNATURE, DELIBERATELY IGNORED. There is no longer an
-     * exhaustive mode to select — the budget is the same constant at every
-     * width — and 71 call sites across twelve .c files and eight .inc files
-     * pass it. Removing the parameter would touch every one of them for no
-     * behavioural gain, and a caller that still asks for exhaustion is asking
-     * for something this file deliberately no longer offers. */
-    (void)exhaustive;
     cq_kd_sample_at(k, W);
 }
 

@@ -118,6 +118,17 @@ jobs:
       # session (`git ls-files` over the same roots and extensions says 194), and
       # a fresh CI checkout will differ again. The limit it enforces is per-file
       # and is unaffected by any of that.
+      #
+      # IT DID DIFFER, AND BY EXACTLY THE PREDICTED AMOUNT (bd a9e, 2026-09-11):
+      # this job printed 195 on run 34583512176 (7cca77a) against the dev box's
+      # 204, and the nine files between them are all of tools/qtg/** and nothing
+      # else. 194 -> 195 is tools/l6/l6_report.py landing, not a change in the
+      # delta. SETTLED there: the walk stays on the filesystem — it is a
+      # SUPERSET of the tracked set, so nothing on a box escapes the limit,
+      # whereas `git ls-files` would stop checking a new module until it was
+      # staged — and the OK line now names the set it counted instead.
+      # check_cites.sh has the same shape for the same reason: 298 here, 288
+      # here in CI, the same nine plus tools/qtg/sweep/run_sweep.sh.
       - name: make lint
         run: make lint
 

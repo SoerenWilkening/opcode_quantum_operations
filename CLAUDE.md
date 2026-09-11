@@ -923,9 +923,24 @@ their absence — because a change that dropped a registration outright would ot
 invisible on a runner where the suite never ran. **The absence check anchors the test name at
 `.` or end-of-line**: M25b's `test_sink_qec_angle` is registered *unconditionally*, so a bare
 `grep -F test_sink_qec` matches a suite that SHOULD be there, measured while writing the file.
-**No lint file COUNT is asserted** — `check_loc.sh` walks the filesystem and `tools/qtg/` is
-gitignored, so the figure is box-local (`bd a9e`); CI printing a different count is not a
-regression.
+**AND NO LINT FILE COUNT IS ASSERTED — THE WALK STAYS ON THE FILESYSTEM, AND WHAT CHANGED IS
+THE PRINTED LINE (`bd a9e`, settled 2026-09-11).** `check_loc.sh` walks the filesystem rather
+than the git index and `tools/qtg/` is gitignored, so the figure is box-local: **204** here
+against CI's **195** (the clang job, run `34583512176`, push, `7cca77a`, green), a delta of
+**exactly nine files, every one of them under `tools/qtg/`** and nothing else — `git status
+--ignored` over the five roots lists only that directory and two `__pycache__/`, which hold no
+countable file. CI printing a different count is not a regression. **The walk was NOT moved to
+`git ls-files`, and the reason is Rule 12 rather than taste:** the filesystem set is a SUPERSET
+of the tracked set, so everything on the box is held to the limit, whereas an index-driven walk
+would stop checking a brand-new module until someone `git add`ed it — silently, at the one
+moment a file is most likely to be over-long, which is Rule 12 inverted. It also keeps a
+POSIX-sh guard runnable in an exported tree with no `.git`. What was actually wrong was a
+printed line inviting a cross-box comparison it could not support, so the OK line now names the
+set it counted: `N file(s) walked (filesystem, not the git index)`. **`check_cites.sh` has the
+identical shape** — **298** local against **288** in that same CI run, a delta of ten because
+it matches `.sh` as well — **and is filed as `bd 6kg`**, so the asymmetry is a scheduled fix
+and not an oversight. The only consumer of either line is `tools/labreport/new_entry.py`, which
+quotes it verbatim into an entry's LOC field.
 
 **L7 IS THREE ENTRIES IN THREE PLACES, AND THAT IS PRD §15 D22 RATHER THAN A LAYOUT
 CHOICE.** `test_grover` runs everywhere; `test_grover_qec` needs `-DCQOPS_QEC_DIR=`;
@@ -1155,11 +1170,18 @@ ctest --test-dir build-release -R l7
 
 - **A SHARED TEST HOOK MUST TAKE THE SUITE'S OWN SWEEP BODY, NOT IMPOSE A SHAPE — a third of
   the catalogue would be silently half-tested.** `cq_kd_for_each_region(what, body)` runs
-  `body` under each of §9's four regions. A version that swept `cq_kd_sweep_at(k, W, 1)` itself
+  `body` under each of §9's four regions. A version that swept `cq_kd_sweep_at(k, W)` itself
   would be wrong for **casts** (whose sweep is over a width PAIR read from a file-static) and
   for **K10's mux** (where `cq_kd_case2` fills `values[2]` with zero, so every exhaustive case
   runs with one arm pinned at 0 — green, and half a kernel). Both are recorded traps; a fixed
-  shape re-acquires them.
+  shape re-acquires them. **That call was spelled `cq_kd_sweep_at(k, W, 1)` here until
+  2026-09-11 (`bd aei`)**: the third argument was an `exhaustive` flag, `(void)`-ignored since
+  2026-08-21 made L1 a constant sample budget, and it is now REMOVED from the signature — 17
+  call sites in 7 files, not the *"71 call sites across twelve `.c` files and eight `.inc`
+  files"* `kernelsweep.c`'s own comment used to give as the reason for keeping it — so a caller
+  that still believes in an exhaustive mode is a **compile error** rather than a `1` that does
+  nothing beside a comment no test can falsify. Same principle as `CQ_BIT_ZERO == 0`: it must
+  break a build, not just a comment.
 
 - **`PASS_REGULAR_EXPRESSION` DISPLACES THE EXIT-CODE CHECK AND `FAIL_REGULAR_EXPRESSION`
   DOES NOT**, so pinning "the message says D11" the obvious way TRADES AWAY the death test's
@@ -1896,6 +1918,21 @@ ctest --test-dir build-release -R l7
   earlier re-measure cycles in the K-docs all went stale again. Verify by grepping the
   phrase; recover the exact original with `git show <sha>:<file> | sed -n <N>p`. Citations
   into `third_party/` keep bare line numbers — that tree is pinned and never moves.
+  **THE TARGET SET IS NO LONGER THE FOUR PLANNING DOCS.** Since 2026-09-11 (`bd j5v`)
+  `tools/check_cites.sh` also scans citations into `docs/constructions/K??.md` and
+  `BASELINES.md`. The narrow set was never a claim that the K-docs are a PINNED class like
+  `third_party/` — they were the four documents `bd 0a7` happened to measure — and the
+  widening was MEASURED rather than taken on taste: `docs/constructions/` has taken **11**
+  commits since 2026-08-01, and `08dc6f3` alone touched **12 of its 15 files** (+928/−140).
+  It found **18** bare citations in **9** files — **13** of them in `src/` and `tests/`
+  citing a K-doc, 5 K-doc to K-doc — and **not one of the 18 resolved exactly**: three
+  overlapped their target off by three lines at each end and the other fifteen landed on
+  unrelated content in a document that had grown under them. **Four were ELIDED rather than
+  pinned, which is the sanctioned second option**: they narrate anchors into an *uncommitted*
+  draft, so no sha reproduces them and pinning would have fabricated provenance. **And the
+  scan is LINE-BASED**, so a pin whose ` @ <sha>` wraps onto the next source line reads as
+  BARE and IS a hit — two freshly-converted comments failed exactly that way on their first
+  run. Wrap before the opening parenthesis, never inside the pin.
 - **Non-interactive shell flags always** (`cp -f`, `mv -f`, `rm -f`, `rm -rf`) —
   `cp`/`mv`/`rm` may be aliased to interactive `-i` and hang the agent. See
   [`AGENTS.md`](AGENTS.md).

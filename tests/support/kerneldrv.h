@@ -185,11 +185,15 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W);
 void cq_kd_sweep(const cq_kd_spec *k);
 
 /* The same at one explicit width, for a kernel whose widths are not the
- * standard ladder (a cast is a PAIR of widths, so its suite drives this).
+ * standard ladder (a cast is a PAIR of widths, so its suite drives this). Same
+ * constant budget as cq_kd_sweep, one width at a time.
  *
- * `exhaustive` IS IGNORED and kept only so the 71 existing call sites compile:
- * there is no exhaustive mode any more, at any width. */
-void cq_kd_sweep_at(const cq_kd_spec *k, int W, int exhaustive);
+ * THE THIRD PARAMETER IS GONE. It read `int exhaustive`, was `(void)`-cast from
+ * 2026-08-21, and was dropped on 2026-09-11 (bd aei) precisely so that a caller
+ * still believing in an exhaustive mode fails to COMPILE rather than passing a
+ * `1` that does nothing and writing a comment nobody can falsify. There is no
+ * exhaustive mode, at any width. See kernelsweep.c. */
+void cq_kd_sweep_at(const cq_kd_spec *k, int W);
 
 /* L4's measurement. Runs the kernel once at the ALL-QUANTUM operand mask —
  * which is the fixed point, since with no demotion (D6) a mask can only drift

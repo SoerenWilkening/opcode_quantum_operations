@@ -135,8 +135,10 @@ int cq_addacc_steps(int W);
  * multi-gate block generally is not. A caller that made one whole
  * `cq_kernel_addacc` into one step would have the reverse pass RE-RUN the
  * accumulate forwards, giving `acc + 2b` while every gate count stayed
- * plausible. Same shape as bd ckd.14a's two worked witnesses (K06.md:566-586,
- * K10.md:153-171), one level up.
+ * plausible. Same shape as bd ckd.14a's two worked witnesses, one level up —
+ * K06 §5, "D1 — CRITICAL: the sandwich step function must be ONE GATE PER
+ * STEP." (K06.md:569-589 @ 7cca77a), and K10 §2.0, "A driver constraint this
+ * kernel forces — ONE GATE PER STEP" (K10.md:174-196 @ 7cca77a).
  *
  * K11 offsets into this: its own step index maps a contiguous run of `6W-5`
  * indices onto `u`, exactly as M12's barrel does with cq_mux_step.

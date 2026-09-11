@@ -289,6 +289,10 @@ cq_ref_w cq_ref_w_mul(cq_ref_w a, cq_ref_w b, int W)
  * always 0 when the shift discards it and the shifted value always fits. That
  * derivation is no longer only a derivation — an exhaustive L1 sweep over every
  * (a,b) including b = 0 reproduces plain C at W <= 5 for both opcodes.
+ * [AMENDED 2026-09-11, bd aei: that sweep RAN, at Step 17, and the sentence is
+ * kept as the record of it. The instrument is gone — since 2026-08-21 every
+ * width draws a constant sample instead — so a re-run reproduces plain C on the
+ * drawn cases, not on every (a,b).]
  *
  * `b == 0` needs no branch: `r >= 0` is always true, so every quotient bit is
  * set and every trial subtract is a no-op, which is D3's `2^W - 1` and `a`

@@ -49,7 +49,7 @@ static void mul_sweep_at(int W)
 {
     clock_t t0 = clock();
 
-    cq_kd_sweep_at(&MUL, W, 1);
+    cq_kd_sweep_at(&MUL, W);
     printf("#   ^ mul W=%d took %.1f s\n", W,
            (double)(clock() - t0) / CLOCKS_PER_SEC);
     fflush(stdout);

@@ -183,7 +183,18 @@ static void a_source_rail_is_not_the_width_its_symbol_names(void)
  * refused there — the asymmetry is M07's (`cq_reg_bits` vs `cq_reg_cbits`) and
  * this file only chooses which door each operand takes. A destination resolved
  * through the READ door would accept a measured rail and write to a rail whose
- * measurement has already been reported. */
+ * measurement has already been reported.
+ *
+ * WHICH LAYER ACTUALLY SPEAKS IS cq_reg_check_operands, NOT tpl_out, AND THIS
+ * PARAGRAPH DID NOT SAY SO UNTIL 2026-09-11 (bd tgx). Measured: the message is
+ * "operand check: the result handle is not a live rail", because
+ * cq_reg_check_operands runs FIRST in tpl_binary and tests `out` for liveness.
+ * The case is still worth having — it pins that the shape aborts through the
+ * whole shim — but it CANNOT see tpl_out's door widened, because the earlier
+ * guard catches it: that is this project's recorded "a guard is untested if a
+ * later copy of itself catches it", with the copies in the other order. The
+ * instrument that does see it is test_reg_death.a_measured_rail_as_the_result_handle,
+ * which calls M07 directly with no layer beneath it to answer. */
 static void an_unc_destination_that_has_been_measured_is_a_write_refusal(void)
 {
     cq_ctx *ctx = open_shim();

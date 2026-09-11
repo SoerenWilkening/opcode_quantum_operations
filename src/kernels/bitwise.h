@@ -5,7 +5,9 @@
  * needed anyway: plan §2.1 is one test binary per module and the suites reach
  * internal headers directly, so `cq_kernel_xor` has to be declared somewhere.
  * The name follows the sibling construction specs, which already print C
- * prototypes in this shape (K05.md:83, K09.md:28), and the `cq_` prefix is
+ * prototypes in this shape — K05 §2, "void cq_kernel_zext ("
+ * (K05.md:103 @ 7cca77a), and K09's preamble, "void cq_kernel_cmp("
+ * (K09.md:40 @ 7cca77a) — and the `cq_` prefix is
  * PRD §14's rule for internal symbols.
  *
  * ALL THREE ARE NATURALLY CLEAN — no cq_sandwich, no scratch, no ancilla, at

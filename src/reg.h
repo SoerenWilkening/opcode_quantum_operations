@@ -66,7 +66,23 @@ enum {
                             * Distinct from LIVE so a later free names the
                             * contract violation; distinct from DEAD because
                             * its qubits still exist and must still be swept
-                            * by cq_reg_audit.                               */
+                            * by cq_reg_audit.
+                            *
+                            * AMENDED 2026-09-11 (bd tgx). The row above is
+                            * kept as what was true when it was written; it is
+                            * re-measured here rather than overwritten, because
+                            * one of its three figures has flipped. Over
+                            * CQ_lang @ 0c7380c593492f8db9ba380325ed0e4fa739e50f
+                            * (tracked tree clean) and its 341 goldens: 412
+                            * cqrt_measure_* calls, 0 later freed — and ONE
+                            * later REFERENCED, cq_template_icmp_ne_i32_hl(h2,
+                            * 0) at line 14 of
+                            * slice_control_select_bool_round2_window
+                            * .expected.log, an L6 fixture. So "terminal" is
+                            * exact for the FREE and was never right for the
+                            * READ: a measured rail is a legal SOURCE, and
+                            * cq_reg_check_operands tests its source slot for
+                            * readability rather than for liveness.          */
     CQ_SLOT_TOKEN    = 4   /* a CLASSICAL RESOURCE TOKEN — `cqrt_tape_alloc`'s
                             * t<N>, and qram's a<N> when it lands (PRD §15 D23,
                             * plan §0.5). NOT A RAIL: width 0, bits NULL, owns
@@ -437,9 +453,31 @@ void cq_reg_swap_bits(cq_reg_table *t, int32_t a, int32_t b);
  *        :44; spec_newcand_qsq_caller:13, :16; spec_replan_qpow_caller:13, :18;
  *        slice_i128_mulhi:4. THIS MUST NOT ABORT. See cq_reg_sources_alias.
  *
- * Also validates, in both configurations, that every handle named is a live
- * rail — which catches a use-after-free operand. `out` may be CQ_REG_NONE for
- * a call that mints nothing. */
+ * AND IT VALIDATES THE HANDLES IN BOTH CONFIGURATIONS, WITH THE TWO SLOTS
+ * OBEYING DIFFERENT PREDICATES. `out` is WRITTEN, so it must be LIVE. A source
+ * is READ, so it need only be READABLE — LIVE **or** MEASURED — and everything
+ * else is refused by name: a TOKEN as a token (PRD §15 D23), a tombstone as a
+ * freed rail, and an out-of-range or poisoned slot one layer down in
+ * cq_reg_slot. `out` may be CQ_REG_NONE for a call that mints nothing.
+ *
+ * THIS READ "every handle named is a live rail — which catches a use-after-free
+ * operand" until 2026-09-11 (bd tgx), and its own second clause is what makes
+ * the first one too strong. The fault this check exists for is a use-after-free,
+ * which is a TOMBSTONE; a measured rail is not one — its qubits still exist and
+ * must still be swept (the enum above says so in as many words) — so liveness
+ * was a strictly stronger test than the purpose it was written for. It was
+ * reasonable while nothing read a measured rail, which was true when it was
+ * written and is not now (the enum's 2026-09-11 amendment has the re-measure
+ * and the CQ_lang SHA), and it made this function the lone dissenter in a stack
+ * that had already taken the other position everywhere else: cq_reg_cbits
+ * admits a measured rail where cq_reg_bits refuses it, shim/cq_runtime_rail.c's
+ * rail_r says so for a source, and shim/cq_shim_ctx.c says so for a §9 control
+ * flag — "the wires are still wires and still carry the value the mz reported"
+ * is already pinned in tests/test_runtime_gate.c.
+ *
+ * WHAT DID NOT MOVE: the WRITE door. A measured rail in `out` still aborts, and
+ * so does a free of one — terminality is about writing and reclaiming, never
+ * about reading. */
 void cq_reg_check_operands(const cq_reg_table *t, int32_t out,
                            const int32_t *srcs, uint32_t n);
 

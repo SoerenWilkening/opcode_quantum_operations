@@ -22,9 +22,10 @@
  * is what L4 pins) and the four value corners taken first, inside the budget;
  * every width prints its count, its pool and its seed. There is no gate-budget
  * cap above W = 4 and no exhaustive cross product below it: cq_kd_sweep_at's
- * `exhaustive` flag is kept in the signature and ignored (kernelsweep.c), and
- * so are dr_sweep's `per_case`, `region` and `budget` (divrem_common.inc says
- * why the parameters stayed). W = 3 is K12.md §2.4b's named R8 witness width
+ * `exhaustive` flag was REMOVED on 2026-09-11 (bd aei) after three weeks as a
+ * (void) cast, and dr_sweep's `per_case`, `region` and `budget` are still
+ * ignored (divrem_common.inc says why those stayed, and records that the
+ * precedent it leaned on has since gone the other way). W = 3 is K12.md §2.4b's named R8 witness width
  * (W in {1,2} do NOT witness it) and is on the ladder for that reason; what
  * turned §2.0's "a W-bit remainder never overflows" into a measurement was
  * K12.md §6.0a's prototype pass, not this file.
@@ -91,10 +92,13 @@ static void dr_i128_case(const cq_kd_spec *k, int want_q)
     fflush(stdout);
 }
 
-/* THE SHIPPED LADDER PLUS THE EXHAUSTIVE ONE. opcode_table.yaml:187-190
- * declares all four opcodes at i1, i8, i16, i32, i64 and i128 — and NOT at i80
- * (:85, :133-135), the mirror image of `icmp`'s fence. Rule 10's exhaustive L1
- * widths {1,2,4} are extended with 3, K12.md §2.4b's named R8 witness. */
+/* THE SHIPPED LADDER PLUS THE NARROW ONE. opcode_table.yaml:187-190 declares
+ * all four opcodes at i1, i8, i16, i32, i64 and i128 — and NOT at i80 (:85,
+ * :133-135), the mirror image of `icmp`'s fence. Rule 10's narrow L1 widths
+ * {1,2,4} are extended with 3, K12.md §2.4b's named R8 witness. (Both headings
+ * said "EXHAUSTIVE" until 2026-09-11, bd aei; the header above has recorded
+ * since bd mmv that the budget is the shared constant at every width, so this
+ * was the same file disagreeing with itself.) */
 CQ_TEST(k12_unsigned_sweep)
 {
     for (int W = 1; W <= 4; W++) {

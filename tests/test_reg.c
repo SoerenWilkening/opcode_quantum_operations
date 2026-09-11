@@ -304,7 +304,23 @@ CQ_TEST(marking_measured_keeps_the_qubits_and_emits_nothing)
     /* Measured over the 239 goldens: 255 measures, 0 later freed, 0 later
      * referenced — the qubits are DELIBERATELY never reclaimed (PRD §7). The
      * gate and the ABI return value belong to M26 at Step 23, so this call
-     * takes the table and cannot emit. */
+     * takes the table and cannot emit.
+     *
+     * AMENDED 2026-09-11 (bd tgx). The row above is kept as what was measured
+     * when it was written rather than overwritten, because one of its three
+     * figures has flipped. Re-measured over CQ_lang @
+     * 0c7380c593492f8db9ba380325ed0e4fa739e50f (tracked tree clean) and its
+     * 341 goldens: 412 cqrt_measure_* calls, 0 later freed — and ONE later
+     * REFERENCED, cq_template_icmp_ne_i32_hl(h2, 0) one line after
+     * cqrt_measure_i32(h2) in
+     * slice_control_select_bool_round2_window.expected.log, an L6 fixture.
+     *
+     * WHAT THIS CASE ASSERTS IS UNMOVED, and it never rested on the clause
+     * that flipped: what is pinned here is that the QUBITS stay and the rail
+     * stays under cq_reg_audit's eye, which is the "0 later freed" half. The
+     * READ is a separate door and is legal — reg.h's CQ_SLOT_MEASURED comment
+     * and cq_reg_check_operands carry the contract, and the case for it is
+     * test_reg_invariants.inc's a_measured_rail_is_a_legal_operand_source. */
     CHECK_EQ(cq_reg_state(&f.ctx.regs, h), CQ_SLOT_MEASURED);
     CHECK_EQ(cq_qubits_live(&f.ctx.pool), live);
     CHECK_EQ(cq_reg_owned_qubits(&f.ctx.regs, h), 1);
@@ -378,5 +394,6 @@ CQ_TEST_MAIN(
     CQ_CASE(the_audit_is_scoped_to_live_and_measured_registers),
     CQ_CASE(distinct_operands_pass_the_d7_check),
     CQ_CASE(d7b_two_aliased_sources_are_legal_and_must_not_abort),
+    CQ_CASE(a_measured_rail_is_a_legal_operand_source),
     CQ_CASE(dispose_leaves_the_table_usable_and_is_not_a_free)
 )

@@ -60,7 +60,7 @@ static const cq_kd_spec *const KS[] = { &K1, &K2, &K3 };
 static void bitwise_narrow(void)
 {
     for (size_t i = 0; i < sizeof KS / sizeof KS[0]; i++)
-        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(KS[i], W, 1);
+        for (int W = 1; W <= 5; W++) cq_kd_sweep_at(KS[i], W);
 }
 
 CQ_TEST(controlled)

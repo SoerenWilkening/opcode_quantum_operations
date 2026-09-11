@@ -104,7 +104,10 @@ static int32_t qreg(cq_ctx *ctx, uint32_t W, uint64_t v)
  * `cq_kernel_udiv` and not `cq_kernel_urem` — and for that the reference only
  * has to be an independent statement of WHICH FUNCTION each row names. The
  * kernels' own agreement with `cq_ref_w` is M14/M18/M19/M20's business and is
- * already asserted, exhaustively, in their suites. */
+ * already asserted in their suites — by an L1 sweep that samples a constant
+ * number of cases per (kernel, width). This said "asserted, exhaustively" until
+ * 2026-09-11 (bd aei); nothing in those suites has been exhaustive since
+ * 2026-08-21, and the dispatch claim above does not rest on it. */
 static cq_ref_w ref_bin(cq_shim_op op, cq_ref_w a, cq_ref_w b, int W)
 {
     switch (op) {
@@ -421,6 +424,61 @@ CQ_TEST(the_controlled_literal_doors_reach_the_region_with_the_right_lane)
 
 #include "test_template_d7.inc"
 
+/* -------------------------------------------------------------------------
+ * 6. The operand check's READ door — bd tgx, 2026-09-11.
+ * ------------------------------------------------------------------------- */
+
+/* THE ONE SHAPE IN THE CORPUS THAT READS A MEASURED RAIL, DRIVEN END TO END.
+ * `cq_reg_check_operands` tested both of its slots for LIVENESS until this
+ * date, so a measured rail handed to any `cq_template_*` aborted before the
+ * shim resolved anything — and CQ_lang emits exactly that, once:
+ *
+ *     cqrt_measure_i32(h2) -> 0
+ *     cq_template_icmp_ne_i32_hl(h2, 0) -> h5
+ *
+ * at lines 13-14 of tests/e2e/slice_control_select_bool_round2_window.
+ * expected.log, CQ_lang @ 0c7380c593492f8db9ba380325ed0e4fa739e50f, where it is
+ * a `bool` read back out of a measured window flag. Re-measured that day over
+ * all 341 goldens: 412 `cqrt_measure_*` calls, ONE later reference, ZERO later
+ * frees. The fixture was the L6 casualty, and this is it as a unit case.
+ *
+ * IT GOES THROUGH `cq_shim_icmp_hl`, WHICH IS THE WHOLE OF THE GENERATED
+ * WRAPPER: `cq_template_icmp_ne_i32_hl` is `cq_shim_icmp_hl(CQ_SHIM_PRED_NE,
+ * 32, ...)` and nothing else (M28's wrappers carry no logic — this file's
+ * opening note), so the shape is the fixture's and the linkage claim is L6's.
+ *
+ * WHAT IT ASSERTS BEYOND "it did not abort": the VALUE, because a read door
+ * that admitted the rail and then handed the kernel the wrong bits would be
+ * silent — `cq_reg_cbits` is the accessor under test as much as the predicate
+ * is. The measured rail is 0xB5 and the fixture's predicate is `!= 0`. */
+CQ_TEST(a_measured_rail_is_a_legal_template_source)
+{
+    cq_mock m; cq_sink s;
+    cq_ctx *ctx = open_with(&m, &s);
+
+    const int32_t h = qreg(ctx, 32u, 0xB5u);
+    const int32_t seen = cqrt_measure_i32(h);
+
+    CHECK_EQ((uint64_t)(uint32_t)seen, 0xB5u);
+    CHECK_EQ(cq_reg_state(&ctx->regs, h), CQ_SLOT_MEASURED);
+
+    const int32_t f = cq_shim_icmp_hl(CQ_SHIM_PRED_NE, 32, h, 0u, 0u);
+
+    CHECK_EQ(cq_reg_width(&ctx->regs, f), 1u);
+    CHECK_EQ(cq_pc_value(ctx, f), 1u);
+
+    /* AND THE `_unc` TWIN, because that is the door the corpus uses to give a
+     * flag back and it resolves `out` through the WRITE door: `f` is live and
+     * must stay writable while its measured SOURCE stays readable. */
+    cq_shim_icmp_hl_unc(CQ_SHIM_PRED_NE, 32, f, h, 0u, 0u);
+    CHECK_EQ(cq_pc_value(ctx, f), 0u);
+
+    /* `h` is NOT freed: measurement is terminal, its qubits are deliberately
+     * never reclaimed (PRD §7), so the pool cannot be asserted restored here. */
+    cqrt_free(f);
+    close_with(&m);
+}
+
 CQ_TEST_MAIN(
     CQ_CASE(every_opcode_dispatches_to_its_own_kernel_through_the_qq_door),
     CQ_CASE(the_hl_and_lh_doors_put_the_literal_on_the_side_the_symbol_names),
@@ -435,5 +493,6 @@ CQ_TEST_MAIN(
     CQ_CASE(d7b_costs_exactly_two_w_cnots_and_no_toffoli_over_the_unaliased_call),
     CQ_CASE(d7b_reaches_the_unc_and_icmp_doors_too),
     CQ_CASE(d7b_on_a_rotation_poisoned_source_is_discharged_by_the_certificate),
-    CQ_CASE(the_d7b_copy_brackets_the_region_from_outside_on_both_sides)
+    CQ_CASE(the_d7b_copy_brackets_the_region_from_outside_on_both_sides),
+    CQ_CASE(a_measured_rail_is_a_legal_template_source)
 )

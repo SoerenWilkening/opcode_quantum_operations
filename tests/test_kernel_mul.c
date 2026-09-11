@@ -134,7 +134,9 @@ static void check_counts(cq_gold *g, int W)
 }
 
 /* The shipped ladder (i1, i8, i16, i32, i64, i128 — opcode_table.yaml:186) plus
- * the exhaustive L1 widths, so every width the sweep runs is also pinned. */
+ * the narrow L1 sweep widths, so every width the sweep runs is also pinned.
+ * (Read "the exhaustive L1 widths" until 2026-09-11, bd aei — the widths are the
+ * same, but none has been exhaustive since 2026-08-21.) */
 CQ_TEST(l4_goldens)
 {
     static const int WS[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };

@@ -125,3 +125,44 @@ CQ_TEST(d7b_two_aliased_sources_are_legal_and_must_not_abort)
     CHECK(cq_reg_sources_alias(s, 2));
     fx_close(&f);
 }
+
+/* --- The operand check's two doors: `out` is written, a source is read. --- */
+
+/* A MEASURED RAIL IS A LEGAL SOURCE, AND THIS CASE IS THE WHOLE OF bd tgx.
+ * cq_reg_check_operands tested BOTH slots for liveness until 2026-09-11, which
+ * refused it — and the check's own stated purpose is to catch a use-after-free,
+ * which a measured rail is not: its qubits still exist, it is still swept by
+ * cq_reg_audit, and every other door in the stack had already taken this
+ * position (cq_reg_cbits admits one where cq_reg_bits refuses it;
+ * shim/cq_runtime_rail.c's rail_r for a source; shim/cq_shim_ctx.c for a §9
+ * flag; tests/test_runtime_gate.c for a control and a target).
+ *
+ * IT IS NOT A HYPOTHETICAL: CQ_lang @ 0c7380c emits exactly this shape once,
+ * `cq_template_icmp_ne_i32_hl(h2, 0)` one line after `cqrt_measure_i32(h2)` in
+ * slice_control_select_bool_round2_window.expected.log:14, and that fixture
+ * ABORTED at L6 under the old predicate. The end-to-end half is
+ * tests/test_template.c; this is the M07 claim on its own, with no shim layer
+ * that could answer for it. */
+CQ_TEST(a_measured_rail_is_a_legal_operand_source)
+{
+    fixture f; fx_open(&f);
+    int32_t out = cq_reg_alloc_zero(&f.ctx.regs, 32);
+    int32_t m   = cq_reg_alloc_zero(&f.ctx.regs, 32);
+    (void)materialise_bit(&f, m, 0, CLEAN_CTRL);
+    cq_reg_mark_measured(&f.ctx.regs, m);
+    CHECK_EQ(cq_reg_state(&f.ctx.regs, m), CQ_SLOT_MEASURED);
+
+    int32_t s[1] = { m };
+    cq_reg_check_operands(&f.ctx.regs, out, s, 1);          /* must not abort */
+
+    /* The READ door one layer down, asserted in the same case so that the two
+     * cannot drift apart again: this function and cq_reg_cbits must agree
+     * about a measured rail, and they disagreed for eleven weeks. */
+    CHECK(cq_reg_cbits(&f.ctx.regs, m) != NULL);
+
+    /* AND THE SOURCE DOOR IS THE ONLY ONE THAT WIDENED. The rail is still not
+     * writable and still not freeable — asserted in test_reg_death.c
+     * (write_to_a_measured_rail, free_of_a_measured_rail,
+     * a_measured_rail_as_the_result_handle), because those are aborts. */
+    fx_close(&f);
+}

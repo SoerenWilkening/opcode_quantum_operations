@@ -114,6 +114,12 @@ def toolchain(cqdir, builddir):
     sys.exit("no single-file e2e slice registered in " + builddir)
 
 
+# DUPLICATED FROM `tools/l6/l6_run.py` ON PURPOSE, SO IT IS KEPT IN STEP BY HAND.
+# `bd ss8` weighed hoisting this, `cq_revision` and `read` into a module both
+# directories import and rejected it: 27 lines, no second subject, and a
+# cross-directory import needs a `sys.path` line. The price is drift, and it has
+# been paid once already -- the `ar x` verification below was missing from this
+# copy until `bd y4o` (2026-09-11). Mirror any edit into the L6 copy.
 def extract_intrinsics(cqdir, builddir, out):
     """The two objects the link DOES take, extracted FRESH on every run.
 
@@ -135,6 +141,17 @@ def extract_intrinsics(cqdir, builddir, out):
                        text=True)
     if r.returncode != 0:
         sys.exit("ar x failed: " + r.stderr)
+    # AND `ar x` CAN EXIT 0 HAVING PRODUCED NOTHING NAMED -- that is what this loop
+    # detects, and it is why the members are taken BY NAME rather than globbed. A
+    # member silently absent here leaves the link to resolve those symbols from
+    # wherever else it can, which is `bd 216` checklist item 20's failure mode:
+    # `libcq_templates.a`'s third member is CQ_lang's trace-only stub, and the same
+    # two archives in opposite order both exit 0 with different answers. L7 has no
+    # `--reuse`, so an absent member cannot be caught by re-reading a previous run
+    # either -- this exit is the only detector there is.
+    for m in members:
+        if not os.path.exists(os.path.join(d, m)):
+            sys.exit("ar x did not produce " + m)
     return d
 
 

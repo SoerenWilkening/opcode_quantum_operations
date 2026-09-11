@@ -49,9 +49,12 @@ void cq_scratch_alloc(cq_scratch *s, uint32_t n);
  * any compute half over a tainted operand every scratch entry reads `unknown`
  * even though the bit is provably back to |0>, and the check would fire on
  * every legitimate kernel that ever met a rotation (bd ckd.17, closed; what
- * cqrt_free reads instead is PRD §15 D15; K09.md:603; K11.md:677 retracts the
- * `cq_scratch_free` that would have done it). The scope of "unimplementable"
- * is that tainted case: on the rotation-free surface the shadow is exact.
+ * cqrt_free reads instead is PRD §15 D15; K09 §5 delta 6, "The shadow cannot
+ * prove K9's scratch clean; M08 must not rely on it." (K09.md:615 @ 7cca77a);
+ * and K11 §4, "There is no `cq_scratch_free`." (K11.md:857 @ 7cca77a), which
+ * retracts the `cq_scratch_free` that would have done it). The scope of
+ * "unimplementable" is that tainted case: on the rotation-free surface the
+ * shadow is exact.
  *
  * What the kind check does catch is the leak M09 cannot: a kernel that grabs a
  * region and materialises into it WITHOUT going through the driver. Nothing

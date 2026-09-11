@@ -146,7 +146,18 @@ static void a_token_as_the_control_flag_of_a_controlled_write(void)
 }
 
 /* A token in a TEMPLATE's operand slot: cq_reg_check_operands refuses it BY
- * NAME (plan §0.5) rather than as "not a live rail". */
+ * NAME (plan §0.5) rather than as "not a live rail".
+ *
+ * WHAT THE ALTERNATIVE WOULD NOW BE IS "a freed rail (a tombstone)", not "not a
+ * live rail" — bd tgx (2026-09-11) made the SOURCE slot test readability rather
+ * than liveness, so the sentence above names a diagnosis that only the `out`
+ * slot can still print. The negative list forbids both strings and is unchanged.
+ * THIS CASE IS ALSO THE ONLY THING THAT KILLS A DELETED TOKEN CLAUSE: with it
+ * gone a token would reach cq_reg_cbits one layer down and be named correctly
+ * there, which no negative list forbids — measured, it SURVIVED the whole
+ * battery at the first shape of that fix, and the predicate was restructured so
+ * that a deleted clause falls to the tombstone message (forbidden here) instead
+ * of falling through. */
 static void a_token_as_a_template_operand(void)
 {
     cq_ctx *ctx = open_shim();

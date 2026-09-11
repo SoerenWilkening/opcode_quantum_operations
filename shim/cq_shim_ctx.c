@@ -198,7 +198,8 @@ void cqops_read_residue(cqops_residue *out)
  * 3. THE FAILURE IS SILENT IN BOTH CONFIGURATIONS, and the THREE guards that
  *    look as though they would catch it each miss it for a DIFFERENT reason —
  *    which is why no one of them can be strengthened into a fix.
- *      - M07's cq_reg_check_operands compares HANDLES and liveness and never
+ *      - M07's cq_reg_check_operands compares HANDLES and slot STATE (liveness
+ *        for `out`, readability for a source since bd tgx) and never
  *        sees a qubit index at all (src/reg_check.c), so it is structurally
  *        blind to a wire; and the control rail is not among the operands it is
  *        handed anyway.

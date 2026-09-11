@@ -22,9 +22,12 @@
  * chosen: the driver re-calls compute(env, s) with the SAME argument on the
  * reverse pass, so a step undoes itself only if it is an INVOLUTION — and a
  * multi-gate block generally is not. Two worked witnesses in the ported specs:
- * K06.md:566-586, where re-running the 5-gate ripple-carry block leaves
- * c_{i+1} = c·(a ⊕ b ⊕ 1), dirty whenever c_i = 1 and a_i = b_i; and
- * K10.md:153-171, where the natural 4-gate mux block leaves r = c·(t ⊕ f).
+ * K06 §5, "D1 — CRITICAL: the sandwich step function must be ONE GATE PER
+ * STEP." (K06.md:569-589 @ 7cca77a), where re-running the 5-gate ripple-carry
+ * block leaves c_{i+1} = c·(a ⊕ b ⊕ 1), dirty whenever c_i = 1 and a_i = b_i;
+ * and K10 §2.0, "A driver constraint this kernel forces — ONE GATE PER STEP"
+ * (K10.md:174-196 @ 7cca77a), where the natural 4-gate mux block leaves
+ * r = c·(t ⊕ f).
  * (K01's 2-gate block IS self-inverse — two commuting CXs into one target —
  * which is why the trap does not show up there.)
  *

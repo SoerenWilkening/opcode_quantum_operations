@@ -311,6 +311,29 @@ typedef struct {
 > calls, **0** later freed and **0** later referenced. None of the three enumerators is
 > numbered 0, so an all-zero slot is not a valid state.
 
+> **AMENDED 2026-09-11 (`bd tgx`) — ONE OF THOSE THREE FIGURES HAS FLIPPED, AND WITH IT ONE
+> PREDICATE IN M07.** The paragraph above is kept verbatim as what was measured in 2026-08;
+> this is the re-measure, not an overwrite. Against CQ_lang
+> `0c7380c593492f8db9ba380325ed0e4fa739e50f` (2026-09-11, tracked tree clean) and its **341**
+> goldens: **412** `cqrt_measure_*` calls, **0** later freed — and **exactly one** later
+> REFERENCED, `cq_template_icmp_ne_i32_hl(h2, 0)` one line after `cqrt_measure_i32(h2)` in
+> `slice_control_select_bool_round2_window.expected.log`, an L6 fixture. So §7's terminality
+> is exact for the **free** and was never a claim about the **read**: a measured rail's qubits
+> still exist, must still be swept by the I2 audit, and still carry the value the `mz`
+> reported. **`cq_reg_check_operands` therefore applies a DIFFERENT PREDICATE TO EACH SLOT.**
+> `out` is WRITTEN, so it must be LIVE — a measured rail refused *there* IS terminality. A
+> source is READ, so it need only be READABLE: LIVE **or** MEASURED, with everything else
+> refused BY NAME — a TOKEN as a token (§15 **D23**), a tombstone as a freed rail, and an
+> out-of-range or poisoned slot one layer down in `cq_reg_slot`. The asymmetry is not new to
+> the stack, which is why no numbered §15 decision is filed for it: `cq_reg_cbits` already
+> admits a measured rail where `cq_reg_bits` refuses it, the shim's `rail_r` says so for a
+> source where `rail_w` does not, the §9 flag bracket says so for a control, and
+> `tests/test_runtime_gate.c`'s `a_measured_rail_is_a_legal_control_and_an_ordinary_one_as_a_target`
+> pins it positively. What was wrong was **one guard dissenting from decisions already taken**,
+> not the data model. **Blast radius, measured rather than estimated: exactly one L6 fixture
+> moves ABORT → OK**, and the corpus scan above finds no second measured-then-referenced
+> handle in 341 goldens.
+
 **Handle table**: dense `int32_t` → `cq_reg`, monotonic allocation to match CQ_lang's
 existing trace convention (`h0`, `h1`, …). Handles are never reused; qubit *indices* are.
 Handle **0 is valid and live** — CQ_lang's counter is `static int32_t next_handle = 0;`
