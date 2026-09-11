@@ -20,8 +20,60 @@
 ## case that actually died. It is set on them anyway: the option is harmless
 ## there, and a death binary whose case list path returns from main normally
 ## (argc != 2) is then checked like any other process.
+##
+## LEAK_EXIT_NOT_ABORT flips abort_on_error to 0 for ONE binary, and it exists
+## because "a leak is a normal non-zero exit" is a DARWIN fact that was written
+## down as a general one (`bd kfi`, 2026-08-28, Homebrew clang 22.1.5 / Darwin
+## 25). On glibc/Linux it is false: CI run 34582398276 built clean and ran
+## 347/348, and the single failure was test_lsan_negative — the log shows the
+## leak detected exactly as intended (`ok 1 -
+## a_leaked_allocation_makes_the_process_exit_nonzero`, then `ERROR:
+## LeakSanitizer: detected memory leaks ... Direct leak of 4096 byte(s)`) and
+## then abort_on_error=1 turned the end-of-process leak report into abort().
+## CTest saw SIGABRT, and WILL_FAIL inverts a non-zero EXIT CODE and does not
+## invert a crash (tests/support/death.h), so the binary went red for succeeding.
+##
+## cmake/CqopsSanitizers.cmake ALREADY KNEW. Its probe runs both arms under
+## `ASAN_OPTIONS=detect_leaks=1:abort_on_error=0`, with a comment saying it is
+## set "so a host that DOES turn the report into a SIGABRT still lands on a
+## plain non-zero status" — the configure-time half of this was correct from the
+## start and only the run-time half was missing. This closes that gap in the one
+## place the string is written, rather than by layering a second ENVIRONMENT
+## property on the test (set_tests_properties OVERWRITES, so a second block would
+## silently drop detect_leaks=1 and leave a green run proving nothing).
+##
+## THE VALUE IS WRITTEN ONCE, NOT APPENDED AFTER abort_on_error=1. Measured on
+## this box, duplicate keys in ASAN_OPTIONS do resolve last-wins
+## (`abort_on_error=1:abort_on_error=0` on a use-after-free gives rc 1, the
+## reverse order gives 134/SIGABRT), so appending would in fact work — and the
+## string would then say two contradictory things and read as a bug to the next
+## person. One occurrence, chosen here.
+##
+## WHAT IT COSTS, STATED RATHER THAN GLOSSED: in that one binary an ASan MEMORY
+## ERROR would now exit non-zero instead of aborting, and WILL_FAIL would invert
+## it to a pass. Three things bound it. (i) It is opt-in and named, and is NOT
+## implied by WILL_FAIL — implying it would silently disarm exactly this coverage
+## on test_harness_negative, whose whole job is to be red for a different reason.
+## (ii) UBSAN_OPTIONS is untouched, and Debug compiles -fno-sanitize-recover=all,
+## so a UBSan error in that binary still abort()s, still reads as a crash, and
+## still cannot be inverted. (iii) The binary's entire body is one malloc and a
+## CHECK(1 == 1).
+##
+## A FAIL_REGULAR_EXPRESSION TRIPWIRE IS NOT AVAILABLE HERE, and that was
+## measured rather than assumed: on a scratch project a WILL_FAIL test whose
+## output contained its own FAIL_REGULAR_EXPRESSION still reported Passed —
+## WILL_FAIL inverts the regex verdict along with the exit code. Nor would
+## "AddressSanitizer" have served as the pattern: a leak report's SUMMARY line
+## is `SUMMARY: AddressSanitizer: 4096 byte(s) leaked in 1 allocation(s)`, so the
+## tripwire would match the very report the test exists to produce.
 function(_cqops_sanitizer_env out)
-    set(asan "abort_on_error=1")
+    cmake_parse_arguments(ARG "LEAK_EXIT_NOT_ABORT" "" "" ${ARGN})
+
+    if(ARG_LEAK_EXIT_NOT_ABORT)
+        set(asan "abort_on_error=0")
+    else()
+        set(asan "abort_on_error=1")
+    endif()
     if(CQOPS_LSAN_ENABLED)
         string(APPEND asan ":detect_leaks=1")
     endif()
@@ -42,9 +94,17 @@ endfunction()
 ##
 ## SOURCES adds extra translation units — the escape hatch for a suite whose
 ## large static table lives in a separate file (plan §2.3).
+##
+## LEAK_EXIT_NOT_ABORT asks for ASAN_OPTIONS=abort_on_error=0 on this binary
+## alone, so that on glibc a LeakSanitizer report stays an ordinary non-zero exit
+## instead of becoming a SIGABRT that WILL_FAIL cannot invert. Exactly one test
+## uses it — test_lsan_negative, the binary whose PASS CONDITION is a leak
+## report — and it is spelled out at the call site rather than inferred from
+## WILL_FAIL. See _cqops_sanitizer_env above for the measurement, the CI run,
+## and what the option costs.
 
 function(add_cqops_test name)
-    cmake_parse_arguments(ARG "WILL_FAIL" "" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARG "WILL_FAIL;LEAK_EXIT_NOT_ABORT" "" "SOURCES" ${ARGN})
 
     add_executable(${name} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.c" ${ARG_SOURCES})
 
@@ -57,7 +117,11 @@ function(add_cqops_test name)
 
     add_test(NAME ${name} COMMAND ${name})
 
-    _cqops_sanitizer_env(sanitizer_env)
+    if(ARG_LEAK_EXIT_NOT_ABORT)
+        _cqops_sanitizer_env(sanitizer_env LEAK_EXIT_NOT_ABORT)
+    else()
+        _cqops_sanitizer_env(sanitizer_env)
+    endif()
     set_tests_properties(${name} PROPERTIES ENVIRONMENT "${sanitizer_env}")
 
     if(ARG_WILL_FAIL)

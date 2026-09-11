@@ -1306,8 +1306,20 @@ add_cqops_test(test_harness_negative WILL_FAIL)
 ## no LSan, CQOPS_LEAK_CHECK=OFF). The claim it makes is conditional, so its
 ## registration is too — and test_skeleton is what makes the ABSENCE loud, by
 ## checking the build's belief against the environment CTest handed it.
+##
+## AND LEAK_EXIT_NOT_ABORT, WHICH IS THE PLATFORM HALF OF THE SAME CLAIM. The
+## file's own header records "a leak report exits 1 NORMALLY, and does so even
+## under ASAN_OPTIONS=abort_on_error=1" — measured on Darwin, TRUE there, and
+## FALSE on glibc, where that option turns the end-of-process leak report into
+## abort(). CI run 34582398276 is the witness: the leak was found, the case
+## printed `ok 1`, and the process then aborted, so CTest saw a crash and
+## WILL_FAIL could not invert it. This is the ONLY binary in the tree whose PASS
+## CONDITION is a sanitizer report, which is why it is the only one that wants
+## abort_on_error=0 and why the option is named at this call site instead of
+## being implied by WILL_FAIL. cmake/CqopsTest.cmake carries the measurement and
+## the bound.
 if(CQOPS_LSAN_ENABLED)
-    add_cqops_test(test_lsan_negative WILL_FAIL)
+    add_cqops_test(test_lsan_negative WILL_FAIL LEAK_EXIT_NOT_ABORT)
 endif()
 
 ## Layer 5 — M26's foundation (Step 23, landing 1). THE FIRST C SUITE OVER
