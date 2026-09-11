@@ -49,6 +49,98 @@ target_compile_definitions(cqops_test_support PUBLIC
     CQOPS_DOCS_DIR="${CMAKE_SOURCE_DIR}/docs"
 )
 
+## ---------------------------------------------------------------------------
+## _DEFAULT_SOURCE — THE TESTS NEED POSIX; THE LIBRARY MUST NEVER GET THIS.
+##
+## PUBLIC and on cqops_test_support, so it reaches every test binary and NOT the
+## cqops target: PUBLIC propagates DOWNSTREAM, to what links this library, and
+## cqops is UPSTREAM of it (target_link_libraries below names cqops PUBLIC, so
+## the flow is cqops -> cqops_test_support -> test binary, never back). Both
+## registrars in cmake/CqopsTest.cmake link cqops_test_support, so every
+## add_cqops_test and every add_cqops_death_test case inherits it, WILL_FAIL
+## binaries (test_harness_negative, test_lsan_negative) included.
+##
+## TWO EXECUTABLES DO NOT LINK IT AND ARE LEFT ALONE, FOR DIFFERENT REASONS.
+## test_link_smoke (cmake/CqopsLinkWitness.cmake) needs nothing: its generated
+## source is <stdbool.h>, <stdint.h>, <stdio.h> and the ABI header, pure ISO
+## C11, and it builds clean on glibc as it stands. `qtg` (root CMakeLists.txt,
+## EXCLUDE_FROM_ALL, source presently .gitignore'd) is a different case and the
+## honest statement is that it is UNFIXED rather than unaffected: measured, it
+## calls setenv, so it would fail on glibc exactly as the tests did. It is out
+## of scope here because CI never sees it — the source is not in the checkout,
+## and the target is excluded from `all` — and because it links `cqops` alone,
+## deliberately, as a worked example of a NON-test caller driving the library.
+## When tools/qtg/ gets tracked it needs its own answer; it must not get one by
+## being quietly folded into the test-support interface.
+##
+## THE MEASURED FAILURE (GitHub run 34580676994, job "clang", step "Build
+## Debug", ubuntu-latest, /usr/bin/clang from apt). ninja stopped on two objects
+## — tests/test_sink.c (setenv/unsetenv) and tests/test_reg.c via
+## tests/test_reg_free.inc (setenv/unsetenv) — each `error: call to undeclared
+## function ...; ISO C99 and later do not support implicit function
+## declarations`. It stopped at 74 of 213 edges, so that pair is where the build
+## DIED, not the extent of the damage.
+##
+## WHY IT HAPPENS, AND WHY IT HAS NEVER FAILED ON A DEV BOX. The root
+## CMakeLists.txt sets CMAKE_C_STANDARD 11 / REQUIRED ON / EXTENSIONS OFF, so
+## every TU compiles -std=c11 and the compiler defines __STRICT_ANSI__. glibc's
+## <features.h> keys on exactly that: with __STRICT_ANSI__ and no feature-test
+## macro it leaves _DEFAULT_SOURCE undefined and hides every POSIX/XSI/BSD
+## declaration — setenv, unsetenv, fdopen, fileno, mkstemp, M_PI. Darwin's
+## headers key on _ANSI_SOURCE / _POSIX_C_SOURCE / _DARWIN_C_SOURCE instead and
+## default __DARWIN_C_LEVEL to __DARWIN_C_FULL whatever __STRICT_ANSI__ says, so
+## the dev box declares all of it and cannot see the fault at all.
+##
+## THE FULL CASUALTY LIST IS 22 TEST TUs, NOT 2 — measured 2026-09-11 by
+## cross-compiling every tests/*.c and tests/support/*.c against glibc headers
+## (zig 0.16.0 `cc -target x86_64-linux-gnu`, -std=c11 -Wall -Wextra -Werror
+## -Wconversion): 19 of the 86 TUs it can compile fail. The sweep skips the
+## three QEC-only suites, which need a <qec/qec.h> it has no copy of — and all
+## three use these symbols too (test_sink_qec and test_sink_qec_death setenv and
+## unsetenv, test_grover_qec all three plus M_PI), which is 22. With
+## -D_DEFAULT_SOURCE the same sweep is 0 of 86, with no residual warning under
+## -Wconversion either.
+##
+## THE LIBRARY KEEPS STRICT C11 AND GETS NO MACRO, WHICH IS THE POINT. The same
+## sweep over src/ and shim/ is 0 failing of 53 TUs with NO feature macro, and
+## the CI log agrees from the other side: all 53 cqops.dir objects built and
+## libcqops.a linked before ninja stopped, with zero warnings. -std=c11 on the
+## cqops target is therefore a live, load-bearing PROOF of PRD §14's "nothing
+## beyond libc" — handing the library a feature macro would retire that proof
+## silently, and the first POSIX call to creep into src/ would then link on
+## glibc and macOS and be discovered by somebody else's toolchain. Note in
+## particular that the library does NOT depend on <math.h> defining M_PI:
+## src/angle.h writes out its own CQ_ANGLE_PI and says why, and the only M_PI in
+## src/ is prose in a comment.
+##
+## WHY _DEFAULT_SOURCE AND NOT _POSIX_C_SOURCE=200809L. Measured, both halves:
+##   - glibc: _POSIX_C_SOURCE alone sets neither __USE_MISC nor __USE_XOPEN, and
+##     M_PI is guarded on those. The cross-compile sweep above under
+##     -D_POSIX_C_SOURCE=200809L still fails, on tests/test_grover.c, 13 errors,
+##     all M_PI — and test_grover_qec.c uses it too. _DEFAULT_SOURCE restores
+##     precisely the set __STRICT_ANSI__ switched off (POSIX 2008 + BSD/SVID,
+##     M_PI included), which is the minimum that makes the suite compile.
+##   - Darwin: _DEFAULT_SOURCE is INERT — __DARWIN_C_LEVEL stays
+##     __DARWIN_C_FULL (900000L), so the dev box compiles exactly as it does
+##     today. _POSIX_C_SOURCE=200809L LOWERS it to 200809L, which is a real
+##     behaviour change on the box every one of these tests is written on:
+##     probed, it hides strlcpy there. A macro that makes the dev box stricter
+##     in order to fix Linux is a second latent divergence, not a fix.
+##
+## AND NOT C_EXTENSIONS ON (-gnu11) ON THE TEST TARGETS, which also works (the
+## sweep is 0 failing under -std=gnu11): it clears __STRICT_ANSI__ as a side
+## effect of changing the LANGUAGE ACCEPTED, admitting typeof, statement
+## expressions and the rest. tests/ puts src/ on its include path, so every
+## src/*.h would then be parsed in gnu11 mode inside a test and in c11 mode
+## inside the library — the two configurations of one header. _DEFAULT_SOURCE
+## changes which libc DECLARATIONS are visible and nothing else, which is the
+## whole and only difference that is wanted here.
+##
+## A glibc build has NOT been run on this box: the sweep above measures glibc
+## HEADERS through a cross-compiler, and CI is the instrument that measures the
+## build (Rule 17).
+target_compile_definitions(cqops_test_support PUBLIC _DEFAULT_SOURCE)
+
 ## src/ is PRIVATE on the cqops target, because none of it is public API. The
 ## suites need it anyway: plan §2.1 is one test binary per *module*, and the
 ## modules are internal — test_bit.c includes "bit.h" directly. Carrying the
