@@ -22,7 +22,8 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | Doc | Role |
 > |---|---|
 > | [`NORTH_STAR.md`](NORTH_STAR.md) | *Why* — the five commitments, the five finish-line conditions, what this repo is **not** |
-> | [`PRD-v1.md`](PRD-v1.md) | *What* — scope §1, the §3 fold table, the kernel contract §4, Bennett-in-the-small §5, the K1–K12 catalogue §6, rotations §7, sinks §8, controlled §9, uncompute §10, tests §11, layout §14, invariants I1–I5 and **decisions §15 (D1–D25)** |
+> | [`PRD-v1.md`](PRD-v1.md) | *What* — scope §1, the §3 fold table, the kernel contract §4, Bennett-in-the-small §5, the K1–K12 catalogue §6, rotations §7, sinks §8, controlled §9, uncompute §10, tests §11, layout §14, invariants I1–I5 and **decisions §15 (D1–D26)** |
+> | [`PRD-v2.md`](PRD-v2.md) | *What v2 is, and is not* — the fp scoping draft **D26** points at. `f64` only, a PORT; why the 884 is the wrong unit; the seams for M31–M39 recorded in advance. **Scoping only — nothing implemented** |
 > | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | *How and when* — §0 design decisions (incl. I6), §3 the M01–M28 module map **with every split seam recorded in advance**, §4 the 28 steps, §5 the critical path, §6 the R1–R9 risk register, §7 definition of done |
 > | `bd` | The tracker (`bd ready`, `bd show <id>`) **and the institutional memory** (`bd remember`, `bd memories <keyword>`) |
 >
@@ -1847,6 +1848,7 @@ Hand-written total ≈ **3,400 LOC** across 27 modules. Kernels M10–M20 are in
 of each other and parallelisable once Step 9 lands.
 
 **Docs map:** [`NORTH_STAR.md`](NORTH_STAR.md) (why) ·
+[`PRD-v2.md`](PRD-v2.md) (what **v2** is — fp, scoping only) ·
 [`PRD-v1.md`](PRD-v1.md) (what — fold table §3, kernels §6, rotations §7, sinks §8,
 controlled §9, uncompute §10, tests §11, decisions §15) ·
 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) (how — §0 design decisions, §3

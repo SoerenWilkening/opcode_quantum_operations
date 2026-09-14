@@ -1,0 +1,112 @@
+% labreport entry 6 — 2026-09-14
+% labreport-to: 0c9f262
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{6}{field}.
+
+\entry{6}{2026-09-14}{v2 scoping: the fp gap is width, not construction}
+
+\begin{generated}
+  \gitem{Range}{\texttt{b4a4657..0c9f262}}
+  \gitem{Tree}{\emph{dirty at capture} --- 4 path(s) uncommitted}
+  \gitem{Tests}{Release \textbf{359}, Debug \textbf{360} (\texttt{ctest -N})}
+  \gitem{LOC}{OK — 204 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{0c9f262} CLAUDE.md: compression pass -- 165,626 -> 146,311 bytes, no normative change
+    \item \texttt{d9e6819} bd 3ep: the bitcast deferral is the caller's reachability, not non-emission (PRD §15 D16 third worked example)
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{16q} D15's carve-out witnesses have moved out from under it at CQ\_lang HEAD: the ckd.18 shape counts ZERO and slice\_loop\_break* is five -> four, \bead{3ep} The fp/integer partition is a NAME rule, and Step 22 consumes it as a CAPABILITY rule: the 24 bitcast symbols}
+  \gitem{Beads filed}{\bead{dl2} v2 §6.1: does v2 vendor intrinsic\_table.yaml + libm\_table.yaml? The link surface is 2880 symbols, not 2479 -- and fma is 4,295 corpus calls, \bead{9ve} v2 = floating point: scope of record is PRD §15 D26 + PRD-v2.md (f64 only, port not re-derive), \bead{9ns} v2 R14: BENCHMARKS.md's MAGNITUDES are not goldens -- re-measure against our own port at the all-quantum mask, \bead{hkg} v2 §6.5 / R12: L1's fp ANCHORS must be written down before M31 -- the 32-sample budget survives, the corners do not, \bead{4tr} v2 §6.3 / R10: do NOT take f32 on the fpext->f64->fptrunc round trip -- upstream rejects the compile and L1 would be correctly red, \bead{1us} v2 §6.2: f80 is an UPSTREAM DEPENDENCY, not a gap to close here -- 5,891 corpus calls, 53 fixtures, zero bytes in the snapshot, \bead{c5x} v2 §6.6: do the 688 never-called fp symbols get their own residual bucket, or stay in cq\_runtime\_v2.c?, \bead{213} v2 §6.4: is D14's non-injective set 232 or 460? The five NAMED opcodes are 232; another 228 are non-injective by the same argument}
+  \gitem{Diff}{\texttt{8 files changed, 665 insertions(+), 732 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Scope v2 = floating point --- not implement it. A decision document and a tracker, in this
+repo's idiom: what v2 is, what it is not, and the seams recorded in advance the way
+\texttt{IMPLEMENTATION\_PLAN} \S3 records a split seam before a module is written. Plus
+\bead{16q}, and an account of an uncommitted \texttt{CLAUDE.md} change of unknown provenance
+before anything else.
+
+\field{What landed}
+No code. Three documents and eight beads.
+
+The \texttt{CLAUDE.md} change was an editorial \emph{compression} from this morning's session,
+left out of \texttt{d9e6819} and unmentioned in entry 5 --- 165{,}626 $\to$ 146{,}311 bytes.
+Committed on its own as \texttt{0c9f262} after a mechanical check found \textbf{zero
+pure-deletion hunks} and identical sets of rules, D-numbers, \texttt{bd remember} keys,
+invariants, modules and bead ids. What it removes is the three categories the file's own
+preamble forbids: box-local measured counts, correction history, step narrative.
+
+\texttt{PRD-v2.md} is new and is the scoping draft; \textbf{PRD \S15 D26} is the one-row
+pointer at it, in the register where every decision lives. The headline is that
+\emph{the fp gap is a WIDTH gap, not a CONSTRUCTION gap}, which the file list actively
+disguises: \texttt{softfloat/} has 35 files and covers every opcode the corpus calls, and is
+\emph{binary64} --- \texttt{f16} and \texttt{f80} have zero files and \texttt{f32} is a
+double-rounding round trip its own source says \texttt{reversible\_compile} rejects. So
+\texttt{f80} is a \emph{dependency on upstream}, not a gap to close here, and \texttt{f32}
+cannot sit inside a condition that is a bit-exact differential test.
+
+The second finding is that \textbf{the 884 is the wrong unit and is wrong in both directions}.
+It over-covers by 688 symbols nothing calls and under-covers by 75 the corpus calls 4{,}913
+times --- dominated by \texttt{fma}, the single most-called fp symbol in the corpus and a
+symbol \texttt{opcode\_table.yaml} \emph{cannot} contain, being ternary. Those come from the
+two tables \texttt{third\_party/cq\_lang/COMMIT} has flagged as deliberately not vendored since
+2026-08-14. \texttt{PRD-v2} \S6.1 files that rather than answering it.
+
+\bead{16q} is closed as \emph{leave dated, amend} (the user's call): D15 keeps its 2026-08-22
+date and its \texttt{397c67c} pin, and \S0 gains amendments (d) and (e).
+
+\field{Measured}
+Corpus figures are against CQ\_lang \texttt{607b6fe4} --- \textbf{a revision this repo does not
+pin}; construction figures are against Bennett \texttt{980805de}, which is pinned and does not
+move. Re-measure the first kind; the second is stable.
+\begin{figures}
+  \fig{yaml byte-identical at CQ\_lang HEAD; 0 of 33 commits since \texttt{170ede1} touch \texttt{runtime/cq\_runtime.h}}{\texttt{shasum -a 256} vs \texttt{git show}; \texttt{git log -- <path>}}{CQ\_lang \texttt{607b6fe4}}
+  \fig{0 fp opcodes the corpus calls are absent from Bennett}{25 base opcodes from the goldens mapped onto \texttt{softfloat.jl}'s export list}{Bennett \texttt{980805de}}
+  \fig{\texttt{Float16} 0 files, \texttt{Float80} 0 files, \texttt{Float64} 30}{\texttt{grep -rl} over \texttt{third\_party/bennett/src}}{Bennett \texttt{980805de}}
+  \fig{191 of 367 goldens touch fp; an \texttt{f64}-only scope unblocks \textbf{100}}{per-fixture width + opcode partition against the expanded grid}{CQ\_lang \texttt{607b6fe4}}
+  \fig{196 of 884 grid fp symbols are ever called; 75 fp symbols outside the grid, 4{,}913 occurrences, \texttt{fma} 4{,}295}{same partition}{CQ\_lang \texttt{607b6fe4}}
+  \fig{corpus fp calls by width --- f16 5, f32 5{,}732, f64 9{,}167, f80 5{,}891}{same}{CQ\_lang \texttt{607b6fe4}}
+  \fig{\texttt{Total} $=$ \texttt{NOT+CNOT+Toffoli} exactly on all three softfloat rows (63{,}058 / 149{,}456 / 247{,}398)}{column arithmetic on \texttt{BENCHMARKS.md}}{Bennett \texttt{980805de}}
+  \fig{D14's five NAMED opcodes are \textbf{232} symbols exactly; 228 more non-injective, 143 invertible}{\texttt{gen\_shim.expand()} over the pinned yaml}{\texttt{third\_party/cq\_lang}}
+  \fig{\bead{16q}: \texttt{ckd.18} shape \textbf{0}, \texttt{slice\_loop\_break*} \textbf{4}, and 0 of 32 freed non-zero-born rails rotated}{golden text, exact-significand literal test}{CQ\_lang \texttt{607b6fe4}}
+  \fig{three literal-classification methods: 3{,}218 / 1{,}031 / \textbf{1{,}032}}{text test, \texttt{float.fromhex}, significand-digit test, over 30{,}704 \texttt{cqrt\_alloc} lines}{CQ\_lang \texttt{607b6fe4}}
+\end{figures}
+
+\field{Decided}
+PRD \S15 \textbf{D26} (new), long form \texttt{PRD-v2.md}. PRD \S15 D15 \S0, amendments (d)
+and (e) (\bead{16q}).
+
+\field{Not taken}
+\textbf{\texttt{f32} on the round trip}, which is one flag away and worth 38 more fixtures
+(100 $\to$ 138). Upstream rejects the compile and says the bit-exactness contract does not
+extend to it, so L1 would be red --- correctly. Filed as \bead{4tr} with the condition that
+would flip it.
+
+\textbf{\texttt{f80}}, and \textbf{re-deriving anything}. There is nothing to port and Rule 1
+forbids the alternative; recorded as an upstream dependency (\bead{1us}) rather than carried
+as a gap.
+
+\textbf{Re-pinning D15's carve-out} to \texttt{607b6fe4}. Nothing here pins CQ\_lang and its
+HEAD moves within days, so a re-pin would manufacture provenance rather than supply it.
+
+\textbf{Answering \S6.1} (vendoring the two tables). It is the largest open item and it is a
+link-surface question --- 2{,}880 symbols, not 2{,}479 --- that binds before the kernel
+question it contains.
+
+\field{Verified}
+\texttt{make lint} only --- \texttt{check\_loc} and \texttt{check\_cites}, both green (204
+files walked, largest 294; 299 files scanned, 0 bare citations; the 299th is the new
+\texttt{PRD-v2.md}, and \texttt{check\_cites.sh}'s target regex was widened
+\texttt{PRD-v1} $\to$ \texttt{PRD-v[0-9]} to reach it). \textbf{No test suite was run in either
+configuration}, and none was owed: the session changed three Markdown documents and one shell
+guard, and no source file. The gate from the previous session stands.
+
+\field{Left open}
+Eight beads filed, all under \bead{9ve}. \bead{dl2} is the one that binds first. \bead{16q} and
+\bead{3ep} closed. Nothing in v2 is scheduled, and nothing should be until \bead{dl2} is
+answered --- it changes the size of the thing.

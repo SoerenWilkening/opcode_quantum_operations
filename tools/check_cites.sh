@@ -80,7 +80,7 @@ cd "$root"
 # in both BSD and GNU grep, so an occurrence carrying a prefix or a SHA matches
 # WITH it and is dropped by the two filters below. A lookahead needs PCRE,
 # which BSD grep does not have.
-TARGETS='(PRD-v1|IMPLEMENTATION_PLAN|NORTH_STAR|CLAUDE|BASELINES|K[0-9][0-9])\.md'
+TARGETS='(PRD-v[0-9]|IMPLEMENTATION_PLAN|NORTH_STAR|CLAUDE|BASELINES|K[0-9][0-9])\.md'
 RANGE='((-|–)[0-9]+)?'   # ASCII hyphen AND en dash; the K-docs use both
 PIN='[[:space:]]*@[[:space:]]*[0-9a-f]{7,40}'
 # `plan:NNN` is the shorthand bd 0a7's own notes use. Measured 2026-09-10 it
