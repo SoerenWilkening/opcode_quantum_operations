@@ -2906,6 +2906,39 @@ and diffs — `make shim-check` / `cmake --build <dir> --target shim-check`, i.e
 > M06 existed, carries the identical refusal — and D11 is where the decision to refuse rather
 > than emit five hand-derived phases lives.
 >
+> **THE THIRD WORKED EXAMPLE IS THE `cq_template_*` GRID RATHER THAN THE 173, AND IT IS THE
+> ONE WHERE THE NAME RULE WINS (`bd 3ep`, resolved 2026-09-14).** The partition that sends 884
+> symbols to `"fp is v2"` is a NAME rule — `docs/cqrt_census.txt`'s *"a cast is 'purely integer'
+> iff BOTH endpoints are integer"* — and §1's abort posture consumes membership in it as a
+> CAPABILITY rule. `bd 3ep` found the two readings come apart on the **24 `bitcast` symbols**
+> (8 same-width pairs × {fwd, `_inv`, `_unc`}): `opcode_table.yaml` calls them *a reversible
+> IDENTITY RELABEL (same basis states under a new type label; ZERO GATE)*, no fp C type reaches
+> their ABI, and D14's ground does not touch them either — a bitcast's inverse EXISTS and ships
+> as its own symbol. So the capability reading says implement them and the name reading says
+> abort.
+>
+> **THE NAME RULE STANDS, AND THE GROUND IS THE CALLER'S REACHABILITY RATHER THAN THE
+> SYMBOL'S.** This is D23's own test — *are there fixtures that are otherwise in scope and stop
+> only on this abort?* — applied to this family and coming out the opposite way. Measured
+> 2026-09-14 against CQ_lang `607b6fe4` (clean working tree, 367 goldens): **1,511 bitcast lines
+> across 127 fixtures**, 12 of the 24 symbols live (f32↔i32, f64↔i64, f80↔i80, each forward and
+> `_unc`; the f16 pair and all eight `_inv` appear zero times, consistent with D14's corpus-wide
+> zero). And **not one of the 127 is otherwise fp-clean** — every one calls at least one other
+> fp symbol, the closest being `slice_libm_real_ilogb` (2 others) and `slice_bitcast_words` (3),
+> the bulk libm kernels at 300–1,700. Implementing the 24 therefore unblocks **zero** fixtures:
+> the whole population is `f64`/`f80` libm work that needs real fp arithmetic, and a bitcast is
+> its first instruction rather than a standalone shape. Contrast D23, where six tape fixtures
+> WERE otherwise integer-clean and ran to `tape is v2` and stopped — which is what collapsed
+> that deferral.
+>
+> **AND THE TEMPTING GROUND IS MEASURABLY FALSE, WHICH IS WHY IT IS RECORDED RATHER THAN LEFT
+> IMPLICIT.** *"Defer them because CQ_lang does not emit them"* is the D14-shaped argument and
+> it does **not** transfer: the bitcasts are among the most heavily emitted symbols in the grid.
+> The reason to defer is that every caller needs fp anyway, not that no caller exists. The
+> disposition is unchanged — the 24 stay in the 884 — so no count in this document moves, and
+> the 12 live symbols become reachable exactly when fp does. Re-measure before quoting any of
+> these figures: this repo pins neither CQ_lang nor its corpus.
+>
 > ### D17 — `cqrt_addc` folds or runs Cuccaro in place, and it is never sandwiched
 >
 > **THE GAP NO DOCUMENT NAMED.** `cqrt_addc_<W>(h, imm)` is `h := (h + imm) mod 2^W`, IN

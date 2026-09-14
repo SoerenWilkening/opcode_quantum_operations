@@ -732,6 +732,18 @@ F1. THE COUNT BY CONSTRUCTION (opcode_table.yaml, 2479)
                     ----
                     2479
 
+    THIS IS A NAME RULE, AND PRD SECTION 1's ABORT POSTURE CONSUMES IT AS A CAPABILITY
+    RULE. The two readings come apart on exactly one family: the 24 `bitcast` symbols
+    (8 same-width pairs x {fwd,inv,unc}) need ZERO floating-point capability -- the yaml
+    itself calls them a reversible identity relabel, zero gate, and no fp C type reaches
+    their ABI. Raised as bd 3ep 2026-08-22; RESOLVED 2026-09-14 as PRD section 15 D16's
+    third worked example: THE NAME RULE STANDS, on the CALLER's reachability rather than
+    the symbol's. Measured at CQ_lang 607b6fe4 (clean, 367 goldens) -- 1,511 bitcast lines
+    across 127 fixtures, and not ONE of the 127 is otherwise fp-clean, so implementing the
+    24 unblocks zero fixtures. Note the ground that is NOT this one: the bitcasts are
+    heavily EMITTED (12 of the 24 are live), so D14's non-emission argument does not
+    transfer. Re-measure before quoting; this repo pins neither CQ_lang nor its corpus.
+
 F2. WHERE 1732 CAME FROM — a stale comment, two of them.
 
     tools/opcode_table.yaml:4      "runtime/cq_templates.h  (1732 declarations)"

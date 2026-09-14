@@ -1,0 +1,84 @@
+% labreport entry 5 — 2026-09-14
+% labreport-to: b4a4657
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{5}{field}.
+
+\entry{5}{2026-09-14}{bd 3ep: the bitcast deferral is the caller's reachability, not non-emission}
+
+\begin{generated}
+  \gitem{Range}{\texttt{2d917b6..b4a4657}}
+  \gitem{Tree}{\emph{dirty at capture} --- 3 path(s) uncommitted}
+  \gitem{Tests}{Release \textbf{359}, Debug \textbf{360} (\texttt{ctest -N})}
+  \gitem{LOC}{OK — 204 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{b4a4657} bd j5v/aei/tgx/ss8/y4o/a9e/q4v: measured-rail sources are legal; check\_cites widened to the K-docs; the exhaustive parameter removed
+    \item \texttt{7cca77a} labreport entry 4 (2026-09-11) + CLAUDE.md: the tests need \_DEFAULT\_SOURCE and the library never; the LSan bullet scoped to Darwin (category 2)
+    \item \texttt{93357fd} bd kju follow-up 2: test\_lsan\_negative runs under abort\_on\_error=0 (LEAK\_EXIT\_NOT\_ABORT) — glibc's LSan aborts on the leak report, Darwin exits 1 (CI run 34582398276)
+    \item \texttt{662002e} bd kju follow-up: tests get \_DEFAULT\_SOURCE; the library keeps strict C11 (CI run 34580676994, glibc hides setenv/unsetenv/fdopen/M\_PI under -std=c11)
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{3ep} The fp/integer partition is a NAME rule, and Step 22 consumes it as a CAPABILITY rule: the 24 bitcast symbols}
+  \gitem{Beads filed}{none}
+  \gitem{Diff}{\texttt{51 files changed, 1134 insertions(+), 137 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Which of the open beads belong to v1, and whether closing them would complete the
+integer surface --- then, on the answer, a decision on \bead{3ep}: whether the 24
+\texttt{bitcast} symbols stay in the fp abort bucket.
+
+\field{What landed}
+No code. \bead{3ep} is resolved in the two documents that own it: PRD \S15 D16 gains a
+third worked example, and \texttt{docs/cqrt\_census.txt} gains a cross-reference under the
+\textsc{domain split} line, which is where the name rule (\emph{a cast is ``purely
+integer'' iff both endpoints are integer}) is written down exactly once. The disposition
+does not move --- the 24 keep \texttt{``fp is v2''} and the $884/1595$ partition is
+unchanged --- so no count in either document changes.
+
+The finding worth carrying is the \emph{ground}, because the plausible one is false. The
+bitcasts look like D14's \texttt{\_inv} family, so the reflex argument is ``defer them,
+nothing emits them''. Measured, they are among the most heavily emitted symbols in the
+2479-symbol grid. What settles it instead is D23's own test --- \emph{are there fixtures
+otherwise in scope that stop only on this abort?} --- applied to this family and coming out
+the opposite way from tape: not one of the 127 bitcast fixtures is otherwise fp-clean, so
+implementing the 24 unblocks zero fixtures. \texttt{bd remember
+bitcast-deferral-is-caller-reachability-not-non-emission}.
+
+\field{Measured}
+All against CQ\_lang \texttt{607b6fe4}, clean working tree, 367 goldens --- a revision this
+repo does not pin, so these are to be re-measured rather than quoted.
+\begin{figures}
+  \fig{1{,}511 bitcast lines across 127 fixtures}{\texttt{grep} over \texttt{tests/e2e/*.expected.log}}{CQ\_lang \texttt{607b6fe4}}
+  \fig{12 of 24 bitcast symbols live}{same; f32$\leftrightarrow$i32, f64$\leftrightarrow$i64, f80$\leftrightarrow$i80, each fwd and \texttt{\_unc}}{CQ\_lang \texttt{607b6fe4}}
+  \fig{0 occurrences of the f16 pair and of all eight \texttt{\_inv}}{same --- consistent with D14's corpus-wide zero \texttt{\_inv}}{CQ\_lang \texttt{607b6fe4}}
+  \fig{0 of 127 bitcast fixtures are otherwise fp-clean}{per-fixture count of non-bitcast fp symbols; minima \texttt{slice\_libm\_real\_ilogb} (2), \texttt{slice\_bitcast\_words} (3)}{CQ\_lang \texttt{607b6fe4}}
+\end{figures}
+
+\field{Decided}
+PRD \S15 D16, third worked example (\bead{3ep}).
+
+\field{Not taken}
+Implementing the 24 on \bead{3ep}'s own capability argument, which is correct as far as it
+goes and was upheld: they genuinely need no floating-point capability. It buys nothing ---
+every caller needs fp anyway --- and it would carve a per-symbol exception into a grid M27
+expands mechanically, which is the forked-shim hazard. The 12 live symbols become reachable
+exactly when fp does.
+
+Also not taken: rewriting the name rule itself. The two readings of ``fp-touching'' do come
+apart, and the entry records that they do rather than collapsing them.
+
+\field{Verified}
+\texttt{make lint} only --- \texttt{check\_loc} and \texttt{check\_cites}, both green (204
+files walked, largest 294; 298 files scanned, 0 bare citations). \textbf{No test suite was
+run in either configuration}, and none was owed: the session changed two Markdown/text
+documents and no source file. The gate from the previous session stands.
+
+\field{Left open}
+No beads filed. 18 remain open, none blocking: five explicitly v2, and thirteen v1-era
+follow-ups (decisions \bead{16q}, \bead{16s}, \bead{bpw}; hygiene \bead{6kg}, \bead{awt},
+\bead{cue}, \bead{ula}, \bead{ljk}, \bead{97s}; docs \bead{nik}, \bead{bz8}; the unpinned
+QEC figures in \bead{65q}). None adds an integer opcode.
