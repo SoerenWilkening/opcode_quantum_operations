@@ -1,0 +1,141 @@
+% labreport entry 7 — 2026-09-17
+% labreport-to: 7f2ee99
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+%% correction is a NEW entry carrying \supersedes{7}{field}.
+
+\entry{7}{2026-09-17}{Three refactor beads as one batch: dr\_sweep's dead parameters, the fork-and-capture helper, all\_const and the null sink}
+
+\begin{generated}
+  \gitem{Range}{\texttt{0c9f262..7f2ee99}}
+  \gitem{Tree}{\emph{dirty at capture} --- 42 path(s) uncommitted}
+  \gitem{Tests}{Release \textbf{359}, Debug \textbf{360} (\texttt{ctest -N})}
+  \gitem{LOC}{OK — 206 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{7f2ee99} v2 scoping: PRD §15 D26 + PRD-v2.md — the fp gap is WIDTH, not CONSTRUCTION
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{16s} dr\_sweep's three dead parameters are the same class as cq\_kd\_sweep\_at's removed 'exhaustive' — decide them, \bead{ula} tests/ has THREE copies of a fork-and-capture helper; extract one tests/support/ module, \bead{cue} Consolidate all\_const and the death-test null sink into kernel.h / death.h}
+  \gitem{Beads filed}{\bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{cmu} dr\_sweep and dr\_sweep\_small are compile-time indistinguishable since bd 16s — the arity discriminator is gone, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Diff}{\texttt{9 files changed, 580 insertions(+), 5 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Orchestrate \bead{16s}, \bead{ula} and \bead{cue} as one batch. All three are the
+same shape --- a helper or a parameter that no longer earns its place --- and none buys any
+correctness, so the binding constraint was that each must move \emph{no observable}: not a gate
+count, not a golden byte, not a ctest case name. A refactor in this batch that changed a
+measured number would be a failed refactor, not a discovered bug.
+
+
+\field{What landed}
+Three consolidations, each written in an isolated worktree, reviewed
+against three questions, given one fix round, and merged serially with a gate after each.
+
+\bead{16s} removed \texttt{dr\_sweep}'s three \texttt{(void)}-cast parameters and the two enum
+constants they orphaned. \bead{ula} replaced three copies of a fork-and-capture helper with
+\texttt{tests/support/childcap.[ch]}, carrying forward the six requirements the bead had written
+down so they would not be re-derived. \bead{cue} moved six private copies of \texttt{all\_const}
+into \texttt{cq\_bits\_all\_const} in \texttt{src/kernels/kernel.h} and seventeen copies of the
+death-test null sink into \texttt{cq\_death\_null\_sink} in \texttt{tests/support/death.h}.
+
+Three things the review round established that the implementing agents had not. First, the
+\texttt{L}-not-\texttt{W} miscompile that \bead{cue} was built around \emph{is} detected: mutating
+\texttt{shift\_var.c}'s call to pass \texttt{W} reddens \texttt{test\_kernel\_shift\_var} in both
+configurations, and under that mutant the \emph{value} check passes while only the pool assertion
+fails. Second, \bead{ula}'s own argument that its \texttt{SIGABRT} test was unfalsifiable rested on
+an incomplete enumeration of child outcomes, and a paired mutation located the work on exactly that
+line. Third, a dated re-measurement note in \bead{16s} was itself wrong, and the orchestrator had
+re-typed it into an agent brief as measured fact.
+
+One defect was introduced and caught: \texttt{cq\_death\_null\_sink} declared its vtable on
+automatic storage where the seventeen file-statics it replaced were zero-initialised static storage,
+converting M04's loud by-name NULL-entry guard into a jump through stack garbage should a seventh
+entry ever be added. Corrected to \texttt{= \{0\}}.
+
+
+\field{Measured}
+\begin{figures}
+  \fig{\texttt{d8102af6211cadd4a5f2f0f8dfcffa394e06000f}, unchanged}{\texttt{shasum} over every file under \texttt{tests/goldens/}, before the batch and after all three merges}{filesystem}
+  \fig{349 / 348 ctest cases, lists byte-identical}{\texttt{ctest -N}, sorted and \texttt{diff}ed against a HEAD configure at matching flags --- not compared by count}{Debug / Release}
+  \fig{349/349 and 348/348 passed}{\texttt{ctest -j6} on the merged tree}{Debug / Release}
+  \fig{6 copies of \texttt{all\_const}, 141 bytes each, md5 \texttt{64046056aeea79c29d624062d5104b53}}{\texttt{grep} over \texttt{src/kernels/}, bodies hashed}{filesystem}
+  \fig{17 byte-identical null sinks in 2 groups (9 at 545 B, 8 at 459 B)}{the six-no-op vtable shape, blocks hashed per file}{filesystem}
+  \fig{39 v1-deferred thunks}{preprocessed \texttt{CQ\_V2\_THUNKS}, 39 unique}{Release}
+  \fig{1 test red, both configurations}{the \texttt{L}$\rightarrow$\texttt{W} mutant applied to a scratch copy, targeted \texttt{ctest -R}}{Debug / Release}
+  \fig{7 mutants of \texttt{childcap.c} unfalsified}{mutation battery, restore by \texttt{cp}+\texttt{touch}}{Debug and Release}
+  \fig{paired mutant survives Release}{\texttt{abort()}$\rightarrow$\texttt{exit(1)} with a byte-identical message, plus the helper weakened to \texttt{return 1}}{Release}
+\end{figures}
+
+The four counts above that a bead asserted differently are recorded in
+\texttt{bd remember a-bead-s-own-dated-re-measurement-note}; none reached this document through
+memory.
+
+
+\field{Decided}
+\bead{16s} decided as \textsc{remove}, on the precedent of \bead{aei}
+rather than against it. No PRD decision number was opened or moved by this batch.
+
+
+\field{Not taken}
+\textbf{The argument \bead{16s} rejected}, recorded because it is the
+better half of the case and the bead stated it correctly: unlike a literal \texttt{1} meaning
+``exhaustive'', each removed argument was a real measurement a reader could use. It lost because
+nothing printed those numbers at those widths and \texttt{dr\_sweep} discarded all three, while both
+measurements survive at the \texttt{i128} cases that do print them --- and because the budget
+constant read at the call site as a cap on a sweep that has had no cap since 2026-08-20.
+
+\textbf{A date discrepancy was investigated and declined}, not fixed: the two dates the reviewer
+read as contradictory are two different events, and \texttt{test\_kernel\_mux.c} states the split
+outright, so there was nothing to correct.
+
+\textbf{Nine death files were deliberately not converted} --- a leak-detecting sink whose entries
+disarm the death window, an \texttt{nmz} tripwire backing a \texttt{FAIL\_REGULAR\_EXPRESSION},
+four counting sinks whose cases read the count, and two where the sink is the subject under test.
+Converting any of them would be a silent loss of what that file measures.
+
+\textbf{The remedy \bead{09z} originally prescribed was withdrawn before anyone built it.} A
+negative control that prints and \emph{returns} kills only one of the two mutants it was meant to
+kill, because a returning child yields status 0 and the two spellings agree; the discriminating set
+is two controls, one that \texttt{\_exit(1)}s and one that raises a non-\textsc{sigabrt} signal.
+
+\textbf{\texttt{CQOPS\_UPDATE\_GOLDENS} was forbidden for the batch} in every configuration, for
+every agent and reviewer, and was never set. It is the documented way to make a red L4 green, so
+for a change that must move no observable it can only launder a failure.
+
+
+\field{Verified}
+\textbf{The extracted header's test figures are not what ran.} They were
+captured from build directories configured with \texttt{-DCQOPS\_CQLANG\_DIR=} and
+\texttt{-DCQOPS\_QEC\_DIR=}; that configure now fails because the \texttt{qec/} checkout has neither
+\texttt{build/} nor \texttt{include/qec/qec.h}, a pre-existing environment condition nothing in this
+batch touches. Every figure quoted under \emph{Measured} was taken at the flag-matched
+configuration, which is also what every agent and reviewer used.
+
+What ran on the merged tree: \texttt{check\_loc} and \texttt{check\_cites} OK; \texttt{gen\_shim
+--check} up to date at 2479 symbols; the whole registered suite green in \textbf{both}
+configurations, Debug 349/349 and Release 348/348. That covers L0--L5 and every registered death
+case. \textbf{L6, L7 \S12(1) and the two QEC sink suites did not run and nothing here claims
+anything about them} --- they are unregistered without those flags, and the flags are unusable on
+this box today.
+
+Intermediate gates were deliberately narrower than the final one, to avoid running the same suite
+nine times: merges A and B were gated on lint, \texttt{shim-check}, a sorted \texttt{ctest -N} diff
+and their affected suites in both configurations; the single full run came after merge C, which has
+the only \texttt{src/} change in the batch.
+
+
+\field{Left open}
+\bead{09z} (P2) is the one worth picking up: seven mutants of
+\texttt{childcap.c} are unfalsified, and the bead now names the two controls that would close it.
+\bead{6q4} records an inversion of this repo's usual masking trap --- an \emph{earlier incidental}
+crash masking a \emph{later purpose-built} assertion --- with the warning not to harden the
+underflow before making the assertion independently observable. \bead{cmu} records what \bead{16s}
+cost: two sweep functions that differed in arity are now compile-time indistinguishable, inert
+today and live again the moment \texttt{cq\_kd\_sweep\_at} regains behaviour. \bead{qki} and
+\bead{ta1} are P4.
+
+

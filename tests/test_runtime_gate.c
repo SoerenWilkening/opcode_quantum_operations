@@ -47,18 +47,15 @@
 #include "cqops/cqops.h"
 
 #include "support/bitkinds.h"
+#include "support/childcap.h"
 #include "support/harness.h"
 #include "support/mock_sink.h"
 #include "support/poolcheck.h"
 
-#include <errno.h>
 #include <math.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 static void fresh(void)
 {

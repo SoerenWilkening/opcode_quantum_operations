@@ -216,9 +216,10 @@ CQ_TEST(d8_a_shift_by_exactly_the_width_is_the_identity)
 }
 
 /* W=1 has ZERO stages, so no bit of the amount is read and the barrel never
- * runs — `amount_is_classical` is vacuously true and M11 answers. Pinned
- * because it is the one width where the whole construction degenerates, and
- * because a ceil(log2 1) = 1 slip would show up here and nowhere else. */
+ * runs — shift_var's `cq_bits_all_const(b, L)` is vacuously true and M11
+ * answers. Pinned because it is the one width where the whole construction
+ * degenerates, and because a ceil(log2 1) = 1 slip would show up here and
+ * nowhere else. */
 CQ_TEST(d8_a_width_of_one_ignores_the_amount_entirely)
 {
     CHECK_EQ(cq_shift_stages(1), 0);

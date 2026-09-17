@@ -184,13 +184,6 @@ static void copyout(cq_ctx *ctx, void *env, int i)
     cq_emit_cx(ctx, &accum_of(e)[i], &e->dst[i]);
 }
 
-static int all_const(const cq_bit *v, int W)
-{
-    for (int i = 0; i < W; i++)
-        if (!cq_bit_is_const(v[i])) return 0;
-    return 1;
-}
-
 /* Risk R9's short-circuit: `dst ^= (a·b) mod 2^W` with every operand bit a
  * constant. Zero gates and zero qubits when `dst` is classical too, which is
  * L5; a real X per set bit of the product when `dst` already sits on qubits,
@@ -240,7 +233,7 @@ void cq_kernel_mul(cq_ctx *ctx, cq_bit *dst,
      * here but out of domain (adder.jl:66). */
     if (W == 1) { cq_kernel_and(ctx, dst, a, b, 1); return; }
 
-    if (all_const(a, W) && all_const(b, W)) {
+    if (cq_bits_all_const(a, W) && cq_bits_all_const(b, W)) {
         fold_constant(ctx, dst, a, b, W);
         return;
     }

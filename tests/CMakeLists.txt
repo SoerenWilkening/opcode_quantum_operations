@@ -8,9 +8,17 @@
 ## those two. TEN kernel modules and Step 20's controlled re-run all land
 ## against them.
 
+## childcap is beyond §2.2's list too, and beyond kerneldrv/goldens: it belongs
+## to no layer and no step. It is `bd ula` — the ONE fork-and-capture helper,
+## after three suites had each written their own and the copies had diverged in
+## what they redirect and in their callback signature. Not folded into death.c:
+## that file's subject is a process that IS one case and every exit path in it
+## is _Exit(); childcap's callers are ordinary suites that need the abort, its
+## bytes, and to keep running.
 add_library(cqops_test_support STATIC
     support/harness.c
     support/death.c
+    support/childcap.c      # bd ula — fork, capture, and report SIGABRT
     support/mock_sink.c
     support/refmodel.c      # Step 10 — plain-C semantics, the L1 reference
     support/refmodel_w.c    # bd zmo — the two-word half, split 2026-09-02 on the header's own seam
@@ -919,12 +927,13 @@ set_tests_properties(test_kernel_step14_death.shl_var_dst_aliases_its_source
                      "retire of a determinate")
 
 ## AND ONE CASE THAT CANNOT BE DISCRIMINATED AT ALL, said out loud rather than
-## dressed up. At W = 0, cq_shift_stages returns 0, so amount_is_classical is
-## vacuously true whatever the amount's kinds are and M12 delegates — meaning
-## M11's identical guard would abort with the identical message. No regex
-## separates them. shift_var_a_width_of_zero is kept because it pins that the
-## entry point refuses W = 0 at all rather than allocating a zero-length region,
-## and it is recorded here as NOT proving M12 owns that refusal.
+## dressed up. At W = 0, cq_shift_stages returns 0, so shift_var's classical
+## short-circuit (cq_bits_all_const over L, NOT over W) is vacuously true
+## whatever the amount's kinds are and M12 delegates — meaning M11's identical
+## guard would abort with the identical message. No regex separates them.
+## shift_var_a_width_of_zero is kept because it pins that the entry point
+## refuses W = 0 at all rather than allocating a zero-length region, and it is
+## recorded here as NOT proving M12 owns that refusal.
 
 ## M15, Step 15. THIS SUITE IS K8's L5. Every other kernel folds an
 ## all-classical operand to zero gates and zero qubits; K8 refuses one, because

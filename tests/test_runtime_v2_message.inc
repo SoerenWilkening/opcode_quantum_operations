@@ -13,55 +13,16 @@
  * Included by tests/test_runtime_v2.c and inheriting its includes, its bucket
  * strings and its `header_deferred`; out of check_loc.sh's reach by the
  * EXTENSION rule.
+ *
+ * THE FORK AND CAPTURE IS tests/support/childcap.h SINCE `bd ula` — it was one
+ * of three copies, and the one whose callback carries no argument, so the sweep
+ * passes NULL. What it must keep doing, and what a green run cannot show: it
+ * reports SIGABRT SPECIFICALLY, never merely a non-zero exit, because this
+ * file's whole claim is that every deferred body ABORTS rather than returning;
+ * and it clears the buffer FIRST, because the sweep below reuses one `msg`
+ * across every symbol and a failed capture must not report the previous one's
+ * bytes.
  */
-
-/* --- fork and capture ----------------------------------------------------- */
-
-static void child_stderr(void (*fn)(void), char *out, size_t cap, int *aborted)
-{
-    int fd[2];
-
-    out[0] = '\0';
-    *aborted = 0;
-
-    if (pipe(fd) != 0) { cq_h_fail(__FILE__, __LINE__, "pipe failed"); return; }
-    fflush(NULL);
-
-    const pid_t pid = fork();
-    if (pid < 0) {
-        (void)close(fd[0]); (void)close(fd[1]);
-        cq_h_fail(__FILE__, __LINE__, "fork failed");
-        return;
-    }
-    if (pid == 0) {
-        (void)close(fd[0]);
-        (void)dup2(fd[1], STDERR_FILENO);
-        (void)close(fd[1]);
-        fn();
-        _exit(0);              /* fn returned: not an abort, and the child must
-                                * not resume the suite */
-    }
-
-    (void)close(fd[1]);
-    size_t n = 0;
-    for (;;) {
-        const ssize_t got = read(fd[0], out + n, cap - 1u - n);
-        if (got == 0) break;
-        if (got < 0) {
-            if (errno == EINTR) continue;
-            cq_h_fail(__FILE__, __LINE__, "read failed: errno %d", errno);
-            break;
-        }
-        n += (size_t)got;
-        if (n + 1u >= cap) break;
-    }
-    out[n] = '\0';
-    (void)close(fd[0]);
-
-    int status = 0;
-    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) { }
-    *aborted = WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT;
-}
 
 /* --- the sweep, run once and cached --------------------------------------- */
 
@@ -111,19 +72,31 @@ static void v2_sweep(void)
 
     if (g_swept) return;
     for (size_t i = 0; i < CQ_V2_N_THUNKS; i++) {
-        int aborted = 0;
+        const int aborted = cq_child_capture(CQ_CHILD_STDERR,
+                                            CQ_V2_THUNKS[i], NULL,
+                                            NULL, 0u, msg, sizeof msg);
 
-        child_stderr(CQ_V2_THUNKS[i], msg, sizeof msg, &aborted);
         g_said[i].aborted = aborted;
         parse_said(msg, &g_said[i]);
     }
     g_swept = 1;
 }
 
-/* EVERY ONE OF THE 98 ABORTS (109 before D23), AND NAMES ITSELF. The abort is the cheap half;
- * the name is what a death suite could never have checked, and with 12 macro
- * bodies covering 98 symbols a single wrong literal would ship 4 or 9 wrong
- * messages at once.
+/* EVERY ONE OF THE 39 ABORTS, AND NAMES ITSELF. The abort is the cheap half;
+ * the name is what a death suite could never have checked, and a wrong literal
+ * ships several wrong messages at once: measured 2026-09-17, the 39 come from
+ * 15 cq_shim_unsupported sites in shim/cq_runtime_v2.c — 8 inside one
+ * per-width macro expanded at f16/f32/f64/f80, which is 32 of them, and 7
+ * written by hand (the four ry `_controlled`, two ry `_controlled_inv`,
+ * cqrt_alloc_handle). So a slip in the macro ships FOUR wrong messages and a
+ * slip in a hand-written body ships one.
+ *
+ * THE COUNT WAS 109, THEN 98, THEN 35, AND IS 39 — D23 moved 11 tape symbols
+ * into scope, D24 moved 63 qram, and the 2026-09-10 re-vendor at CQ_lang
+ * `170ede1` added 4 (`bd w9i`). Read it from CQ_V2_N_THUNKS, never from a
+ * comment: this paragraph said 98 until today, while the sibling table said 39
+ * (`bd ula` / `bd 09z`). shim/cq_runtime_v2.c's own header still ends its
+ * running history at 35 and is stale by the same +4 — `bd qki`.
  *
  * OBSERVED FAILING (2026-08-27, both configurations): a body rewritten to
  * `return 0;` instead of aborting. */

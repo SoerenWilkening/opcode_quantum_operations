@@ -147,4 +147,32 @@ static inline void cq_kernel_check_dst(const cq_bit *dst, const cq_bit *a,
     cq_kernel_check_n(dst, W, src, w, 2);
 }
 
+/* RISK R9's SHORT-CIRCUIT PREDICATE, in one place (bd cue). Six kernels had a
+ * byte-identical private copy of this loop before 2026-09-17 — add, cmp, mul,
+ * divrem_u, divrem_s under the name `all_const`, and shift_var under the name
+ * `amount_is_classical`.
+ *
+ * IT IS NOT AN OPTIMISATION AND MUST NOT BE READ AS ONE. The short-circuit it
+ * guards is L5's claim — zero gates and zero qubits on a fully-classical
+ * operand set — so widening or narrowing this predicate moves a pinned
+ * observable, not a cost.
+ *
+ * THE SECOND PARAMETER IS A COUNT, NOT A WIDTH, AND THE DISTINCTION IS
+ * LOAD-BEARING. Five of the six callers pass `W` because they read every lane.
+ * M12's barrel passes `L = cq_shift_stages(W)`: bits at or above L are
+ * structurally invisible to the construction — never mux controls — so their
+ * kind is not that module's business, and at W=1 L is 0 and the scan is
+ * vacuously true, which is how a width-1 variable shift becomes the identity.
+ * "Normalising" that call site to `W` would make a classical-amount shift with
+ * a quantum high lane take the sandwich path instead of the constant one: a
+ * different circuit for the same value, which the L1 sweep need never see.
+ * The parameter is named `n` rather than `W` so the call site has to say which
+ * it means. */
+static inline int cq_bits_all_const(const cq_bit *v, int n)
+{
+    for (int i = 0; i < n; i++)
+        if (!cq_bit_is_const(v[i])) return 0;
+    return 1;
+}
+
 #endif /* CQOPS_KERNELS_KERNEL_H */

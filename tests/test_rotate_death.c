@@ -79,8 +79,13 @@
  * misuse, so a sink that treated emission as a failure would fail the setup
  * rather than the assertion. Passing NULL to cq_ctx_init is not an option — it
  * resolves CQOPS_SINK, and "no default sink registered" is itself a hard error,
- * outside the armed window. (bd cue tracks consolidating these; this is the ELEVENTH copy — the same
- * stub set is in ten other death suites.) */
+ * outside the armed window.
+ *
+ * NOT tests/support/death.h's cq_death_null_sink, DELIBERATELY: bd cue
+ * consolidated seventeen byte-identical copies of this stub set and skipped
+ * this file, because `nmz` below is a TRIPWIRE rather than a no-op. Swapping
+ * the whole vtable for the shared one would delete it silently — a green run,
+ * not a red one. */
 static void nx(void *u, uint32_t q) { (void)u; (void)q; }
 static void ncx(void *u, uint32_t c, uint32_t t) { (void)u; (void)c; (void)t; }
 static void nccx(void *u, uint32_t a, uint32_t b, uint32_t t)

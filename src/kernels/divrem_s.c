@@ -185,13 +185,6 @@ static void copyout(cq_ctx *ctx, void *env, int c)
 
 /* --- The classical fold (risk R9). --------------------------------------- */
 
-static int all_const(const cq_bit *v, int W)
-{
-    for (int i = 0; i < W; i++)
-        if (!cq_bit_is_const(v[i])) return 0;
-    return 1;
-}
-
 /* The same sign-magnitude wrapper the circuit emits, evaluated rather than
  * emitted — so `b == 0` and `typemin / -1` inherit the unsigned contract here
  * exactly as they do on the sandwich path. */
@@ -229,7 +222,7 @@ static void sdivrem(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
 
     cq_kernel_check_dst(dst, a, b, W);
 
-    if (all_const(a, W) && all_const(b, W)) {
+    if (cq_bits_all_const(a, W) && cq_bits_all_const(b, W)) {
         fold_constant(ctx, dst, a, b, W, want_q);
         return;
     }

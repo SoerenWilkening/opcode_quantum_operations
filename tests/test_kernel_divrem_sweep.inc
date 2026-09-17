@@ -23,12 +23,14 @@
  * every width prints its count, its pool and its seed. There is no gate-budget
  * cap above W = 4 and no exhaustive cross product below it: cq_kd_sweep_at's
  * `exhaustive` flag was REMOVED on 2026-09-11 (bd aei) after three weeks as a
- * (void) cast, and dr_sweep's `per_case`, `region` and `budget` are still
- * ignored (divrem_common.inc says why those stayed, and records that the
- * precedent it leaned on has since gone the other way). W = 3 is K12.md §2.4b's named R8 witness width
- * (W in {1,2} do NOT witness it) and is on the ladder for that reason; what
- * turned §2.0's "a W-bit remainder never overflows" into a measurement was
- * K12.md §6.0a's prototype pass, not this file.
+ * (void) cast, and dr_sweep's `per_case`, `region` and `budget` — which this
+ * paragraph recorded as "still ignored", with divrem_common.inc saying why
+ * they stayed — were REMOVED on 2026-09-17 (bd 16s), on that same reasoning;
+ * divrem_common.inc's dr_sweep now carries the decision and the argument that
+ * was rejected. W = 3 is K12.md §2.4b's named R8 witness width (W in {1,2} do
+ * NOT witness it) and is on the ladder for that reason; what turned §2.0's "a
+ * W-bit remainder never overflows" into a measurement was K12.md §6.0a's
+ * prototype pass, not this file.
  *
  * WHAT CARRIES i128. The circuit is width-generic with no width switch (I5,
  * Rule 3), so W = 128 is structurally W = 64 with different loop bounds —
@@ -42,11 +44,14 @@
  * over 263,166 qubit acquisitions, which is why it is one and not twelve.
  */
 
-/* THE FORMER KNOB. Until 2026-08-20 this was a budget in gate emissions per
- * (opcode, width) block from which the case count was derived; dr_sweep now
- * ignores it, and udiv_per_case survives because the i128 case prints it. The
- * knob that sets coverage is cq_kd_samples() / CQOPS_L1_SAMPLES. */
-enum { DR_GATE_BUDGET = 600000 };
+/* THE FORMER KNOB, NOW DELETED. `enum { DR_GATE_BUDGET = 600000 };` stood
+ * here. Until 2026-08-20 it was a budget in gate emissions per (opcode, width)
+ * block from which the case count was derived; from then dr_sweep ignored the
+ * `budget` parameter it was passed to, and on 2026-09-17 (bd 16s) the
+ * parameter and this constant went together — C does not warn on an unused
+ * enum constant, so deleting it WITH the parameter was the only way the orphan
+ * could not go silent. udiv_per_case survives because the i128 case prints it.
+ * The knob that sets coverage is cq_kd_samples() / CQOPS_L1_SAMPLES. */
 
 static uint64_t udiv_per_case(int W, int want_q)
 {
@@ -110,10 +115,8 @@ CQ_TEST(k12_unsigned_sweep)
         static const int WS[] = { 5, 8, 16, 32, 64 };
         int W = WS[wi];
 
-        dr_sweep(&UDIV, W, udiv_per_case(W, 1), cq_divrem_region(W, 1),
-                 DR_GATE_BUDGET);
-        dr_sweep(&UREM, W, udiv_per_case(W, 0), cq_divrem_region(W, 0),
-                 DR_GATE_BUDGET);
+        dr_sweep(&UDIV, W);
+        dr_sweep(&UREM, W);
     }
 
     dr_i128_case(&UDIV, 1);

@@ -15,7 +15,13 @@
  * rest of the quadrants at every mask.
  */
 
-enum { DS_GATE_BUDGET = 600000 };
+/* `enum { DS_GATE_BUDGET = 600000 };` STOOD HERE until 2026-09-17 (bd 16s) —
+ * the signed twin of DR_GATE_BUDGET, and dead in the same way: dr_sweep had
+ * ignored the `budget` parameter it was passed to since 2026-08-20. It was
+ * removed WITH that parameter, because C does not warn on an unused enum
+ * constant and the orphan would have been silent in both configurations.
+ * sdiv_per_case survives — the i128 case prints it. The decision, and the
+ * argument against it, are on dr_sweep in test_kernel_divrem_common.inc. */
 
 static uint64_t sdiv_per_case(int W, int want_q)
 {
@@ -71,10 +77,8 @@ CQ_TEST(k12_signed_sweep)
         static const int WS[] = { 5, 8, 16, 32, 64 };
         int W = WS[wi];
 
-        dr_sweep(&SDIV, W, sdiv_per_case(W, 1), cq_sdivrem_region(W, 1),
-                 DS_GATE_BUDGET);
-        dr_sweep(&SREM, W, sdiv_per_case(W, 0), cq_sdivrem_region(W, 0),
-                 DS_GATE_BUDGET);
+        dr_sweep(&SDIV, W);
+        dr_sweep(&SREM, W);
     }
 
     ds_i128_case(&SDIV, 1);

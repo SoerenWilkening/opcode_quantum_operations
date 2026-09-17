@@ -61,21 +61,11 @@ static cq_ctx ctx;
  * failure would fail the setup instead of the assertion. Passing NULL to
  * cq_ctx_init is not an option: it resolves CQOPS_SINK, and "no default sink
  * registered" is itself a hard error, outside the armed window. */
-static void nx(void *u, uint32_t q) { (void)u; (void)q; }
-static void ncx(void *u, uint32_t c, uint32_t t) { (void)u; (void)c; (void)t; }
-static void nccx(void *u, uint32_t a, uint32_t b, uint32_t t)
-{ (void)u; (void)a; (void)b; (void)t; }
-static void nry(void *u, uint32_t q, double th) { (void)u; (void)q; (void)th; }
-static void nrz(void *u, uint32_t q, double ph) { (void)u; (void)q; (void)ph; }
-static void nmz(void *u, uint32_t q) { (void)u; (void)q; }
-
 static cq_sink g_sink;
 
 static void open_ctx(void)
 {
-    g_sink.x  = nx;  g_sink.cx = ncx; g_sink.ccx = nccx;
-    g_sink.ry = nry; g_sink.rz = nrz; g_sink.mz  = nmz;
-    g_sink.user = NULL;
+    g_sink = cq_death_null_sink();
     cq_ctx_init(&ctx, &g_sink);
 }
 

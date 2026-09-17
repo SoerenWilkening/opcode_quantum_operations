@@ -21,13 +21,14 @@
  * body that stringifies the wrong literal makes one name appear twice and
  * another never, and both directions of the set check go red.
  *
- * THIS IS THE THIRD COPY OF A fork-and-capture HELPER IN tests/ — after
+ * THIS WAS THE THIRD COPY OF A fork-and-capture HELPER IN tests/ — after
  * tests/test_shim_ctx_region.inc (stderr) and tests/test_runtime_gate_rotate.inc
- * (stdout AND stderr) — and it is NOT extracted here on purpose. Extraction
- * means a new tests/support/ module, which is LOC-counted under Rule 12, plus
- * edits to two working suites whose captures differ in what they redirect;
- * doing that inside a step whose subject is 109 abort bodies would be scope the
- * step did not ask for. Filed rather than accreted silently.
+ * (stdout AND stderr). EXTRACTED 2026-09-17 as tests/support/childcap.[ch]
+ * (`bd ula`): the objection recorded here was that a new tests/support/ module
+ * is LOC-counted under Rule 12 and that tests/support/refmodel.c had no seam
+ * left, and re-measured, that half is stale — refmodel_w.c was split off it
+ * under `bd zmo`. The other half stood and was simply paid: two working suites
+ * whose captures differ in what they redirect and in their callback signature.
  *
  * RULE 12. Split seam, RECORDED BEFORE THE CASES WERE WRITTEN AND TAKEN ON THE
  * FIRST MEASUREMENT:
@@ -49,15 +50,12 @@
 
 #include "cq_shim.h"
 
+#include "support/childcap.h"
 #include "support/harness.h"
 
-#include <errno.h>
-#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 #include "test_runtime_v2_table.inc"
 

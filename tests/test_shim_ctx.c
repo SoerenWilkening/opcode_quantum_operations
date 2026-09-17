@@ -59,19 +59,16 @@
 #include "sink_count.h"
 
 #include "support/bitkinds.h"
+#include "support/childcap.h"
 #include "support/harness.h"
 #include "support/mock_sink.h"
 #include "support/poolcheck.h"
 
 #include <dirent.h>
-#include <errno.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 /* Every case starts from a known SELECTION state and a known CONTEXT. The two
  * are independent and the order between them does not matter: nothing is

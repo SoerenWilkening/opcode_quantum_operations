@@ -162,17 +162,6 @@ static void copyout(cq_ctx *ctx, void *env, int i)
     cq_emit_cx(ctx, &res[i], &e->dst[i]);
 }
 
-/* Only the bits the construction READS. Bits at or above L are structurally
- * invisible to the barrel — never mux controls — so their kind is not this
- * module's business, exactly as in cq_shift_amount. At W=1, L is 0 and this is
- * vacuously true, which is how a width-1 variable shift becomes the identity. */
-static int amount_is_classical(const cq_bit *b, int L)
-{
-    for (int i = 0; i < L; i++)
-        if (!cq_bit_is_const(b[i])) return 0;
-    return 1;
-}
-
 /* `cq_kernel_fn` (kernels/kernel.h), not a local re-typedef: M11's three entry
  * points have exactly Rule 7's canonical shape, which is the whole reason the
  * delegation below is a plain call and not an adapter. */
@@ -195,8 +184,20 @@ static void barrel(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
 
     /* Risk R9's short-circuit, and D8's agreement made structural: the constant
      * path is not an approximation of this one, it is the same reduction with
-     * the mux stages evaluated at compile time. */
-    if (amount_is_classical(b, L)) { constant_path(ctx, dst, a, b, W); return; }
+     * the mux stages evaluated at compile time.
+     *
+     * THE COUNT IS `L`, NOT `W`, AND THAT IS LOAD-BEARING — it is why
+     * kernels/kernel.h's shared predicate takes a COUNT and names the parameter
+     * `n`. Only the bits the construction READS are scanned: bits at or above L
+     * are structurally invisible to the barrel — never mux controls — so their
+     * kind is not this module's business, exactly as in cq_shift_amount. At
+     * W=1, L is 0 and the scan is vacuously true, which is how a width-1
+     * variable shift becomes the identity. Passing `W` here would send a rail
+     * whose amount is classical in every lane the barrel reads, but quantum in
+     * a lane it never looks at, down the SANDWICH path instead of the constant
+     * one: the same value by a different circuit, which no value-level test is
+     * obliged to see. */
+    if (cq_bits_all_const(b, L)) { constant_path(ctx, dst, a, b, W); return; }
 
     cq_scratch_alloc(&scr, (uint32_t)(W * (3 * L + 1)));
 

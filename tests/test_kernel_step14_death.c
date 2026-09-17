@@ -64,18 +64,9 @@
 static cq_sink g_sink;
 static cq_ctx  g_ctx;
 
-static void nx  (void *u, uint32_t q)                        { (void)u; (void)q; }
-static void ncx (void *u, uint32_t c, uint32_t t)            { (void)u; (void)c; (void)t; }
-static void nccx(void *u, uint32_t a, uint32_t b, uint32_t t){ (void)u; (void)a; (void)b; (void)t; }
-static void nry (void *u, uint32_t q, double th)             { (void)u; (void)q; (void)th; }
-static void nrz (void *u, uint32_t q, double ph)             { (void)u; (void)q; (void)ph; }
-static void nmz (void *u, uint32_t q)                        { (void)u; (void)q; }
-
 static void setup(void)
 {
-    g_sink.x = nx; g_sink.cx = ncx; g_sink.ccx = nccx;
-    g_sink.ry = nry; g_sink.rz = nrz; g_sink.mz = nmz;
-    g_sink.user = NULL;
+    g_sink = cq_death_null_sink();
     cq_ctx_init(&g_ctx, &g_sink);
 }
 
@@ -204,12 +195,13 @@ static void shift_var_the_value_is_the_amount(void)
 }
 
 /* THIS CASE CANNOT DISCRIMINATE M12 FROM M11 AND IS KEPT ANYWAY, WITH THAT SAID
- * OUT LOUD. At W = 0, `cq_shift_stages` returns 0, so `amount_is_classical` is
- * vacuously true whatever the amount's bit-kinds are and the barrel delegates —
- * meaning M11's identical `cq_kernel_check_dst` would abort with the identical
- * message if M12's were deleted. No FAIL_REGULAR_EXPRESSION can tell them
- * apart. What it does pin is that the entry point refuses W = 0 at all rather
- * than computing `1 << 0` scratch bits and walking off a zero-length region.
+ * OUT LOUD. At W = 0, `cq_shift_stages` returns 0, so shift_var's classical
+ * short-circuit `cq_bits_all_const(b, L)` is vacuously true whatever the
+ * amount's bit-kinds are and the barrel delegates — meaning M11's identical
+ * `cq_kernel_check_dst` would abort with the identical message if M12's were
+ * deleted. No FAIL_REGULAR_EXPRESSION can tell them apart. What it does pin is
+ * that the entry point refuses W = 0 at all rather than computing `1 << 0`
+ * scratch bits and walking off a zero-length region.
  *
  * An earlier version of this comment claimed the guard "stops a zero width from
  * reaching cq_shift_stages". It did not: the call sat in `L`'s initialiser and

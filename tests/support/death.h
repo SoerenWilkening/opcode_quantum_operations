@@ -33,6 +33,8 @@
 #ifndef CQOPS_TEST_DEATH_H
 #define CQOPS_TEST_DEATH_H
 
+#include "sink.h"      /* cq_death_null_sink returns one by value */
+
 #include <stddef.h>
 
 typedef struct {
@@ -95,6 +97,32 @@ int cq_death_main(int argc, char **argv, const cq_death_case *cases, size_t n);
 #else
 #  define CQ_DEATH_SKIP_WITHOUT_INVARIANTS(why) cq_death_skip(why)
 #endif
+
+/* THE DISCARDING SINK, in one place (bd cue). Seventeen death suites carried a
+ * byte-identical copy of the same six no-op vtable entries before 2026-09-17.
+ *
+ * WHAT IT IS FOR. Most death cases reach their abort through ordinary
+ * bookkeeping and emit real gates while building the rail they then misuse, so
+ * a sink that treated emission as a failure would fail the SETUP rather than
+ * the assertion. Passing NULL to cq_ctx_init is not an option either: it
+ * resolves CQOPS_SINK, and "no default sink registered" is itself a hard error,
+ * raised outside the armed window. And a death binary's stdout is not a trace,
+ * so the shim suites install this before their first cq_shim_ctx() to stop the
+ * built-in printf sink winning.
+ *
+ * IT IS OPT-IN AND MUST STAY THAT WAY. A death file whose sink MEASURES
+ * something is not a candidate: tests/test_emit_death.c's entries DISARM the
+ * window and report a leaked gate, tests/test_rotate_death.c's `mz` is a
+ * tripwire for an emission past the abort point, and four suites install a
+ * COUNTING sink because a case reads the count. Converting any of those is a
+ * silent loss of exactly what that file exists to see — the failure direction
+ * is a green run, not a red one.
+ *
+ * BY VALUE, on cq_sink_counter's and cq_mock_sink's precedent, so the caller
+ * keeps owning the storage: `cqops_set_sink` borrows the pointer it is given
+ * and does not copy, so the object assigned into must outlive its use — every
+ * caller here keeps a file-static for that reason. */
+cq_sink cq_death_null_sink(void);
 
 #define CQ_DEATH_CASE(fn) { #fn, fn }
 

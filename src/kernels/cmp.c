@@ -260,13 +260,6 @@ static void layout(cmp_env *e, cq_scratch *scr, int prim)
     e->raw = &e->u.carry[W];
 }
 
-static int all_const(const cq_bit *v, int W)
-{
-    for (int i = 0; i < W; i++)
-        if (!cq_bit_is_const(v[i])) return 0;
-    return 1;
-}
-
 /* The raw flag the compute half would have produced, in plain C: `a != b` for
  * eq, `a >=u b` for ult, `a >=s b` for slt.
  *
@@ -314,7 +307,7 @@ static void cmp(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
 
     if (swap) { const cq_bit *t = a; a = b; b = t; }
 
-    if (all_const(a, W) && all_const(b, W)) {
+    if (cq_bits_all_const(a, W) && cq_bits_all_const(b, W)) {
         if (const_raw(a, b, W, prim) ^ invert) cq_emit_x(ctx, &dst[0]);
         return;
     }

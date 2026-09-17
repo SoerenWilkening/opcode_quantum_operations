@@ -226,28 +226,51 @@ static int dr_zero_bit(cq_ref_w v, cq_ref_w q, int i)
 
 enum { DR_MAX_PAIRS = 128 + 12 };
 
-/* THE SIGNATURE IS UNCHANGED AND THREE OF ITS PARAMETERS ARE NOW IGNORED.
- * `per_case`, `region` and `budget` were the inputs to a cost model that no
- * longer exists; both callers compute them from udiv_per_case / sdiv_per_case /
- * cq_divrem_region, which are real measurements used elsewhere in those files.
- * Keeping the parameters costs one (void) each and touches neither caller.
+/* THE THREE DEAD PARAMETERS ARE GONE (2026-09-17, bd 16s), ON bd aei's
+ * PRECEDENT RATHER THAN AGAINST IT. Until today the signature read
+ * `dr_sweep(k, W, uint64_t per_case, int region, uint64_t budget)` with all
+ * three `(void)`-cast here, and the comment kept them "on cq_kd_sweep_at's
+ * precedent" — a precedent REVERSED on 2026-09-11 (bd aei), when that
+ * function's dead `exhaustive` parameter was removed outright so that a
+ * caller's stale belief is a COMPILE error rather than a `1` that does
+ * nothing.
  *
- * THE PRECEDENT THIS CITED HAS BEEN REVERSED (2026-09-11, bd aei). It read "on
- * cq_kd_sweep_at's precedent" — and that parameter was removed outright,
- * because a dead parameter carries a live promise: callers went on passing `1`
- * for "exhaustive" and writing comments claiming exhaustive coverage that no
- * test could falsify. These three are a weaker case (they are static, local to
- * two suites, four call sites, and each argument at the call site is a real
- * measurement a reader can use) — but they are the same class, and dropping
- * them is filed rather than assumed to be unwanted. */
-static void dr_sweep(const cq_kd_spec *k, int W, uint64_t per_case, int region,
-                     uint64_t budget)
+ * WHAT WAS ARGUED FOR KEEPING THEM, AND WHY IT DID NOT SURVIVE MEASUREMENT.
+ * bd 16s recorded the counter-argument and it is the better half of the case:
+ * unlike a literal `1` meaning "exhaustive", each argument was a REAL
+ * measurement — the callers spelled them udiv_per_case / sdiv_per_case and
+ * cq_divrem_region / cq_sdivrem_region — so a reader of the call site learned
+ * the per-case gate cost and the scratch region at that width. MEASURED
+ * 2026-09-17, and the removal is better justified than that concession makes
+ * it sound: nothing PRINTED them at those widths and dr_sweep discarded all
+ * three, so the call site showed a number computed and thrown away. The two
+ * halves survive in DIFFERENT places and neither of them was the call site.
+ * udiv_per_case / sdiv_per_case survive at dr_i128_case / ds_i128_case, which
+ * print them. The REGION was never carried by these call sites at all: each
+ * suite already ASSERTS cq_divrem_region / cq_sdivrem_region against its
+ * closed form at nine widths, in
+ * the_sandwich_takes_its_scratch_and_gives_it_back, and M19/M20 call the same
+ * function to size their scratch on every case. The one swept width that
+ * assertion ladder omits is W = 5 — and at W = 5 the kernel evaluates it on
+ * every sweep case anyway. Removing the parameters loses no measurement.
+ *
+ * `budget` DECIDED IT, AND IT WAS THE STRONGEST OF THE THREE. DR_GATE_BUDGET
+ * and DS_GATE_BUDGET were 600000 and read at the call site as a cap on a sweep
+ * that HAS no cap: the coverage knob has been cq_kd_samples() /
+ * CQOPS_L1_SAMPLES at every width since 2026-08-20, and both sweep headers
+ * already spend a paragraph disclaiming a cap their own call sites went on
+ * spelling in capitals. That is bd aei's failure mode exactly —
+ * test_kernel_cast.c claimed exhaustive coverage for three weeks after the
+ * flag went dead, because no test reads a comment. Both enums were deleted
+ * WITH the parameters: C does not warn on an unused enum constant, so an
+ * orphan left behind would have been silent in both configurations.
+ *
+ * NOTHING THE SWEEP DOES MOVED — the same cq_kd_sample_at call, the same case
+ * counts, the same per-width output, the same ctest entries, and
+ * tests/goldens/ untouched. */
+static void dr_sweep(const cq_kd_spec *k, int W)
 {
     clock_t t0 = clock();
-
-    (void)per_case;
-    (void)region;
-    (void)budget;
 
     cq_kd_sample_at(k, W);
     printf("#   ^ %s W=%d took %.1f s\n", k->name, W,
@@ -256,8 +279,47 @@ static void dr_sweep(const cq_kd_spec *k, int W, uint64_t per_case, int region,
 }
 
 /* The same at the narrow widths. Identical to dr_sweep now that the budget is
- * one constant at every width; kept as a separate name because both callers use
- * it and because the narrow/wide distinction still reads in their ladders. */
+ * one constant at every width; kept as a separate name because both callers
+ * use it and because the narrow/wide distinction still reads in their ladders.
+ *
+ * THAT FIRST SENTENCE IS TRUE, AND IS RE-MEASURED HERE (2026-09-17, bd 16s)
+ * BECAUSE IT HAS NOW BEEN READ AS FALSE TWICE. cq_kd_sweep_at is a ONE-LINE
+ * ALIAS of cq_kd_sample_at, and IT HAS NEVER HELD A WIDTH LADDER at any
+ * revision. The ladder belongs to cq_kd_sweep — the neighbouring function
+ * WITHOUT the `_at`, which nothing in either divrem suite calls — so a
+ * citation spanning both function bodies reads as though dr_sweep_small sweeps
+ * a ladder while dr_sweep does not. It does not: the two differ only in that
+ * dr_sweep reaches cq_kd_sample_at directly and dr_sweep_small reaches it
+ * through the alias. Check it against cq_kd_sweep_at's own BODY, never the
+ * lines after it.
+ *
+ * AND THE HISTORY CLAUSE THAT USED TO BE IN THIS PARAGRAPH WAS ITSELF
+ * UNMEASURED — the src/angle.h shape exactly, a shipped comment asserting a
+ * history nobody checked, in the one paragraph whose whole job is to stop the
+ * next reader getting this history wrong. It read "before bd aei it was a
+ * three-way dispatch on `exhaustive` rather than a loop". MEASURED
+ * 2026-09-17: the dispatch (sweep_full_cross / sweep_values / sweep_sampled)
+ * is the body at e4a7a24, 5b18ae4 and e628ed0 ONLY. 5b57e4f replaced it with
+ * `(void)exhaustive; cq_kd_sample_at(k, W);` on 2026-08-21, and that one-liner
+ * is still the body at b4a4657^ — so for the three weeks before bd aei it was
+ * already the alias plus a dead cast. bd aei removed the PARAMETER, not the
+ * dispatch. Nothing the paragraph above rests on moves: no ladder, at any of
+ * those four revisions or at HEAD.
+ *
+ * THE COST bd 16s ACCEPTED, RECORDED RATHER THAN ARGUED AWAY (F1 of its review
+ * round, filed as bd cmu). Until 2026-09-17 these two names differed in ARITY,
+ * so putting dr_sweep_small on a wide width — or dr_sweep on a narrow one —
+ * was a COMPILE error. They are now the same signature with provably identical
+ * behaviour, and MEASURED in review, substituting one for the other builds
+ * clean with no warning and prints byte-identical stdout. bd 16s removed a dead
+ * parameter on the principle that a dead thing carrying a live promise must
+ * break a BUILD rather than a comment, and took the only compile-time
+ * discriminator between this pair with it. INERT while cq_kd_sweep_at has no
+ * behaviour of its own; live the moment it regains any, which it HAD as
+ * recently as 5b57e4f. Not merged and not reversed — the pair carries the
+ * narrow/wide distinction for a reader, and the remedy if it ever bites is to
+ * give cq_kd_sweep_at behaviour or the pair a type, never to re-add a
+ * parameter nothing reads. */
 static void dr_sweep_small(const cq_kd_spec *k, int W)
 {
     clock_t t0 = clock();

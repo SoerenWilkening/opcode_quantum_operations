@@ -350,83 +350,15 @@ CQ_TEST(a_controlled_ry_taints_its_target_and_a_controlled_rz_does_not)
  * 3. D11's refusal, and the part of it that is not atomic.
  * ------------------------------------------------------------------------- */
 
-/* Runs `fn` in a child whose STDOUT is a pipe, and reports the bytes and
- * whether it died on SIGABRT. tests/test_shim_ctx_region.inc's helper with
- * STDOUT_FILENO in place of STDERR_FILENO, and for the mirror-image reason: the
- * subject here is what reached the SINK, and M23 writes its trace to stdout and
- * flushes per line, so a child that aborts mid-rail has already emitted every
- * gate it got to.
- *
- * fflush(NULL) BEFORE THE FORK is not hygiene — the harness's TAP diagnostics
- * are buffered under ctest, so a child forked mid-case inherits them and
- * re-emits them when it aborts. */
-static void drain(int fd, char *buf, size_t cap)
-{
-    size_t n = 0;
-
-    buf[0] = '\0';
-    for (;;) {
-        const ssize_t got = read(fd, buf + n, cap - 1u - n);
-        if (got == 0) break;
-        if (got < 0) {
-            if (errno == EINTR) continue;
-            cq_h_fail(__FILE__, __LINE__, "read failed: errno %d", errno);
-            break;
-        }
-        n += (size_t)got;
-        if (n + 1u >= cap) break;
-    }
-    buf[n] = '\0';
-}
-
-/* BOTH STREAMS, ON SEPARATE PIPES, and the second one is not decoration: the
- * subject is what reached the SINK before the abort, and the abort's own
- * identity is on stderr. A version reading only stdout can say "something died
- * having emitted N gates" and cannot say WHICH refusal — and at j == 0 that
- * reduces to "nothing was emitted and something died", which any abort in the
- * fixture satisfies. */
-static void child_streams(void (*fn)(void *), void *arg,
-                          char *out, size_t out_cap,
-                          char *err, size_t err_cap, int *signalled)
-{
-    int fo[2], fe[2];
-
-    out[0] = '\0'; err[0] = '\0';
-    *signalled = 0;
-    if (pipe(fo) != 0) { cq_h_fail(__FILE__, __LINE__, "pipe failed"); return; }
-    if (pipe(fe) != 0) {
-        (void)close(fo[0]); (void)close(fo[1]);
-        cq_h_fail(__FILE__, __LINE__, "pipe failed");
-        return;
-    }
-
-    fflush(NULL);
-
-    const pid_t pid = fork();
-    if (pid < 0) {
-        (void)close(fo[0]); (void)close(fo[1]);
-        (void)close(fe[0]); (void)close(fe[1]);
-        cq_h_fail(__FILE__, __LINE__, "fork failed");
-        return;
-    }
-    if (pid == 0) {
-        (void)close(fo[0]); (void)close(fe[0]);
-        (void)dup2(fo[1], STDOUT_FILENO);
-        (void)dup2(fe[1], STDERR_FILENO);
-        (void)close(fo[1]); (void)close(fe[1]);
-        fn(arg);
-        _exit(0);
-    }
-
-    (void)close(fo[1]); (void)close(fe[1]);
-    drain(fo[0], out, out_cap);
-    drain(fe[0], err, err_cap);
-    (void)close(fo[0]); (void)close(fe[0]);
-
-    int status = 0;
-    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) { }
-    *signalled = WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT;
-}
+/* THIS CASE IS WHY tests/support/childcap.h TAKES A STREAM MASK RATHER THAN
+ * REDIRECTING A FIXED ONE (`bd ula`). It is the only caller in the tree that
+ * needs BOTH, on separate pipes, and the second one is not decoration: the
+ * subject is what reached the SINK before the abort — M23 writes its trace to
+ * stdout and flushes per line, so a child that aborts mid-rail has already
+ * emitted every gate it got to — while the abort's own identity is on stderr.
+ * A version reading only stdout can say "something died having emitted N gates"
+ * and cannot say WHICH refusal, and at j == 0 that reduces to "nothing was
+ * emitted and something died", which any abort in the fixture satisfies. */
 
 /* `j` constant lanes below the first wire, then a wire, under a quantum flag. */
 static void rz_on_a_rail_with_a_constant_lane(void *p)
@@ -475,9 +407,10 @@ CQ_TEST(the_d11_rz_refusal_emits_four_gates_per_wire_below_the_first_constant)
 
     for (size_t i = 0; i < sizeof JS / sizeof JS[0]; i++) {
         uint32_t j = JS[i];
-        int signalled = 0;
-        child_streams(rz_on_a_rail_with_a_constant_lane, &j,
-                      out, sizeof out, err, sizeof err, &signalled);
+        const int signalled =
+            cq_child_capture(CQ_CHILD_STDOUT | CQ_CHILD_STDERR,
+                             rz_on_a_rail_with_a_constant_lane, &j,
+                             out, sizeof out, err, sizeof err);
 
         CHECK(signalled);                 /* it aborted, in both configurations */
 

@@ -488,70 +488,14 @@ CQ_TEST(the_region_bracket_lives_in_exactly_one_shim_file)
  * (tests/CMakeLists.txt records this) — and it cannot tell stdout from stderr,
  * which is the other half of what is pinned here: every hard error in this
  * project goes to stderr, and stdout is where the default sink writes its
- * trace. Only STDERR_FILENO is dup2'd into the pipe, so a refusal that went to
- * stdout would arrive as an empty string.
+ * trace. The captures below pass CQ_CHILD_STDERR alone, so stdout is left
+ * inherited and a refusal that went there would arrive as an empty string.
  *
- * fflush(NULL) BEFORE THE FORK, AND IT IS NOT HYGIENE. The harness writes its
- * TAP diagnostics to stdout with printf and flushes at the end of a case
- * (tests/support/harness.c); under ctest stdout is a pipe and therefore fully
- * buffered, so a child forked mid-case inherits every line the case has already
- * printed and RE-EMITS them when it aborts. Measured before the flush was
- * added: three `# FAIL` lines for two failed checks.
+ * fflush(NULL) BEFORE THE FORK, AND IT IS NOT HYGIENE — that, the SIGABRT
+ * discrimination and the EINTR retries all live in tests/support/childcap.c
+ * now (`bd ula`), which is where the reasons are written down. This file was
+ * the FIRST of the three copies.
  * ------------------------------------------------------------------------- */
-
-/* Runs `fn` in a child with stderr on a pipe, and reports what it wrote and
- * whether it died on SIGABRT. If `fn` RETURNS, the child _exit()s rather than
- * falling back into the parent's case list — a forked test binary that resumed
- * would run every remaining case a second time. */
-static void child_stderr(void (*fn)(void *), void *arg,
-                         char *out, size_t cap, int *signalled)
-{
-    int fd[2];
-
-    out[0] = '\0';                    /* never report a previous call's bytes */
-    *signalled = 0;
-
-    if (pipe(fd) != 0) { cq_h_fail(__FILE__, __LINE__, "pipe failed"); return; }
-
-    fflush(NULL);
-
-    const pid_t pid = fork();
-    if (pid < 0) {
-        (void)close(fd[0]);
-        (void)close(fd[1]);
-        cq_h_fail(__FILE__, __LINE__, "fork failed");
-        return;
-    }
-
-    if (pid == 0) {
-        (void)close(fd[0]);
-        (void)dup2(fd[1], STDERR_FILENO);
-        (void)close(fd[1]);
-        fn(arg);
-        _exit(0);                     /* fn returned: not an abort, and the
-                                       * child must not resume the suite */
-    }
-
-    (void)close(fd[1]);
-    size_t n = 0;
-    for (;;) {
-        const ssize_t got = read(fd[0], out + n, cap - 1u - n);
-        if (got == 0) break;                       /* EOF: the child is gone  */
-        if (got < 0) {
-            if (errno == EINTR) continue;          /* a signal, not an end    */
-            cq_h_fail(__FILE__, __LINE__, "read failed: errno %d", errno);
-            break;
-        }
-        n += (size_t)got;
-        if (n + 1u >= cap) break;
-    }
-    out[n] = '\0';
-    (void)close(fd[0]);
-
-    int status = 0;
-    while (waitpid(pid, &status, 0) < 0 && errno == EINTR) { }
-    *signalled = WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT;
-}
 
 typedef struct { const char *symbol, *reason; } unsup_args;
 
@@ -565,7 +509,8 @@ static void unsupported_says(const char *symbol, const char *reason,
                              char *out, size_t cap, int *signalled)
 {
     unsup_args a = { symbol, reason };
-    child_stderr(call_unsupported, &a, out, cap, signalled);
+    *signalled = cq_child_capture(CQ_CHILD_STDERR, call_unsupported, &a,
+                                  NULL, 0u, out, cap);
 }
 
 /* THE MESSAGE IS THE CONTRACT, AND UNTIL NOW NOTHING READ THE REAL ONE.
@@ -677,14 +622,16 @@ CQ_TEST(each_region_refusal_names_itself_on_stderr)
     region_args wide = { cq_reg_alloc_zero(&ctx->regs, 8u) };
     region_args one  = { cq_reg_alloc_zero(&ctx->regs, 1u) };
 
-    child_stderr(region_with_a_wide_flag, &wide, got, sizeof got, &signalled);
+    signalled = cq_child_capture(CQ_CHILD_STDERR, region_with_a_wide_flag,
+                                 &wide, NULL, 0u, got, sizeof got);
     CHECK_EQ(signalled, 1);
     CHECK(strstr(got, "libcqops: FATAL: shim: ") == got);
     CHECK(strstr(got, "not one bit wide") != NULL);
     CHECK(strstr(got, "nests") == NULL);          /* not the nesting refusal  */
     CHECK(strstr(got, "no body") == NULL);        /* nor the body one         */
 
-    child_stderr(region_nested, &one, got, sizeof got, &signalled);
+    signalled = cq_child_capture(CQ_CHILD_STDERR, region_nested,
+                                 &one, NULL, 0u, got, sizeof got);
     CHECK_EQ(signalled, 1);
     CHECK(strstr(got, "libcqops: FATAL: shim: ") == got);
     CHECK(strstr(got, "never nests") != NULL);
