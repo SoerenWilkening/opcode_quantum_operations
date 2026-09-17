@@ -39,15 +39,21 @@
  * that never folds.
  *
  * WHAT IS STILL NOT PINNED, stated plainly so the next reader does not take
- * this file for more than it is: requirement 5's read-side EINTR retry, the
- * rider's buffer clear, and streams_are_paired() itself. The reasons are at
- * their cases' absence below.
+ * this file for more than it is: requirement 5's READ-side EINTR retry, and
+ * that one alone. The rider's buffer clear and streams_are_paired() were
+ * closed by the fix round of the same day; the POLL-side and WAITPID-side
+ * EINTR retries were closed on 2026-09-17 by the two cases at the end of this
+ * file (`bd 698`). The read-side reason is at its case's absence there, and it
+ * is a MEASUREMENT rather than an apology.
  */
 
-/* `raise`/SIGTERM for the requirement-3 controls, and `alarm`/`write` for the
- * ta1 one. The host .c needs none of them; an .inc that brings its own is more
- * honest than widening the suite's include block for three cases. */
+/* `raise`/SIGTERM for the requirement-3 controls, `alarm`/`write` for the ta1
+ * one, and `setitimer`/`nanosleep` for the two EINTR ones. The host .c needs
+ * none of them; an .inc that brings its own is more honest than widening the
+ * suite's include block. */
 #include <signal.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 
 /* The child's bytes. Verbatim through CHECK_STR_EQ, so a capture that dropped
@@ -353,4 +359,191 @@ CQ_TEST(a_child_that_fills_one_pipe_before_finishing_the_other_does_not_deadlock
     CHECK_EQ(strlen(err), sizeof err - 1u);
     CHECK_EQ(err[0], 'e');
     CHECK_EQ(err[sizeof err - 2u], 'e');
+}
+
+/* -------------------------------------------------------------------------
+ * REQUIREMENT 5 — the EINTR retries (`bd 698`).
+ *
+ * THERE ARE THREE EINTR SITES IN childcap.c, NOT TWO, and every document that
+ * named them named a different pair. childcap.h's requirement 5 says "read()
+ * and waitpid()"; its later paragraph says poll() and read(); the code has
+ * read() (cap_step), poll() (drain_both, ADDED by `bd ta1`) and waitpid(). The
+ * three are NOT equally reachable and the difference is structural rather than
+ * statistical, so they get three different verdicts:
+ *
+ *   poll()    — where the parent actually blocks. Pinned below.
+ *   waitpid() — reachable whenever the child outlives its own output. Pinned
+ *               below, and it needs a DIFFERENT child: the drain must reach
+ *               EOF while the process is still alive.
+ *   read()    — NOT pinned, and not for want of trying. cap_step runs only
+ *               after poll() has reported the fd readable or hung up, so the
+ *               read never sleeps, so it cannot be interrupted before it
+ *               transfers. MEASURED rather than argued (2026-09-17, both
+ *               configurations, a scratch build of childcap.c with a counter
+ *               in each of the three EINTR branches): over 100 captures of a
+ *               child dribbling 40 separate one-byte writes — 4,000 read()
+ *               calls — under a 1 ms repeating SIGALRM, the branch counts were
+ *               poll 21,489 / wait 4 / read 0 in Release and poll 32,159 /
+ *               wait 1 / read 0 in Debug. Both read-side mutants (EINTR as
+ *               EOF, and EINTR falling through to cq_h_fail) SURVIVE 100/100
+ *               in both configurations. A control for it would not be flaky;
+ *               it would be VACUOUS, which is worse, so the gap is recorded.
+ *
+ * THE INSTRUMENT IS AN ITIMER IN THE PARENT, NOT A SIGNAL FROM THE CHILD, and
+ * that is what makes these two cases deterministic rather than a timing race.
+ * The child is made to take ~100 ms; a 5 ms repeating SIGALRM therefore fires
+ * ~20 times INSIDE the one blocking call the case is aiming at. Measured over
+ * 100 runs per mode per configuration: 0 failures on the real childcap.c, and
+ * 100/100 kills of the matching mutant.
+ *
+ * sa_flags = 0 IS THE WHOLE MECHANISM. With SA_RESTART the kernel restarts the
+ * interrupted call itself and EINTR never reaches our code, so the case would
+ * be green against any childcap at all.
+ * ------------------------------------------------------------------------- */
+
+static volatile sig_atomic_t cc_ticks;
+static void cc_count_a_tick(int sig) { (void)sig; cc_ticks++; }
+
+static struct sigaction cc_old_alrm;
+
+static void cc_nap_ms(long ms)
+{
+    struct timespec ts;
+    ts.tv_sec  = (time_t)(ms / 1000);
+    ts.tv_nsec = (long)((ms % 1000) * 1000000L);
+    (void)nanosleep(&ts, NULL);
+}
+
+static void cc_arm_interrupter(long period_ms)
+{
+    struct sigaction sa;
+    struct itimerval it;
+
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = cc_count_a_tick;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;                   /* NO SA_RESTART -- see the note above */
+    if (sigaction(SIGALRM, &sa, &cc_old_alrm) != 0)
+        cq_h_fail(__FILE__, __LINE__, "sigaction(SIGALRM) failed");
+
+    cc_ticks = 0;
+    it.it_value.tv_sec  = 0;
+    it.it_value.tv_usec = (suseconds_t)(period_ms * 1000L);
+    it.it_interval = it.it_value;
+    if (setitimer(ITIMER_REAL, &it, NULL) != 0)
+        cq_h_fail(__FILE__, __LINE__, "setitimer(ITIMER_REAL) failed");
+}
+
+/* TEARDOWN ORDER IS LOAD-BEARING AND THE OBVIOUS ORDER IS WRONG. Disarming the
+ * timer does not discard a SIGALRM that has ALREADY fired, so restoring the old
+ * disposition -- SIG_DFL, since nothing else in this tree installs one --
+ * delivers it with default action and kills the test binary with "Alarm clock".
+ * Measured while building this: two of six scratch runs at a 1 ms period died
+ * that way. Setting the disposition to SIG_IGN first DISCARDS the pending
+ * instance, so the restore is safe.
+ *
+ * AND THE RESTORE PROTECTS A CASE THAT IS NOT THIS ONE. The ta1 flood child
+ * relies on alarm(5) TERMINATING it if the drain regresses; a forked child
+ * inherits the parent's disposition, so leaving cc_count_a_tick installed would
+ * turn that watchdog into a counter bump and the bounded red back into an
+ * unbounded hang. The read-back below is what makes that an assertion instead
+ * of a comment. */
+static int cc_disarm_interrupter(void)
+{
+    struct sigaction ign, now;
+    struct itimerval off;
+
+    off.it_value.tv_sec = 0; off.it_value.tv_usec = 0;
+    off.it_interval = off.it_value;
+    (void)setitimer(ITIMER_REAL, &off, NULL);
+
+    memset(&ign, 0, sizeof ign);
+    ign.sa_handler = SIG_IGN;
+    sigemptyset(&ign.sa_mask);
+    ign.sa_flags = 0;
+    (void)sigaction(SIGALRM, &ign, NULL);
+
+    (void)sigaction(SIGALRM, &cc_old_alrm, NULL);
+
+    memset(&now, 0, sizeof now);
+    (void)sigaction(SIGALRM, NULL, &now);
+    CHECK(now.sa_handler == cc_old_alrm.sa_handler);
+
+    return (int)cc_ticks;
+}
+
+/* Returns rather than _Exit()ing, so it is the "prints, RETURNS" row of the
+ * table at the top of this file with a delay in front. The delay is the point:
+ * while it runs, the parent is inside poll() with nothing to read. */
+static void cc_sleeps_then_prints_on_stderr(void *p)
+{
+    (void)p;
+    cc_nap_ms(100);
+    fputs(CQ_CC_SAYS, stderr);
+    fflush(stderr);
+}
+
+/* Kills both poll-side mutants: EINTR treated as an end (`break`), and the
+ * EINTR branch deleted so it falls through to cq_h_fail. The SECOND assertion
+ * is the one with teeth -- the `break` spelling is SILENT, so a case that only
+ * checked the verdict would pass while the capture came back empty. */
+CQ_TEST(a_signal_arriving_while_the_parent_blocks_in_poll_does_not_end_the_drain)
+{
+    char err[256];
+    int  signalled, ticks;
+
+    cc_arm_interrupter(5);
+    signalled = cq_child_capture(CQ_CHILD_STDERR,
+                                 cc_sleeps_then_prints_on_stderr, NULL,
+                                 NULL, 0u, err, sizeof err);
+    ticks = cc_disarm_interrupter();
+
+    /* NON-VACUITY FIRST. With no signal delivered this case asserts nothing
+     * about EINTR and would be green against any drain whatsoever -- the same
+     * defect as an implication-shaped assertion over a module that never
+     * folds. Measured at ~20 (Release) and ~40 (Debug); 2 is a floor. */
+    CHECK(ticks >= 2);
+    CHECK_EQ(signalled, 0);
+    CHECK_STR_EQ(err, CQ_CC_SAYS);
+}
+
+/* THE WAITPID WINDOW HAS TO BE MANUFACTURED. In every other child here the
+ * drain ends BECAUSE the child exited, so the parent reaches waitpid() with the
+ * status already available and the call never blocks -- measured at 4 EINTRs
+ * per 100 captures, i.e. a real race and a useless control. Closing the pipe
+ * first separates the two events: the drain sees EOF, the parent parks in
+ * waitpid(), and the child is still alive for another ~100 ms. That took the
+ * count to 1,997 of 2,000 signal deliveries.
+ *
+ * IT MUST ABORT, NOT EXIT. Without the retry waitpid() returns -1 and `status`
+ * keeps its initial 0, so WIFSIGNALED(0) is false and the verdict is 0 -- which
+ * AGREES with the true answer for every child that does not abort. Only a child
+ * whose correct verdict is 1 can tell the two apart.
+ *
+ * write(2) rather than fputs: after close(STDERR_FILENO) the stdio stream is
+ * attached to a closed descriptor, so the flush has to precede the close and
+ * the direct write makes that ordering unmissable. */
+static void cc_closes_its_pipe_then_lingers_and_aborts(void *p)
+{
+    (void)p;
+    (void)write(STDERR_FILENO, CQ_CC_SAYS, sizeof CQ_CC_SAYS - 1u);
+    (void)close(STDERR_FILENO);        /* the parent's drain now sees EOF */
+    cc_nap_ms(100);
+    abort();
+}
+
+CQ_TEST(a_signal_arriving_while_the_parent_blocks_in_waitpid_keeps_the_verdict)
+{
+    char err[256];
+    int  signalled, ticks;
+
+    cc_arm_interrupter(5);
+    signalled = cq_child_capture(CQ_CHILD_STDERR,
+                                 cc_closes_its_pipe_then_lingers_and_aborts,
+                                 NULL, NULL, 0u, err, sizeof err);
+    ticks = cc_disarm_interrupter();
+
+    CHECK(ticks >= 2);
+    CHECK_EQ(signalled, 1);
+    CHECK_STR_EQ(err, CQ_CC_SAYS);
 }

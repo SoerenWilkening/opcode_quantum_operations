@@ -32,8 +32,18 @@
  * ConstOperand (arith.jl:185-198); our amount arrives as W `cq_bit`s, so this
  * module has to test for it. Without the test, `x << 3` on a tainted `x` costs
  * ~10WL gates and W(3L+1) qubits instead of <= W CX and none, and L5 — whose
- * shipped example is `int a = 0; a |= b << 3` — is false. At W=1, S is 0, the
- * test is vacuously true, and every variable shift is the identity.
+ * shipped example is `int a = 0; a |= b << 3` — is false.
+ *
+ * AT W=1 EVERY VARIABLE SHIFT IS STILL THE IDENTITY, BUT NOT BY THE MECHANISM
+ * THIS HEADER USED TO NAME (bd djf). It read "At W=1, S is 0, the test is
+ * vacuously true, and every variable shift is the identity." The CONCLUSION is
+ * unchanged and no behaviour moved; what is superseded is the reason. S is 0
+ * exactly when W <= 1, and the short-circuit now opens with an explicit
+ * `S == 0 ||` disjunct, which short-circuits — so at W=1 the classical test is
+ * NEVER CALLED rather than called and vacuously true. The disjunct exists
+ * because the sandwich's entry condition is S >= 1 (copyout indexes stage
+ * S - 1), and resting that on a predicate's ARGUMENT made a wrong count reach
+ * a uint32_t underflow. See kernels/shift_var.c.
  */
 #ifndef CQOPS_KERNELS_SHIFT_VAR_H
 #define CQOPS_KERNELS_SHIFT_VAR_H

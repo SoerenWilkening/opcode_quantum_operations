@@ -149,11 +149,22 @@ static void compute(cq_ctx *ctx, void *env, int s)
     cq_kernel_die("shift_var: compute step past the end of the schedule");
 }
 
-/* The answer is r_{L-1}, and L >= 1 HERE BY CONSTRUCTION: at L = 0 the amount
- * test below is vacuously true, so the barrel delegates and this driver never
- * runs. An `L == 0 ? cur0 : ...` guard would be a branch no test can reach,
- * which is worse than no guard — cq_scratch_span bounds-checks the result
- * anyway, so an arithmetic slip aborts at the point the mistake was made. */
+/* The answer is r_{L-1}, and L >= 1 HERE BY CONSTRUCTION — but the reason moved
+ * (bd djf). This used to say "at L = 0 the amount test below is vacuously true,
+ * so the barrel delegates and this driver never runs", which made the
+ * precondition rest on cq_bits_all_const's ARGUMENT: pass that predicate the
+ * wrong count and L = 0 reaches here, where `stage_off(e, L - 1) + W` is -W and
+ * `span` hands M08 (4294967295, W). barrel() now delegates on `L == 0 ||`
+ * outright, so the precondition is a written entry condition rather than an
+ * inference through a vacuous scan.
+ *
+ * STILL NOT TAKEN — an `L == 0 ? cur0 : ...` guard HERE. It remains a branch no
+ * test can reach, and at L = 0 it would additionally be a fix in the wrong
+ * direction: it makes the barrel PRODUCE the identity through a sandwich that
+ * costs W scratch qubits, where R9's short-circuit produces it for none.
+ * cq_scratch_span bounds-checks the result either way, so an arithmetic slip
+ * still aborts at the point the mistake was made — which is exactly why M08 was
+ * left alone rather than taught to tolerate the wrapped offset. */
 static void copyout(cq_ctx *ctx, void *env, int i)
 {
     const barrel_env *e = (const barrel_env *)env;
@@ -190,14 +201,43 @@ static void barrel(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
      * kernels/kernel.h's shared predicate takes a COUNT and names the parameter
      * `n`. Only the bits the construction READS are scanned: bits at or above L
      * are structurally invisible to the barrel — never mux controls — so their
-     * kind is not this module's business, exactly as in cq_shift_amount. At
-     * W=1, L is 0 and the scan is vacuously true, which is how a width-1
-     * variable shift becomes the identity. Passing `W` here would send a rail
-     * whose amount is classical in every lane the barrel reads, but quantum in
-     * a lane it never looks at, down the SANDWICH path instead of the constant
-     * one: the same value by a different circuit, which no value-level test is
-     * obliged to see. */
-    if (cq_bits_all_const(b, L)) { constant_path(ctx, dst, a, b, W); return; }
+     * kind is not this module's business, exactly as in cq_shift_amount.
+     * Passing `W` here would send a rail whose amount is classical in every
+     * lane the barrel reads, but quantum in a lane it never looks at, down the
+     * SANDWICH path instead of the constant one: the same value by a different
+     * circuit, which no value-level test is obliged to see.
+     *
+     * `L == 0` IS A SEPARATE DISJUNCT, AND IT IS NOT REDUNDANT THE WAY IT LOOKS
+     * (bd djf). This comment used to read "at W=1, L is 0 and the scan is
+     * vacuously true, which is how a width-1 variable shift becomes the
+     * identity" — true of the SCAN, and it made the sandwich's own precondition
+     * depend on the ARGUMENT of a predicate rather than on anything structural.
+     * L is 0 exactly when W <= 1 (cq_shift_stages), and at L = 0 the driver
+     * below has no last stage: copyout's `stage_off(e, L - 1) + W` is -W, which
+     * `span` casts to uint32_t and M08 refuses as (4294967295, W). So the
+     * entry condition for cq_sandwich is L >= 1, and it is now WRITTEN rather
+     * than inferred through cq_bits_all_const(b, 0) being vacuously true.
+     *
+     * Behaviourally inert on a correct library, deliberately — the scan already
+     * answers 1 at n = 0, so no test can separate the two routes, and none is
+     * claimed to. What the disjunct buys is that a wrong COUNT in the scan can
+     * no longer reach the underflow: measured, with `L` mutated to `W`, W=1
+     * delegates instead of aborting and the purpose-built detector in
+     * tests/test_kernel_shift_var_d8.inc keeps firing. Its dated numbers are in
+     * tests/test_kernel_shift_var.c beside the case-order note.
+     *
+     * AND THAT SURVIVAL IS STRUCTURAL, NOT A LUCKY MEASUREMENT — which is the
+     * durable form of the argument and the one worth keeping. The disjunct can
+     * only fire at L == 0, and cq_shift_stages gives L == 0 iff W <= 1. The
+     * detector runs at W=8, where L is 3. So the hardening and the detector are
+     * DISJOINT BY CONSTRUCTION: no choice of operands can route that case
+     * through this clause, and it would keep its teeth against a wrong count at
+     * every width above 1 even if the mutant re-run had never been done. The
+     * measurement confirms the reasoning; it is not what the claim rests on. */
+    if (L == 0 || cq_bits_all_const(b, L)) {
+        constant_path(ctx, dst, a, b, W);
+        return;
+    }
 
     cq_scratch_alloc(&scr, (uint32_t)(W * (3 * L + 1)));
 

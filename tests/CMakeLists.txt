@@ -928,12 +928,21 @@ set_tests_properties(test_kernel_step14_death.shl_var_dst_aliases_its_source
 
 ## AND ONE CASE THAT CANNOT BE DISCRIMINATED AT ALL, said out loud rather than
 ## dressed up. At W = 0, cq_shift_stages returns 0, so shift_var's classical
-## short-circuit (cq_bits_all_const over L, NOT over W) is vacuously true
-## whatever the amount's kinds are and M12 delegates — meaning M11's identical
-## guard would abort with the identical message. No regex separates them.
-## shift_var_a_width_of_zero is kept because it pins that the entry point
+## short-circuit delegates whatever the amount's kinds are — meaning M11's
+## identical guard would abort with the identical message. No regex separates
+## them. shift_var_a_width_of_zero is kept because it pins that the entry point
 ## refuses W = 0 at all rather than allocating a zero-length region, and it is
 ## recorded here as NOT proving M12 owns that refusal.
+##
+## THE MECHANISM IN THAT SENTENCE IS SUPERSEDED, THE CONCLUSION IS NOT (bd djf).
+## It used to read "so shift_var's classical short-circuit (cq_bits_all_const
+## over L, NOT over W) is vacuously true whatever the amount's kinds are and M12
+## delegates". M12 now delegates on an explicit `L == 0 ||` disjunct placed
+## before that scan, and it short-circuits, so at W = 0 the predicate is never
+## called. The scan is still over L and not over W where it IS called, so the
+## parenthetical's point survives; it simply is not what decides W = 0 any more.
+## Both routes reach the same M11 entry point, so the indiscriminability this
+## block records is unchanged and no ctest property here needed editing.
 
 ## M15, Step 15. THIS SUITE IS K8's L5. Every other kernel folds an
 ## all-classical operand to zero gates and zero qubits; K8 refuses one, because

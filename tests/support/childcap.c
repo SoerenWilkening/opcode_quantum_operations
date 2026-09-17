@@ -32,17 +32,56 @@ static void cap_open(cq_cap *s, int fd, char *buf, size_t cap)
     if (fd >= 0) buf[0] = '\0';       /* an UNSELECTED stream may be NULL */
 }
 
-/* REQUIREMENT 5, half one. EOF is the only end: EINTR is a signal arriving
+/* REQUIREMENT 5's FIRST SITE. EOF is the only end: EINTR is a signal arriving
  * mid-read, not the child finishing, and treating it as one truncates the
  * capture to whatever had arrived.
+ *
+ * IT IS ALSO THE ONE SITE OF THE THREE THAT IS UNPINNED, and `bd 698` declined
+ * it on a MEASUREMENT rather than on flakiness. This read runs only after
+ * poll() has reported the fd readable or hung up, so it never sleeps and cannot
+ * be interrupted before transferring. Instrumented in a scratch copy: 0 entries
+ * of this branch across 4,000 read() calls under 21,489 signal deliveries
+ * (Release; 32,159 in Debug). Both mutants of this line survive in both
+ * configurations. A control here would be vacuous, not flaky — childcap.h has
+ * the full statement.
  *
  * AND A FULL BUFFER IS NOT AN END EITHER (`bd ta1`). This used to `break` at
  * the cap, which leaves the child blocked in write() on a pipe nobody is
  * emptying — so a SMALL capture buffer made the hazard WORSE, not safer, which
  * is the counter-intuitive half of that bead. Past the cap the bytes are read
  * and DROPPED: the stored prefix is byte-for-byte what the old shape stored,
- * and the child always gets to finish. Nothing tells the caller its buffer was
- * short; see childcap.h's note on what is still not pinned. */
+ * and the child always gets to finish. Confirmed directly (`bd 0on`, probe
+ * below): the flood fixture stores 1,023 and drops 261,121, which sum to
+ * exactly its 256 KiB — every byte was read, so the drain does reach EOF.
+ *
+ * NOTHING TELLS THE CALLER ITS BUFFER WAS SHORT, AND `bd 0on` MEASURED THAT
+ * THIS COSTS NOTHING — a sentence that used to read as an open TODO and kept
+ * attracting the same proposal. Instrumented on 2026-09-17 (a scratch copy;
+ * this file was never left modified) with a per-capture (cap, stored, dropped)
+ * line, across all four consuming suites: 63 live captures, of which EXACTLY
+ * ONE truncates — the ta1 flood fixture, which truncates ON PURPOSE and
+ * already asserts it by `CHECK_EQ(strlen(err), sizeof err - 1u)` plus the
+ * first and last stored byte, which is STRICTLY STRONGER than the boolean the
+ * proposal would add. The other 62 have at least 8x headroom; the tightest
+ * real margin is 190 bytes stored into a 512 buffer, and the largest message
+ * anywhere is 357 into 4,096.
+ *
+ * AND TRUNCATION IS NOT SILENT AT MOST OF THE SITES ANYWAY. Of the five real
+ * consumer call sites, three go RED on a short capture without any new
+ * machinery: test_runtime_v2_message.inc's parse_said requires the message to
+ * END with ")\n" (`e[2] == '\0'`), test_shim_ctx_region.inc's message cases use
+ * CHECK_STR_EQ against the whole string, and test_runtime_gate_rotate.inc
+ * counts newlines in `out`. Only the two substring-shaped checks could pass on
+ * a prefix, and both sit ~8-11x under their buffers. So the hazard has zero
+ * live instances and cannot acquire one quietly at the majority of sites.
+ *
+ * WHAT WAS REFUSED, so it is not re-proposed a third time: making truncation a
+ * cq_h_fail (it converts a documented, harmless prefix into a NEW hard failure
+ * across every call site, and it collides head-on with the flood fixture — the
+ * ta1 detector — which must overflow); and widening the signature with an
+ * out-parameter (17 call sites today, not the four the bead budgeted). If a
+ * future consumer ever does need this, the shape to add is a SEPARATE QUERY,
+ * which costs zero call-site edits at any count. */
 static int cap_step(cq_cap *s)
 {
     char    drop[512];
@@ -80,9 +119,18 @@ static int cap_step(cq_cap *s)
  * in tests/test_childcap_controls.inc — whose child arms an alarm so a
  * REGRESSION is a bounded red rather than an unbounded hang.
  *
- * poll() rather than a second fork: one process, nothing extra to reap, and the
- * EINTR retry stays in the two places requirement 5 already names. A POLLHUP
- * with no POLLIN still gets its read(), which returns 0 and ends the stream. */
+ * poll() rather than a second fork: one process, nothing extra to reap. A
+ * POLLHUP with no POLLIN still gets its read(), which returns 0 and ends the
+ * stream.
+ *
+ * THIS ADDED A THIRD EINTR SITE RATHER THAN REUSING ONE OF REQUIREMENT 5's TWO,
+ * and the header said otherwise until `bd 698` counted them. It is also the
+ * ONLY one of the three a signal can realistically land on — measured, this is
+ * where 21,489 of 21,493 interruptions arrived — so its retry is pinned by
+ * `a_signal_arriving_while_the_parent_blocks_in_poll_does_not_end_the_drain`
+ * in tests/test_childcap_controls.inc. The `break` spelling of this mutant is
+ * SILENT, which is why that case asserts the captured BYTES and not only the
+ * verdict. */
 static void drain_both(cq_cap *a, cq_cap *b)
 {
     for (;;) {
@@ -217,11 +265,20 @@ int cq_child_capture(unsigned streams,
     if (want_out) (void)close(fo[0]);
     if (want_err) (void)close(fe[0]);
 
-    /* REQUIREMENT 5, half two, then REQUIREMENT 3. A child that RETURNED from
-     * `fn` reached `_exit(0)` above and did not abort; a child that exited
+    /* REQUIREMENT 5's THIRD SITE, then REQUIREMENT 3. A child that RETURNED
+     * from `fn` reached `_exit(0)` above and did not abort; a child that exited
      * non-zero did not abort either. The v1-boundary suite's entire claim is
      * that every deferred body ABORTS, so "the status is not zero" would
-     * accept a body rewritten to `return 1;`. */
+     * accept a body rewritten to `return 1;`.
+     *
+     * THE RETRY IS PINNED BY A CHILD THAT CLOSES ITS PIPE BEFORE IT DIES
+     * (`bd 698`). In every other child here the drain ends BECAUSE the child
+     * exited, so the status is already available and this call never blocks —
+     * 4 EINTRs per 100 captures, a real race and a useless control. Separating
+     * EOF from exit took that to 1,997 per 2,000 deliveries. The child must
+     * also ABORT: without the retry waitpid returns -1 and `status` keeps its
+     * initial 0, so the verdict is 0, which AGREES with the truth for every
+     * child that does not abort. */
     int status = 0;
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) { }
     return WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT;

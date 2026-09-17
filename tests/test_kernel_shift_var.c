@@ -341,17 +341,43 @@ CQ_TEST(the_scratch_is_the_whole_region_for_every_direction)
  * written to detect a wrong short-circuit count; it is incidental, and it is
  * first.
  *
- * TODAY THE SUITE IS RED EITHER WAY, SO THE WHOLE EXPOSURE IS IN THE FUTURE.
- * Harden the W=1 underflow into a graceful path — a bounds check, a saturating
- * offset, an early return for a zero-length region — and this case silently
- * becomes the sole detector, with nobody told it had been load-bearing. Running
- * it first makes its coverage unconditional instead. Do NOT reorder it back,
- * and do not harden that underflow without re-running the mutant here.
+ * THE HARDENING HAS SINCE LANDED, AND THE RE-RUN THAT bd 6q4 DEMANDED WAS DONE
+ * (bd djf, 2026-09-17). This paragraph used to read "TODAY THE SUITE IS RED
+ * EITHER WAY, SO THE WHOLE EXPOSURE IS IN THE FUTURE. Harden the W=1 underflow
+ * into a graceful path ... and this case silently becomes the sole detector,
+ * with nobody told it had been load-bearing." The exposure is no longer in the
+ * future: kernels/shift_var.c now delegates on an explicit `L == 0 ||` disjunct,
+ * so at W=1 the barrel never enters cq_sandwich and the span offset never
+ * underflows. This case IS the sole detector now, and it is being told so here.
  *
- * WORTH CARRYING: under the mutant the VALUE check PASSES and only the POOL
- * check fails. That is the executed witness for what kernels/shift_var.c's own
- * comment argues — the same value by a different circuit, which no value-level
- * test is obliged to see.
+ * MEASURED AFTER THE HARDENING, on a scratch copy carrying the same L -> W
+ * mutant, in BOTH configurations, and the figures are IDENTICAL to the ones
+ * above: the case name appears 9 times, with 8 failed checks at
+ * tests/test_kernel_shift_var_d8.inc:265, one per k in 0..7. What CHANGED is
+ * everything around it. The M08 abort appears ZERO times; the last TAP line is
+ * now `ok 14 - r9_a_classical_amount_never_enters_the_sandwich` rather than
+ * this case's own `not ok 1`, so all fourteen cases execute where thirteen
+ * were previously UNMEASURED; and ctest's reason moves from
+ * `(Subprocess aborted)` to `(Failed)` — the mutant is now killed by an
+ * ASSERTION rather than by a crash.
+ *
+ * AND THAT FULL RUN IS WHAT FIRST MADE "SOLE DETECTOR" AN EXECUTED CLAIM RATHER
+ * THAN AN INFERENCE. With all fourteen cases reached, case 1 is still the ONLY
+ * `not ok` in either configuration — the three sweeps, the goldens, the
+ * palindrome and the scratch-peak case all stay green under the wrong count.
+ * Before the hardening that could not be observed at all, because the process
+ * died before any of them ran.
+ *
+ * Do NOT reorder this case back. Its position no longer rescues it from an
+ * abort, but it is still the first thing a reader of a red run should see, and
+ * the ordering costs nothing.
+ *
+ * WORTH CARRYING, AND RE-MEASURED UNDER THE HARDENING: under the mutant the
+ * VALUE check PASSES and only the POOL check fails — all 8 failures are line
+ * 265's `CHECK(peak <= (uint32_t)W)` and none is line 262's value comparison.
+ * That is the executed witness for what kernels/shift_var.c's own comment
+ * argues — the same value by a different circuit, which no value-level test is
+ * obliged to see.
  *
  * NOT TAKEN — a ctest FAIL_REGULAR_EXPRESSION naming the span underflow. It
  * cannot do the job it was proposed for: in a correct library that string is
@@ -360,7 +386,22 @@ CQ_TEST(the_scratch_is_the_whole_region_for_every_direction)
  * hardening that logged and continued, and demonstrating even that would mean
  * building the hardening bd 6q4 forbids until this case is independently
  * observable. An inert guard is the "assertion nobody has seen fail" this
- * project already refuses. */
+ * project already refuses.
+ *
+ * THAT REJECTION IS NOW CONFIRMED BY EXECUTION RATHER THAN ARGUED (bd djf).
+ * The hardening that landed IS the silent kind: the mutant run above prints the
+ * span string ZERO times in both configurations. A property pinned on it would
+ * have gone from inert to inert, reddening nothing on the one change it was
+ * proposed to watch.
+ *
+ * ALSO NOT TAKEN — hardening M08 instead (a zero-length region refused, or
+ * cq_scratch_span tolerating the wrapped offset). The region at L = 0 is
+ * W(3L+1) = W bits and is NOT zero-length, so that arm was never the one
+ * firing; and by the time M08 sees the offset the cast to uint32_t has erased
+ * the sign, so it cannot tell "the caller meant -1" from "the caller meant
+ * 4294967295". Softening that bounds check would delete a real detector from
+ * every kernel that carves a region, to fix one kernel's offset arithmetic.
+ * The fix belongs where the precondition lives, which is M12. */
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(a_quantum_bit_above_the_stages_does_not_force_the_barrel),
     CQ_CASE(k10_barrel_shl_sweep),

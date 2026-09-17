@@ -1,0 +1,131 @@
+% labreport entry 9 — 2026-09-17
+% labreport-to: de92b7f
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{9}{field}.
+
+\entry{9}{2026-09-17}{Four follow-ons: a W=1 underflow hardened, two EINTR retries pinned, a generated figure taught to name its tree}
+
+\begin{generated}
+  \gitem{Range}{\texttt{7e44bfe..de92b7f}}
+  \gitem{Tree}{\emph{dirty at capture} --- 13 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{348} --- \texttt{/\allowbreak private/\allowbreak tmp/\allowbreak claude-501/\allowbreak -Users-sorenwilkening-Desktop-Projects-opcode-quantum-operations/\allowbreak a38495b8-7697-4ed7-91fb-a4735fd81bfd/\allowbreak scratchpad/\allowbreak bl-release}, no opt-in flags. Debug \textbf{349} --- \texttt{/\allowbreak private/\allowbreak tmp/\allowbreak claude-501/\allowbreak -Users-sorenwilkening-Desktop-Projects-opcode-quantum-operations/\allowbreak a38495b8-7697-4ed7-91fb-a4735fd81bfd/\allowbreak scratchpad/\allowbreak bl-debug}, no opt-in flags.}
+  \gitem{LOC}{OK — 206 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{de92b7f} bd 09z/ta1/6q4/qki: four follow-ons, and three claims falsified by execution
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{bj0} tools/labreport/new\_entry.py hardcodes build-release/build-debug, so the generated Tests figure is wrong whenever those dirs carry different flags, \bead{djf} M08/M12: the W=1 barrel span underflow is now unblocked for hardening — but hardening it makes bd 6q4's case the SOLE detector, \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{16s} dr\_sweep's three dead parameters are the same class as cq\_kd\_sweep\_at's removed 'exhaustive' — decide them, \bead{ula} tests/ has THREE copies of a fork-and-capture helper; extract one tests/support/ module, \bead{cue} Consolidate all\_const and the death-test null sink into kernel.h / death.h, \bead{0on} tests/support/childcap.c: a TRUNCATED capture is still indistinguishable from a complete one, \bead{698} tests/support/childcap.c: the two EINTR retries are the last unpinned requirement, and ta1 ADDED the reachable one, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Beads filed}{\bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{8u0} M12's blast radius is wider than shift\_var|step14 — test\_template.c drives all three entry points through the shim dispatch table, \bead{bj0} tools/labreport/new\_entry.py hardcodes build-release/build-debug, so the generated Tests figure is wrong whenever those dirs carry different flags, \bead{djf} M08/M12: the W=1 barrel span underflow is now unblocked for hardening — but hardening it makes bd 6q4's case the SOLE detector, \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{cmu} dr\_sweep and dr\_sweep\_small are compile-time indistinguishable since bd 16s — the arity discriminator is gone, \bead{447} tools/labreport/gen\_data.py stamps the WORKING TREE's HEAD into a .dat, not the archive's — a stale archive gets a fresh SHA, \bead{7b5} childcap.h's requirement list has now been wrong four times about what is pinned, \bead{0on} tests/support/childcap.c: a TRUNCATED capture is still indistinguishable from a complete one, \bead{698} tests/support/childcap.c: the two EINTR retries are the last unpinned requirement, and ta1 ADDED the reachable one, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Diff}{\texttt{11 files changed, 726 insertions(+), 56 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Four open follow-ons as one orchestrated batch --- \bead{djf}, \bead{bj0}, \bead{698},
+\bead{0on} --- with one reviewer for \bead{djf} alone, a single full-suite run after the
+last merge, and no redundant test execution anywhere else. \bead{cmu} was explicitly
+excluded as a tripwire rather than a task and was not touched.
+
+\field{What landed}
+\bead{djf}: the W=1 barrel span underflow is hardened in M12, not M08. The entire
+behavioural change is one disjunct --- \texttt{L == 0 ||} in \texttt{barrel()} --- and
+every other line of its seven-file diff is a comment, checked mechanically rather than
+asserted. The bead's obligation was that hardening makes \bead{6q4}'s case the SOLE
+detector, so the L-to-W mutant was re-run after hardening in both configurations by the
+implementer and again independently by the reviewer. Coverage did not merely survive, it
+INCREASED: the incidental abort previously killed the process after one of fourteen cases,
+and all fourteen now execute with case 1 still the only failure, so ``sole detector'' is
+an executed claim rather than an unobservable one.
+
+\bead{698}: the EINTR retries in \texttt{tests/support/childcap.c} are pinned at
+\texttt{poll()} and \texttt{waitpid()} by new controls, and declined at \texttt{read()} on
+a measurement. The bead, and \texttt{childcap.h}'s own requirement list, both said there
+were TWO retries; there are THREE, and three documents named three different pairs.
+
+\bead{0on}: refused a second time, on a new ground, and the prose that attracted the
+proposal twice was replaced by the measurement behind the refusal.
+
+\bead{bj0}: \texttt{tools/labreport/new\_entry.py} takes \texttt{--release-tree} and
+\texttt{--debug-tree}, names the tree each count came from, and records that tree's opt-in
+flags read from its own \texttt{CMakeCache.txt}. A tree that cannot be counted yields an
+italic reason and a path, never a digit. The Tests row of this entry is the first produced
+by it.
+
+\field{Measured}
+\begin{figures}
+\fig{9 case-name occurrences, 8 failed checks at \texttt{shift\_var\_d8.inc:265}}{L-to-W mutant under \texttt{ctest -R}}{identical in Debug and Release, before and after the hardening}
+\fig{1 of 14 cases executed $\rightarrow$ 14 of 14}{last TAP line, same mutant}{Debug and Release; ctest reason moved from \emph{Subprocess aborted} to \emph{Failed}}
+\fig{1 span abort $\rightarrow$ 0}{same mutant}{Debug and Release; kill is by assertion, zero sanitizer mentions}
+\fig{3 EINTR retries, not 2}{read of \texttt{childcap.c}}{n/a --- \texttt{read}, \texttt{poll} and \texttt{waitpid}}
+\fig{poll 21{,}489 / wait 4 / read 0}{counter in each EINTR branch, 4{,}000 \texttt{read()} calls under a 1\,ms SIGALRM}{Release; Debug gave poll 32{,}159 / wait 1 / read 0}
+\fig{0 failures in 400 runs}{shipped controls, host binary, serial}{Release; 0 in 100 runs in Debug}
+\fig{63 live captures, exactly 1 truncates}{per-capture \texttt{(cap, stored, dropped)} probe across all four consuming suites}{the one is \bead{ta1}'s flood fixture, which asserts truncation more strongly than the proposed flag}
+\fig{15 call sites, not 4}{textual \texttt{cq\_child\_capture(} invocations in code position}{at \texttt{de92b7f}; 3 further files include the header and never call it}
+\end{figures}
+
+\field{Decided}
+No PRD or plan decision was opened or amended. The two layer choices are recorded in
+\bead{djf} and \bead{bj0} respectively and are not restated here.
+
+\field{Not taken}
+\bead{djf} rejected option (a), the M08 layer, for two reasons --- and the first corrects
+the bead's own text: the bead described (a) as ``\texttt{cq\_scratch\_span} refusing a
+zero-length region'', which does not match the mechanism, since the region at $L=0$ is $W$
+bits and not zero-length. The second is that M08 cannot distinguish $-1$ from
+\texttt{4294967295} once the cast has erased the sign, so softening that bounds check would
+delete a real detector from every kernel that carves a region in order to fix one kernel's
+arithmetic. Also rejected there: an \texttt{L == 0 ? cur0} guard in \texttt{copyout}, which
+is unreachable AND would produce the identity through a sandwich costing $W$ scratch qubits
+where the short-circuit costs none.
+
+\bead{bj0} rejected a \texttt{--tests} override to TYPE the counts (rule 2 inverted);
+staleness detection (doing it properly needs a reconfigure or a build, which this generator
+must never do); making a missing tree a hard error (the bead's own first requirement forbids
+it); and abbreviating the path, since the absolute path IS the extracted fact.
+
+\bead{0on} was refused rather than taken. \bead{698}'s \texttt{read()} retry was declined
+because a control there would be VACUOUS rather than flaky --- worse, because it reads as
+coverage.
+
+One reviewer finding was recorded rather than fixed: the \bead{djf} gate's ARGUMENT was
+false though its substance held, and that is now \bead{8u0}.
+
+\field{Verified}
+Rule 17, literally. The session's ONE full-suite run, in two trees configured with NEITHER
+opt-in flag: \textbf{349 of 349 green in Debug} and \textbf{348 of 348 green in Release}.
+Before it: \texttt{check\_loc.sh} OK, \texttt{check\_cites.sh} OK, \texttt{gen\_shim.py
+--check} up to date at 2{,}479 symbols, and both configurations built \texttt{rc 0} with the
+exit code checked before any ctest result was believed.
+
+Per-merge gates, each scoped to its own blast radius and run in BOTH configurations: 42
+cases under \texttt{-R "childcap|runtime\_v2|runtime\_gate|shim\_ctx"} for \bead{698} and
+\bead{0on}; 12 cases under \texttt{-R "shift\_var|step14"} plus \texttt{test\_template} for
+\bead{djf}. \bead{bj0} is covered by no ctest test, so its gate was lint plus exercising the
+generator five ways --- no suite was skipped, there is none to run.
+
+NOT RUN AND NOT CLAIMED: L6, L7 \S12(1) and the two QEC sink suites are unregistered in a
+tree with neither opt-in flag, and nothing in this entry says anything about them.
+
+The goldens tree hash \texttt{d8102af6211cadd4a5f2f0f8dfcffa394e06000f} is unchanged from
+the start of the session to the end, and \texttt{CQOPS\_UPDATE\_GOLDENS} was never set by
+anyone at any point.
+
+ON THIS ENTRY'S OWN GENERATED BLOCK, since \bead{bj0} is about exactly that: the Tests row
+is the first to name the trees it counted and to state that they carry no opt-in flags, and
+it is trustworthy for what it now claims. The Range, Commits and Beads rows are NOT: they
+were extracted with the working tree dirty --- the block says so --- so they describe the
+prior committed range and list the previous session's beads alongside this one's. They are
+re-extracted correctly only once this session's work is committed.
+
+\field{Left open}
+\bead{8u0} (P3): M12's blast radius is wider than \texttt{shift\_var|step14}, because
+\texttt{test\_template.c} reaches all three entry points through the shim dispatch table ---
+a symbol-name grep cannot see through a table hop. Nothing was missed in substance;
+\texttt{test\_template} was run in both configurations and is green.
+\bead{7b5} (P4): \texttt{childcap.h}'s ``what is pinned'' list has now been wrong four times.
+\bead{447} (P4): \texttt{gen\_data.py} stamps the working tree's HEAD into a \texttt{.dat}
+rather than the archive's.
+\bead{cmu} remains open deliberately, untouched, as the tripwire it was filed as.

@@ -161,8 +161,11 @@ static inline void cq_kernel_check_dst(const cq_bit *dst, const cq_bit *a,
  * LOAD-BEARING. Five of the six callers pass `W` because they read every lane.
  * M12's barrel passes `L = cq_shift_stages(W)`: bits at or above L are
  * structurally invisible to the construction — never mux controls — so their
- * kind is not that module's business, and at W=1 L is 0 and the scan is
- * vacuously true, which is how a width-1 variable shift becomes the identity.
+ * kind is not that module's business. At W=1, L is 0 and this scan is
+ * vacuously true; that used to be stated here as "which is how a width-1
+ * variable shift becomes the identity", and since bd djf it is not — M12
+ * delegates on an explicit `L == 0` disjunct, so the degenerate width no longer
+ * depends on this predicate's behaviour at n = 0 (kernels/shift_var.c).
  * "Normalising" that call site to `W` would make a classical-amount shift with
  * a quantum high lane take the sandwich path instead of the constant one: a
  * different circuit for the same value, which the L1 sweep need never see.

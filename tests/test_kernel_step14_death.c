@@ -196,12 +196,21 @@ static void shift_var_the_value_is_the_amount(void)
 
 /* THIS CASE CANNOT DISCRIMINATE M12 FROM M11 AND IS KEPT ANYWAY, WITH THAT SAID
  * OUT LOUD. At W = 0, `cq_shift_stages` returns 0, so shift_var's classical
- * short-circuit `cq_bits_all_const(b, L)` is vacuously true whatever the
- * amount's bit-kinds are and the barrel delegates — meaning M11's identical
- * `cq_kernel_check_dst` would abort with the identical message if M12's were
- * deleted. No FAIL_REGULAR_EXPRESSION can tell them apart. What it does pin is
- * that the entry point refuses W = 0 at all rather than computing `1 << 0`
- * scratch bits and walking off a zero-length region.
+ * short-circuit delegates whatever the amount's bit-kinds are — meaning M11's
+ * identical `cq_kernel_check_dst` would abort with the identical message if
+ * M12's were deleted. No FAIL_REGULAR_EXPRESSION can tell them apart. What it
+ * does pin is that the entry point refuses W = 0 at all rather than computing
+ * `1 << 0` scratch bits and walking off a zero-length region.
+ *
+ * WHICH CLAUSE DELEGATES HAS MOVED, AND THE CONCLUSION HAS NOT (bd djf). The
+ * sentence above used to read "so shift_var's classical short-circuit
+ * `cq_bits_all_const(b, L)` is vacuously true whatever the amount's bit-kinds
+ * are and the barrel delegates". barrel() now opens with an explicit
+ * `L == 0 ||` disjunct, which short-circuits, so at W = 0 that predicate is
+ * NEVER CALLED. The indiscriminability is untouched — both routes delegate to
+ * the same M11 entry point, which is the whole reason no regex separates them —
+ * and this case passed in both configurations before and after. Not a
+ * correctness defect; only the mechanism is superseded.
  *
  * An earlier version of this comment claimed the guard "stops a zero width from
  * reaching cq_shift_stages". It did not: the call sat in `L`'s initialiser and

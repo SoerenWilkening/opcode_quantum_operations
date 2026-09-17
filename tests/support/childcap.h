@@ -25,7 +25,14 @@
  *   2. The callback takes a `void *`; a nullary caller passes NULL.
  *   3. SIGABRT SPECIFICALLY, never merely a non-zero exit.
  *   4. fflush(NULL) BEFORE the fork.
- *   5. EINTR retry on BOTH read() and waitpid().
+ *   5. EINTR retry on EVERY blocking call — and there are THREE, not two:
+ *      read() (cap_step), poll() (drain_both) and waitpid(). This line said
+ *      "BOTH read() and waitpid()" until 2026-09-17; it predates `bd ta1`,
+ *      which ADDED the poll site, and the paragraph further down had meanwhile
+ *      been rewritten to say "poll() and read()". So the file named a
+ *      DIFFERENT PAIR in two places and neither pair was the set. Nothing was
+ *      wrong in the code — the miscount is the point, and it is why the three
+ *      sites now get three separate verdicts rather than one sentence.
  *
  * Plus the rider: the capture buffers are cleared FIRST, so a failed capture
  * can never report a previous call's bytes.
@@ -80,16 +87,34 @@
  *   asserts the buffer is EMPTY afterwards, which a call that went ahead and
  *   captured cannot satisfy.
  *
- *   ONLY THE TWO EINTR RETRIES ARE LEFT, AND THEY ARE NOT EQUALLY REACHABLE —
- *   lumping them together overstates one. Since `bd ta1` the parent blocks in
- *   poll(), so poll()'s retry is the one a signal can land on; cap_step's
- *   read() runs only after poll has already reported readiness or hangup, and
- *   its EINTR branch is close to unreachable in practice. Both survive
- *   mutation in both configurations. Closing either needs a signal delivered
- *   into a blocking call, i.e. a timing race, and a flaky control is worse than
- *   a recorded gap. Note that ta1 ADDED the poll-side one: a restructure that
- *   fixes a hazard can widen the unpinned surface, and saying so is cheaper
- *   than rediscovering it.
+ *   ONLY THE READ-SIDE EINTR RETRY IS LEFT, and the paragraph this replaces was
+ *   this file's FOURTH wrong tally — it said "the two EINTR retries" while
+ *   requirement 5 above named a different two. `bd 698` closed the poll side
+ *   and the waitpid side on 2026-09-17, in both configurations, in
+ *   tests/test_childcap_controls.inc. Note that ta1 ADDED the poll-side one: a
+ *   restructure that fixes a hazard can widen the unpinned surface, and saying
+ *   so is cheaper than rediscovering it.
+ *
+ *   THE OLD REASON FOR DECLINING WAS "a timing race, and a flaky control is
+ *   worse than a recorded gap". The premise was right and the conclusion did
+ *   not follow: an ITIMER IN THE PARENT plus a child made to take ~100 ms puts
+ *   ~20 deliveries INSIDE the blocking call per capture, so the event is the
+ *   common case rather than a rare one. Measured over 400 runs of the host
+ *   binary in Release and 100 in Debug, plus the whole -R gate at `-j 6`
+ *   (8 rounds Release, 5 Debug): ZERO failures, while both poll-side mutants
+ *   and the waitpid-side mutant die on 100% of runs. `sa_flags = 0` is the
+ *   whole mechanism — under SA_RESTART the kernel restarts the call itself and
+ *   EINTR never reaches this file.
+ *
+ *   AND THE READ SIDE IS DECLINED ON A MEASUREMENT, NOT ON FLAKINESS. With a
+ *   counter in each of the three EINTR branches (a scratch copy; this file was
+ *   never written), driven by a child dribbling 40 separate one-byte writes so
+ *   the parent makes 4,000 read() calls, under a 1 ms repeating SIGALRM: the
+ *   branch counts were poll 21,489 / wait 4 / read 0 in Release and poll
+ *   32,159 / wait 1 / read 0 in Debug. cap_step runs only after poll has
+ *   reported readiness or hangup, so the read never sleeps and cannot be
+ *   interrupted before it transfers. A control for it would not be flaky, it
+ *   would be VACUOUS — which is worse, because it would read as coverage.
  *
  *   WHAT ta1 PINNED is the drain shape itself, in both configurations: making
  *   the two drains sequential again, and making a full buffer end a drain
@@ -149,6 +174,16 @@ enum {
  * harness fault (pipe, fork, read) yields an empty capture and 0, never the
  * previous call's bytes. Such a fault is reported through cq_h_fail, so it
  * reddens the calling case rather than passing quietly as "did not abort".
+ *
+ * A CAPTURE IS A PREFIX AND THE CALLER IS NOT TOLD SO — a deliberate,
+ * MEASURED non-feature since `bd 0on` (2026-09-17), not an omission. Past the
+ * cap the bytes are read and dropped, so the child never blocks and the drain
+ * always reaches EOF; what is lost is only the notification. Measured across
+ * all four consuming suites: 63 live captures, exactly ONE truncates, and that
+ * one is the ta1 flood fixture, which does so on purpose and asserts the full
+ * prefix length — a stronger claim than the flag anyone would add. The
+ * arithmetic, the per-site truncation sensitivity and the two shapes that were
+ * REFUSED are in childcap.c, at the comment on cap_step's cap handling.
  *
  * `fn` returning is not an abort: the child then _exit(0)s rather than falling
  * back into the parent's case list, because a forked test binary that resumed

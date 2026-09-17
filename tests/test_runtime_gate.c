@@ -367,5 +367,12 @@ CQ_TEST_MAIN(
     CQ_CASE(the_parents_pending_stdout_does_not_reappear_in_the_childs_capture),
     CQ_CASE(a_refused_capture_reports_no_bytes_from_the_previous_one),
     CQ_CASE(a_mask_and_buffer_that_disagree_are_refused_before_anything_forks),
+    /* The two EINTR controls are registered BEFORE the flood case although
+     * they are defined after it: they install a SIGALRM handler, and a forked
+     * child inherits the parent's disposition, so running them first is what
+     * exercises their restore against the one case whose watchdog needs
+     * SIG_DFL (`bd 698`). */
+    CQ_CASE(a_signal_arriving_while_the_parent_blocks_in_poll_does_not_end_the_drain),
+    CQ_CASE(a_signal_arriving_while_the_parent_blocks_in_waitpid_keeps_the_verdict),
     CQ_CASE(a_child_that_fills_one_pipe_before_finishing_the_other_does_not_deadlock)
 )

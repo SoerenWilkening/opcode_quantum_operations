@@ -216,10 +216,19 @@ CQ_TEST(d8_a_shift_by_exactly_the_width_is_the_identity)
 }
 
 /* W=1 has ZERO stages, so no bit of the amount is read and the barrel never
- * runs — shift_var's `cq_bits_all_const(b, L)` is vacuously true and M11
- * answers. Pinned because it is the one width where the whole construction
- * degenerates, and because a ceil(log2 1) = 1 slip would show up here and
- * nowhere else. */
+ * runs — M11 answers. Pinned because it is the one width where the whole
+ * construction degenerates, and because a ceil(log2 1) = 1 slip would show up
+ * here and nowhere else.
+ *
+ * THE ROUTE THIS CASE TAKES CHANGED UNDER IT, AND ITS EXPECTATIONS DID NOT
+ * (bd djf). This comment used to finish "— shift_var's `cq_bits_all_const(b, L)`
+ * is vacuously true and M11 answers". That mechanism is superseded: barrel()
+ * now delegates on an explicit `L == 0 ||` disjunct, which short-circuits, so
+ * at W=1 `cq_bits_all_const` is NEVER CALLED. Every value, gate count and peak
+ * asserted below is unchanged — this is the one case in the suite that
+ * exercises the new route, and it was green before and after the disjunct in
+ * both configurations. Not a correctness defect in either wording; only the
+ * reason W=1 delegates has moved. */
 CQ_TEST(d8_a_width_of_one_ignores_the_amount_entirely)
 {
     CHECK_EQ(cq_shift_stages(1), 0);
