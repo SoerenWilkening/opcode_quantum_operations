@@ -1,0 +1,106 @@
+% labreport entry 10 — 2026-09-17
+% labreport-to: 454afa4
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{10}{field}.
+
+\entry{10}{2026-09-17}{CQ\_lang and qec relocate, eleven suites switch on, and L6's first run is red}
+
+\begin{generated}
+  \gitem{Range}{\texttt{de92b7f..454afa4}}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{359} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{360} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 206 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{454afa4} bd djf/698/0on/bj0: one disjunct, two EINTR retries, and a figure that names its tree
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{bj0} tools/labreport/new\_entry.py hardcodes build-release/build-debug, so the generated Tests figure is wrong whenever those dirs carry different flags, \bead{djf} M08/M12: the W=1 barrel span underflow is now unblocked for hardening — but hardening it makes bd 6q4's case the SOLE detector, \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{16s} dr\_sweep's three dead parameters are the same class as cq\_kd\_sweep\_at's removed 'exhaustive' — decide them, \bead{ula} tests/ has THREE copies of a fork-and-capture helper; extract one tests/support/ module, \bead{cue} Consolidate all\_const and the death-test null sink into kernel.h / death.h, \bead{0on} tests/support/childcap.c: a TRUNCATED capture is still indistinguishable from a complete one, \bead{698} tests/support/childcap.c: the two EINTR retries are the last unpinned requirement, and ta1 ADDED the reachable one, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Beads filed}{\bead{30k} L6 is RED: e2e-slice-loop-pairing-measure-owned aborts on 'measure of a rail that is not live (1, 3)' — NORTH\_STAR condition 1 unmet, \bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{8u0} M12's blast radius is wider than shift\_var|step14 — test\_template.c drives all three entry points through the shim dispatch table, \bead{bj0} tools/labreport/new\_entry.py hardcodes build-release/build-debug, so the generated Tests figure is wrong whenever those dirs carry different flags, \bead{djf} M08/M12: the W=1 barrel span underflow is now unblocked for hardening — but hardening it makes bd 6q4's case the SOLE detector, \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{cmu} dr\_sweep and dr\_sweep\_small are compile-time indistinguishable since bd 16s — the arity discriminator is gone, \bead{447} tools/labreport/gen\_data.py stamps the WORKING TREE's HEAD into a .dat, not the archive's — a stale archive gets a fresh SHA, \bead{7b5} childcap.h's requirement list has now been wrong four times about what is pinned, \bead{0on} tests/support/childcap.c: a TRUNCATED capture is still indistinguishable from a complete one, \bead{698} tests/support/childcap.c: the two EINTR retries are the last unpinned requirement, and ta1 ADDED the reachable one, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Diff}{\texttt{14 files changed, 702 insertions(+), 74 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+After entry 9's batch was committed: merge to \texttt{main}, repoint the two opt-in
+dependencies at their new locations, and prune the accumulated agent worktrees. The
+second of those turned out not to be a path edit.
+
+\field{What landed}
+\texttt{CQ\_lang} and the QEC repository both moved to \texttt{\textasciitilde/Desktop/Projects/},
+and both are genuinely BUILT --- \texttt{build/runtime/libcq\_templates.a} on one side, and
+on the other all four artefacts \texttt{CMakeLists.txt} checks BY PATH rather than by
+\texttt{find\_library} (that check is deliberate: a partial answer gives an
+undefined-symbol wall that reads as our bug). Reconfiguring both trees with the corrected
+flags SWITCHED ON ELEVEN SUITES THAT HAD NEVER EXECUTED IN ANY PRIOR SESSION:
+\texttt{l6\_cqlang\_fixtures}, \texttt{l7\_grover\_cqlang}, \texttt{test\_grover\_qec},
+\texttt{test\_shim\_trace} with two death cases, and \texttt{test\_sink\_qec} with four.
+Registered counts move 349/348 to 360/359.
+
+Ten of the eleven are green. \textbf{L6 is RED}, and it is the first evidence this repo has
+ever had about its own acceptance gate: PRD \S15 D18 and NORTH\_STAR condition 1 make that
+gate exactly \emph{link, run, and do not abort}, and one fixture aborts. \bead{30k} carries
+it. Condition 1 is therefore NOT currently met --- which was previously not so much
+believed as unmeasured.
+
+Ten agent worktrees and their branches were removed and their working-tree diffs archived
+outside the repository first, because five of the ten did not reverse-apply to \texttt{main}
+(they are pre-fix-round copies, superseded rather than lost) and ``probably superseded'' is
+a poor basis for deleting.
+
+\field{Measured}
+\begin{figures}
+\fig{349/348 $\rightarrow$ 360/359 registered}{\texttt{ctest -N}}{Debug/Release, before and after adding both opt-in flags}
+\fig{15 of 15 green}{\texttt{ctest -R "l7\_grover\_cqlang|test\_grover\_qec|test\_shim\_trace|test\_sink\_qec"}}{Debug and Release; both trees built \texttt{rc 0}}
+\fig{1 ABORT / 201 DEFERRED / 191 OK, 818\,s}{\texttt{ctest -R l6}}{Release, sink \texttt{counter}, against CQ\_lang @ \texttt{b1b1dc0} with a DIRTY working tree --- not a pinned SHA, and this repo does not pin CQ\_lang}
+\fig{identical abort at \texttt{de92b7f} and \texttt{454afa4}}{two archives built, \texttt{l6\_run.py --only}, matched link lines}{Release, both configured WITHOUT the qec flag so neither needed extra libs}
+\fig{0 convicted, 992 merely unproven (pool total 992)}{D15 residue report over the L6 corpus}{Release; frees 0 on the dirty row, 58 on the unproven row; 171 of 191 completing fixtures stranded nothing}
+\end{figures}
+
+\field{Decided}
+Nothing. No PRD or plan decision was opened or amended; \bead{30k}'s first question is
+recorded as OPEN rather than answered.
+
+\field{Not taken}
+The abort was NOT diagnosed, and deliberately not guessed at. Whether our
+\texttt{measure of a rail that is not live} guard is wrong, or CQ\_lang emits a measure of a
+rail it has already retired, is left open in \bead{30k} with the instruction to decode what
+\texttt{(1, 3)} actually prints before theorising. The fixture is upstream's own known-hard
+case, which is a reason to suspect NEITHER side in advance. The guard was not weakened:
+measuring a non-live rail is a real refusal.
+
+Entry 9 was NOT edited and is owed no \texttt{\textbackslash supersedes}. Its claims remain
+accurate for the trees it names --- it states that the opt-in suites are unregistered in
+those trees and that nothing is claimed about them, which is still true of them. This entry
+records different trees, not a correction. Its Range, Commits and Beads rows do overlap
+entry 9's, because entry 9's generated block was extracted before its own commit existed.
+
+\field{Verified}
+Rule 17. \textbf{15 cases under \texttt{-R "l7\_grover\_cqlang|test\_grover\_qec|test\_shim\_trace|test\_sink\_qec"} green in Debug and Release}, both trees built \texttt{rc 0} with the exit code checked before any ctest result was believed.
+\textbf{L6 ran in Release only and FAILED}: 1 of 1 ctest entry red, \texttt{rc 134},
+\texttt{libcqops: FATAL: reg: measure of a rail that is not live (1, 3)}. L6 was NOT run in
+Debug and nothing here claims anything about it there.
+
+The pre-existing/regression question was settled BY EXECUTION rather than by argument, which
+matters because the reasoning ``this batch touched M12's $L=0$ short-circuit, a child-capture
+test helper and a lab-report generator, none of them near measure or rail liveness'' is
+exactly the sort of impossibility claim this project has been burned by. Two archives were
+built and the fixture run against each; the message is byte-identical.
+
+NOT RUN AND NOT CLAIMED: no full-suite run happened in this entry's work --- entry 9 holds
+this session's one full run, at 349/349 Debug and 348/348 Release in the
+no-opt-in-flag configuration. A full run in the NEW configuration has not been made and
+would be red until \bead{30k} is resolved.
+
+\field{Left open}
+\bead{30k} (P2, bug) is the one that matters and should lead the next session: L6 red, the
+v1 acceptance gate unmet, the cause undiagnosed. Budget it as its own session --- a full L6
+run is 818\,s, so use \texttt{--only} with the DASHED fixture name, and note that running
+\texttt{l6\_run.py} by hand exports none of the three \texttt{CQOPS\_L6\_*} variables CMake
+sets on the ctest entries, so a hand run against a qec-enabled archive reports
+\texttt{BUILD\_FAIL} instead of its real result.
+\bead{8u0}, \bead{7b5} and \bead{447} remain as a cheap, disjoint follow-on batch.
+\bead{cmu} remains open, untouched, as the tripwire it was filed as.
+A consequence worth carrying: \texttt{make test} on this box now runs a materially larger
+suite than anything gated in entry 9, and its first full run will be red.
