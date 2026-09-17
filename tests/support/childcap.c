@@ -11,31 +11,102 @@
 #include "support/harness.h"
 
 #include <errno.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* One capture in flight. `fd < 0` means this stream has ended and is out of
+ * the poll set; a stream never selected is born that way. */
+typedef struct {
+    int    fd;
+    char  *buf;
+    size_t cap;
+    size_t n;
+} cq_cap;
+
+static void cap_open(cq_cap *s, int fd, char *buf, size_t cap)
+{
+    s->fd = fd; s->buf = buf; s->cap = cap; s->n = 0u;
+    if (fd >= 0) buf[0] = '\0';       /* an UNSELECTED stream may be NULL */
+}
+
 /* REQUIREMENT 5, half one. EOF is the only end: EINTR is a signal arriving
  * mid-read, not the child finishing, and treating it as one truncates the
- * capture to whatever had arrived. */
-static void drain(int fd, char *buf, size_t cap)
+ * capture to whatever had arrived.
+ *
+ * AND A FULL BUFFER IS NOT AN END EITHER (`bd ta1`). This used to `break` at
+ * the cap, which leaves the child blocked in write() on a pipe nobody is
+ * emptying — so a SMALL capture buffer made the hazard WORSE, not safer, which
+ * is the counter-intuitive half of that bead. Past the cap the bytes are read
+ * and DROPPED: the stored prefix is byte-for-byte what the old shape stored,
+ * and the child always gets to finish. Nothing tells the caller its buffer was
+ * short; see childcap.h's note on what is still not pinned. */
+static int cap_step(cq_cap *s)
 {
-    size_t n = 0;
+    char    drop[512];
+    char   *dst  = s->buf + s->n;
+    size_t  room = s->cap - 1u - s->n;
+    ssize_t got;
 
-    buf[0] = '\0';
+    if (room == 0u) { dst = drop; room = sizeof drop; }
+    got = read(s->fd, dst, room);
+    if (got == 0) return 0;                        /* EOF: the child is gone  */
+    if (got < 0) {
+        if (errno == EINTR) return 1;              /* a signal, not an end    */
+        cq_h_fail(__FILE__, __LINE__, "read failed: errno %d", errno);
+        return 0;
+    }
+    if (dst != drop) {
+        s->n += (size_t)got;
+        s->buf[s->n] = '\0';
+    }
+    return 1;
+}
+
+/* `bd ta1` — THE SELECTED STREAMS ARE DRAINED TOGETHER, and the sequential
+ * shape this replaces could DEADLOCK. With both streams selected the parent
+ * read stdout to EOF and only then stderr; EOF on stdout arrives when the child
+ * exits, so a child that filled the stderr pipe before finishing stdout blocked
+ * in write() while the parent blocked in read(). It presents as a ctest
+ * TIMEOUT, not a red assertion, which is why nothing would have named it.
+ *
+ * IT COULD NOT FIRE ON THE TREE AS IT STOOD, measured 2026-09-17: the one
+ * both-streams caller is the D11 characterisation and it emits tens of bytes
+ * against a pipe that holds at least 16 KiB. This is HARDENING, so it needs
+ * its own detector, and that is
+ * `a_child_that_fills_one_pipe_before_finishing_the_other_does_not_deadlock`
+ * in tests/test_childcap_controls.inc — whose child arms an alarm so a
+ * REGRESSION is a bounded red rather than an unbounded hang.
+ *
+ * poll() rather than a second fork: one process, nothing extra to reap, and the
+ * EINTR retry stays in the two places requirement 5 already names. A POLLHUP
+ * with no POLLIN still gets its read(), which returns 0 and ends the stream. */
+static void drain_both(cq_cap *a, cq_cap *b)
+{
     for (;;) {
-        const ssize_t got = read(fd, buf + n, cap - 1u - n);
-        if (got == 0) break;                       /* EOF: the child is gone  */
-        if (got < 0) {
+        struct pollfd  pfd[2];
+        cq_cap        *who[2];
+        nfds_t         nf = 0u;
+        nfds_t         i;
+
+        if (a->fd >= 0) { pfd[nf].fd = a->fd; pfd[nf].events  = POLLIN;
+                          pfd[nf].revents = 0; who[nf] = a; nf++; }
+        if (b->fd >= 0) { pfd[nf].fd = b->fd; pfd[nf].events  = POLLIN;
+                          pfd[nf].revents = 0; who[nf] = b; nf++; }
+        if (nf == 0u) break;
+
+        if (poll(pfd, nf, -1) < 0) {
             if (errno == EINTR) continue;          /* a signal, not an end    */
-            cq_h_fail(__FILE__, __LINE__, "read failed: errno %d", errno);
+            cq_h_fail(__FILE__, __LINE__, "poll failed: errno %d", errno);
             break;
         }
-        n += (size_t)got;
-        if (n + 1u >= cap) break;
+        for (i = 0u; i < nf; i++) {
+            if (pfd[i].revents == 0) continue;
+            if (!cap_step(who[i])) who[i]->fd = -1;
+        }
     }
-    buf[n] = '\0';
 }
 
 static void close_pair(int fd[2])
@@ -134,14 +205,15 @@ int cq_child_capture(unsigned streams,
                                        * child must not resume the suite */
     }
 
-    /* Sequential, stdout first — inherited from the two-pipe copy, whose
-     * children write a bounded trace to stdout and one short line to stderr.
-     * It is not safe for a child that can fill a pipe on the stream drained
-     * second while the parent blocks on the first (`bd ta1`). */
+    /* CONCURRENT, not stdout-then-stderr (`bd ta1`). The two pipes are
+     * independent and either can fill; the write ends are closed FIRST so EOF
+     * means the child and nothing else. */
+    cq_cap co, ce;
     if (want_out) (void)close(fo[1]);
     if (want_err) (void)close(fe[1]);
-    if (want_out) drain(fo[0], out, out_cap);
-    if (want_err) drain(fe[0], err, err_cap);
+    cap_open(&co, want_out ? fo[0] : -1, out, want_out ? out_cap : 0u);
+    cap_open(&ce, want_err ? fe[0] : -1, err, want_err ? err_cap : 0u);
+    drain_both(&co, &ce);
     if (want_out) (void)close(fo[0]);
     if (want_err) (void)close(fe[0]);
 

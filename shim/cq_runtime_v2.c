@@ -3,8 +3,31 @@
  * symbols, 63 `qram`, ~~11 `tape`~~ and `cqrt_alloc_handle`. **98 since
  * 2026-09-02** — the 11 tape bodies moved into scope (PRD §15 D23,
  * shim/cq_runtime_tape.c); **35 since later that day** — PRD §15 D24 moved the
- * 63 qram bodies into shim/cq_runtime_qram.c. Every "109" and "74" below is the
- * 2026-08-27 figure.
+ * 63 qram bodies into shim/cq_runtime_qram.c; **39 since 2026-09-10** — the ABI
+ * was re-vendored at CQ_lang `170ede1` and widened the fp bucket by the four
+ * `cqrt_ry_f<W>_controlled` (`bd w9i`, purely additive: `opcode_table.yaml` is
+ * byte-identical), so the fp core is 38 rather than 34. Every "109" and "74"
+ * below is the 2026-08-27 figure.
+ *
+ * READ THE POPULATION FROM `CQ_V2_N_THUNKS`, NEVER FROM A COMMENT — THAT
+ * INSTRUCTION IS THE DURABLE HALF OF THIS PARAGRAPH AND THE NUMBER IS NOT.
+ * The running history above is a chain of DATED measurements kept verbatim; the
+ * LIVE count is whatever `CQ_V2_N_THUNKS` says (tests/test_runtime_v2_table.inc)
+ * and tests/test_runtime_v2.c pins it. On 2026-09-10 three files carried 39, 98
+ * and 35 for this one quantity on the same day (`bd qki`) — the second
+ * occurrence of a figure outliving the first, which is the exact failure mode
+ * `CLAUDE.md`'s preamble describes.
+ *
+ * DERIVING 39 FROM THIS FILE, since a reader will reach for grep. `grep -c
+ * cq_shim_unsupported` answers 18, and 18 is a count of LINES: 3 of them are
+ * prose (this paragraph, the `(void)`-cast note, and the Ry block's), leaving 15
+ * call SITES — 8 inside `CQ_V2_FP_WIDTH` expanded at four widths (32 symbols)
+ * plus 7 hand-written (4 `cqrt_ry_f<W>_controlled`, 2 `..._controlled_inv`,
+ * `cqrt_alloc_handle`). 32 + 7 = 39, and `nm -g` on this TU's object agrees.
+ * The thunk table decomposes the SAME 39 differently — 9 per width x 4, plus 2
+ * plus 1, because it folds `t_ryc_f##W` into its per-width macro where this file
+ * hand-writes it — which is what makes it an independent check rather than a
+ * second transcription.
  *
  * PRD §15 D16 (bd vxk, bd r3y, bd ck6), and the discriminator is CAPABILITY
  * rather than liveness. libcqops DEFINES every `cqrt_*` it could serve —
@@ -181,8 +204,10 @@ void cqrt_ry_f64_controlled_inv(int32_t ctrl, int32_t handle, double angle)
 /* --- The 63 qram symbols: GONE, 2026-09-02 (PRD §15 D24) ----------------- */
 /* They live in shim/cq_runtime_qram.c as v1.2 — D23's token plus `count`
  * registers, Bennett's unary-iteration tree for the read and his shadow store
- * under it for the write. This file's population is 35: the 34 fp-width core
- * symbols and `cqrt_alloc_handle`. The `V2_QRAM` reason string is gone with
+ * under it for the write. This file's population WAS 35 ON 2026-09-02: the 34
+ * fp-width core symbols and `cqrt_alloc_handle`. Both figures are that date's,
+ * kept as measured; the live count is `CQ_V2_N_THUNKS` and is 38 + 1 = 39 since
+ * the 2026-09-10 re-vendor (`bd qki`). The `V2_QRAM` reason string is gone with
  * them, and the ADDRESSABLE-MEMORY side of the recorded seam below is empty. */
 
 /* --- The 11 tape symbols: GONE, 2026-09-02 (PRD §15 D23) ------------------ */
@@ -191,7 +216,8 @@ void cqrt_ry_f64_controlled_inv(int32_t ctrl, int32_t handle, double angle)
  * on tainted data" was measured false at Step 24 — six shipped fixtures ARE
  * that consumer — and the cost was the copy's: a tape write is `cqrt_copy`
  * into a kept rail, and the tape handle is a zero-qubit token (plan §0.5).
- * This file's population is 98. */
+ * This file's population WAS 98 ON 2026-09-02, before D24 took the qram
+ * family — that date's measurement, kept as measured. */
 
 /* --- cqrt_alloc_handle, which is not an ordinary member of this file ------- */
 

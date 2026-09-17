@@ -1,0 +1,109 @@
+% labreport entry 8 — 2026-09-17
+% labreport-to: 7e44bfe
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{8}{field}.
+
+\entry{8}{2026-09-17}{bd 09z/ta1/6q4/qki: four follow-ons, and three claims falsified by execution}
+
+\begin{generated}
+  \gitem{Range}{\texttt{7f2ee99..7e44bfe}}
+  \gitem{Tree}{\emph{dirty at capture} --- 7 path(s) uncommitted}
+  \gitem{Tests}{Release \textbf{359}, Debug \textbf{360} (\texttt{ctest -N})}
+  \gitem{LOC}{OK — 206 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{7e44bfe} bd 16s/ula/cue: three refactors that move no observable
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{16s} dr\_sweep's three dead parameters are the same class as cq\_kd\_sweep\_at's removed 'exhaustive' — decide them, \bead{ula} tests/ has THREE copies of a fork-and-capture helper; extract one tests/support/ module, \bead{cue} Consolidate all\_const and the death-test null sink into kernel.h / death.h, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Beads filed}{\bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{djf} M08/M12: the W=1 barrel span underflow is now unblocked for hardening — but hardening it makes bd 6q4's case the SOLE detector, \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{cmu} dr\_sweep and dr\_sweep\_small are compile-time indistinguishable since bd 16s — the arity discriminator is gone, \bead{0on} tests/support/childcap.c: a TRUNCATED capture is still indistinguishable from a complete one, \bead{698} tests/support/childcap.c: the two EINTR retries are the last unpinned requirement, and ta1 ADDED the reachable one, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Diff}{\texttt{46 files changed, 790 insertions(+), 535 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Orchestrate the four follow-ons of the \bead{16s}/\bead{ula}/\bead{cue} batch ---
+\bead{09z}, \bead{ta1}, \bead{6q4}, \bead{qki} --- as one batch of worktree agents, with a
+single reviewer for \bead{09z}, under a hard budget of exactly one full-suite run for the
+whole session. \bead{cmu} was named only to be left alone: it is a tripwire recorded beside
+the pair it describes, not a task.
+
+\field{What landed}
+\texttt{tests/support/childcap.c}'s two pipes are drained \emph{concurrently} through
+\texttt{poll()}, and a full buffer no longer ends a drain --- past the cap the bytes are read
+and dropped, so the stored prefix is byte-for-byte what the sequential shape stored while the
+child always gets to finish. The counter-intuitive half of \bead{ta1} is now executable rather
+than argued: a \emph{small} capture buffer made the old hazard worse, not safer.
+
+A new \texttt{tests/test\_childcap\_controls.inc} carries six cases. Being an \texttt{.inc} it
+registers no ctest entry and is outside \texttt{check\_loc.sh}'s extension walk, so
+\texttt{tests/CMakeLists.txt} was untouched by either agent and the sorted \texttt{ctest -N}
+diff is empty in both configurations. What closed \bead{09z} was not an assertion but a
+\emph{wider corpus of children}: every child the tree forked before today either aborted or
+returned, so four different weakenings of the SIGABRT test agreed with the real predicate on
+every input it was ever given. A child that prints and \texttt{\_Exit(1)}s, and one that prints
+and raises \texttt{SIGTERM}, are what make them disagree.
+
+\texttt{test\_kernel\_shift\_var.c}'s purpose-built pool assertion now runs first, ahead of the
+sweep whose incidental \texttt{W=1} span underflow used to abort the process before it.
+\texttt{shim/cq\_runtime\_v2.c}'s running count is appended rather than corrected, and carries
+the instruction to read the population from \texttt{CQ\_V2\_N\_THUNKS} and never from a comment.
+
+\field{Measured}
+\begin{figures}
+  \fig{11 of 13 mutants killed}{hand-applied mutants, \texttt{ctest -R} on the three helper suites}{Debug and Release}
+  \fig{2 survivors, both EINTR retries}{same battery}{Debug and Release}
+  \fig{sequential drain restored $\rightarrow$ red in 5.4\,s / 6.9\,s}{the flood child's \texttt{alarm(5)}}{Release / Debug}
+  \fig{L$\rightarrow$W mutant: case B absent (0 occurrences) before the reorder, 9 after}{\texttt{ctest -R test\_kernel\_shift\_var}}{Debug and Release}
+  \fig{39 deferred symbols}{three independent derivations --- 15 call sites, \texttt{CQ\_V2\_N\_THUNKS}, \texttt{nm -g}}{Release object}
+\end{figures}
+\datasource{Every figure above was run by the agent or reviewer that reports it, in a scratch
+build tree configured with neither \texttt{-DCQOPS\_CQLANG\_DIR=} nor \texttt{-DCQOPS\_QEC\_DIR=}.
+Mutants were applied to scratch copies and restored with \texttt{cp -f} plus \texttt{touch};
+\texttt{third\_party/} was not written.}
+
+\field{Not taken}
+\emph{\bead{6q4}'s second remedy}, a ctest \texttt{FAIL\_REGULAR\_EXPRESSION} naming the span
+underflow, was rejected as unsound rather than merely costly: the property fires on
+\emph{presence}, the string is never printed by a correct library, and the threat it was
+proposed against is a \emph{silent} hardening that removes the message --- so it would redden
+nothing. It would have caught only a hardening that logged and continued.
+
+\emph{The two EINTR retries} (\bead{698}) stay unpinned: closing either needs a signal delivered
+into a blocking call, and a flaky control is worse than a recorded gap. \bead{ta1} \emph{added}
+the reachable one, which is worth saying at the time rather than rediscovering later.
+
+\emph{Making a truncated capture a \texttt{cq\_h\_fail}} (\bead{0on}) was refused: it converts a
+documented silent truncation into a new hard failure mode across four call sites, and it
+collides with the one fixture that must overflow on purpose.
+
+\emph{The \texttt{W=1} span underflow} was not hardened (\bead{djf}); \bead{6q4} forbids it until
+the purpose-built case is independently observable, which it now is. \emph{\bead{cmu}} was left
+open untouched.
+
+\field{Verified}
+\textbf{The generated \texttt{Tests} figure above is not what this session ran.}
+\texttt{tools/labreport/new\_entry.py} hardcodes \texttt{build-release}/\texttt{build-debug},
+and this box's copies of those carry \texttt{-DCQOPS\_QEC\_DIR=} pointing at a checkout with no
+\texttt{build/} and no \texttt{include/qec/qec.h}; they were not used and \texttt{make test}
+fails at configure against them. Filed as a bead.
+
+What actually ran, once, after the last merge, in scratch trees configured with neither opt-in
+flag: \textbf{the full suite, Release 348/348 passed and Debug 349/349 passed}, both building
+clean at \texttt{-Werror} with zero warnings. \texttt{check\_loc} OK (largest 294),
+\texttt{check\_cites} OK (0 bare), \texttt{shim-check} \texttt{rc 0} and a genuine no-op. The
+sorted \texttt{ctest -N} diff against the pre-batch baseline is empty in both configurations,
+and the goldens tree hash is unchanged at \texttt{d8102af6}.
+
+\textbf{Not run, and nothing here may be read as a claim about them:} L6, L7 §12(1) and the two
+QEC sink suites --- all four \emph{unregistered} at these configure flags, which the configure
+log states in four STATUS lines. \texttt{CQOPS\_UPDATE\_GOLDENS} was not set by anyone, in any
+configuration, at any point.
+
+\field{Left open}
+\bead{698} (the two EINTR retries), \bead{0on} (a truncated capture is indistinguishable from a
+complete one), \bead{djf} (the \texttt{W=1} underflow, now unblocked but obliged to re-run the
+L$\rightarrow$W mutant), and a new bead against \texttt{new\_entry.py}'s hardcoded build dirs.
+\bead{cmu} remains open by design.

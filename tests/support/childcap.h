@@ -30,11 +30,19 @@
  * Plus the rider: the capture buffers are cleared FIRST, so a failed capture
  * can never report a previous call's bytes.
  *
- * WHICH OF THESE A CASE ACTUALLY PINS — `bd 09z`, RE-MEASURED 2026-09-17 in
- * BOTH configurations, and the first version of this paragraph got it wrong in
- * both directions. It said "none of the six is pinned", which was the
- * `src/angle.h` shape: a measured-sounding claim resting on a battery that
- * never mutated the requirement it was generalising over.
+ * WHICH OF THESE A CASE ACTUALLY PINS — `bd 09z`, and THIS PARAGRAPH HAS NOW
+ * BEEN WRONG THREE TIMES, which is itself the finding. (1) It said "none of
+ * the six is pinned", resting on a battery that never mutated the requirement
+ * it was generalising over. (2) It said SEVEN mutants survive, true of the
+ * corpus of children that existed on 2026-09-17 and false by the end of that
+ * day. (3) It said two of the survivors were UNREACHABLE, which was refuted by
+ * someone spending twenty minutes writing the controls it claimed were
+ * impossible. Every one of the three was a measured-SOUNDING claim that no test
+ * read — `src/angle.h`'s defect, in the one file whose entire job is recording
+ * what is and is not pinned. The lesson is not "be careful": it is that a
+ * survivor should be re-measured before it is explained, and that an
+ * IMPOSSIBILITY claim is the most expensive kind to get wrong, because it stops
+ * the next person trying.
  *
  *   REQUIREMENT 1 IS PINNED, and it is the strongest thing here. Ignoring the
  *   stream mask, and swapping the two drains, are both KILLED in both
@@ -43,30 +51,74 @@
  *   CHECK_EQ(gates, 4*j) needs stdout and its CHECK(strstr(err, "D11")) needs
  *   stderr, so that one case cannot pass unless both pipes go where they say.
  *
- *   REQUIREMENTS 3, 4, 5 AND THE RIDER ARE NOT PINNED. Seven mutants survive
- *   both configurations: requirement 3 three ways (`status != 0`, a hard-wired
- *   `return 1`, and WIFSIGNALED without the SIGABRT test), requirement 5's
- *   read-side EINTR retry turned into a break, requirement 4's fflush deleted,
- *   the rider's buffer clear deleted, and streams_are_paired() forced true.
+ *   REQUIREMENTS 3 AND 4 ARE PINNED SINCE 2026-09-17 by the CONTROLS in
+ *   tests/test_childcap_controls.inc, measured in BOTH configurations. What
+ *   closed them was not an assertion but a WIDER CORPUS OF CHILDREN: every
+ *   child forked before then either aborted or returned, so `status != 0`,
+ *   `WIFEXITED(status) && WEXITSTATUS(status) != 0`, `WIFSIGNALED(status)` and
+ *   a hard-wired `return 1` all agreed with the real predicate on every input
+ *   it was ever given. A child that prints and _Exit(1)s, and one that prints
+ *   and raises SIGTERM, are what make them disagree; a parent that leaves bytes
+ *   pending in its own stdout is what makes requirement 4 observable.
  *
- * BUT REQUIREMENT 3's LINE IS LOAD-BEARING RATHER THAN UNTESTED, and only a
- * PAIRED mutation shows the difference. Change the corpus of children so one
- * of them exits non-zero WITHOUT a signal — cq_shim_unsupported's abort()
- * replaced by exit(1), message byte-identical — and five CHECK_EQ(signalled, 1)
- * in tests/test_shim_ctx_region.inc go red in Release while every message check
- * still passes. Pair that with `return 1` here and the whole thing goes green
- * again. So this line is the SOLE Release detector of "the refusal printed
- * correctly and did not abort", and the three survivors above are EQUIVALENT
- * MUTANTS on the children that exist today, not dead code.
+ *   THE RIDER AND streams_are_paired() ARE PINNED TOO, since the fix round of
+ *   the same day, and the claim they REPLACE is worth keeping visible because
+ *   it is this file's third wrong tally. It said the two were "unreachable by a
+ *   passing case, not merely unwritten", on the reasoning that their only
+ *   effect on a SUCCEEDING call is a cq_h_fail and that a test cannot assert
+ *   its own redness. THAT WAS FALSE, and falsified by running code: harness.h
+ *   ships cq_h_mute + cq_h_take_failures for exactly this, under a section
+ *   headed FALSIFIABILITY that quotes the principle the false claim was
+ *   invoking, and tests/test_kerneldrv.c's CQ_EXPECT_CAUGHT / CQ_EXPECT_CLEAN
+ *   is the established idiom. tests/test_harness_negative.c is NOT the only
+ *   inversion point in this tree; it is only the coarsest.
  *
- * THE CONTROL THAT CLOSES IT IS NOT THE OBVIOUS ONE. This paragraph used to
- * prescribe "a callback that prints and RETURNS"; measured against a probe
- * linking this archive, a returning child reaches _exit(0), so the baseline and
- * `status != 0` BOTH report 0 and that control kills only the hard-wired
- * `return 1`. What discriminates: a child that prints and _exit(1)s (kills
- * `status != 0` AND `return 1`), plus a child that prints and raises a
- * non-SIGABRT signal (kills WIFSIGNALED-without-SIGABRT). Two controls, and
- * 09z carries the measured table.
+ *   Measured in both configurations: deleting the rider's clear, removing
+ *   streams_are_paired's body, and IGNORING its result are all three RED. The
+ *   last of those is the sharp one — a guard whose complaint still prints
+ *   passes any control that merely counts the diagnostic, so the control
+ *   asserts the buffer is EMPTY afterwards, which a call that went ahead and
+ *   captured cannot satisfy.
+ *
+ *   ONLY THE TWO EINTR RETRIES ARE LEFT, AND THEY ARE NOT EQUALLY REACHABLE —
+ *   lumping them together overstates one. Since `bd ta1` the parent blocks in
+ *   poll(), so poll()'s retry is the one a signal can land on; cap_step's
+ *   read() runs only after poll has already reported readiness or hangup, and
+ *   its EINTR branch is close to unreachable in practice. Both survive
+ *   mutation in both configurations. Closing either needs a signal delivered
+ *   into a blocking call, i.e. a timing race, and a flaky control is worse than
+ *   a recorded gap. Note that ta1 ADDED the poll-side one: a restructure that
+ *   fixes a hazard can widen the unpinned surface, and saying so is cheaper
+ *   than rediscovering it.
+ *
+ *   WHAT ta1 PINNED is the drain shape itself, in both configurations: making
+ *   the two drains sequential again, and making a full buffer end a drain
+ *   again, are each KILLED by
+ *   `a_child_that_fills_one_pipe_before_finishing_the_other_does_not_deadlock`.
+ *
+ * REQUIREMENT 3's LINE WAS LOAD-BEARING RATHER THAN UNTESTED ALL ALONG, and
+ * only a PAIRED mutation showed the difference. Change the corpus of children
+ * so one of them exits non-zero WITHOUT a signal — cq_shim_unsupported's
+ * abort() replaced by exit(1), message byte-identical — and in RELEASE the five
+ * CHECK_EQ(signalled, 1) in tests/test_shim_ctx_region.inc and the 39 `thunk N
+ * did not abort` reports in tests/test_runtime_v2_message.inc all go red while
+ * every message check still passes. Pair that with `return 1` here and those
+ * two suites go green again; what stays red is tests/test_childcap_controls.inc,
+ * which is the whole point of it.
+ *
+ * MEASURE THAT PAIRING IN RELEASE. Its Debug reading is an ARTEFACT and points
+ * the wrong way: the mutated child reaches exit(1), which runs atexit handlers,
+ * so LeakSanitizer writes its report into the captured child stderr and the
+ * five CHECK_STR_EQ beside those CHECK_EQs fail too — on the appended leak
+ * report, not on anything about the abort. A Debug-only reader concludes the
+ * message check covers it. It does not. This is the fail-direction twin of
+ * `bd remember sanitizer-abort-passes-expect-abort`.
+ *
+ * AND A BARE BINARY RUN CANNOT SEE THAT ARTEFACT EITHER, because
+ * ASAN_OPTIONS=detect_leaks=1 lives in ctest's ENVIRONMENT property
+ * (cmake/CqopsTest.cmake) and the shell does not win over it. Measured: the
+ * same mutant run directly out of the Debug tree shows five clean
+ * CHECK_EQ(signalled, 1) failures and no leak report at all.
  */
 #ifndef CQOPS_TEST_CHILDCAP_H
 #define CQOPS_TEST_CHILDCAP_H

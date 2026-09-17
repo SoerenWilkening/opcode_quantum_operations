@@ -320,7 +320,49 @@ CQ_TEST(the_scratch_is_the_whole_region_for_every_direction)
 #include "test_kernel_shift_var_sweep.inc"
 #include "test_kernel_shift_var_d8.inc"
 
+/* THE CASE ORDER IS LOAD-BEARING, AND IT IS THIS REPO'S RECORDED MASKING RUN
+ * BACKWARDS (bd 6q4). The written-down pattern is a LATER copy of a guard
+ * catching what an EARLIER deleted one would have. Here an EARLIER INCIDENTAL
+ * CRASH MASKS A LATER PURPOSE-BUILT ASSERTION, which is the same hazard
+ * inverted and was not written down anywhere until now.
+ *
+ * `a_quantum_bit_above_the_stages_does_not_force_the_barrel` is the only
+ * purpose-built detector of the COUNT in kernels/shift_var.c's short-circuit,
+ * `cq_bits_all_const(b, L)` — the `L`, not `W`. Measured 2026-09-17 in BOTH
+ * configurations on a scratch copy carrying the L -> W mutant: with the sweeps
+ * first, `k10_barrel_shl_sweep` takes the process down at the very first case
+ * with M08's
+ *
+ *     scratch: span is outside the region (off, len) (4294967295, 1)
+ *
+ * and this case never executes — it appears ZERO times in the ctest output. At
+ * W=1, L is 0, so under the mutant a quantum amount bit sends the call into the
+ * sandwich and a uint32_t span offset underflows. Nothing about that abort was
+ * written to detect a wrong short-circuit count; it is incidental, and it is
+ * first.
+ *
+ * TODAY THE SUITE IS RED EITHER WAY, SO THE WHOLE EXPOSURE IS IN THE FUTURE.
+ * Harden the W=1 underflow into a graceful path — a bounds check, a saturating
+ * offset, an early return for a zero-length region — and this case silently
+ * becomes the sole detector, with nobody told it had been load-bearing. Running
+ * it first makes its coverage unconditional instead. Do NOT reorder it back,
+ * and do not harden that underflow without re-running the mutant here.
+ *
+ * WORTH CARRYING: under the mutant the VALUE check PASSES and only the POOL
+ * check fails. That is the executed witness for what kernels/shift_var.c's own
+ * comment argues — the same value by a different circuit, which no value-level
+ * test is obliged to see.
+ *
+ * NOT TAKEN — a ctest FAIL_REGULAR_EXPRESSION naming the span underflow. It
+ * cannot do the job it was proposed for: in a correct library that string is
+ * never printed, so the property is inert on every green run, and a SILENT
+ * hardening removes the string and reddens nothing. It would catch only a
+ * hardening that logged and continued, and demonstrating even that would mean
+ * building the hardening bd 6q4 forbids until this case is independently
+ * observable. An inert guard is the "assertion nobody has seen fail" this
+ * project already refuses. */
 CQ_TEST_MAIN_ARGV(
+    CQ_CASE(a_quantum_bit_above_the_stages_does_not_force_the_barrel),
     CQ_CASE(k10_barrel_shl_sweep),
     CQ_CASE(k10_barrel_lshr_sweep),
     CQ_CASE(k10_barrel_ashr_sweep),
@@ -333,6 +375,5 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(d8_the_barrel_saturates_without_being_asked_to),
     CQ_CASE(d8_a_shift_by_exactly_the_width_is_the_identity),
     CQ_CASE(d8_a_width_of_one_ignores_the_amount_entirely),
-    CQ_CASE(a_quantum_bit_above_the_stages_does_not_force_the_barrel),
     CQ_CASE(r9_a_classical_amount_never_enters_the_sandwich)
 )

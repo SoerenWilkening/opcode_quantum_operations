@@ -342,6 +342,13 @@ CQ_TEST(a_measured_rail_is_a_legal_control_and_an_ordinary_one_as_a_target)
 
 #include "test_runtime_gate_rotate.inc"
 
+/* The CONTROLS for tests/support/childcap.[ch] (`bd 09z`). They are hosted
+ * here rather than in a suite of their own because childcap's requirement 1
+ * is already pinned by test_runtime_gate_rotate.inc next door, and because an
+ * .inc adds no ctest entry -- the three cases below register through this
+ * binary's CQ_TEST_MAIN and tests/CMakeLists.txt is untouched. */
+#include "test_childcap_controls.inc"
+
 CQ_TEST_MAIN(
     CQ_CASE(the_discrete_primitives_are_the_fold_table_on_a_one_bit_rail),
     CQ_CASE(x_controlled_is_a_cx_and_cnot_controlled_is_a_ccx),
@@ -354,5 +361,11 @@ CQ_TEST_MAIN(
     CQ_CASE(ry_controlled_inv_is_the_rotation_at_a_negated_angle),
     CQ_CASE(ry_controlled_inv_is_ry_controlled_at_a_negated_angle),
     CQ_CASE(a_controlled_ry_taints_its_target_and_a_controlled_rz_does_not),
-    CQ_CASE(the_d11_rz_refusal_emits_four_gates_per_wire_below_the_first_constant)
+    CQ_CASE(the_d11_rz_refusal_emits_four_gates_per_wire_below_the_first_constant),
+    CQ_CASE(a_child_that_prints_and_exits_nonzero_did_not_abort),
+    CQ_CASE(a_child_that_prints_and_dies_on_a_non_sigabrt_signal_did_not_abort),
+    CQ_CASE(the_parents_pending_stdout_does_not_reappear_in_the_childs_capture),
+    CQ_CASE(a_refused_capture_reports_no_bytes_from_the_previous_one),
+    CQ_CASE(a_mask_and_buffer_that_disagree_are_refused_before_anything_forks),
+    CQ_CASE(a_child_that_fills_one_pipe_before_finishing_the_other_does_not_deadlock)
 )
