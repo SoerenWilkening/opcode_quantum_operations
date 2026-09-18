@@ -448,6 +448,7 @@ CQ_TEST(dst_owns_one_qubit_and_the_scratch_comes_back)
 
 #include "test_kernel_cmp_derivation.inc"
 #include "test_kernel_cmp_block.inc"
+#include "test_kernel_cmp_slt_block.inc"
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(k9_eq_family_sweep),
@@ -465,5 +466,9 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_signed_oracle_agrees_with_plain_c_on_sign_extended_values),
     CQ_CASE(the_eq_block_is_a_palindrome_and_gives_the_pool_back),
     CQ_CASE(the_eq_kernels_are_the_block_twice_plus_their_copyout),
-    CQ_CASE(the_eq_blocks_flag_is_a_not_equal_b)
+    CQ_CASE(the_eq_blocks_flag_is_a_not_equal_b),
+    CQ_CASE(the_slt_block_is_a_palindrome_and_gives_the_pool_back),
+    CQ_CASE(the_slt_kernels_are_the_block_twice_plus_their_copyout),
+    CQ_CASE(the_slt_blocks_flag_is_a_greater_equal_s_b),
+    CQ_CASE(the_two_slt_blocks_in_one_region_do_not_collide)
 )

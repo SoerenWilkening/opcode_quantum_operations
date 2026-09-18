@@ -907,7 +907,56 @@ set_tests_properties(test_kernel_step11_death.a_quantum_shift_amount
 add_cqops_death_test(test_kernel_add_death CASES
     add_dst_aliases_a_classical_source
     sub_dst_aliases_a_classical_source
+    add_steps_called_directly_with_a_zero_width
+    add_step_index_past_the_end
+    add_step_index_is_negative
 )
+
+## M14's SECOND EXPORT — `cq_add_steps` / `cq_add_step`, PRD-v2 §7.10's
+## out-of-place ripple for the fp port (bd 9ve.30). Same argument as
+## `cq_sub_step`'s and `cq_eq_step`'s: a step function whose caller is a
+## DIFFERENT MODULE mapping its own index space onto this one, where an
+## off-by-one emits a plausible gate from the wrong stage rather than failing.
+##
+## WHICH LAYER ABORTED, and BOTH directions of masking are live at once.
+## (1) The KERNEL masks the width guard from ABOVE: `cq_kernel_add` reaches
+## `cq_kernel_check_dst` before it ever calls `cq_add_steps`, so a W = 0 add
+## aborts in kernel.h and M14's own width guard is unreachable that way. The
+## zero-width case therefore calls the exported entry point directly and must
+## NOT be allowed to pass on either kernel.h message — nor on the range check's,
+## which would let the width guard survive mutation to always-true.
+set_tests_properties(test_kernel_add_death.add_steps_called_directly_with_a_zero_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "destination width is not positive;source width is not positive;add: step index outside")
+
+## (2) The width guard masks the RANGE check from BELOW, inside one function:
+## `cq_add_step` spells its range as `[0, cq_add_steps(W))`, so that width guard
+## runs first. An index case allowed to pass on "add: width is not positive"
+## would leave the range check — the guard the whole export exists to have —
+## surviving mutation to always-true.
+##
+## MEASURED, AND NOT WHAT THE SHAPE SUGGESTS (bd 9ve.1's finding, re-measured
+## here for K6): deleting the range check produces NO sanitizer abort and no
+## lower-layer abort at all. `u == cq_add_steps(W)` lands on `ripple`'s tail
+## `default:` arm reading `c[W-1]`/`t[W-1]`, and `u == -1` lands on the SAME arm
+## at index 0 — C's division truncates toward zero, so `i = 0` and `u % 5` is
+## -1. Both are inside the region, and the region materialises nothing, so the
+## fold table kills each gate before its target is read. The exit code alone
+## convicts a deleted range check, in BOTH configurations.
+##
+## The rest of the list is the standing negative pin for a wild index (`bd
+## 9ve.2` / `9ve.3`): every layer one COULD reach if a future mutant widened the
+## window further, plus `sub:` because `ripple` is shared with K7, plus
+## `Assertion failed` — `cq_bit_value`'s Debug-only CQ_BIT_ASSERT is a third
+## abort source the auto-prepended tripwire does NOT name (`bd 9ve.18`). The two
+## sanitizer banners are NOT written here: cqops_death_arm_sanitizer_tripwire
+## prepends them under cmake_language(DEFER), and the composed list is read back
+## from build-*/tests/CTestTestfile.cmake rather than assumed. The guard's own
+## message is "kernel: add: step index outside …" and matches none of them.
+set_tests_properties(test_kernel_add_death.add_step_index_past_the_end
+                     test_kernel_add_death.add_step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "add: width is not positive;sub:;addacc:;scratch:;shadow:;qubit pool:;emit:;reg:;sandwich:;Assertion failed")
 
 ## M16, Step 13. Same argument as M14's, one predicate family at a time — and
 ## `the_two_sources_are_the_same_register` is the sharpest case in the project
@@ -933,6 +982,9 @@ add_cqops_death_test(test_kernel_cmp_death CASES
     eq_steps_zero_width
     eq_step_index_high
     eq_step_index_negative
+    slt_steps_zero_width
+    slt_step_index_high
+    slt_step_index_negative
 )
 
 ## M16's SECOND EXPORT — `cq_eq_steps` / `cq_eq_step`, PRD-v2 §7.10's step block
@@ -971,6 +1023,47 @@ set_tests_properties(test_kernel_cmp_death.eq_step_index_high
                      test_kernel_cmp_death.eq_step_index_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "eq: width is not positive")
+
+## M16's THIRD EXPORT — `cq_slt_steps` / `cq_slt_step`, the signed half PRD-v2
+## §5's M32 (`fpround`) composes four times. Same argument as the eq pair above,
+## with one difference that had to be MEASURED rather than copied: cq_slt_steps
+## is spelled `2W + 2 + cq_ult_steps(W)`, so its width guard is masked from
+## BELOW as well as from above.
+##
+## (1) BOTH DIRECTIONS AT ONCE ON THE WIDTH CASE. From ABOVE, cq_kernel_slt
+## reaches cq_kernel_check_n before n_compute_of ever calls cq_slt_steps, so a
+## W = 0 compare aborts in kernel.h — a_width_of_zero pins that — and this case
+## must call the exported entry point directly. From BELOW, deleting the guard
+## leaves cq_ult_steps' identical one firing one layer down; measured, the case
+## still aborts and would PASS on the exit code alone. That is the LATER-copy
+## shape, and naming "ult: width is not positive" is the whole of the
+## discriminator.
+set_tests_properties(test_kernel_cmp_death.slt_steps_zero_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "destination width is not positive;source width is not positive;ult: width is not positive;Assertion failed")
+
+## (2) THE TWO INDEX CASES CONVICT DIFFERENTLY, AND ONLY ONE OF THEM ON THE EXIT
+## CODE — measured by making the range check unreachable and reading the failure
+## TEXT rather than the pass/fail bit, in BOTH configurations.
+##
+##   PAST-THE-END lands in cq_ult_step, whose own range guard fires with
+##   "ult: step index outside [0, cq_ult_steps(W))". The case still aborts, so
+##   without that string in this list it passes with the guard gone.
+##
+##   NEGATIVE does not reach cq_ult_step at all: C's `-1 / 2` is 0 and `-1 % 2`
+##   is -1, so step -1 emits an in-bounds CX into `bf[0]`, the fixture
+##   materialises nothing so the fold table drops it, and the case convicts on
+##   the death harness's own SURVIVED path.
+##
+## The list names every layer a wild index can reach (enumerated with
+## grep -rhoE 'FATAL: [a-z_ ]+:' over src/), plus the width guard inside the
+## same function, plus assert()'s banner — the third abort source, which the
+## auto-prepended sanitizer tripwire does not name. The tripwire itself is
+## PREPENDED by cqops_death_arm_sanitizer_tripwire and must not be added here.
+set_tests_properties(test_kernel_cmp_death.slt_step_index_high
+                     test_kernel_cmp_death.slt_step_index_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "slt: width is not positive;ult: step index outside;ult: width is not positive;scratch:;shadow:;qubit pool:;emit:;reg:;sandwich:;Assertion failed")
 
 ## M17 and M12, Step 14. Same argument as M14's and M16's — with the difference
 ## that M12 could NOT use their trick, and paid for it.
@@ -1883,6 +1976,116 @@ set_tests_properties(test_kernel_fpfield_death.class_block_region_is_one_bit_sho
 set_tests_properties(test_kernel_fpfield_death.pack_of_a_quantum_lane
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "Assertion failed;scratch:;emit:;reg:;shadow:;qubit pool:")
+
+## ---------------------------------------------------------------------------
+## M36 `fcmp` — K18, the FIRST floating-point KERNEL (bd 9ve.20). PRD-v2 §5's
+## ORDERED CORE <-> PREDICATE TABLE seam, §7.1's instruments-before-the-kernel,
+## §7.2's literal grain, §7.3's constants-as-sources, §7.4's C transcription,
+## §7.7's name mapping, §7.11's K9 shape, §7.12's anchors.
+##
+## ONE WIDTH AND FOURTEEN PREDICATES, WHICH IS WHY THIS SUITE IS THE PROJECT'S
+## SLOWEST PER CASE AND NOT PER WIDTH. PRD-v2 §1 scopes v2 to f64, so there is
+## no ladder; what there is instead is ten ported bodies over up to 42 blocks
+## each, and §7.13 has already said the wall clock is not a reason to cut the
+## anchor budget.
+add_cqops_test(test_kernel_fcmp)
+
+## M36's fail-loud paths. Which layer would answer for each guard, and why the
+## regex names it, is in the file header.
+add_cqops_death_test(test_kernel_fcmp_death CASES
+    oeq_width_is_not_64
+    ule_width_is_not_64
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    flag_of_a_program_that_does_not_fit
+    a_block_with_no_region
+    a_program_of_no_rows
+    a_body_appended_past_the_buffer
+    a_body_id_outside_the_three
+    a_row_with_an_unknown_op
+    a_row_with_an_unknown_operand_code
+    a_one_bit_operand_that_is_not_a_row
+    callee_of_an_unknown_predicate
+    program_of_an_unknown_predicate
+    eval_of_an_unknown_predicate
+    oeq_dst_aliases_its_first_source
+    olt_sources_alias_each_other
+)
+
+## (1) THE STEP-INDEX GUARD IS MASKED FROM BELOW ON ONE SIDE AND BY ITSELF ON
+## THE OTHER.  `cq_fcmp_step` dispatches a negative `u` straight into the first
+## row, which is always a class block, so M31 aborts with "fpclass: step index
+## outside" and the NEGATIVE case would report green with M36's guard deleted.
+## The HIGH side is the rarer shape recorded in `bd remember
+## a-guard-is-untested-if-a-later-copy-of-itself-catches-it`: with the range
+## check gone the dispatch walks off the end of the program and dies in M36's
+## OWN fall-off `cq_kernel_die`, a different message from the same module — so
+## that message is pinned absent too, and only then is this case a claim about
+## the range check. Every other layer a wild index can reach is named as well,
+## enumerated with `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c`.
+set_tests_properties(test_kernel_fcmp_death.step_index_past_the_end
+                     test_kernel_fcmp_death.step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fcmp: the step dispatch fell off;fpclass: step index outside;fpclass: the block's region;eq: step index outside;ult: step index outside;sub: step index outside;eq: width is not positive;ult: width is not positive;sub: width is not positive;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion failed")
+
+## (2) THE REGION CHECK IS MASKED FROM BELOW TWICE. Delete it and the first
+## out-of-region span aborts either in M08's cq_scratch_span ("FATAL: scratch:
+## span is outside the region") or, one layer in, in M31's own check_region —
+## both real aborts inside the CQ_EXPECT_ABORT window in BOTH configurations.
+## Their messages name the REGION and the inner BLOCK; M36's names the program
+## and its offset, which is the only one that points at the consumer that
+## mis-sized it. Same list for the flag accessor, which carries the same check,
+## and for the NULL-region case.
+set_tests_properties(test_kernel_fcmp_death.block_region_is_one_bit_short
+                     test_kernel_fcmp_death.block_offset_runs_off_the_region
+                     test_kernel_fcmp_death.flag_of_a_program_that_does_not_fit
+                     test_kernel_fcmp_death.a_block_with_no_region
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fpclass: the block's region;fpclass: the block has no region;fpclass: step index outside;eq: step index outside;ult: step index outside;sub: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion failed")
+
+## (3) THE WIDTH GUARD IS THE ONLY THING BETWEEN A WRONG `W` AND A PLAUSIBLE
+## ANSWER, AND `Assertion failed` IS THE THIRD ABORT SOURCE (bd 9ve.18's M31
+## finding, measured there and carried here on purpose). With the guard deleted
+## the all-classical path reaches cq_fp_pack, which reads 64 lanes of a 64-lane
+## rail whatever `W` said, then cq_bit_value — whose precondition is a
+## Debug-only CQ_BIT_ASSERT. So a mutant that survives in Release could pass in
+## Debug on an assert's abort landing inside the window. Pinned absent, with
+## the lower layers named too.
+set_tests_properties(test_kernel_fcmp_death.oeq_width_is_not_64
+                     test_kernel_fcmp_death.ule_width_is_not_64
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "Assertion failed;fpfield: pack;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness")
+
+## (4) THE VOCABULARY AND THE ENUM. Nothing below M36 knows what a row op, an
+## operand code or an LLVM predicate is, so no lower layer can answer for these
+## — but an unknown op falling through `row_region`'s default would still
+## allocate a region and an unknown operand code would hand the emitter a stale
+## buffer, so the layers that WOULD then speak are pinned absent to keep each
+## case a claim about M36's own refusal.
+set_tests_properties(test_kernel_fcmp_death.a_row_with_an_unknown_op
+                     test_kernel_fcmp_death.a_row_with_an_unknown_operand_code
+                     test_kernel_fcmp_death.a_one_bit_operand_that_is_not_a_row
+                     test_kernel_fcmp_death.a_program_of_no_rows
+                     test_kernel_fcmp_death.a_body_appended_past_the_buffer
+                     test_kernel_fcmp_death.a_body_id_outside_the_three
+                     test_kernel_fcmp_death.callee_of_an_unknown_predicate
+                     test_kernel_fcmp_death.program_of_an_unknown_predicate
+                     test_kernel_fcmp_death.eval_of_an_unknown_predicate
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fpclass:;eq: step index outside;ult: step index outside;sub: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion failed")
+
+## (5) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations;
+## D7b is LEGAL at the handle boundary and a hard error here, because reaching
+## a kernel means M26's defensive cqrt_copy is missing (bd 493). Both operands
+## are all-classical so M05's Debug-gated distinctness assert cannot fire —
+## which is the whole reason kernel.h's guard is not a duplicate of it — and
+## that layer is pinned absent so the case says which guard spoke.
+set_tests_properties(test_kernel_fcmp_death.oeq_dst_aliases_its_first_source
+                     test_kernel_fcmp_death.olt_sources_alias_each_other
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "distinctness;scratch:;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;Assertion failed")
 
 add_cqops_death_test(test_kernel_qrom_death CASES
     an_index_narrower_than_the_tree

@@ -291,6 +291,20 @@ add_library(cqops STATIC
                                # is_subnormal as K9-shape one-bit kernels over
                                # an exported step block. The first module where
                                # SLOTS and GATES come apart (D-K18-6)
+    src/kernels/fcmp.c         # M36, K18 (v2) — the ORDERED CORE half: the row
+                               # tables for soft_fcmp_olt / _oeq / _either_nan
+                               # (fcmp.jl:8-47, :57-82, :117-125), one row per
+                               # operator occurrence, and nothing else
+    src/kernels/fcmp_step.c    # M36, K18 (v2) — the ROW TABLES <-> STEP MACHINE
+                               # seam (D-K18-7, taken at implementation): slot
+                               # and region arithmetic ASKED of M14/M16/M17/M31,
+                               # operand resolution over views and constant
+                               # spans, and the one-gate-per-slot dispatch
+    src/kernels/fcmp_pred.c    # M36, K18 (v2) — PRD-v2 §5's ORDERED CORE <->
+                               # PREDICATE TABLE seam: the seven one-line
+                               # compositions, instructions.jl's fourteen-row
+                               # dispatch (four swaps, zero inversions), the
+                               # fourteen entry points and the classical row
 
     # Layer 4 — the analog surface. Everything above this line is a classical
     # permutation over {X, CX, CCX} (Rule 4), which is the surface the two-bit

@@ -158,6 +158,64 @@ static void eq_step_index_negative(void)
     CQ_EXPECT_ABORT(cq_eq_step(&g_ctx, &k, -1));
 }
 
+/* ---- The exported `slt` step block (plan §0.4 / PRD-v2 §7.10). -----------
+ *
+ * THE SAME TWO GUARDS AS `eq`'s, AND BOTH ARE MASKED FROM A DIRECTION `eq`'s
+ * ARE NOT — measured, not assumed, by making each unreachable and watching what
+ * spoke.
+ *
+ *   - `cq_slt_steps(W)` is `2W + 2 + cq_ult_steps(W)`, so with its own width
+ *     guard gone a W = 0 call falls into cq_ult_steps' identical guard ONE
+ *     LAYER DOWN and still aborts. That is the LATER-copy shape, which the
+ *     natural review question ("does an earlier caller already check this?")
+ *     does not ask. The case is carried by naming "ult: width is not positive"
+ *     as forbidden, not by the exit code. It is masked from ABOVE as well, by
+ *     cq_kernel_check_n — which is why it calls the exported entry directly.
+ *   - `cq_slt_step`'s range check is spelled against `cq_slt_steps(W)`, so the
+ *     width guard runs FIRST inside the same function; and a PAST-THE-END index
+ *     that got past the check lands in `cq_ult_step`, whose own range guard
+ *     fires. A NEGATIVE index does not: `-1 / 2` is `0` and `-1 % 2` is `-1` in
+ *     C, so it emits a perfectly in-bounds CX into `bf[0]` and the case
+ *     convicts on the death harness's own SURVIVED path instead.
+ *
+ * Nothing is materialised, so every bit is CQ_BIT_ZERO and cq_emit_* folds a
+ * wild gate away before it reads its target — the region is there only to give
+ * the block well-formed spans. */
+static void slt_block(cq_slt_block *k, int W)
+{
+    cq_bit *r;
+
+    setup();
+    cq_scratch_alloc(&g_scr, (uint32_t)(7 * W + 1));
+    r = g_scr.bits;
+    k->a  = r;           k->b  = r + W;
+    k->af = r + 2 * W;   k->bf = r + 3 * W;   k->nb = r + 4 * W;
+    k->carry = r + 5 * W;                     /* W + 1 bits */
+    k->axnb  = r + 6 * W + 1;
+    k->W = W;
+}
+
+static void slt_steps_zero_width(void)
+{
+    CQ_EXPECT_ABORT((void)cq_slt_steps(0));
+}
+
+static void slt_step_index_high(void)
+{
+    cq_slt_block k;
+
+    slt_block(&k, 4);
+    CQ_EXPECT_ABORT(cq_slt_step(&g_ctx, &k, cq_slt_steps(4)));
+}
+
+static void slt_step_index_negative(void)
+{
+    cq_slt_block k;
+
+    slt_block(&k, 4);
+    CQ_EXPECT_ABORT(cq_slt_step(&g_ctx, &k, -1));
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(eq_dst_aliases_a_classical_source),
     CQ_DEATH_CASE(ult_dst_aliases_a_classical_source),
@@ -168,5 +226,8 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(a_negative_width),
     CQ_DEATH_CASE(eq_steps_zero_width),
     CQ_DEATH_CASE(eq_step_index_high),
-    CQ_DEATH_CASE(eq_step_index_negative)
+    CQ_DEATH_CASE(eq_step_index_negative),
+    CQ_DEATH_CASE(slt_steps_zero_width),
+    CQ_DEATH_CASE(slt_step_index_high),
+    CQ_DEATH_CASE(slt_step_index_negative)
 )

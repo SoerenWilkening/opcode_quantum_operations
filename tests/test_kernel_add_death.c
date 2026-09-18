@@ -40,11 +40,13 @@
 #include "bit.h"
 #include "ctx.h"
 #include "reg.h"
+#include "scratch.h"
 #include "support/bitkinds.h"
 #include "support/death.h"
 
-static cq_sink g_sink;
-static cq_ctx  g_ctx;
+static cq_sink    g_sink;
+static cq_ctx     g_ctx;
+static cq_scratch g_scr;
 
 static void setup(void)
 {
@@ -74,7 +76,77 @@ static void sub_dst_aliases_a_classical_source(void)
                                   cq_reg_cbits(&g_ctx.regs, hb), 8));
 }
 
+/* --- K6's EXPORTED STEP BLOCK (bd 9ve.30). ------------------------------
+ *
+ * THE OTHER HALF OF THE FILE'S ARGUMENT, and a different one. The two cases
+ * above prove an ENTRY POINT makes a call it could omit. These three prove the
+ * two guards the export itself added, whose caller is a DIFFERENT MODULE
+ * mapping its own index space onto `[0, cq_add_steps(W))` — M32/M33/M39 at
+ * W = 64 — where an off-by-one does not fail. It lands in `ripple`'s tail and
+ * emits a real, plausible gate from the wrong stage. `cq_sub_step`'s three
+ * cases in tests/test_kernel_divrem_death.c are the template.
+ *
+ * MEASURED, AND IT IS NOT WHAT THE SHAPE SUGGESTS: neither index case reaches
+ * out of bounds even with the range check deleted. At `u == cq_add_steps(W)`
+ * the tail's `u - 5*(W-1)` is 3, which takes the `default:` arm and reads
+ * `c[W-1]`/`t[W-1]`; at `u == -1`, C's truncating division gives `i = 0` and
+ * `u % 5 == -1`, which takes the same arm at index 0. Both are INSIDE the
+ * region. So the conviction is the death harness's own SURVIVED path — the
+ * exit code — in both configurations, exactly as bd 9ve.1 measured for
+ * `cq_eq_step`. The message pins in tests/CMakeLists.txt are there for the
+ * OTHER direction: `cq_add_steps`' width guard runs first inside the same
+ * function, and an index case allowed to pass on ITS message would leave the
+ * range check surviving mutation to always-true.
+ *
+ * THE REGION MATERIALISES NOTHING, deliberately: every bit is CQ_BIT_ZERO, so
+ * the fold table kills each gate before its target is read and no sanitizer
+ * can speak for these cases either. */
+static cq_bit *region(int n)
+{
+    cq_scratch_alloc(&g_scr, (uint32_t)n);
+    return g_scr.bits;
+}
+
+static void bind(cq_add_block *k, int W)
+{
+    cq_bit *r = region(4 * W);
+
+    k->a = r;
+    k->b = r + W;
+    k->c = r + 2 * W;      /* `c ++ t`, the opposite of add.c's own layout */
+    k->t = r + 3 * W;
+    k->W = W;
+}
+
+static void add_steps_called_directly_with_a_zero_width(void)
+{
+    CQ_EXPECT_ABORT((void)cq_add_steps(0));
+}
+
+static void add_step_index_past_the_end(void)
+{
+    cq_add_block k;
+
+    setup();
+    bind(&k, 4);
+
+    CQ_EXPECT_ABORT(cq_add_step(&g_ctx, &k, cq_add_steps(4)));
+}
+
+static void add_step_index_is_negative(void)
+{
+    cq_add_block k;
+
+    setup();
+    bind(&k, 4);
+
+    CQ_EXPECT_ABORT(cq_add_step(&g_ctx, &k, -1));
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(add_dst_aliases_a_classical_source),
-    CQ_DEATH_CASE(sub_dst_aliases_a_classical_source)
+    CQ_DEATH_CASE(sub_dst_aliases_a_classical_source),
+    CQ_DEATH_CASE(add_steps_called_directly_with_a_zero_width),
+    CQ_DEATH_CASE(add_step_index_past_the_end),
+    CQ_DEATH_CASE(add_step_index_is_negative)
 )

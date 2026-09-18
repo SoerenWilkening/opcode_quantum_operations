@@ -1,0 +1,65 @@
+# M36 kernels/fcmp.c — K18 IEEE binary64 compares, all fourteen LLVM predicates (sandwiched)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+# measured-at: ALL-QUANTUM on `a` and `b`, whose width is the W column (f64 only); dst is ONE bit; at ctrl_depth 0. The views' constant lanes and the constant spans fold at EVERY mask, so these are well below twice the slot count
+#
+# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open
+# reads them back, and a checking run fails if either
+# disagrees with the snapshot on disk or with what the suite
+# declares. The mask matters because operand folds still fire
+# (a^0 and x&0 legitimately emit fewer gates, which is what L5
+# proves), so a count is a function of (W, operand mask) — and
+# a golden that does not say which mask it was taken at pins
+# nothing. The line above is per-file for the reason bd 2r5
+# records: as a literal in the writer it was false in four of
+# the twelve files and nothing could contradict it.
+#
+# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with
+# no demotion (D6) a mask can only drift TOWARDS Q, so it is
+# the FIXED POINT, and the one mask where forward and unc
+# agree. A file measured anywhere else says so above, and owes
+# the reader a note saying why.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+fcmp_oeq  forward   64    56  2545      894
+fcmp_oeq  unc       64    56  2545      894
+fcmp_ogt  forward   64   456  3457     1662
+fcmp_ogt  unc       64   456  3457     1662
+fcmp_oge  forward   64   512  6005     2558
+fcmp_oge  unc       64   512  6005     2558
+fcmp_olt  forward   64   456  3457     1662
+fcmp_olt  unc       64   456  3457     1662
+fcmp_ole  forward   64   512  6005     2558
+fcmp_ole  unc       64   512  6005     2558
+fcmp_one  forward   64   238  4075     1532
+fcmp_one  unc       64   238  4075     1532
+fcmp_ord  forward   64    50  1271      510
+fcmp_ord  unc       64    50  1271      510
+fcmp_uno  forward   64    48  1269      510
+fcmp_uno  unc       64    48  1269      510
+fcmp_ueq  forward   64   104  3817     1406
+fcmp_ueq  unc       64   104  3817     1406
+fcmp_ugt  forward   64   504  4729     2174
+fcmp_ugt  unc       64   504  4729     2174
+fcmp_uge  forward   64   560  7277     3070
+fcmp_uge  unc       64   560  7277     3070
+fcmp_ult  forward   64   504  4729     2174
+fcmp_ult  unc       64   504  4729     2174
+fcmp_ule  forward   64   560  7277     3070
+fcmp_ule  unc       64   560  7277     3070
+fcmp_une  forward   64   188  2805     1020
+fcmp_une  unc       64   188  2805     1020

@@ -35,6 +35,8 @@
 #include "ctx.h"
 #include "emit.h"
 #include "reg.h"
+#include "sandwich.h"
+#include "scratch.h"
 #include "sink_count.h"
 
 #include "support/bitkinds.h"
@@ -476,6 +478,14 @@ CQ_TEST(the_sandwich_takes_its_scratch_and_gives_it_back)
  * test_kernel_divrem.c already took: everything above tests src/kernels/add.c,
  * and l1s_oracle tests refmodel.c's two-word cq_ref_w_add / cq_ref_w_sub
  * against a bit-serial ripple that shares no operation with them. */
+/* THE K6 COMPUTE HALF AS AN EXPORTED STEP BLOCK (bd 9ve.30, PRD-v2 §7.10).
+ * Everything above drives the KERNEL; these five cases drive the block a
+ * consumer outside M14 is handed, which is the only thing they can see —
+ * `cq_kernel_add` is a whole sandwich and `cq_sandwich` refuses nesting, so the
+ * fp port reaches `lower_add!` through `cq_add_step` or not at all. Placed
+ * after `ADD` because the composition case measures the kernel through it. */
+#include "test_kernel_add_block.inc"
+
 #include "test_kernel_add_refmodel.inc"
 
 CQ_TEST_MAIN_ARGV(
@@ -491,5 +501,11 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(r9_all_classical_operands_never_enter_the_sandwich),
     CQ_CASE(the_classical_fold_writes_real_gates_into_a_quantum_dst),
     CQ_CASE(the_sandwich_takes_its_scratch_and_gives_it_back),
-    CQ_CASE(l1s_oracle_agrees_with_an_independent_bit_serial_model)
+    CQ_CASE(l1s_oracle_agrees_with_an_independent_bit_serial_model),
+    CQ_CASE(the_add_block_is_a_palindrome_and_gives_the_pool_back),
+    CQ_CASE(the_add_blocks_step_count_is_bennetts_loop_counted_twice),
+    CQ_CASE(the_add_kernel_is_the_block_twice_plus_its_copyout),
+    CQ_CASE(the_two_blocks_in_one_region_do_not_collide),
+    CQ_CASE(the_add_blocks_output_span_is_a_plus_b),
+    CQ_CASE(the_two_blocks_run_inside_one_sandwich)
 )

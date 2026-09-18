@@ -67,6 +67,14 @@
  * body, never a second transcription of `lower_eq!` — and the ten L4 goldens
  * did not move.
  *
+ * AND A THIRD TIME FOR `slt` AT 2026-09-18, in the same wave and for the same
+ * consumer. K15.md's block table counts FOUR SIGNED compares on `fadd`'s
+ * `Int64 result_exp`, and PRD-v2 §5's M32 (`fpround`) owns all four; the
+ * silently-wrong substitute is `cq_ult_block`, which has the same gate shape
+ * and is wrong only when `result_exp` is negative. `cq_kernel_slt`, `_sgt`,
+ * `_sle` and `_sge` now DISPATCH through `cq_slt_step` exactly as `ult` and
+ * `eq` dispatch through theirs, and the ten L4 goldens did not move.
+ *
  * RULE 12: DO NOT READ A LINE COUNT OUT OF THIS PARAGRAPH — RE-MEASURE IT.
  * This sentence read "cmp.c IS NOW AT EXACTLY 200/200" and was stale in both
  * directions before the eq export landed: `tools/check_loc.sh`'s own reckoning
@@ -75,10 +83,18 @@
  * 300-line hard limit. The ult export cost ten lines because `cq_ult_step`
  * REPLACED `ult_compute`; the eq one cost nineteen for the same reason plus
  * three new entry points — the width guard, the range guard and `cq_eq_flag`.
- * Plan §3's recorded seam (`primitives ↔ predicate derivation`, moving to
- * `src/kernels/cmp_prim.c`) is STILL NOT TAKEN, and a third export in this
- * module is what takes it. Do not add "just one more" here without measuring
- * first.
+ * The slt one cost nineteen again, on the same arithmetic, re-measured at 232.
+ *
+ * PLAN §3's RECORDED SEAM (`primitives ↔ predicate derivation`, moving to
+ * `src/kernels/cmp_prim.c`) IS STILL NOT TAKEN, and this paragraph used to say
+ * that "a third export in this module is what takes it". Measured, it was not:
+ * the third export replaced a private compute half with a public one, so it
+ * paid only for the two guards and the accessor. What decides the seam is the
+ * measurement and never the count of exports — the threshold is the 300-line
+ * hard limit, and at 232 the split would be a churn that moves every citation
+ * into this file for no guard. Do not add "just one more" here without
+ * measuring first; a FOURTH export, or any body that is not a replacement,
+ * is what should take it.
  *
  * ALL THREE PRIMITIVES ARE DIRTY BY DESIGN and therefore sandwiched.
  * `lower_eq!` leaves `diff` and the OR-prefix behind, `lower_ult!` leaves `nb`,
@@ -230,5 +246,79 @@ void cq_eq_step(cq_ctx *ctx, const cq_eq_block *k, int u);
 
 /* The raw flag `a != b`, inside the caller's own region. */
 const cq_bit *cq_eq_flag(const cq_eq_block *k);
+
+/* --- `lower_slt!`'s compute half, exported for the fp port (PRD-v2 §7.10). -
+ *
+ * WHO ASKED, AND WHY THE SUBSTITUTE IS SILENT. K15.md's block table counts FOUR
+ * SIGNED compares on a `result_exp` that `fadd.jl` declares `Int64` — the
+ * `result_exp <= 0` of `_sf_handle_subnormal` and the three clamp rows beside
+ * it — and PRD-v2 §5's M32 (`fpround`) owns all four. `Int64` and `UInt64` are
+ * THE SAME 64 `cq_bit`s under §7.2's literal grain, so the only thing that
+ * distinguishes the two families is which comparator the row reaches for. Pick
+ * `cq_ult_block` for a signed row and the circuit is well formed, the gate
+ * tuple is the SAME SHAPE, the palindrome holds, the scratch comes back — and
+ * the answer is wrong exactly when `result_exp` is negative, which is the
+ * subnormal path. That is K9's own `uge`-meaning-`ule` in a new costume and
+ * ONLY L1 sees it. A consumer cannot call `cq_kernel_slt` instead: it is a
+ * whole sandwich and `cq_sandwich` refuses nesting in both configurations.
+ *
+ * THE FIVE SPANS ARE FLAT AND THE INNER `cq_ult_block` IS NOT IN THE STRUCT.
+ * That is the one design choice here and it is made against the obvious
+ * alternative — embedding a `cq_ult_block` the caller fills — for a reason the
+ * paragraph above already gives. `lower_slt!` ends `lower_ult!(g, wa, af, bf,
+ * W)` (arith.jl:471): the inner comparator runs over the BIASED COPIES, never
+ * over `a`/`b`, and that wiring is part of the CONSTRUCTION rather than part of
+ * the caller's layout. An embedded block hands the consumer two extra fields
+ * whose only correct value is `af` and `bf`, and filling them with `a` and `b`
+ * — the natural slip, since they are the operands — silently rebuilds `ult`.
+ * `cq_slt_step` therefore assembles the inner block itself, from spans the
+ * caller genuinely owns, and the mis-wire is unrepresentable. It also keeps
+ * `k->nb` reading the way `cq_ult_block`'s and `cq_eq_block`'s spans read,
+ * rather than `k->u.nb`.
+ *
+ * THE RAW FLAG IS `a >=s b`, THE NEGATION OF `slt`, for `cq_ult_block`'s exact
+ * reason: the inner carry-out is `af >=u bf`, and the bias makes that `a >=s b`
+ * verbatim. Bennett's trailing `CNOT(carry[W+1], r); NOT(r)` (arith.jl:461) is
+ * the COPY-OUT's, folded there by K09.md §5 delta 2 — so `cq_kernel_sge` copies
+ * this wire out unchanged and `cq_kernel_slt` appends one X. A consumer wanting
+ * `slt` owes itself that one `lower_not1!`; K15.md's own table carries it as
+ * the `+1` on every `<` and `>` row. Read it through `cq_slt_flag`.
+ *
+ * THE BLOCK ALLOCATES NOTHING and `a`/`b` MAY BE SCRATCH SUB-ARRAYS, including
+ * a view that overlaps a region an earlier step wrote — plan §0.4 obligations
+ * 2, 3 and 4, exactly as for the two blocks above and sound for their reason:
+ * all three reach the emitter only through `cq_emit_*`'s `const cq_bit *`
+ * control parameters, so none can ever be a target, and guards compare RANGES
+ * rather than base pointers.
+ *
+ * A CONSUMER'S LAYOUT BUDGETS `5W + 1` for `af ++ bf ++ nb ++ carry ++ axnb`,
+ * and `carry` IS W+1 BITS, NOT W — off-by-one there writes past the caller's
+ * sub-array, which `cq_scratch_span` cannot catch since it hands out a bare
+ * pointer. The five spans need not be contiguous and need not be in this
+ * order; the block imposes none. */
+typedef struct {
+    const cq_bit *a, *b;   /* controls only; may be scratch views, may overlap */
+    cq_bit       *af;      /* a with its sign bit flipped, W bits              */
+    cq_bit       *bf;      /* b with its sign bit flipped, W bits              */
+    cq_bit       *nb;      /* ~bf, W bits                                      */
+    cq_bit       *carry;   /* W+1 bits; carry[W] IS `a >=s b`                  */
+    cq_bit       *axnb;    /* af ^ ~bf, W bits                                 */
+    int           W;
+} cq_slt_block;
+
+/* `2W + 2 + cq_ult_steps(W)` — the two biased copies, the two MSB flips, and
+ * the inner comparator, which is `8W + 3` at every W >= 1 and is what `cmp.c`
+ * hands `cq_sandwich`. One gate per step, so this is also the gate count at
+ * the all-quantum mask: `(W+3, 5W, 2W)`. The `cq_ult_steps` term is CALLED,
+ * never written out, so a consumer composing the two cannot disagree with M16
+ * about what the inner block costs. */
+int cq_slt_steps(int W);
+
+/* One gate of the block, `u` in [0, cq_slt_steps(W)). Out of range is a hard
+ * error in BOTH configurations, for cq_ult_step's reason. */
+void cq_slt_step(cq_ctx *ctx, const cq_slt_block *k, int u);
+
+/* The raw flag `a >=s b`, inside the caller's own region. */
+const cq_bit *cq_slt_flag(const cq_slt_block *k);
 
 #endif /* CQOPS_KERNELS_CMP_H */

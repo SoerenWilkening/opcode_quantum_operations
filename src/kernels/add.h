@@ -4,7 +4,8 @@
  * Both are ports of `third_party/bennett/src/adder.jl` — `lower_add!` at :1-18
  * and `lower_sub!` at :148-172 — and `lower_sub!`'s body at :162-170 is
  * `lower_add!`'s carry chain verbatim with `not_b` substituted for `b`, which
- * is why one module carries both and why they share one step function.
+ * is why one module carries both and why the two exported step functions share
+ * one `ripple` body rather than transcribing the recurrence twice.
  *
  * RIPPLE-CARRY, NOT CUCCARO, AND THAT IS RULE 7 RATHER THAN A PREFERENCE.
  * `_pick_add_strategy` (arith.jl:20-26) returns `:ripple` for `:auto`, and v1
@@ -60,6 +61,12 @@
  * three K12 scratch schemes that were built and measured needs a depth-aware
  * `cq_sandwich`, because per-iteration uncompute is scheduled as extra step
  * indices inside one flat step space rather than as an inner sandwich.
+ *
+ * AND M14 EXPORTS TWICE NOW — `cq_add_block` landed 2026-09-18 for the fp port
+ * (bd 9ve.30, PRD-v2 §7.10, K06.md §7), on exactly the shape below and under
+ * the same four obligations. Both kernels DISPATCH through their block, so the
+ * recurrence has one reader and one writer; the goldens did not move on either
+ * landing, which is what says an export is additive.
  */
 #ifndef CQOPS_KERNELS_ADD_H
 #define CQOPS_KERNELS_ADD_H
@@ -81,6 +88,69 @@ void cq_kernel_add(cq_ctx *ctx, cq_bit *dst,
  * K06 identity `K7 = K6 + 2W + 1` per compute half instead (K07.md §3.6). */
 void cq_kernel_sub(cq_ctx *ctx, cq_bit *dst,
                    const cq_bit *a, const cq_bit *b, int W);
+
+/* --- K6's compute half, exported for the fp port (PRD-v2 §7.10, bd 9ve.30). -
+ *
+ * WHO ASKED. K15.md's block table found it missing on 2026-09-18: `soft_fadd`
+ * has two `+` occurrences and `soft_fma` twelve, and PRD-v2 §5's M32 / M33 /
+ * M39 rows compose this block at W = 64. A consumer cannot call
+ * `cq_kernel_add` instead — it is a whole sandwich and `cq_sandwich` refuses
+ * nesting in both configurations, which is the composite-kernels-call-the-
+ * step-function rule M12 is the witness for. `cq_kernel_add` DISPATCHES
+ * through the block, so there is ONE body and never a second transcription of
+ * `lower_add!`, and tests/goldens/add.counts did not move.
+ *
+ * THE SILENTLY-WRONG SUBSTITUTE IS K8, AND IT IS THE REASON THIS EXISTS AT
+ * ALL. `cq_addacc_step` is `acc += b` — in place, destructive in `acc` and
+ * transiently destructive in `b`, and its inverse is the REVERSE CIRCUIT
+ * rather than a re-run (CLAUDE.md Rule 7's K8 paragraph, K08.md §5 D1).
+ * Substituted here it gives the right forward VALUE and a wrong `_unc`, which
+ * is a silent miscompile rather than a test failure — and an fp sandwich's
+ * replay-in-reverse is exactly what breaks. The out-of-place ripple is what
+ * makes the replay cancel.
+ *
+ * NO CARRY-IN AND NO CARRY-OUT, AND THAT IS A PORT DECISION RATHER THAN AN
+ * OMISSION. `t` is the sum mod 2^W; `c[W-1]` is the last INTERMEDIATE carry
+ * and no carry-out is produced, because `lower_add!`'s own `if i < W` guard
+ * (adder.jl:11) drops the top stage's two Toffolis. `c[0]` is never a target
+ * and is read at i = 0 as the carry-in, so binding a value to it is possible
+ * in principle — but it is NOT what upstream does: `_add128`
+ * (softfloat_common.jl:299-304) materialises the carry as a VALUE,
+ * `carry = ifelse(lo < a_lo, 1, 0)` — an unsigned compare plus a mux — and
+ * then adds it as an ordinary 64-bit operand. A carry-chained variant would
+ * be a re-derivation of `_add128` (Rule 1); it is owed by nothing and is on no
+ * bead. K20.md's Phase I ("UPSTREAM'S 128-BIT ADD NEEDS NO CARRY-IN") states it
+ * in full; K06.md §7.2 is this module's copy.
+ *
+ * THE BLOCK ALLOCATES NOTHING, and `a` / `b` MAY BE SCRATCH SUB-ARRAYS that
+ * overlap a region an earlier step wrote — plan §0.4 obligations 2, 3 and 4,
+ * exactly as for `cq_sub_block` below and sound for its reason: both reach the
+ * emitter ONLY through `cq_emit_*`'s `const cq_bit *` control parameters, so
+ * neither can ever be a target, and guards compare RANGES not base pointers.
+ *
+ * A consumer's layout budgets `2W` bits for `t` and `c`, in EITHER order — the
+ * block imposes none, which is why tests/test_kernel_add_block.inc lays them
+ * out `c ++ t`, the opposite of add.c's own, on the eq block's precedent. */
+typedef struct {
+    const cq_bit *a, *b;   /* controls only; may be scratch views, may overlap */
+    cq_bit       *t;       /* the sum a + b mod 2^W, W bits — the OUTPUT       */
+    cq_bit       *c;       /* the carry chain, W bits; c[0] is the carry-in    */
+    int           W;
+} cq_add_block;
+
+/* `5W - 2` at every W >= 1 — one gate per step, so this is also the gate count
+ * at the all-quantum mask: `(0, 3W, 2W-2)`. Unlike K8's `6W - 5` the per-type
+ * split is EXACT at W = 1 too: the loop is empty there and the three-CNOT tail
+ * is the whole construction, `(0, 3, 0)` = 3 (K06.md §3.3). K8's closed form
+ * gives a NEGATIVE Toffoli count at that width. */
+int cq_add_steps(int W);
+
+/* One gate of the block, `u` in [0, cq_add_steps(W)). Out of range is a hard
+ * error in BOTH configurations, for cq_sub_step's reason: a consumer maps a
+ * contiguous run of its own step indices onto this one, and an off-by-one
+ * there lands in `ripple`'s final `default:` and emits a real, plausible gate
+ * from the wrong stage rather than failing. */
+void cq_add_step(cq_ctx *ctx, const cq_add_block *k, int u);
 
 /* --- K7's compute half, exported for M19's divider (plan §0.4, D9(e)). ----
  *

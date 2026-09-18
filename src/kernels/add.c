@@ -35,26 +35,35 @@
 #include "sandwich.h"
 #include "scratch.h"
 
-/* `y` is THE ADDEND THE CARRY CHAIN READS — `b` for K6, `nb` for K7 — which is
- * the whole of the sharing. `k.b` stays separate because K7's phase 1 needs it
- * as the source of the complement, and K6 never looks at `y` and `b` as two
- * things. `k.nb` is NULL for K6, where no complement region exists.
- *
- * THE SUB HALF IS NOW `cq_sub_block`, A PUBLIC TYPE (add.h, plan §0.4). Nothing
- * about K6 or K7 changed with it — the same `ripple` serves both and the same
- * gates come out in the same order — but M19 can now be handed the recurrence
- * instead of re-typing it, which is the whole point of D9(e). */
+/* `out` is the span `copyout` reads — `k6.t` for K6, `k7.d` for K7 — so one
+ * copy-out serves both. BOTH BLOCKS ARE PUBLIC TYPES NOW (add.h, plan §0.4 for
+ * the sub half at Step 17, PRD-v2 §7.10 / bd 9ve.30 for the add half). Nothing
+ * about K6 or K7 changed with either export: the same `ripple` serves both and
+ * the same gates come out in the same order, so tests/goldens/add.counts is
+ * byte-identical across both landings. What changed is that a consumer can be
+ * handed the recurrence instead of re-typing it — M19 for `sub`, M32/M33/M39
+ * for `add`. Only ONE of the two block members is bound per call; the other's
+ * pointers are never read, because the compute function reaches for the one
+ * its own kernel filled in. */
 typedef struct {
     cq_bit       *dst;
-    const cq_bit *y;
-    cq_sub_block  k;
+    cq_bit       *out;
+    cq_add_block  k6;
+    cq_sub_block  k7;
 } adder_env;
 
-/* Bennett's carry recurrence, one gate per step, 5W-2 steps.
+/* Bennett's carry recurrence, one gate per step, 5W-2 steps. The operands are
+ * NAMED rather than taken as a block, because the two callers hand it two
+ * different structs whose output span is spelled differently (`t` for K6, `d`
+ * for K7) — one body, two bindings, and no second transcription.
  *
  *   t[i] ^= a[i];  t[i] ^= y[i]                    -> t[i] = a_i ⊕ y_i
  *   c[i+1] ^= a[i]·y[i];  c[i+1] ^= t[i]·c[i]      -> c[i+1] = MAJ(a_i, y_i, c_i)
  *   t[i] ^= c[i]                                   -> t[i] = the sum bit
+ *
+ * `y` is THE ADDEND THE CARRY CHAIN READS — `b` for K6, `nb` for K7 — which is
+ * the whole of the sharing. K7's `b` stays separate because its phase 1 needs
+ * it as the source of the complement; K6 passes `b` itself and has no `nb`.
  *
  * THE ORDER IS LOAD-BEARING: the MAJ Toffoli at j=3 consumes `t[i]` while it
  * still holds a_i ⊕ y_i, BEFORE j=4 turns it into the sum bit. `c[0]` is never
@@ -63,19 +72,18 @@ typedef struct {
  * both, because the driver pre-materialises the whole region and the fold table
  * dispatches on kind, never on shadow value. That single fact is the whole
  * difference between the pre-I6(b) 11W-8 golden and today's 11W-4. */
-static void ripple(cq_ctx *ctx, const cq_sub_block *k, const cq_bit *y, int u)
+static void ripple(cq_ctx *ctx, const cq_bit *a, const cq_bit *y,
+                   cq_bit *t, cq_bit *c, int W, int u)
 {
-    int W = k->W;
-
     if (u < 5 * (W - 1)) {
         int i = u / 5;
 
         switch (u % 5) {
-        case 0:  cq_emit_cx (ctx, &k->a[i],             &k->d[i]);     break;
-        case 1:  cq_emit_cx (ctx, &y[i],                &k->d[i]);     break;
-        case 2:  cq_emit_ccx(ctx, &k->a[i], &y[i],      &k->c[i + 1]); break;
-        case 3:  cq_emit_ccx(ctx, &k->d[i], &k->c[i],   &k->c[i + 1]); break;
-        default: cq_emit_cx (ctx, &k->c[i],             &k->d[i]);     break;
+        case 0:  cq_emit_cx (ctx, &a[i],                &t[i]);     break;
+        case 1:  cq_emit_cx (ctx, &y[i],                &t[i]);     break;
+        case 2:  cq_emit_ccx(ctx, &a[i],     &y[i],     &c[i + 1]); break;
+        case 3:  cq_emit_ccx(ctx, &t[i],     &c[i],     &c[i + 1]); break;
+        default: cq_emit_cx (ctx, &c[i],                &t[i]);     break;
         }
         return;
     }
@@ -85,17 +93,35 @@ static void ripple(cq_ctx *ctx, const cq_sub_block *k, const cq_bit *y, int u)
      * and this is the entire construction, which is why the closed forms need
      * no W >= 2 dagger. */
     switch (u - 5 * (W - 1)) {
-    case 0:  cq_emit_cx(ctx, &k->a[W - 1], &k->d[W - 1]); break;
-    case 1:  cq_emit_cx(ctx, &y[W - 1],    &k->d[W - 1]); break;
-    default: cq_emit_cx(ctx, &k->c[W - 1], &k->d[W - 1]); break;
+    case 0:  cq_emit_cx(ctx, &a[W - 1], &t[W - 1]); break;
+    case 1:  cq_emit_cx(ctx, &y[W - 1], &t[W - 1]); break;
+    default: cq_emit_cx(ctx, &c[W - 1], &t[W - 1]); break;
     }
+}
+
+/* K6's compute half as a public step block (add.h). `cq_kernel_add` DISPATCHES
+ * through it, so `ripple` above is reached one way only and a consumer's
+ * circuit is the kernel's circuit by construction rather than by inspection. */
+int cq_add_steps(int W)
+{
+    if (W <= 0) cq_kernel_die("add: width is not positive");
+    return 5 * W - 2;
+}
+
+void cq_add_step(cq_ctx *ctx, const cq_add_block *k, int u)
+{
+    /* The width guard runs first, inside cq_add_steps, and its message is
+     * DISJOINT from this one so a death test can say which spoke — cq_sub_step
+     * records the Step 15 finding this follows. */
+    if (u < 0 || u >= cq_add_steps(k->W))
+        cq_kernel_die("add: step index outside [0, cq_add_steps(W))");
+
+    ripple(ctx, k->a, k->b, k->t, k->c, k->W, u);
 }
 
 static void k6_compute(cq_ctx *ctx, void *env, int s)
 {
-    const adder_env *e = (const adder_env *)env;
-
-    ripple(ctx, &e->k, e->y, s);
+    cq_add_step(ctx, &((const adder_env *)env)->k6, s);
 }
 
 /* a - b = a + ~b + 1. Phase 1 builds ~b into scratch (2W steps), phase 2 sets
@@ -138,12 +164,12 @@ void cq_sub_step(cq_ctx *ctx, const cq_sub_block *k, int u)
      * bit is the entire 15W-4 -> 15W-2 and 3W-1 -> 3W delta (K07.md §5 D2b). */
     if (u == 2 * W) { cq_emit_x(ctx, &k->c[0]); return; }
 
-    ripple(ctx, k, k->nb, u - (2 * W + 1));
+    ripple(ctx, k->a, k->nb, k->d, k->c, W, u - (2 * W + 1));
 }
 
 static void k7_compute(cq_ctx *ctx, void *env, int s)
 {
-    cq_sub_step(ctx, &((const adder_env *)env)->k, s);
+    cq_sub_step(ctx, &((const adder_env *)env)->k7, s);
 }
 
 /* The "^=" of Rule 7's contract, and the only place `dst` is written on the
@@ -154,7 +180,7 @@ static void copyout(cq_ctx *ctx, void *env, int k)
 {
     const adder_env *e = (const adder_env *)env;
 
-    cq_emit_cx(ctx, &e->k.d[k], &e->dst[k]);
+    cq_emit_cx(ctx, &e->out[k], &e->dst[k]);
 }
 
 /* Risk R9's short-circuit: `dst ^= (a + y + carry_in) mod 2^W` with every input
@@ -199,16 +225,15 @@ void cq_kernel_add(cq_ctx *ctx, cq_bit *dst,
      * named sub-arrays, it never allocates two. */
     cq_scratch_alloc(&scr, (uint32_t)(2 * W));
 
-    e.dst  = dst;
-    e.y    = b;
-    e.k.a  = a;
-    e.k.b  = b;
-    e.k.nb = NULL;
-    e.k.d  = cq_scratch_span(&scr, 0u,          (uint32_t)W);
-    e.k.c  = cq_scratch_span(&scr, (uint32_t)W, (uint32_t)W);
-    e.k.W  = W;
+    e.dst   = dst;
+    e.k6.a  = a;
+    e.k6.b  = b;
+    e.k6.t  = cq_scratch_span(&scr, 0u,          (uint32_t)W);
+    e.k6.c  = cq_scratch_span(&scr, (uint32_t)W, (uint32_t)W);
+    e.k6.W  = W;
+    e.out   = e.k6.t;
 
-    cq_sandwich(ctx, &scr, k6_compute, 5 * W - 2, copyout, W, &e);
+    cq_sandwich(ctx, &scr, k6_compute, cq_add_steps(W), copyout, W, &e);
     cq_scratch_dispose(&scr);
 }
 
@@ -227,14 +252,14 @@ void cq_kernel_sub(cq_ctx *ctx, cq_bit *dst,
 
     cq_scratch_alloc(&scr, (uint32_t)(3 * W));          /* nb ++ d ++ c */
 
-    e.dst  = dst;
-    e.k.a  = a;
-    e.k.b  = b;
-    e.k.nb = cq_scratch_span(&scr, 0u,              (uint32_t)W);
-    e.k.d  = cq_scratch_span(&scr, (uint32_t)W,     (uint32_t)W);
-    e.k.c  = cq_scratch_span(&scr, (uint32_t)(2*W), (uint32_t)W);
-    e.k.W  = W;
-    e.y    = e.k.nb;
+    e.dst   = dst;
+    e.k7.a  = a;
+    e.k7.b  = b;
+    e.k7.nb = cq_scratch_span(&scr, 0u,              (uint32_t)W);
+    e.k7.d  = cq_scratch_span(&scr, (uint32_t)W,     (uint32_t)W);
+    e.k7.c  = cq_scratch_span(&scr, (uint32_t)(2*W), (uint32_t)W);
+    e.k7.W  = W;
+    e.out   = e.k7.d;
 
     cq_sandwich(ctx, &scr, k7_compute, cq_sub_steps(W), copyout, W, &e);
     cq_scratch_dispose(&scr);

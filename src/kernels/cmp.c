@@ -50,22 +50,25 @@
  * operand swap and a trailing negation, exactly as `lower_icmp!` has it. */
 enum { PRIM_EQ, PRIM_ULT, PRIM_SLT };
 
-/* `u.a` / `u.b` are WHAT THE ult RECURRENCE COMPARES, and that is the whole of
- * the sharing between ult and slt: `lower_slt!` biases `a` and `b` into `af`
- * and `bf` and then calls `lower_ult!` on those (arith.jl:471), so slt's
- * Phase C is the ult step function verbatim with its operands re-pointed at
- * scratch. `a` and `b` stay separate because slt's own Phase A needs them.
+/* ONE ENV, THREE BLOCKS, AND `layout` FILLS EXACTLY ONE OF THEM. All three
+ * primitives are public types now (cmp.h, plan §0.4 / PRD-v2 §7.10) and all
+ * three entry-point families DISPATCH through the matching step function, so
+ * this struct is a union in everything but spelling — the two blocks a given
+ * `prim` does not use are NULLed and never read.
  *
- * THE ult HALF IS NOW `cq_ult_block`, A PUBLIC TYPE (cmp.h, plan §0.4). Nothing
- * about K9 changed with it — the same four gates per stage in the same order,
- * and slt still re-points the block at its biased copies — but M19 can be
- * handed the comparator instead of re-typing it, which is D9(e). */
+ * `u.a` / `u.b` are WHAT THE ult RECURRENCE COMPARES. That used to be the whole
+ * of the sharing between ult and slt, because slt re-pointed THIS block at its
+ * biased copies; since the slt export it does not, and `cq_slt_step` assembles
+ * its own inner `cq_ult_block` at `af`/`bf` (arith.jl:471) so that no consumer
+ * — this file included — can wire it at the operands instead. Nothing about K9
+ * changed with either export: the same gates in the same order, and the
+ * goldens did not move. */
 typedef struct {
     cq_bit       *dst;
     const cq_bit *a, *b;
     cq_ult_block  u;                      /* ult: a, b, nb, carry, axnb, W */
     cq_eq_block   e;                      /* eq:  a, b, diff, orr, W       */
-    cq_bit       *af, *bf;                /* slt */
+    cq_slt_block  s;                      /* slt: a, b, af, bf + ult's three */
     const cq_bit *raw;
     int           W;
 } cmp_env;
@@ -205,24 +208,62 @@ static void ult_compute(cq_ctx *ctx, void *env, int s)
  * even compile against cq_emit_*'s const controls. K09.md §5 delta 11 records
  * the identity that WOULD remove this phase — a <s b = (a <u b) ^ a_msb ^
  * b_msb, worth 4W+2 gates and 2W qubits — as NOT ADOPTED: it is not in
- * Bennett, and Rule 1 forbids substituting it on our own authority. */
-static void slt_compute(cq_ctx *ctx, void *env, int s)
+ * Bennett, and Rule 1 forbids substituting it on our own authority.
+ *
+ * THIS IS A PUBLIC BLOCK AS OF PRD-v2 §7.10 and the four signed entry points
+ * DISPATCH THROUGH IT — one body, never a second transcription of `lower_slt!`,
+ * which is what `cq_ult_step` did to `ult_compute` at Step 17. See cmp.h for
+ * who consumes it, why the five spans are flat rather than an embedded
+ * cq_ult_block, and why the flag it leaves is `a >=s b`. */
+int cq_slt_steps(int W)
 {
-    const cmp_env *e = (const cmp_env *)env;
-    int W = e->W;
+    if (W <= 0) cq_kernel_die("slt: width is not positive");
+    return 2 * W + 2 + cq_ult_steps(W);    /* 2W copy + 2 bias + the inner ult */
+}
 
-    if (s < 2 * W) {
-        int i = s / 2;
+void cq_slt_step(cq_ctx *ctx, const cq_slt_block *k, int u)
+{
+    int W = k->W;
 
-        if (s % 2 == 0) cq_emit_cx(ctx, &e->a[i], &e->af[i]);
-        else            cq_emit_cx(ctx, &e->b[i], &e->bf[i]);
+    /* The width guard is cq_slt_steps'; its message is DISJOINT from this one
+     * so a death test can say which spoke. This range check is the consumer's,
+     * for cq_ult_step's reason — and here a deleted one is answered by
+     * cq_ult_step's own guard one layer DOWN, which is why the death cases pin
+     * that message as forbidden rather than resting on the exit code. */
+    if (u < 0 || u >= cq_slt_steps(W))
+        cq_kernel_die("slt: step index outside [0, cq_slt_steps(W))");
+
+    if (u < 2 * W) {
+        int i = u / 2;
+
+        if (u % 2 == 0) cq_emit_cx(ctx, &k->a[i], &k->af[i]);
+        else            cq_emit_cx(ctx, &k->b[i], &k->bf[i]);
         return;
     }
 
-    if (s == 2 * W)     { cq_emit_x(ctx, &e->af[W - 1]); return; }
-    if (s == 2 * W + 1) { cq_emit_x(ctx, &e->bf[W - 1]); return; }
+    if (u == 2 * W)     { cq_emit_x(ctx, &k->af[W - 1]); return; }
+    if (u == 2 * W + 1) { cq_emit_x(ctx, &k->bf[W - 1]); return; }
 
-    cq_ult_step(ctx, &e->u, s - (2 * W + 2));
+    /* `lower_ult!(g, wa, af, bf, W)` (arith.jl:471) — over the BIASED COPIES,
+     * never over `a`/`b`. Assembled here rather than carried in the struct so a
+     * consumer cannot wire it the other way; that mutant is `slt` silently
+     * meaning `ult`, with the same gate tuple and a wrong answer only on a
+     * negative operand (cmp.h). */
+    {
+        cq_ult_block in = { k->af, k->bf, k->nb, k->carry, k->axnb, W };
+
+        cq_ult_step(ctx, &in, u - (2 * W + 2));
+    }
+}
+
+const cq_bit *cq_slt_flag(const cq_slt_block *k)
+{
+    return &k->carry[k->W];
+}
+
+static void slt_compute(cq_ctx *ctx, void *env, int s)
+{
+    cq_slt_step(ctx, &((const cmp_env *)env)->s, s);
 }
 
 /* The "^=" of Rule 7's contract, and the only place `dst` is written on the
@@ -243,7 +284,7 @@ static int n_compute_of(int prim, int W)
 {
     if (prim == PRIM_EQ)  return cq_eq_steps(W);         /* 5W - 3          */
     if (prim == PRIM_ULT) return cq_ult_steps(W);        /* 6W + 1          */
-    return 2 * W + 2 + cq_ult_steps(W);                  /* 8W + 3          */
+    return cq_slt_steps(W);                              /* 8W + 3          */
 }
 
 /* ONE CONTIGUOUS REGION, carved into named sub-arrays. emit.c's I6(a) check is
@@ -255,13 +296,15 @@ static void layout(cmp_env *e, cq_scratch *scr, int prim)
 {
     uint32_t W = (uint32_t)e->W;
 
-    e->af = e->bf = NULL;
     e->u.nb = e->u.carry = e->u.axnb = NULL;
     e->u.a  = e->u.b = NULL;
     e->u.W  = e->W;
     e->e.diff = e->e.orr = NULL;
     e->e.a  = e->e.b = NULL;
     e->e.W  = e->W;
+    e->s.af = e->s.bf = e->s.nb = e->s.carry = e->s.axnb = NULL;
+    e->s.a  = e->s.b = NULL;
+    e->s.W  = e->W;
 
     if (prim == PRIM_EQ) {
         cq_scratch_alloc(scr, 2u * W - 1u);
@@ -284,15 +327,18 @@ static void layout(cmp_env *e, cq_scratch *scr, int prim)
         return;
     }
 
+    /* The five spans in cq_slt_block's own declaration order. `cq_slt_step`
+     * wires the inner comparator at `af`/`bf` itself (cmp.h), so nothing here
+     * names a cq_ult_block at all. */
     cq_scratch_alloc(scr, 5u * W + 1u);
-    e->af      = cq_scratch_span(scr, 0u,          W);
-    e->bf      = cq_scratch_span(scr, W,           W);
-    e->u.nb    = cq_scratch_span(scr, 2u * W,      W);
-    e->u.carry = cq_scratch_span(scr, 3u * W,      W + 1u);
-    e->u.axnb  = cq_scratch_span(scr, 4u * W + 1u, W);
-    e->u.a = e->af;                      /* ult runs over the biased copies */
-    e->u.b = e->bf;
-    e->raw = &e->u.carry[W];
+    e->s.af    = cq_scratch_span(scr, 0u,          W);
+    e->s.bf    = cq_scratch_span(scr, W,           W);
+    e->s.nb    = cq_scratch_span(scr, 2u * W,      W);
+    e->s.carry = cq_scratch_span(scr, 3u * W,      W + 1u);
+    e->s.axnb  = cq_scratch_span(scr, 4u * W + 1u, W);
+    e->s.a = e->a;
+    e->s.b = e->b;
+    e->raw = cq_slt_flag(&e->s);
 }
 
 /* The raw flag the compute half would have produced, in plain C: `a != b` for
