@@ -1,0 +1,85 @@
+% labreport entry 12 — 2026-09-18
+% labreport-to: b15200b
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{12}{field}.
+
+\entry{12}{2026-09-18}{the one-opcode experiment: bit-level lowering measured at W=8 and W=32, and not adopted}
+
+\begin{generated}
+  \gitem{Range}{\texttt{b15200b..b15200b}}
+  \gitem{Tree}{\emph{dirty at capture} --- 23 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{357} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{358} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 209 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{none in range at capture}
+  \gitem{Beads closed}{none}
+  \gitem{Beads filed}{\bead{cls} one-opcode experiment: bit-level (pass-scheduled) vs opcode (kernel) lowering of add i8, measured}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+A design question, not a bead: could libcqops shrink to the seven gate primitives if CQ\_lang
+lowered arithmetic to \texttt{i1} gates itself --- one \texttt{cq\_theta\_i32} becoming 32
+\texttt{cq\_theta\_i1}, every adder a sea of \texttt{and}/\texttt{xor} --- and would that inherit
+clang's optimisations? Argued first, then, at the user's request, \emph{measured} with a one-opcode
+prototype: the same K6 ripple carry in two spellings, applied four times so clang has a chain to
+work on, at W=8 and then W=32.
+
+\field{What landed}
+\texttt{tools/bitlevel/} --- \texttt{gen\_fixture.py} emits one CQ program in two spellings at
+width W (\texttt{-DBITLEVEL=0}: unsigned \texttt{+}, lowered by the pass to
+\texttt{cq\_template\_add}; \texttt{=1}: the identical construction written over tainted
+\texttt{bool}s, which is exactly what a bit-level lowering would hand the pass), with
+\texttt{-DCHAIN} choosing four distinct addends or the same one four times;
+\texttt{bitlevel.py} runs both through CQ\_lang's real front end and pass, links against this
+archive with a pool probe on the line, runs quantum and classical, and tabulates gates, peak,
+strands, ABI calls, stage timings and lowered-IR size. Neither repository needed a change to run
+the experiment, and the decision it produced is \textbf{PRD~\S15 D27}.
+
+\field{Measured}
+Release archive, CQ\_lang \texttt{62b0b111}, printf sink, \texttt{clang -O1} (\texttt{-O2}
+identical; \texttt{-O0} declines in the pass for both spellings), four-deep add chain.
+\begin{figures}
+  \fig{1568 CX / 868 CCX / peak 352 / 21 ABI calls}{\texttt{bitlevel.py}, opcode, distinct addends}{W=32}
+  \fig{1424 CX / 488 CCX / peak 776 / 2136 ABI calls}{\texttt{bitlevel.py}, bit-level, distinct addends}{W=32}
+  \fig{392 / 196 / 88 / 21 vs 320 / 104 / 176 / 480}{same, opcode vs bit-level}{W=8}
+  \fig{280 CX / 120 CCX / peak 190}{opcode, same addend $\times 4$ (clang: $x+y+y+y+y \to x+(y\ll 2)$)}{W=32}
+  \fig{1390 CX / 484 CCX / peak 669}{bit-level, same addend $\times 4$ (all four adders still emitted)}{W=32}
+  \fig{0 stranded, 0 unproven, over 500+ \texttt{i1} frees}{\texttt{cqops\_read\_residue} via \texttt{l6\_residue.c}}{every row}
+  \fig{classical-correct, 0 gates}{$\theta=\pi$ run of the same binary}{every row}
+  \fig{0.36 / 0.43\,s clang; 0.13 / 0.14\,s pass; 64 / 2245 IR lines}{stage timings in \texttt{run.sh}, single runs}{W=32, opcode / bit-level}
+  \fig{21 / 480 opaque calls, order unchanged}{stock LLVM~19 \texttt{opt -O2} on the LOWERED IR}{W=8}
+\end{figures}
+\datasource{All figures from one invocation of \texttt{tools/bitlevel/bitlevel.py -{}-widths 8,32}
+against \texttt{build-release/libcqops.a}; the W=8 rows reproduce the earlier hand-written
+fixture exactly, which is the check that the generator emits the same construction. Timings are
+single runs and an order of magnitude, not a benchmark.}
+
+\field{Decided}
+PRD~\S15 \textbf{D27}.
+
+\field{Not taken}
+The bit-level backend itself, on the measurement. Three things the row records so they are not
+re-derived: the Toffoli halving is global-versus-local \emph{uncompute} (kernel sandwich
+$\times$ pass \texttt{\_unc}), not bit granularity, and is reachable at the opcode boundary by a
+kernel that hands its scratch to the pass (derived, not measured, and a CQ\_lang ABI addition);
+half the $2\times$ peak is SSA out-of-place mapping the pass could remove with three rewrites,
+the other half \emph{is} the Toffoli saving --- Bennett's pebble game; and clang's integer algebra
+lands on the opcode spelling only, so bits must be expanded \emph{after} value-level clang, and
+even then clang deletes an expanded uncompute rather than optimising it. Also not taken: a
+second clang run over the lowered IR (measured inert), and the hand-written W=8 fixture, replaced
+by the generator once the generator reproduced its numbers.
+
+\field{Verified}
+The experiment ran in \textbf{Release} only, through CQ\_lang's own pipeline; no ctest suite was
+executed this session and none needed to be --- \texttt{src/} and \texttt{shim/} are untouched.
+\texttt{make lint} green with the four new files under \texttt{tools/} (LOC and citations).
+Nothing in Debug ran.
+
+\field{Left open}
+\bead{cls} closed with the decision. The follow-on worth a prototype, if T-count ever outranks
+qubits: the scratch-exposing kernel variant of D27~(1), measured rather than derived. The
+harness stays in \texttt{tools/bitlevel/} for D27's re-open condition.

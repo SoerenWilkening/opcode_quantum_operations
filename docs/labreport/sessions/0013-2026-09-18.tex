@@ -1,0 +1,95 @@
+% labreport entry 13 — 2026-09-18
+% labreport-to: b15200b
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{13}{field}.
+
+\entry{13}{2026-09-18}{v2 mechanics decided: the fp port is a source transcription over step blocks, the short-circuit never touches a double, and the transcendentals arrive by source injection}
+
+\begin{generated}
+  \gitem{Range}{\texttt{b15200b..b15200b}}
+  \gitem{Tree}{\emph{dirty at capture} --- 25 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{357} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{358} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 209 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{none in range at capture}
+  \gitem{Beads closed}{\bead{dl2} v2 §6.1: does v2 vendor intrinsic\_table.yaml + libm\_table.yaml? The link surface is 2880 symbols, not 2479 -- and fma is 4,295 corpus calls, \bead{cls} one-opcode experiment: bit-level (pass-scheduled) vs opcode (kernel) lowering of add i8, measured}
+  \gitem{Beads filed}{\bead{9ve.28} M26/M27 f64 at the ABI edge: cqrt\_alloc\_f64 (memcpy into 64 constant bits) / measure / copy / ry / rz by WIDENING cq\_runtime\_rail.c + cq\_runtime\_gate.c; generator emits real f64 template wrappers; dispatch; D15 effect rows; D21 brackets, \bead{9ve.24} M39 fma K20 + PRD-v2 §6.1 VENDORING in ONE commit: intrinsic\_table.yaml + libm\_table.yaml pinned, gen\_shim learns the ternary qql shape, CqopsSymbolSets 2479->2880, L6 link line drops the two stub objects, \bead{9ve.23} M37 fconv K19: fptosi / fptoui / sitofp / uitofp at f64 with x86 saturation pinned; fpext/fptrunc stay aborts, \bead{9ve.22} M34 fmul K16: soft\_fmul; the 53x53 significand product is M18's step block over a span, \bead{9ve.21} M33 fadd/fsub K15: soft\_fadd / soft\_fsub as one sandwich over flat scratch, \bead{9ve.20} M36 fcmp K18: the 10 ported predicates + 4 operand swaps -- the FIRST fp kernel, \bead{9ve.19} M32 fpround: the shared round-and-pack (\_sf\_round\_and\_pack, softfloat\_common.jl) as an exported step block, \bead{9ve.18} M31 fpfield: IEEE binary64 field VIEWS over a cq\_bit span + class predicates (is\_nan/is\_inf/is\_zero/is\_subnormal) as K9-shape one-bit kernels, \bead{9ve.3} v2 step export: M18 cq\_mul\_step over a cq\_mul\_block (fmul's 53x53 product), \bead{9ve.2} v2 step export: M12 variable-shift barrel as cq\_barrel\_block + cq\_barrel\_step, \bead{9ve.1} v2 step export: M16 eq/ne as cq\_eq\_block + cq\_eq\_step, \bead{9ve.29} Integer intrinsics port (v1-shaped, exposed by the vendoring): ctlz/ctpop/cttz/bswap/bitreverse/fshl/fshr/abs/smin/smax/umin/umax/*\_sat from Bennett's extractor expansions, \bead{9ve.27} M38 fmisc: fneg/fabs/copysign (sign ops, true L5 row), fmin/fmax = soft\_fmin/soft\_fmax, floor/ceil/trunc, round = soft\_round\_away, rint/nearbyint = soft\_round, \bead{9ve.26} M40 fsqrt K21: soft\_fsqrt, the digit-by-digit restoring root mirroring fdiv's loop -- NEW module row, \bead{9ve.25} M35 fdiv K17: soft\_fdiv composes M19's divrem step block, never transcribes it, \bead{9ve.5} v2 D8 audit: every variable-amount shift in the f64 softfloat sources is clamped or its out-of-range result discarded, recorded per file, \bead{9ve.4} v2 host probe: tests/support asserts round-to-nearest and FTZ/DAZ off before any fp anchor runs, \bead{cls} one-opcode experiment: bit-level (pass-scheduled) vs opcode (kernel) lowering of add i8, measured}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Whether v2 --- floating point --- can start now, on the premise that Bennett.jl provides every
+construction and every classical routine is \texttt{X}/\texttt{CX}/\texttt{CCX}, ``so we just copy what
+Bennett emits''; then, in turn, why \texttt{fadd} needs $\sim$30k qubits, whether the integer
+additions inside it are the kernels we already ship, what \texttt{cq\_sandwich} is, whether the
+step functions are the existing operations, which f64 operations are in (``also \texttt{sqrt}?''),
+why not the transcendentals, and finally: write the docs and file the issues.
+
+\field{What landed}
+The premise corrected and the port's mechanics decided in one place: \textbf{PRD-v2 \S7}
+(fifteen items), with PRD-v1 \S15 \textbf{D26} amended to point at it, \S1a's transcendental
+bullet rewritten on its true ground, \S3.3's rounding and \texttt{fmin} rows corrected, \S5 given
+the \textbf{M40 \texttt{fsqrt}} row it lacked and a third shared obligation, \S6.5's anchors written
+(\S7.12), \S6.6 widened. Three new CLAUDE.md callouts and four \texttt{bd remember} entries
+(\texttt{fp-port-is-a-source-transcription-over-step-blocks},
+\texttt{fp-nan-cells-are-x86-and-pinned-by-table}, \texttt{soft-name-mapping-is-not-identity},
+\texttt{transcendentals-arrive-by-source-injection-not-by-symbol}). Seventeen beads filed under
+\bead{9ve} with their dependency edges (\bead{9ve.1}--\bead{9ve.5}, \bead{9ve.18}--\bead{9ve.29}),
+\bead{dl2} closed as resolved, dated notes on \bead{hkg}, \bead{1us}, \bead{c5x}, \bead{9ve}. No
+code changed.
+
+\field{Measured}
+\begin{figures}
+  \fig{no \texttt{.qasm}, no gate dump, no circuit collection}{\texttt{find} over \texttt{third\_party/bennett/}}{Bennett \texttt{980805de}}
+  \fig{63 intermediates in \texttt{soft\_fadd}; 287 \texttt{ifelse}; 0 \texttt{leading\_zeros}}{\texttt{grep} over the f64 softfloat sources}{Bennett \texttt{980805de}}
+  \fig{Wires $30{,}141 - $ Ancillae $29{,}949 = 192 = 3\times 64$}{\texttt{BENCHMARKS.md}, \texttt{soft\_fadd} row}{upstream's own table}
+  \fig{\texttt{:auto} always resolves to \texttt{:ripple}}{\texttt{arith.jl:9}}{Bennett \texttt{980805de}}
+  \fig{6 modules export a step block; barrel, \texttt{eq}/\texttt{ne}, \texttt{cq\_mul\_step} do not}{\texttt{grep} over \texttt{src/kernels/*.h}}{working tree}
+  \fig{\texttt{Inf-Inf}, $0\cdot$\texttt{Inf}, \texttt{sqrt(-1)} $=$ \texttt{fff8000000000000}; two-NaN add returns the first operand; sNaN gets no priority}{7-line C probe, \texttt{cc -std=c11 -O0 -ffp-contract=off}}{this box, x86\_64}
+  \fig{\texttt{INDEF = 0xFFF8000000000000}; \texttt{fptosi} saturates to \texttt{0x8000000000000000}}{\texttt{softfloat\_common.jl:14}, \texttt{fptosi.jl:6-8}}{Bennett \texttt{980805de}}
+  \fig{no \texttt{soft\_rint}, no \texttt{soft\_lrint}; \texttt{soft\_round} is ties-to-even, \texttt{soft\_round\_away} ties-away; \texttt{soft\_fmin} NaN-absorbing, \texttt{soft\_fminimum} NaN-propagating}{\texttt{softfloat.jl} export list; \texttt{fround.jl}, \texttt{fmin.jl} docstrings}{Bennett \texttt{980805de}}
+  \fig{12 \texttt{fma}, 4 \texttt{fmul}, 2 \texttt{fadd}, 2 \texttt{fcmp\_olt}, 2 \texttt{fptosi}, 2 \texttt{sitofp}, 2 \texttt{fneg}, 2 \texttt{bitcast}, 2 \texttt{shl}, 2 \texttt{zext}, 2 \texttt{add}; all f64; no \texttt{exp2}}{\texttt{grep} over \texttt{slice\_branchless\_exp2.expected.log}}{CQ\_lang \texttt{67ace652}, docs-dirty}
+  \fig{50 \texttt{slice\_branchless\_*.c} fixtures call a \texttt{math.h} transcendental}{\texttt{ls}}{CQ\_lang \texttt{67ace652}}
+  \fig{\texttt{llvm.ctpop}/\texttt{ctlz}/\texttt{bswap}/\texttt{fshl} expanded at \texttt{instructions.jl:4826-4948}}{\texttt{grep} over \texttt{src/extract/}}{Bennett \texttt{980805de}}
+\end{figures}
+\datasource{Every row is a read of the pinned snapshot, of CQ\_lang's checkout, or of this tree's
+headers; the one executed artefact is the NaN probe, built and run once in the scratchpad. No
+gate count in this entry is ours --- none was emitted.}
+
+\field{Decided}
+PRD-v1 \S15 \textbf{D26}, amended 2026-09-18, pointing at \textbf{PRD-v2 \S7.1--7.15}.
+
+\field{Not taken}
+\emph{Copying an emitted gate stream} --- there is none in the snapshot, and Rule 13 forbids
+holding one. \emph{The transcendentals as kernels} --- CQ\_lang's Rule 18 source-injects
+\texttt{math.h} bodies, so no symbol exists to implement; they arrive through the arithmetic port
+at CQ\_lang's algorithm, and a Bennett-backed single opcode is a CQ\_lang table row, filed there
+if ever wanted (\S7.8). \emph{The host \texttt{double} operator as the classical short-circuit}
+--- measured x86-specific on the IEEE-unspecified cells; ARM disagrees, so classical and quantum
+mode would diverge per host (\S7.4). \emph{CSE and field narrowing in the transcription} --- D9's
+K12 refusal, K11's optimisation-shaped mutant (\S7.2). \emph{\texttt{lrint}/\texttt{llrint},
+\texttt{fpext}/\texttt{fptrunc}, \texttt{frem} at f64} --- liveness (\S7.9). \emph{Committing} ---
+Conservative profile; the tree was already dirty with two earlier sessions' work, reported instead.
+
+\field{Verified}
+Nothing under \texttt{src/}, \texttt{shim/} or \texttt{tests/} was touched by this session, so no
+ctest suite was run in either configuration and none is claimed. \texttt{make lint} ran once after
+the doc edits: \texttt{check\_loc} OK (209 files, largest 294), \texttt{check\_cites} OK (306 files,
+0 bare living-target citations). The 25 dirty paths the header counts are this session's three
+documents, entries 11--13, \texttt{tools/bitlevel/}, and code from the two preceding uncommitted
+sessions, which this entry does not describe.
+
+\field{Left open}
+The whole of v2, now as beads with edges: first \bead{9ve.1}--\bead{9ve.3} (the three step exports
+v1 owes), \bead{9ve.4} (host probe), \bead{9ve.5} (D8 audit) and \bead{hkg}'s sampler; then
+\bead{9ve.18} M31, \bead{9ve.19} M32, \bead{9ve.20} M36 \texttt{fcmp} as the first kernel;
+\bead{9ve.21}--\bead{9ve.23} \texttt{fadd}/\texttt{fmul}/\texttt{fconv}; \bead{9ve.24}
+\texttt{fma} with the \S6.1 vendoring in one commit; \bead{9ve.25}--\bead{9ve.27}
+\texttt{fdiv}/\texttt{fsqrt}/\texttt{fmisc}; \bead{9ve.28} the f64 ABI edge; \bead{9ve.29} the
+integer intrinsics. Still open from before: \bead{c5x}, \bead{213}, \bead{1us}, \bead{4tr},
+\bead{9ns}. The one question that is not ours: whether CQ\_lang ever wants a Bennett-backed
+\texttt{exp} opcode (\S7.8).
+

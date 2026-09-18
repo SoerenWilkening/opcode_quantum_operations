@@ -911,6 +911,27 @@ ctest --test-dir build-release -R l7
 
 ## Hallucination-Risk Callouts (specific things agents get wrong here)
 
+- **BENNETT SHIPS 27 TRANSCENDENTALS AND NOT ONE IS A KERNEL HERE, BECAUSE CQ_lang NEVER EMITS A
+  SYMBOL FOR THEM — AND THEY ARRIVE THROUGH THE fp PORT ANYWAY.** CQ_lang's Rule 18 compiles a
+  `math.h` function by SOURCE INJECTION and calls a per-function template *"fiction"*; measured,
+  its `exp2` fixture lowers to 12 `fma` + 4 `fmul` + 2 `fadd` + … at `f64` and no `exp2`. "Bennett
+  has `soft_exp`, port it" is the reflex; a Bennett-backed single opcode is a CQ_lang table row,
+  filed there. PRD-v2 §7.8. `bd remember transcendentals-arrive-by-source-injection-not-by-symbol`.
+
+- **THE LLVM-NAME → `soft_*` MAPPING IS NOT IDENTITY, AND A WRONG PICK IS K9's `uge`-MEANING-`ule`
+  AGAIN.** `rint`/`nearbyint` are `soft_round` (ties-to-even), C's `round` is `soft_round_away`,
+  `fmin`/`fmax` (`minnum`/`maxnum`) are `soft_fmin`/`soft_fmax` and NOT the NaN-propagating
+  `soft_fminimum`/`soft_fmaximum` beside them; there is no `soft_rint` and no `soft_lrint`. Only L1
+  against an independent reference sees the wrong row. PRD-v2 §7.7.
+  `bd remember soft-name-mapping-is-not-identity`.
+
+- **L1's fp ORACLE IS HOST-DEPENDENT ON THE IEEE-UNSPECIFIED CELLS, AND THE LIBRARY MUST NEVER DO
+  `double` ARITHMETIC.** Measured on this x86_64 box: `Inf−Inf` and `0·Inf` are `fff8…` (Bennett's
+  `INDEF`), a two-NaN add returns the FIRST operand, an sNaN gets no priority — ARM differs on all
+  three. So the fp classical short-circuit is a C transcription of the same Julia body over
+  `uint64_t`, never the host operator, and the reference pins those cells by TABLE. PRD-v2 §7.4.
+  `bd remember fp-nan-cells-are-x86-and-pinned-by-table`.
+
 - **PRD §12's GROVER LISTING DOES NOT LOWER THROUGH CQ_lang, AND WRITING IT OUT VERBATIM IS
   THE FIRST THING STEP 25 TRIES** (PRD §15 **D22**). Two UPSTREAM guards decline it in turn, and
   **both are CQ_lang doing its job**, not our defects — an in-place `Ry` rotates the basis a live

@@ -1,0 +1,106 @@
+% labreport entry 11 — 2026-09-17
+% labreport-to: b15200b
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{11}{field}.
+
+\entry{11}{2026-09-17}{L6 goes green: a repeat measure is legal, and three stale-claim defects in one batch}
+
+\begin{generated}
+  \gitem{Range}{\texttt{454afa4..b15200b}}
+  \gitem{Tree}{\emph{dirty at capture} --- 18 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{357} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{358} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 206 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{b15200b} labreport entry 10: CQ\_lang and qec relocate, eleven suites switch on, L6's first run is red
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{30k} L6 is RED: e2e-slice-loop-pairing-measure-owned aborts on 'measure of a rail that is not live (1, 3)' — NORTH\_STAR condition 1 unmet, \bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{8u0} M12's blast radius is wider than shift\_var|step14 — test\_template.c drives all three entry points through the shim dispatch table, \bead{bj0} tools/labreport/new\_entry.py hardcodes build-release/build-debug, so the generated Tests figure is wrong whenever those dirs carry different flags, \bead{djf} M08/M12: the W=1 barrel span underflow is now unblocked for hardening — but hardening it makes bd 6q4's case the SOLE detector, \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{16s} dr\_sweep's three dead parameters are the same class as cq\_kd\_sweep\_at's removed 'exhaustive' — decide them, \bead{ula} tests/ has THREE copies of a fork-and-capture helper; extract one tests/support/ module, \bead{cue} Consolidate all\_const and the death-test null sink into kernel.h / death.h, \bead{447} tools/labreport/gen\_data.py stamps the WORKING TREE's HEAD into a .dat, not the archive's — a stale archive gets a fresh SHA, \bead{7b5} childcap.h's requirement list has now been wrong four times about what is pinned, \bead{0on} tests/support/childcap.c: a TRUNCATED capture is still indistinguishable from a complete one, \bead{698} tests/support/childcap.c: the two EINTR retries are the last unpinned requirement, and ta1 ADDED the reachable one, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Beads filed}{\bead{0po} bd tgx's sole witness fixture was DELETED upstream at 66428ddc - the measured-rail READ relaxation now rests on no golden, \bead{30k} L6 is RED: e2e-slice-loop-pairing-measure-owned aborts on 'measure of a rail that is not live (1, 3)' — NORTH\_STAR condition 1 unmet, \bead{09z} tests/support/childcap.c: requirement 3 needs an \_exit(1) and a non-SIGABRT control; 7 mutants unfalsified (req 1 IS pinned), \bead{7s0} CLAUDE.md names a CQ\_lang path that no longer exists; third\_party/cq\_lang/COMMIT names it too and must stay wrong (Rule 1), \bead{luk} A ctest -R regex is not a coverage claim: it over-selects on CASE names and can match ZERO tests silently - measured twice in one batch, \bead{bd6} WATCH: CQ\_lang's open P1 yiid on post-measure semantics - ruling (b) BROAD would delete the repeat measure bd 30k now permits, \bead{8u0} M12's blast radius is wider than shift\_var|step14 — test\_template.c drives all three entry points through the shim dispatch table, \bead{bj0} tools/labreport/new\_entry.py hardcodes build-release/build-debug, so the generated Tests figure is wrong whenever those dirs carry different flags, \bead{djf} M08/M12: the W=1 barrel span underflow is now unblocked for hardening — but hardening it makes bd 6q4's case the SOLE detector, \bead{6q4} M12: an INCIDENTAL W=1 span underflow masks the purpose-built pool assertion for the L-not-W short-circuit, \bead{cmu} dr\_sweep and dr\_sweep\_small are compile-time indistinguishable since bd 16s — the arity discriminator is gone, \bead{4ib} .claude/worktrees/ is untracked and NOT gitignored - a git add -A during an agent batch would stage four full checkouts, \bead{447} tools/labreport/gen\_data.py stamps the WORKING TREE's HEAD into a .dat, not the archive's — a stale archive gets a fresh SHA, \bead{7b5} childcap.h's requirement list has now been wrong four times about what is pinned, \bead{0on} tests/support/childcap.c: a TRUNCATED capture is still indistinguishable from a complete one, \bead{698} tests/support/childcap.c: the two EINTR retries are the last unpinned requirement, and ta1 ADDED the reachable one, \bead{qki} shim/cq\_runtime\_v2.c header ends its running count at 35; measured 39 since the 170ede1 re-vendor, \bead{ta1} tests/support/childcap.c drains its two pipes SEQUENTIALLY — a latent deadlock if a child ever fills the second}
+  \gitem{Diff}{\texttt{2 files changed, 107 insertions(+)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Three phases, gated: \bead{30k} first and alone --- L6's single aborting fixture, to be taken
+to a \emph{decision} rather than a patch --- then a cheap trio (\bead{8u0}, \bead{7b5},
+\bead{447}) in parallel, then v2 scoping (\bead{9ve}, \bead{dl2}) as documents only. Phase~1
+was permitted to consume the whole session.
+
+\field{What landed}
+\textbf{L6 no longer aborts, so NORTH\_STAR finish-line condition~1 is met for the first
+time.} The one fixture that aborted,
+\texttt{e2e-slice-loop-pairing-measure-owned}, did so on a \emph{second}
+\texttt{cqrt\_measure} of one handle, and that turns out to be legal on the frozen ABI ---
+CQ\_lang's own committed golden emits it twice, its loop pass is written to expect plural
+measure users, and its post-measure reject explicitly \emph{excludes} measure sinks from the
+user set it scans. \texttt{cq\_reg\_mark\_measured} is now idempotent on
+\texttt{CQ\_SLOT\_MEASURED} in one line; \texttt{DEAD}, \texttt{TOKEN}, poison, the write door
+and \texttt{cq\_reg\_free} all still refuse. Two death cases became \emph{positive} exemption
+cases, since a refusal's permitted direction needs its own fixture.
+
+Alongside it, three defects of one class --- a claim that went stale because the thing it
+described moved underneath it. \texttt{childcap.c}'s EINTR retry count is now measured at
+configure time and \texttt{\_Static\_assert}ed, so a fourth site breaks the build.
+\texttt{gen\_data.py}'s \texttt{scratch.dat} provenance line now names the archive's mtime and
+says the SHA dates the \emph{run}. M12's three entry points carry a note recording that they
+are rows of a dispatch table, which a symbol grep cannot follow.
+
+\field{Measured}
+\begin{figures}
+  \fig{358 / 358 passed, 1711.27\,s}{\texttt{make test}}{Debug, both opt-in flags}
+  \fig{357 / 357 passed, 579.50\,s}{\texttt{make test}}{Release, both opt-in flags}
+  \fig{Passed, 1617.20\,s}{\texttt{l6\_cqlang\_fixtures}}{Debug}
+  \fig{Passed, 527.33\,s}{\texttt{l6\_cqlang\_fixtures}}{Release}
+  \fig{Passed, 9.25\,s}{\texttt{l7\_grover\_cqlang}}{Release}
+  \fig{up to date, 2479 symbols}{\texttt{gen\_shim.py -{}-check}}{either}
+  \fig{302 scanned, 0 bare}{\texttt{check\_cites.sh}}{filesystem walk}
+  \fig{360 $\to$ 358 / 359 $\to$ 357}{\texttt{ctest -N}, diffed against a baseline taken before any edit}{Debug / Release}
+  \fig{survived 57 tests}{a mutant widening the new early return to \texttt{CQ\_SLOT\_DEAD}}{both, before the fix}
+  \fig{392 goldens, 548 measures, 0 freed, 0 referenced}{corpus scan}{CQ\_lang \texttt{b1b1dc02}, dirty tree}
+\end{figures}
+
+\datasource{The \texttt{ctest -N} delta is a diff of two sorted listings captured in this
+session, not a recollection of the earlier counts. The CQ\_lang figures name a revision this
+repository does not pin.}
+
+\field{Decided}
+PRD-v1 \S2.2's third dated amendment (the repeat measure); PRD-v2 \S6.1 (vendoring), with
+PRD-v1 \S15 D26 amended to point at the resolution rather than at an open question.
+
+\field{Not taken}
+\textbf{The guard was not weakened to make L6 green} --- the legality was argued from
+upstream's code first, and had the answer been \emph{no} the deliverable would have been an
+upstream report with no code change. \bead{dl2}'s sub-question (b), porting \texttt{fma}, was
+left scoped: it is a kernel question and this phase wrote no kernels. \bead{8u0} did
+\emph{not} widen every kernel gate --- the finding is that the symbol-grep \emph{method} has a
+blind spot, not that the gate was dangerous. \bead{7b5} rejected its own bead's sketch of
+disposition (iii): a requirement-number-to-case-name check would have stayed green through the
+very event that falsified requirement~5. \bead{447} rejected stamping a configure-time SHA
+(a different wrong SHA) and rejected refusing on a stale archive (it false-positives on
+build-then-commit and false-negatives on the dirty tree where the defect was confirmed). Two
+dead paths in \texttt{third\_party/cq\_lang/COMMIT} and CLAUDE.md were left unfixed --- the
+former is read-only under Rule~1 and must stay wrong.
+
+\field{Verified}
+Rule~17, literally. \textbf{One full-suite run, by the orchestrator, after the last merge}:
+\texttt{make test} green end to end in \emph{both} configurations --- \texttt{check\_loc},
+\texttt{check\_cites}, \texttt{gen\_shim -{}-check}, then Debug 358/358 and Release 357/357,
+\texttt{l6\_cqlang\_fixtures} and \texttt{l7\_grover\_cqlang} included. Goldens byte-identical
+throughout at tree \texttt{e99a05d1}, verified against a content hash taken before any edit;
+\texttt{CQOPS\_UPDATE\_GOLDENS} was never set by anyone. Agent-level gates were selections
+(244/244, 175/175, 32/32, 349/349, 348/348) and are recorded as selections in their beads, not
+as suite claims. No agent ran \texttt{make test}.
+
+\field{Left open}
+\bead{0po} --- \bead{tgx}'s sole witness fixture was deleted upstream at \texttt{66428ddc}, so
+the measured-rail \emph{read} relaxation now rests on no golden. \bead{bd6} --- CQ\_lang's open
+P1 \texttt{yiid} could delete the repeat measure this session permitted; the failure directions
+are asymmetric, so nothing is owed unless upstream moves. \bead{luk} --- a \texttt{ctest -R}
+regex over-selects on case names and can match zero tests silently; both directions were
+measured this session and one was in a brief written by the orchestrator. \bead{7s0},
+\bead{4ib} --- a dead path in CLAUDE.md, and \texttt{.claude/worktrees/} being untracked and
+not ignored. \bead{9ve} stays open as v2's tracker root; \bead{dl2} stays open awaiting the
+maintainer's ratification of a scope decision already written into the document of record.
