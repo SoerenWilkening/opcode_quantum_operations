@@ -1,0 +1,110 @@
+% labreport entry 14 — 2026-09-18
+% labreport-to: a5eb52d
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{14}{field}.
+
+\entry{14}{2026-09-18}{v2 Waves 1 and 2: three step exports, the host probe, the anchors, M31 fpfield, six K-docs, four boundary decisions}
+
+\begin{generated}
+  \gitem{Range}{\texttt{b15200b..a5eb52d}}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{381} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{382} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 219 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{a5eb52d} v2 Wave 2: bd 9ve.18/9ve.32 — M31 fpfield (K22) and the per-shape L1 budget floor; K16/K19/K20/K21 drafted; three boundary decisions
+    \item \texttt{5b323a9} PRD-v2 §5: assign K22 (M31 fpfield) and K23 (M32 fpround) so their K-docs have numbers
+    \item \texttt{127ce04} v2 Wave 1: bd 9ve.1/9ve.2/9ve.3/9ve.4/9ve.5/hkg — three step exports, the fp host probe, the D8 audit, the L1 anchors; K15/K18 drafted
+    \item \texttt{5a14ba2} bd 30k/8u0/7b5/447: the repeat measure is legal, childcap's EINTR count is static-asserted, gen\_data names the archive
+    \item \texttt{7cf0664} v2 mechanics: PRD-v2 §7, D26 amended, 17 beads filed; labreport entries 11-13
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{9ve.34} DECISION: uitofp i64->f64 has NO bias correction upstream (UIToFP routes to soft\_sitofp; bit 63 read as a sign for u >= 2\textasciicircum{}63) — port verbatim, deviate, or keep that one width an abort?, \bead{9ve.32} v2 L1 budget: per-shape floor (cq\_kd\_shape.min\_samples) so an fp kernel's anchor block runs all three mask rows by default, \bead{9ve.18} M31 fpfield: IEEE binary64 field VIEWS over a cq\_bit span + class predicates (is\_nan/is\_inf/is\_zero/is\_subnormal) as K9-shape one-bit kernels, \bead{9ve.3} v2 step export: M18 cq\_mul\_step over a cq\_mul\_block (fmul's 53x53 product), \bead{9ve.2} v2 step export: M12 variable-shift barrel as cq\_barrel\_block + cq\_barrel\_step, \bead{9ve.1} v2 step export: M16 eq/ne as cq\_eq\_block + cq\_eq\_step, \bead{dl2} v2 §6.1: does v2 vendor intrinsic\_table.yaml + libm\_table.yaml? The link surface is 2880 symbols, not 2479 -- and fma is 4,295 corpus calls, \bead{9ve.5} v2 D8 audit: every variable-amount shift in the f64 softfloat sources is clamped or its out-of-range result discarded, recorded per file, \bead{9ve.4} v2 host probe: tests/support asserts round-to-nearest and FTZ/DAZ off before any fp anchor runs, \bead{hkg} v2 §6.5 / R12: L1's fp ANCHORS must be written down before M31 -- the 32-sample budget survives, the corners do not, \bead{cls} one-opcode experiment: bit-level (pass-scheduled) vs opcode (kernel) lowering of add i8, measured}
+  \gitem{Beads filed}{\bead{9ve.34} DECISION: uitofp i64->f64 has NO bias correction upstream (UIToFP routes to soft\_sitofp; bit 63 read as a sign for u >= 2\textasciicircum{}63) — port verbatim, deviate, or keep that one width an abort?, \bead{9ve.32} v2 L1 budget: per-shape floor (cq\_kd\_shape.min\_samples) so an fp kernel's anchor block runs all three mask rows by default, \bead{9ve.31} v2 step export: M16 slt as cq\_slt\_block + cq\_slt\_step (K9 signed compare) — fadd's round-and-pack has four signed compares on Int64, \bead{9ve.30} v2 step export: M14 add as cq\_add\_block + cq\_add\_step (K6 ripple, out-of-place) — soft\_fadd has two + occurrences, \bead{9ve.28} M26/M27 f64 at the ABI edge: cqrt\_alloc\_f64 (memcpy into 64 constant bits) / measure / copy / ry / rz by WIDENING cq\_runtime\_rail.c + cq\_runtime\_gate.c; generator emits real f64 template wrappers; dispatch; D15 effect rows; D21 brackets, \bead{9ve.24} M39 fma K20 + PRD-v2 §6.1 VENDORING in ONE commit: intrinsic\_table.yaml + libm\_table.yaml pinned, gen\_shim learns the ternary qql shape, CqopsSymbolSets 2479->2880, L6 link line drops the two stub objects, \bead{9ve.23} M37 fconv K19: fptosi / fptoui / sitofp / uitofp at f64 with x86 saturation pinned; fpext/fptrunc stay aborts, \bead{9ve.22} M34 fmul K16: soft\_fmul; the 53x53 significand product is M18's step block over a span, \bead{9ve.21} M33 fadd/fsub K15: soft\_fadd / soft\_fsub as one sandwich over flat scratch, \bead{9ve.20} M36 fcmp K18: the 10 ported predicates + 4 operand swaps -- the FIRST fp kernel, \bead{9ve.19} M32 fpround: the shared round-and-pack (\_sf\_round\_and\_pack, softfloat\_common.jl) as an exported step block, \bead{9ve.18} M31 fpfield: IEEE binary64 field VIEWS over a cq\_bit span + class predicates (is\_nan/is\_inf/is\_zero/is\_subnormal) as K9-shape one-bit kernels, \bead{9ve.3} v2 step export: M18 cq\_mul\_step over a cq\_mul\_block (fmul's 53x53 product), \bead{9ve.2} v2 step export: M12 variable-shift barrel as cq\_barrel\_block + cq\_barrel\_step, \bead{9ve.1} v2 step export: M16 eq/ne as cq\_eq\_block + cq\_eq\_step, \bead{9ve.33} tests/support/harness: CQ\_EXPECT\_CLEAN / CQ\_EXPECT\_CAUGHT zero the per-case failure counter, so a CHECK that fails BEFORE the macro prints \# FAIL and the case reports GREEN, \bead{9ve.29} Integer intrinsics port (v1-shaped, exposed by the vendoring): ctlz/ctpop/cttz/bswap/bitreverse/fshl/fshr/abs/smin/smax/umin/umax/*\_sat from Bennett's extractor expansions, \bead{9ve.27} M38 fmisc: fneg/fabs/copysign (sign ops, true L5 row), fmin/fmax = soft\_fmin/soft\_fmax, floor/ceil/trunc, round = soft\_round\_away, rint/nearbyint = soft\_round, \bead{9ve.26} M40 fsqrt K21: soft\_fsqrt, the digit-by-digit restoring root mirroring fdiv's loop -- NEW module row, \bead{9ve.25} M35 fdiv K17: soft\_fdiv composes M19's divrem step block, never transcribes it, \bead{9ve.5} v2 D8 audit: every variable-amount shift in the f64 softfloat sources is clamped or its out-of-range result discarded, recorded per file, \bead{9ve.4} v2 host probe: tests/support asserts round-to-nearest and FTZ/DAZ off before any fp anchor runs, \bead{cls} one-opcode experiment: bit-level (pass-scheduled) vs opcode (kernel) lowering of add i8, measured}
+  \gitem{Diff}{\texttt{77 files changed, 20221 insertions(+), 324 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Burn down the v2 (floating point) beads under \bead{9ve} in dependency order, wave by wave, with
+one Opus agent per bead in its own worktree, a PORT / MEASURED / DETECTOR review of every report,
+one full gate per wave, and a stop at a wave boundary once about half the context window was
+spent. Commit the fifteen files entry~11 left dirty first (asked once, approved).
+
+\field{What landed}
+\textbf{Wave 1} (\texttt{127ce04}): the three step blocks PRD-v2 \S7.10 said v1 owes the fp
+port --- \texttt{cq\_eq\_block} (M16; the flag is \texttt{a != b}), \texttt{cq\_barrel\_block} (M12;
+\texttt{cq\_barrel\_steps} takes the direction) and \texttt{cq\_mul\_block} (M18) --- each kernel now
+dispatching through its export with every L4 golden byte-identical, each block carrying a
+palindrome case at an asymmetric mask, a composition identity that reads no golden, L2 at three
+points, a two-blocks-in-one-region case and death cases whose regexes were provoked in both
+configurations. The fp host probe (\texttt{cmake/CqopsFpHost.cmake}, \texttt{tests/support/fphost.[ch]},
+\texttt{CQOPS\_FPHOST}, CI hardened), which corrected PRD-v2 \S7.4's two-NaN row. The \S7.12 anchors
+forced into every draw through \texttt{cq\_kd\_shape.anchors} (\texttt{tests/support/fpanchors.[ch]}).
+PRD-v2 \S7.6's D8 table over all fifteen \texttt{f64} files. K15 and K18 drafted.
+
+\textbf{Wave 2} (\texttt{a5eb52d}): M31 \texttt{fpfield} (K22) --- IEEE field views as assembled
+\texttt{cq\_bit[64]} arrays that emit nothing, the softfloat constants as sources, and the four class
+predicates as one exported step block plus four Rule~7 one-bit kernels; the first module where slots
+and gates come apart, so every identity is over slots, the slot scan is four-valued and a
+span-disjointness scan sits beside it. The per-shape L1 budget floor (\texttt{cq\_kd\_shape.min\_samples}).
+K16, K19, K20, K21 drafted. Two more owed exports found by the drafts and filed (\bead{9ve.30}
+\texttt{add}, \bead{9ve.31} \texttt{slt}); \texttt{\_sf\_normalize\_to\_bit52} found unowned and
+assigned to M32; the M39 row corrected (vocabulary, not M34's product or M33's align).
+
+\field{Measured}
+\begin{figures}
+  \fig{367 / 367 passed}{\texttt{ctest -E '\^{}l6\_cqlang\_fixtures\$'}, Wave 1 gate}{Debug, both opt-in flags}
+  \fig{366 / 366 passed}{same}{Release, both opt-in flags}
+  \fig{381 / 381 passed}{same, Wave 2 gate}{Debug}
+  \fig{380 / 380 passed}{same}{Release}
+  \fig{OK, 213 then 219 files; up to date, 2479 symbols}{\texttt{make lint}; \texttt{gen\_shim.py -{}-check}}{filesystem walk}
+  \fig{fp host probe OK, 10 arms, both compilers}{\texttt{cmake/CqopsFpHost.cmake} STATUS line}{Debug (clang 22), Release (Apple clang 17)}
+  \fig{\texttt{sNaN + qNaN\_B} $=$ \texttt{7ff8000000000001}, the quietened FIRST operand}{7-line C probe, both compilers, \texttt{-O0}}{this box, x86\_64}
+  \fig{25 variable-amount shifts on 24 lines, 0 EXPOSED}{hand read + \texttt{grep -nE '(<<|>>)[[:space:]]*[\^{}0-9[:space:]]'}}{Bennett \texttt{980805de}, fifteen f64 files}
+  \fig{637 slots $\to$ (12, 316, 127) $=$ 455 gates, \texttt{is\_nan} at W$=$64}{counting sink, all-quantum mask}{Release}
+  \fig{8 golden rows added, 0 moved}{\texttt{git diff --stat tests/goldens/}}{Release}
+  \fig{362 sampler lines, then 8 whole binary outputs, byte-identical}{direct binary runs before/after, \texttt{cmp}}{both}
+  \fig{6 of 8, then 1 of 6 agent worktrees created behind HEAD}{\texttt{git worktree list} after spawning}{this session}
+\end{figures}
+\datasource{Every count is from a gate log or an agent report that named its instrument, re-checked
+by the orchestrator where a citation into the pinned tree was involved. The K-doc figures (row
+counts, scratch tallies) are hand counts marked UNVERIFIED-BY-EXECUTION in each document and are not
+repeated here.}
+
+\field{Decided}
+PRD-v2 \S7.2 (Bool is a 1-bit span; \texttt{1 - x} is a \texttt{sub} block), \S7.3 (a compile-time
+constant mask or shift is WIRING, a view), \S7.4 (the two-NaN row), \S7.9 (\texttt{i64} $\to$ \texttt{f64}
+\texttt{uitofp} stays an abort, \bead{9ve.34}), \S7.10 (three exports landed, two more owed), \S5
+(K22/K23 assigned; M32's three helpers; M34's seam at \texttt{fmul.jl:136}; M39's vocabulary note;
+M40's citation). \bead{9ve.32} (per-shape budget floor). All four maintainer calls were taken at a
+wave boundary, none in code.
+
+\field{Not taken}
+\emph{Wave 3} --- not started, by the context rule: it would have ended near half the window.
+\emph{K18's \texttt{lower\_not1!} reading of \texttt{1 - x}} --- refused for the \texttt{sub} block with a
+constant source. \emph{Raising the global L1 constant} --- refused for a per-shape floor. \emph{Porting
+or correcting \texttt{uitofp i64}} --- refused for an abort plus an upstream report. \emph{A
+carry-in on \texttt{cq\_add\_block}} --- not owed; upstream's 128-bit adds materialise the carry as a
+value. \emph{Composing \texttt{cq\_divrem\_step} in fsqrt} --- refused, loop-variant subtrahend.
+\emph{Running L6} --- not asked for. \emph{Filing the Bennett.jl issue} --- outward-facing, left to the
+maintainer.
+
+\field{Verified}
+Two full gates ran, one per wave, each as \texttt{make lint}, \texttt{make shim-check}, both
+configurations built, then \texttt{ctest -j6 -E '\^{}l6\_cqlang\_fixtures\$'} in Debug (ASan+UBSan+LSan,
+\texttt{CQOPS\_DEBUG\_INVARIANTS}) and Release: 367/367 and 366/366 after Wave~1, 381/381 and 380/380
+after Wave~2. L6 did not run and no claim about it is made. Each agent ran only its own ctest
+selection in both configurations and reported the counts; those reports are in \texttt{bd}'s notes on
+each bead. \texttt{make lint} ran once more after the docs-only edits that followed the Wave~2 gate.
+
+\field{Left open}
+Wave 3 as amended: \bead{9ve.30} and \bead{9ve.31} first (they now block \bead{9ve.19},
+\bead{9ve.21}, \bead{9ve.24}, \bead{9ve.26}), in parallel with \bead{9ve.19} M32 (K23, its own K-doc)
+and \bead{9ve.20} M36 \texttt{fcmp} (unblocked). Then \bead{9ve.21}/\bead{9ve.22}/\bead{9ve.23},
+\bead{9ve.28}; \bead{9ve.24} alone; \bead{9ve.25}/\bead{9ve.26}/\bead{9ve.27}/\bead{9ve.29}. Filed
+this session: \bead{9ve.33} (the harness's \texttt{CQ\_EXPECT\_CLEAN} zeroes the failure counter).
+K17 (fdiv) and K23 (fpround) have no draft yet. The upstream \texttt{uitofp} report is the
+maintainer's. The handoff state is on \bead{9ve}'s notes.
+
