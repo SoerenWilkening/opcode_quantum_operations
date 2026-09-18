@@ -319,6 +319,7 @@ CQ_TEST(the_scratch_is_the_whole_region_for_every_direction)
 
 #include "test_kernel_shift_var_sweep.inc"
 #include "test_kernel_shift_var_d8.inc"
+#include "test_kernel_shift_var_block.inc"
 
 /* THE CASE ORDER IS LOAD-BEARING, AND IT IS THIS REPO'S RECORDED MASKING RUN
  * BACKWARDS (bd 6q4). The written-down pattern is a LATER copy of a guard
@@ -416,5 +417,8 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(d8_the_barrel_saturates_without_being_asked_to),
     CQ_CASE(d8_a_shift_by_exactly_the_width_is_the_identity),
     CQ_CASE(d8_a_width_of_one_ignores_the_amount_entirely),
-    CQ_CASE(r9_a_classical_amount_never_enters_the_sandwich)
+    CQ_CASE(r9_a_classical_amount_never_enters_the_sandwich),
+    CQ_CASE(the_block_is_a_palindrome_over_caller_supplied_scratch),
+    CQ_CASE(the_kernel_is_the_exported_block_twice_plus_the_copyout),
+    CQ_CASE(the_blocks_result_span_is_the_reference_shift)
 )

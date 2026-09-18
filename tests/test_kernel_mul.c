@@ -59,6 +59,7 @@
 #include "emit.h"
 #include "kernels/addacc.h"
 #include "reg.h"
+#include "sandwich.h"
 #include "sink_count.h"
 
 #include "support/bitkinds.h"
@@ -411,6 +412,8 @@ CQ_TEST(the_stream_is_a_palindrome_around_the_copyout)
     cq_mock_dispose(&m);
 }
 
+#include "test_kernel_mul_block.inc"
+
 /* ---- W = 1: the delegation, and the trap. ------------------------------- */
 
 /* `mul` at i1 IS in the opcode table (opcode_table.yaml:186), and it is the one
@@ -563,6 +566,11 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_partial_products_are_truncated_and_the_high_half_never_exists),
     CQ_CASE(the_flat_step_schedule_matches_a_brute_force_scan),
     CQ_CASE(the_stream_is_a_palindrome_around_the_copyout),
+    CQ_CASE(the_block_mirrors_around_a_consumer_supplied_copyout),
+    CQ_CASE(the_blocks_stream_is_the_kernels_forward_half_gate_for_gate),
+    CQ_CASE(at_w1_the_block_has_no_region_and_no_steps),
+    CQ_CASE(the_two_blocks_in_one_region_do_not_collide),
+    CQ_CASE(the_fmul_half_width_operands_fold_phase_p_and_nothing_else),
     CQ_CASE(w1_is_k2_with_one_toffoli_and_not_the_closed_form),
     CQ_CASE(the_sandwich_takes_its_scratch_and_gives_it_back),
     CQ_CASE(a_ceiling_at_the_measured_peak_admits_the_kernel_and_is_not_lifted),

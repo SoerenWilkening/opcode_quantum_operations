@@ -32,6 +32,11 @@ void cq_kd_default_shape(int W, cq_kd_shape *out)
 {
     out->n_src = 2;
     out->w_dst = W;
+    /* NULL is "no anchors", i.e. the sampler exactly as it was before bd hkg.
+     * Nulled HERE rather than left to the caller because every shape in the
+     * project is built by this function and then mutated, so a spec that never
+     * heard of anchors cannot inherit a stale pointer from the stack. */
+    out->anchors = NULL;
     for (int i = 0; i < CQ_KD_MAX_SRC; i++) {
         out->w[i] = W;
         out->classical[i] = 0u;

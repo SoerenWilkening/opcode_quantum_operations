@@ -43,6 +43,7 @@
 #include "bit.h"
 #include "ctx.h"
 #include "reg.h"
+#include "scratch.h"
 #include "support/bitkinds.h"
 #include "support/death.h"
 
@@ -141,6 +142,71 @@ static void mul_steps_called_directly_with_a_zero_width(void)
     CQ_EXPECT_ABORT((void)cq_mul_steps(0));
 }
 
+/* --- The STEP BLOCK's guards (PRD-v2 §5, §7.10 — M34's consumer surface). -- */
+
+/* THE SAME ARGUMENT ONE LEVEL OUT. `cq_mul_region` is the second entry point
+ * whose width guard cq_kernel_check_dst would mask through the kernel, and it
+ * is reached directly by every consumer that sizes a region — so like
+ * cq_mul_steps it needs its own case or the line survives mutation to
+ * always-true. Without the guard it returns 0·0 + 2·0 = 0 and a consumer
+ * allocates nothing for a block that then reads out of bounds. */
+static void mul_region_called_directly_with_a_zero_width(void)
+{
+    setup();
+    CQ_EXPECT_ABORT((void)cq_mul_region(0));
+}
+
+/* An in-range, well-formed block at W = 8, so the ONLY thing wrong in the two
+ * cases below is the step index. All-quantum operands, because the block has no
+ * R9 fold and cq_addacc_check refuses a classical bit — a classical operand
+ * would abort from M15 for an unrelated reason and the cases would verify
+ * nothing (a death test's native claim is only "it aborted"). */
+static void mul_step_fixture(cq_scratch *scr, cq_mul_block *k)
+{
+    setup();
+    int32_t ha = cq_bk_reg(&g_ctx, 8u, 0x0Cu, 0xFFu);
+    int32_t hb = cq_bk_reg(&g_ctx, 8u, 0x15u, 0xFFu);
+
+    cq_scratch_alloc(scr, (uint32_t)cq_mul_region(8));
+    k->a   = cq_reg_cbits(&g_ctx.regs, ha);
+    k->b   = cq_reg_cbits(&g_ctx.regs, hb);
+    k->scr = scr;
+    k->off = 0u;
+    k->W   = 8;
+}
+
+/* THE EXPORT'S OWN RANGE GUARD, unreachable from any ordinary case: the suite
+ * drives cq_mul_step only in range, and an out-of-range index is an abort.
+ *
+ * BOTH ENDS, BECAUSE THEY FAIL DIFFERENTLY AND ONLY ONE OF THEM IS SILENT.
+ * Past the end the index runs off the last block into cq_addacc_step's own
+ * guard one layer down, so the process aborts EITHER WAY and the exit code
+ * alone cannot tell M18's refusal from K8's — which is exactly the
+ * masked-by-a-LATER-copy shape, and why tests/CMakeLists.txt pins `addacc:`
+ * negatively on this case. A NEGATIVE index has nothing underneath it at all:
+ * the binary search clamps to j = 0, block_start(W, 0) is 0 so u == s, the
+ * phase-P branch is taken, and a[s] and pp[0][s] are read out of bounds —
+ * undefined behaviour, and in Release frequently no crash whatever. The same
+ * CMake list excludes the two sanitizer banners so a Debug run cannot pass on
+ * ASan's abort instead of the guard's. */
+static void mul_step_index_past_the_end(void)
+{
+    cq_scratch scr;
+    cq_mul_block k;
+
+    mul_step_fixture(&scr, &k);
+    CQ_EXPECT_ABORT(cq_mul_step(&g_ctx, &k, cq_mul_steps(8)));
+}
+
+static void mul_step_index_is_negative(void)
+{
+    cq_scratch scr;
+    cq_mul_block k;
+
+    mul_step_fixture(&scr, &k);
+    CQ_EXPECT_ABORT(cq_mul_step(&g_ctx, &k, -1));
+}
+
 /* --- `bd fxz` / PRD §15 D25: D2's ceiling reaches K11's scratch region. ---- */
 
 /* A SINK THAT ABORTS ON ANY GATE, and it is the whole instrument. `bd fxz`'s
@@ -220,5 +286,8 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(mul_a_width_of_zero),
     CQ_DEATH_CASE(mul_a_negative_width),
     CQ_DEATH_CASE(mul_steps_called_directly_with_a_zero_width),
+    CQ_DEATH_CASE(mul_region_called_directly_with_a_zero_width),
+    CQ_DEATH_CASE(mul_step_index_past_the_end),
+    CQ_DEATH_CASE(mul_step_index_is_negative),
     CQ_DEATH_CASE(mul_scratch_exceeds_the_pool_ceiling)
 )

@@ -67,6 +67,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* The standard ladder. Widths are NOT sampled — they are the axis that
  * actually catches faults here, because every kernel is width-generic over
@@ -80,7 +81,8 @@ static const int LADDER_W[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64 };
 enum {
     CQ_KD_SAMPLES_DEFAULT = 32,
     MAX_PAIRS             = 128 + 12,
-    N_ANCHORS             = 6      /* 2 mask anchors + 4 value corners */
+    N_ANCHORS             = 6,     /* 2 mask anchors + 4 value corners */
+    N_ANCHOR_ROWS         = 3      /* PRD-v2 §7.12: all-classical + two mixed */
 };
 
 int cq_kd_samples(void)
@@ -132,6 +134,29 @@ static uint32_t pairs_for(const cq_kd_spec *k, int W, cq_bk_pair *out,
     return np;
 }
 
+/* The mask rows an fp ANCHOR is replayed at, in the order the budget truncates
+ * them (kerneldrv.h has the schedule). Looked up BY NAME rather than by index:
+ * the all-quantum row is index 1 by construction and is asserted as such below,
+ * but nothing pins where cq_bk_fixed_pairs puts the asymmetric six, and an
+ * anchor silently landing on the wrong mask is a coverage claim nobody could
+ * falsify. A row that is not there is a hard error, not a substitution. */
+static const char *const ANCHOR_ROW_NAMES[N_ANCHOR_ROWS] = {
+    "all-classical",            /* where an fp value reaches the ifelse tree */
+    "a-quantum/b-classical",    /* a NaN payload on the CIRCUIT's own path    */
+    "a-classical/b-quantum"
+};
+
+static uint32_t row_by_name(const cq_bk_pair *pairs, uint32_t np, const char *w)
+{
+    for (uint32_t i = 0; i < np; i++)
+        if (strcmp(pairs[i].name, w) == 0) return i;
+
+    cq_h_fail(__FILE__, __LINE__,
+              "cq_kd_sample_at: no mask row named \"%s\" — the anchor schedule "
+              "names three rows of cq_bk_fixed_pairs and one has moved", w);
+    return 0u;
+}
+
 /* One kernel at one width: cq_kd_samples() cases, drawn jointly over the mask
  * pairs and the value space, with the six anchors above taken first.
  *
@@ -146,6 +171,7 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
 {
     cq_bk_pair pairs[MAX_PAIRS];
     cq_kd_shape sh;
+    uint32_t anchor_row[N_ANCHOR_ROWS] = { 0u, 0u, 0u };
     uint32_t np = pairs_for(k, W, pairs, MAX_PAIRS);
     int n = cq_kd_samples();
     uint64_t seed = seed_for(k->name, W);
@@ -170,21 +196,48 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
                   "cq_kd_sample_at: fixed pair 1 is [%s], not all-quantum",
                   np < 2u ? "<none>" : pairs[1].name);
 
+    /* THE ANCHOR BLOCK'S SIZE, decided before the loop so the printed line can
+     * name what the budget dropped. `want` is the full schedule (every anchor
+     * at every one of the three mask rows); `have` is what fits after slots 0
+     * and 1, which are not negotiable — slot 0 IS L5 and slot 1 is L4's mask.
+     * The budget WINS: bd hkg's instruction is to widen the anchors and leave
+     * the budget at 32, so a wide anchor table does drop rows by default and
+     * the line below says how many. */
+    const int n_anch = sh.anchors ? sh.anchors(W, -1, NULL) : 0;
+    const int want   = n_anch * N_ANCHOR_ROWS;
+    const int room   = n > 2 ? n - 2 : 0;
+    const int have   = want < room ? want : room;
+
+    if (n_anch > 0)
+        for (int r = 0; r < N_ANCHOR_ROWS; r++)
+            anchor_row[r] = row_by_name(pairs, np, ANCHOR_ROW_NAMES[r]);
+
     cq_bk_rng_init(&rng, seed);
 
     for (int s = 0; s < n; s++) {
         cq_ref_w v[CQ_KD_MAX_SRC];
         uint32_t p;
+        int anch = -1;
 
         /* Anchors first, then a joint draw. See the header for why each anchor
          * is inside the budget rather than added to it. */
-        if (s == 0)                 p = 0u;   /* all-classical — this IS L5 */
-        else if (s < N_ANCHORS)     p = 1u;   /* all-quantum  — what L4 pins */
-        else                        p = (uint32_t)cq_bk_rng_below(&rng, np);
+        if (s == 0)                       p = 0u; /* all-classical — this IS L5 */
+        else if (s == 1)                  p = 1u; /* all-quantum — what L4 pins */
+        else if (s - 2 < have) {
+            /* ROW-MAJOR BY ROW, so truncation drops whole mask ROWS and every
+             * anchor still runs at the all-classical one. */
+            anch = (s - 2) % n_anch;
+            p    = anchor_row[(s - 2) / n_anch];
+        }
+        else if (n_anch == 0 && s < N_ANCHORS) p = 1u;  /* the value corners */
+        else                       p = (uint32_t)cq_bk_rng_below(&rng, np);
 
         for (int i = 0; i < sh.n_src; i++) {
-            if (s >= 2 && s < N_ANCHORS && i < 2) {
-                /* The four corners: (0,0), (ones,0), (0,ones), (ones,ones). */
+            if (n_anch == 0 && s >= 2 && s < N_ANCHORS && i < 2) {
+                /* The four corners: (0,0), (ones,0), (0,ones), (ones,ones).
+                 * REPLACED, not supplemented, once a shape declares anchors —
+                 * an fp table already names +0 and the all-ones pattern is a
+                 * payload NaN nobody chose. */
                 int hot = ((s - 2) >> i) & 1;
 
                 v[i] = hot ? cq_ref_w_ones(sh.w[i]) : cq_ref_w_zero();
@@ -193,15 +246,36 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
                                      sh.w[i]);
             }
         }
+
+        /* The provider OVERWRITES the operands it names, over a fully drawn
+         * tuple — so an operand it does not name is still sampled rather than
+         * pinned at 0, which is the cq_kd_case2 trap in a new costume. Drawn
+         * first in every case, so the RNG stream does not depend on whether an
+         * anchor fired. */
+        if (anch >= 0 && !sh.anchors(W, anch, v))
+            cq_h_fail(__FILE__, __LINE__,
+                      "%s W=%d: the anchor provider refused index %d of the %d "
+                      "it declared at this width", k->name, W, anch, n_anch);
+
         cq_kd_case(k, W, v, &pairs[p]);
     }
 
-    printf("# %s W=%3d SAMPLED: %d cases (all-classical + all-quantum + 4 value "
-           "corners forced, %d drawn jointly) from %u mask pairs, seed 0x%llx — "
-           "a CONSTANT budget, not a product; see kernelsweep.c for what the "
-           "draw replaced\n",
-           k->name, W, n, n > N_ANCHORS ? n - N_ANCHORS : 0, np,
-           (unsigned long long)seed);
+    if (n_anch == 0)
+        printf("# %s W=%3d SAMPLED: %d cases (all-classical + all-quantum + 4 "
+               "value corners forced, %d drawn jointly) from %u mask pairs, "
+               "seed 0x%llx — a CONSTANT budget, not a product; see "
+               "kernelsweep.c for what the draw replaced\n",
+               k->name, W, n, n > N_ANCHORS ? n - N_ANCHORS : 0, np,
+               (unsigned long long)seed);
+    else
+        printf("# %s W=%3d SAMPLED: %d cases (all-classical + all-quantum + %d "
+               "of %d ANCHOR cases forced = %d anchors x %d mask rows, %d "
+               "DROPPED by the budget (raise CQOPS_L1_SAMPLES), the 4 value "
+               "corners REPLACED, %d drawn jointly) from %u mask pairs, seed "
+               "0x%llx — anchors are FORCED, a pool row is not; see PRD-v2 "
+               "§7.12\n",
+               k->name, W, n, have, want, n_anch, N_ANCHOR_ROWS, want - have,
+               room - have, np, (unsigned long long)seed);
     fflush(stdout);
 }
 

@@ -448,7 +448,7 @@ Numbering continues v1's M01–M30.
 | Module | What | Est. LOC | **Seam, recorded in advance** |
 |---|---|---:|---|
 | **M31 `fpfield`** | The IEEE field views over a `cq_bit` array — sign / exponent / mantissa as `cq_scratch_span`-shaped read-only views, the implicit-bit rules, and the class predicates (`is_nan`, `is_inf`, `is_zero`, `is_subnormal`) as one-bit kernels | 180 | **VIEWS ↔ CLASS PREDICATES.** The views emit nothing and are pure addressing; the predicates are Rule 7 kernels with `dst` one bit, which is **K9's shape** and needs K9's test adapter. Split at the first predicate |
-| **M32 `fpround`** | The shared round-and-pack path — `soft_fround`'s `_sf_round_and_pack`, sticky/guard/round bits, the carry-out that bumps subnormal→normal | 260 | **PACK ↔ ROUND.** Upstream keeps them in one helper; at our LOC limit the rounding-decision logic splits from the field assembly. Seam is at the point the decision bit is known |
+| **M32 `fpround`** | The shared round-and-pack path — `soft_fround`'s `_sf_round_and_pack`, sticky/guard/round bits, the carry-out that bumps subnormal→normal **Widened 2026-09-18 (K15.md risk 5): M32 also owns the shared normalisation helpers `_sf_normalize_clz` and `_sf_handle_subnormal` (`softfloat_common.jl`), which `fadd`/`fmul`/`fdiv`/`fma` all call — assigned here so they are transcribed once as exported step blocks, not four times** | 260 | **PACK ↔ ROUND.** Upstream keeps them in one helper; at our LOC limit the rounding-decision logic splits from the field assembly. Seam is at the point the decision bit is known |
 | **M33 `fadd`** | K15 — `soft_fadd` / `soft_fsub` | 280 | **ALIGN ↔ ADD-AND-NORMALISE.** The exponent-difference shift is the half that is `O(W)` in its own right and is the half `fma` reuses. **Do not spell `fsub` as `fadd(a, fneg(b))`** — upstream fixed a NaN-RHS sign bug in exactly that composition (`Bennett-m63k`) |
 | **M34 `fmul`** | K16 — `soft_fmul` | 240 | **SIGNIFICAND PRODUCT ↔ EXPONENT/PACK.** The 53×53 product is M18's `mul` over a span; the seam is where the integer kernel ends |
 | **M35 `fdiv`** | K17 — `soft_fdiv` | 240 | **The 56-bit restoring-division loop ↔ pre-normalisation.** The loop is K12's shape and should **compose M19's exported step block, not transcribe it** (plan §0.4's obligation, and the K11/K12 composition-check trap applies verbatim) |
@@ -471,7 +471,7 @@ Numbering continues v1's M01–M30.
   reduction. fp offers this trade everywhere — every field is provably narrower than its span.
 - **Three step blocks do not exist yet and every row above assumes them**: M12's variable-shift
   barrel, M16's `eq`/`ne`, and M18's `cq_mul_step` (only the count `cq_mul_steps` is exported).
-  Measured 2026-09-18 over `src/kernels/*.h`; §7.10.
+  Measured 2026-09-18 over `src/kernels/*.h`; §7.10. **Two more found by K15.md's block table the same day: M14 exports `cq_sub_block` but no `add` block (`soft_fadd` has two `+` occurrences), and M16 exports no `slt` block (four signed compares). Filed as `9ve.30` / `9ve.31`; both have silently-wrong substitutes (K8 for K6 = right forward, wrong `_unc`; unsigned for signed = wrong on a negative `result_exp`).**
 
 ---
 
@@ -618,7 +618,13 @@ Bennett compiles LLVM-optimised IR; we transcribe the Julia source, and the two 
 0x7FF` is computed twice in `soft_fadd` (`a_nan` and `a_inf`) and LLVM would CSE it; every
 intermediate is a `UInt64` although the exponent is 11 bits. **Decision: literal.** One block per
 operator occurrence as the source spells it; every intermediate a 64-bit span (the Julia type's
-width); no common-subexpression sharing; no narrowing towards the field width. Two grounds. D9's
+width); no common-subexpression sharing; no narrowing towards the field width. **Clarified 2026-09-18 (K18.md D-K18-1): "the Julia type's width" is the rule and "64-bit" is
+its value for `UInt64` — a `Bool` intermediate (nine of them in `fcmp.jl`, e.g. `a_nan`, `both_zero`)
+is a ONE-bit span, exactly as Bennett gives `i1` one wire; widening it to 64 would be a re-derivation
+in the other direction.** **And `UInt64(1) − x` on a 0/1 value (`fcmp.jl:102`, `:154`; the idiom recurs in every
+fp file) is M14's `sub` block with the constant `1` as a source — decided by the maintainer
+2026-09-18 against K18.md's draft D-K18-2 (`lower_not1!`): one block per OPERATOR occurrence, no
+reading of what the operator "means", and the fold table elides nearly all of the sub's gates anyway.** Two grounds. D9's
 K12 precedent refused exactly this narrowing (`~17W²` towards `~8.5W²`) because it is a
 re-derivation rather than a port; and K11's finding stands that the one mutant L1 cannot see is
 the one that looks like an optimisation. The composition check pins `compute = Σ blocks`, each
@@ -648,11 +654,22 @@ host's `double` operator, and **that is refused, on a measurement** (`cc -std=c1
 | `Inf − Inf` | `fff8000000000000` | `INDEF = 0xFFF8000000000000` (`softfloat_common.jl:14`, Intel SDM Vol 1 §4.8.3.7) |
 | `0 · Inf` | `fff8000000000000` | same |
 | `qNaN₁ + qNaN₂` | the FIRST operand's payload, in both orders | first operand |
-| `qNaN + sNaN`, both orders | the qNaN — no signalling priority | quietened operand per IEEE 754-2019 §6.2.3, upstream's priority |
+| `qNaN + sNaN`, both orders | **the FIRST operand, quietened if it was signalling** (corrected 2026-09-18, see below; the 2026-09-18 draft said "the qNaN — no signalling priority") | `_sf_propagate_nan2`: `ifelse(a_nan, a \| QUIET_BIT, b \| QUIET_BIT)` (`softfloat_common.jl:23-24`, "first-operand NaN (x86 SSE rule)") |
 | `sqrt(−1)` | `fff8000000000000` | `INDEF` |
 
 Every cell is IEEE-unspecified and every value is x86's choice; ARM's differ on all of them (a
-positive default NaN, and signalling priority). So the host operator agrees with the circuit **on
+positive default NaN, and signalling priority).
+
+> **CORRECTION 2026-09-18 (bead `9ve.4`, `tests/support/fphost.c`).** The `qNaN + sNaN` row above
+> was first measured at a DEGENERATE payload pair: quietening `sNaN 0x7ff0000000000001` gives exactly
+> `qNaN 0x7ff8000000000001`, so "the qNaN won" and "the first operand won" print identical bits. At
+> `qNaN_B = 0x7ff8000000000002` they separate: `qNaN_B + sNaN = …0002` and `sNaN + qNaN_B = …0001`
+> (the quietened sNaN), re-measured with Apple clang 17 and Homebrew clang 22 at `-O0` and `-O3`. The
+> rule on this box is **the first operand, quietened** — which is also upstream's, verbatim — so the
+> host oracle and the circuit still agree on the cell; only the prose was wrong. "No signalling
+> priority" is true and is not the whole rule. The host probe pins the NON-degenerate row for this
+> reason (CLAUDE.md: a table of hand-derived cells needs one non-degenerate row to fix its
+> convention). `hkg`'s anchors must use distinguishable payloads for the sNaN-vs-qNaN pair. So the host operator agrees with the circuit **on
 this box** and would disagree on an arm64 box — a program whose classical mode and quantum mode
 return different bits on the same input, on some hosts only. **Decision: the short-circuit is a C
 transcription of the Julia body over `uint64_t`** — the same source, evaluated on constants — so
@@ -681,13 +698,71 @@ never traps — which is D3 for `sdiv` by zero and D8 for shifts, applied a thir
 
 ### 7.6 Variable-amount shifts go through D8, and each one is audited before its file is ported
 
-Our barrel masks the amount to `⌈log₂ W⌉ = 6` bits at W=64 and then saturates, so a source shift by
-64 becomes a shift by **0** where Julia's `>>` gives 0. In `fadd.jl` every variable shift is either
-clamped in the source (`d_clamped`, `fadd.jl:76`) or its out-of-range result is discarded by a later
-`ifelse` (`wb_mid`, `fadd.jl:79`, selected only for `d < 56`), so the divergence is unreachable.
-**That is an audit, not a theorem**: every `<<`/`>>` by a non-literal in the f64 sources
-(`fadd.jl`, `fptosi.jl`, `fround.jl`, `sitofp.jl`, `fpconv.jl`, and whatever `fmul`/`fdiv`/`fma`/
-`fsqrt` add) is checked the same way before its file is ported, and the check is recorded per file.
+Our barrel reads only the low `cq_shift_stages(W)` = `⌈log₂ W⌉` lanes of the amount — **6 at
+W=64** — and every stage zero-fills, so the variable path computes `sat_shift(a, k mod 2^6)`
+(`src/kernels/shift_var.c`; PRD §15 D8, *"MASK, THEN SATURATE"*). At W=64 the mask is the whole of
+it and the saturation never fires, since `k mod 64 < 64 = W`: an amount of exactly **64** becomes a
+shift by **0** where Julia's `>>`/`<<` on a `UInt64` gives **0**, and 65..127 become 1..63 where
+Julia still gives 0. **D8 and the Julia source therefore agree on every amount in `[0, 63]` and can
+disagree at every amount ≥ 64**, which reduces the audit to one question per site: what is that
+amount's provable range?
+
+**AUDITED 2026-09-18 over the fifteen `f64` files on the port list — 25 variable-amount shift
+operators on 24 lines. Every one is CLAMPED (the source bounds the amount below 64) or DISCARDED
+(the out-of-range result is provably never selected). NOT ONE IS EXPOSED, so the port owes no D8
+decision on any of these files.** `fadd.jl`'s two sites are the pre-existing entry, re-verified
+here. A file with no variable shift gets a row saying so, because "it has none" is the finding.
+
+| File | var. | Sites, the amount's provable range, and what bounds it | Verdict |
+|---|---|---|---|
+| `fadd.jl` | **2** | `:77` `(UInt64(1) << d_clamped)`, with `d_clamped = ifelse(d == UInt64(0), UInt64(1), ifelse(d >= UInt64(64), UInt64(63), d))` at `:76` → **`[1, 63]`**. `:79` `wb_mid = (wb >> d) \| sticky`, `d = ea_eff - eb_eff` **unclamped** and reaching 2046 — but `:81-83` selects `wb_mid` only for `0 < d < 56` (`ifelse(d >= UInt64(56), wb_large, ifelse(d > UInt64(0), wb_mid, wb))`) | CLAMPED `:77` · **DISCARDED** `:79` |
+| `fsub.jl` | **0** | one shift, `:21` `>> 52`. `soft_fsub` is `soft_fadd(a, soft_fneg(b))` behind a NaN guard, so it inherits `fadd`'s two rows and adds none | — |
+| `fmul.jl` | **0** | every amount a decimal literal (`12`, `14`, `15`, `26`, `38`, `41`, `42`, `49`, `50`, `52`, `56`, `63`). Inherits `_sf_normalize_to_bit52`, `_sf_normalize_clz`, `_sf_handle_subnormal`, `_sf_round_and_pack` | — |
+| `fdiv.jl` | **0** | the restoring-division loop at `:91` is `for i in 0:55` with literal `<< 1` throughout; `:107` `wr << 1` is literal. Same four helpers inherited | — |
+| `fma.jl` | **0** | all literal (`6`, `9`, `10`, `56`, `62`, `63`). Its variable alignment is **delegated**: `:99` `_shiftRightJam128(p_hi, p_lo, -expDiff)` and `:110` `_shiftRightJam128(mc_s, UInt64(0), expDiff)` hand an unbounded `expDiff` to a helper that clamps it — see the `softfloat_common.jl` row | — |
+| `fsqrt.jl` | **0** | the digit-recurrence loop at `:80` is `for i in 0:63` with literal `<< 2` / `<< 1` / `>> 62`; the radicand set-up at `:68-69` is `>> 6` and `<< 58` | — |
+| `fcmp.jl` | **0** | eight shifts, all `>> 52` or `>> 63` | — |
+| `fmin.jl` | **0** | eight shifts, all `>> 52` | — |
+| `fneg.jl` | **0** | no shift of any kind — the body is one expression, `a ⊻ UInt64(0x8000000000000000)` | — |
+| `fptosi.jl` | **2** | `:49` `full_mant >> right_shift_clamped` and `:50` `full_mant << left_shift_clamped`, both off `ifelse(x > UInt64(63), UInt64(63), x)` at `:45-46` → **`[0, 63]`**. The **unsigned wraparound is the mechanism, not an accident**: `left_shift = exp - UInt64(1075)` at `:42` wraps for `exp < 1075` into a value that is `> 63` and so clamps | CLAMPED |
+| `fptoui.jl` | **0** | two shifts, `>> 63` and `>> 52`. Calls `soft_fptosi` twice and `soft_fsub` once; inherits their rows | — |
+| `sitofp.jl` | **1** | `:60` `magnitude << shift_clamped`, with `shift_clamped = ifelse(clz > UInt64(63), UInt64(63), clz)` at `:59` → **`[0, 63]`**. The clamp is **inert**: the six-stage CLZ at `:29-50` adds at most `32+16+8+4+2+1 = 63`, so `clz ∈ [0, 63]` structurally — 63 being the all-zero case, which `is_zero` overrides at `:83` | CLAMPED |
+| `fround.jl` | **9** | `soft_trunc` `:39`, off `frac_bits_clamped = clamp(frac_bits, Int64(0), Int64(52))` → **`[0, 52]`**. `soft_round` `:172` `:176` `:178` `:183` and `soft_round_away` `:266` `:276`, all off `frac_bits = clamp(frac_bits_raw, Int64(1), Int64(52))` → **`[1, 52]`**; `:175` and `:269` off `round_bit_pos = frac_bits - Int64(1)` → **`[0, 51]`**. `soft_floor` and `soft_ceil` add none — they call `soft_trunc` (`:62`, `:87`) | CLAMPED |
+| `fpconv.jl` | **3** | `soft_fpext` has none; its normalisation is `_sf_normalize_to_bit52`. `soft_fptrunc` `:156` `(m_full >> shift_sub)`, with `shift_sub = UInt64(clamp(Int64(30) - e_new, Int64(1), Int64(63)))` at `:155` → **`[1, 63]`**; `:157` `>> (shift_sub - UInt64(1))` and `:158` `<< (shift_sub - UInt64(1))` → **`[0, 62]`**, the clamp's lower bound of **1** being exactly what stops that subtraction wrapping | CLAMPED |
+| `softfloat_common.jl` | **8** on 7 lines | `_sf_handle_subnormal` `:180` `:182`, off `shift_u = UInt64(ifelse(flush_to_zero, Int64(0), clamp(shift_sub, Int64(0), Int64(63))))` at `:177-179` → **`[0, 63]`**. `_shiftRightJam128` `:382` `:384` and **both** shifts of `:385`, off `dA_u = UInt64(clamp(dist, Int64(1), Int64(63)))` → **`[1, 63]`** — `:385`'s first is `a_hi << (UInt64(64) - dA_u)`, also `[1, 63]`; then `:394` `:398`, off `dB_u = UInt64(clamp(dist, Int64(64), Int64(127)) - Int64(64))` → **`[0, 63]`**. The CLZ helpers `_sf_normalize_to_bit52`, `_sf_normalize_clz`, `_sf_clz128_to_hi_bit61` and the two `by1` shifters are entirely literal | CLAMPED |
+
+**NOTHING IN THESE FILES IS 128 BITS WIDE, SO THE MASK STAYS 6 LANES AND NEVER 7.** `UInt128`
+occurs in the fifteen only in prose — `softfloat_common.jl:235-252` records that native `UInt128`
+*would* compile cleanly and was declined anyway, because the hand-rolled hi/lo pair is "the direct
+ancestor of the gate sequence soft_fma emits". `fsqrt`'s 112-bit radicand and `fma`'s 128-bit
+accumulator are both `(hi, lo)` `UInt64` pairs, and `_shiftRightJam128` is a 128-bit shift built
+out of 64-bit ones. Every shift the port will see is on a 64-bit span — §7.2's grain — so
+`⌈log₂ 64⌉ = 6` throughout.
+
+**UPSTREAM CLAMPS IN TWO DIFFERENT SIGNEDNESSES AND THE PORT MUST NOT PICK ONE FOR ALL OF THEM.**
+`fround.jl`, `fpconv.jl` and both helpers in `softfloat_common.jl` clamp an **`Int64`** that is
+genuinely negative on the unselected branches (`Int64(1075) - exp` reaches −972 at `exp = 0x7FF`),
+so those sites need the **signed** compare. `fadd.jl:76`, `fptosi.jl:45-46` and `sitofp.jl:59`
+compare a **`UInt64`** whose wraparound is the mechanism, so those need the **unsigned** one.
+Substituting one for the other at `fptosi.jl` inverts the out-of-range guard and lets a wrapped
+64-bit amount reach the shift — K9's `uge`-meaning-`ule` in a different dress, and equally
+invisible to a gate count.
+
+**A DISCARDED ARM IS STILL EMITTED, WHICH IS §7.2's GRAIN AND NOT A COST TO OPTIMISE AWAY.**
+`fadd.jl:79`'s `wb >> d` is computed for every `d` and thrown away by the `ifelse` above 56, so
+the D8 divergence never reaches a value — but the barrel is still built, still costs its
+`W(3L+1)` scratch qubits, and is still uncomputed. **DISCARDED is a claim about the RESULT, never
+about the circuit**; narrowing or skipping the arm would be re-deriving the construction (Rule 1)
+and would strand the mux that selects it.
+
+**THE MECHANICAL SWEEP, AND THE OBVIOUS PATTERN IS INCOMPLETE.**
+`grep -nE '(<<|>>) *[a-z_]' <file>` misses a **parenthesised** amount: it does not find
+`fpconv.jl:157` or `fpconv.jl:158` at all, and it matches `softfloat_common.jl:385` only because
+that line's *second* shift happens to be bare. The complete form is
+`grep -nE '(<<|>>)[[:space:]]*[^0-9[:space:]]' <file>` — and the character class must exclude the
+space as well as the digits, or `[^0-9]` matches the separator and returns every literal shift
+too. Over the fifteen files it returns **36** lines, **24** code and 12 comment or docstring, and
+those 24 are exactly the table above. No `>>>` occurs anywhere in the set.
 
 ### 7.7 The LLVM-name → `soft_*` mapping is NOT identity, and a wrong pick is K9's trap
 
@@ -747,6 +822,14 @@ exports `ult` only); `fmul` needs **`cq_mul_step`** (M18 exports the count and n
 Bitwise ops are one gate per bit and are emitted directly in the fp step function, as K12 emits
 its two CNOTs; casts and constant shifts are wiring. §5's *"M33/M34/M35 must export compute
 halves the way M14/M16/M17 do"* assumed these three existed. They are the first three beads.
+
+**LANDED 2026-09-18 (Wave 1, beads `9ve.1`/`9ve.2`/`9ve.3`)**: `cq_eq_block`/`cq_eq_steps`/`cq_eq_step`/`cq_eq_flag`
+(M16, the flag is `a != b`), `cq_barrel_block`/`cq_barrel_region`/`cq_barrel_steps(W, dir)`/`cq_barrel_step`/
+`cq_barrel_result` (M12, the count takes the direction because `ashr` has `W` shuffle slots per stage where
+`shl`/`lshr` have `W − 2^k`), and `cq_mul_block`/`cq_mul_region`/`cq_mul_step`/`cq_mul_product` (M18). All
+three keep every L4 golden byte-identical. **Two more turned up in K15.md's block table the same day and are
+owed before `fadd`/`fpround`: an out-of-place `add` block (M14 exports `sub` only) and an `slt` block (M16
+exports `ult` and now `eq`) — `9ve.30` / `9ve.31`.**
 
 ### 7.11 Signatures: no new contract
 

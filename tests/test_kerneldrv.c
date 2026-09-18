@@ -41,6 +41,7 @@
 #include "sink_count.h"
 
 #include "support/bitkinds.h"
+#include "support/fpanchors.h"
 #include "support/harness.h"
 #include "support/kerneldrv.h"
 #include "support/poolcheck.h"
@@ -407,6 +408,11 @@ CQ_TEST(cq_pc_indices_are_free_sees_an_index_that_did_not_come_back)
     cq_ctx_dispose(&f.ctx);
 }
 
+/* bd hkg's four cases. In an .inc because this file is at Rule 12's edge, and
+ * because the anchor mechanism is a subject of its own: the two macros above,
+ * the broken-kernel idiom and CQ_TEST are all it borrows from here. */
+#include "test_kerneldrv_anchors.inc"
+
 CQ_TEST_MAIN(
     CQ_CASE(the_driver_accepts_a_correct_kernel),
     CQ_CASE(l1_catches_a_wrong_value),
@@ -417,5 +423,10 @@ CQ_TEST_MAIN(
     CQ_CASE(the_driver_refuses_a_shape_its_default_call_path_cannot_serve),
     CQ_CASE(cq_pc_same_sees_a_changed_live_count),
     CQ_CASE(cq_pc_live_is_exactly_sees_an_unowned_qubit),
-    CQ_CASE(cq_pc_indices_are_free_sees_an_index_that_did_not_come_back)
+    CQ_CASE(cq_pc_indices_are_free_sees_an_index_that_did_not_come_back),
+    CQ_CASE(an_anchor_is_forced_and_a_drawn_value_is_not),
+    CQ_CASE(the_anchor_schedule_is_row_major_by_row),
+    CQ_CASE(an_unnamed_operand_is_still_drawn_and_not_zero_filled),
+    CQ_CASE(anchors_sit_inside_the_budget_and_never_on_top_of_it),
+    CQ_CASE(the_f64_anchor_constants_are_what_they_claim)
 )

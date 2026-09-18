@@ -59,13 +59,26 @@
  *     §2.1a). That is legal because `ua` is only ever a control; guards compare
  *     RANGES, never base pointers.
  *
- * RULE 12: `cmp.c` IS NOW AT EXACTLY 200/200. The export cost ten lines, not
- * thirty, because `cq_ult_step` REPLACED `ult_compute` rather than being added
- * beside it — so plan §3's recorded seam (`primitives ↔ predicate derivation`,
- * moving to `src/kernels/cmp_prim.c`) was not taken and has zero headroom left.
- * The next line added to this module takes it. The hard limit is 300, so this
- * is a scheduled split rather than a wall, but do not add "just one more" here
- * without moving the three primitives out first.
+ * AND AGAIN FOR `eq` AT 2026-09-18, THIS TIME FOR THE fp PORT rather than for
+ * K12. PRD-v2 §7.10 measured what v1 owes the port before its first fp kernel
+ * and `eq`/`ne` was one of three missing step blocks; §5's M31 and M36 rows
+ * compose it at W = 64. `cq_kernel_eq` and `cq_kernel_ne` now DISPATCH through
+ * `cq_eq_step` exactly as the ten predicates dispatch through `cmp()` — one
+ * body, never a second transcription of `lower_eq!` — and the ten L4 goldens
+ * did not move.
+ *
+ * RULE 12: DO NOT READ A LINE COUNT OUT OF THIS PARAGRAPH — RE-MEASURE IT.
+ * This sentence read "cmp.c IS NOW AT EXACTLY 200/200" and was stale in both
+ * directions before the eq export landed: `tools/check_loc.sh`'s own reckoning
+ * (non-blank, non-comment, and the only one that counts) put the file at 194,
+ * and the eq export took it to 213 against plan §3's 200-line budget and the
+ * 300-line hard limit. The ult export cost ten lines because `cq_ult_step`
+ * REPLACED `ult_compute`; the eq one cost nineteen for the same reason plus
+ * three new entry points — the width guard, the range guard and `cq_eq_flag`.
+ * Plan §3's recorded seam (`primitives ↔ predicate derivation`, moving to
+ * `src/kernels/cmp_prim.c`) is STILL NOT TAKEN, and a third export in this
+ * module is what takes it. Do not add "just one more" here without measuring
+ * first.
  *
  * ALL THREE PRIMITIVES ARE DIRTY BY DESIGN and therefore sandwiched.
  * `lower_eq!` leaves `diff` and the OR-prefix behind, `lower_ult!` leaves `nb`,
@@ -160,5 +173,62 @@ int cq_ult_steps(int W);
 /* One gate of the block, `u` in [0, cq_ult_steps(W)). Out of range is a hard
  * error in BOTH configurations, for cq_sub_step's reason. */
 void cq_ult_step(cq_ctx *ctx, const cq_ult_block *k, int u);
+
+/* --- `lower_eq!`'s compute half, exported for the fp port (PRD-v2 §7.10). --
+ *
+ * WHO ASKED, AND WHY IT IS A BLOCK RATHER THAN A CALL. PRD-v2 §7.10 measured
+ * the step blocks v1 owes the port before its first fp kernel and `eq`/`ne` is
+ * one of the three; §5's M31 (the IEEE class predicates) and M36 (`fcmp`) rows
+ * compose it at W = 64, and `soft_fadd`'s `ea == 0x7FF` shapes are literally
+ * this block over 64-bit spans (§7.2's literal grain, §7.3's constants-as-
+ * sources). A consumer cannot reach `cq_kernel_eq` instead: it is a whole
+ * sandwich and `cq_sandwich` refuses nesting in both configurations, which is
+ * the composite-kernels-call-the-step-function rule M12 is already the witness
+ * for. Nothing about K9 changed with the export — the same gates in the same
+ * order, and its goldens did not move.
+ *
+ * THE RAW FLAG IS `a != b`, NOT `a == b`, AND THAT IS UPSTREAM'S SHAPE RATHER
+ * THAN OURS. `lower_eq!` ends `CNOT(or[W-1], r); NOT(r)` (arith.jl:445) and
+ * that trailing NOT is the COPY-OUT's, folded there by K09.md §5 delta 2 — so
+ * `cq_kernel_ne` copies this wire out unchanged and `cq_kernel_eq` appends the
+ * X. A consumer wanting `eq` owes itself that one gate. Nothing structural can
+ * see the mistake: reading the flag as "equal" gives the same gates, the same
+ * count, the same palindrome and clean scratch, which is K9's own
+ * uge-meaning-ule one layer down.
+ *
+ * READ THE FLAG THROUGH cq_eq_flag AND NOT BY THE RULE. It is `orr[W-2]` in
+ * general and `diff[0]` at W == 1, where `orr` is EMPTY — so a consumer that
+ * spells the rule inline reads `orr[-1]` at the bottom of the ladder. The
+ * accessor is pure addressing and allocates nothing.
+ *
+ * THE BLOCK ALLOCATES NOTHING and `a`/`b` MAY BE SCRATCH SUB-ARRAYS, including
+ * a view that overlaps a region an earlier step wrote — plan §0.4 obligations
+ * 2, 3 and 4, exactly as for cq_ult_block above and sound for its reason: both
+ * reach the emitter only through `cq_emit_*`'s `const cq_bit *` controls, so
+ * neither can ever be a target, and guards compare RANGES rather than base
+ * pointers.
+ *
+ * `orr` IS W-1 BITS, NOT W. A consumer's layout budgets `2W - 1`, and at
+ * W == 1 the one-past-the-end pointer cq_scratch_span returns for a zero-length
+ * span is the correct thing to store. */
+typedef struct {
+    const cq_bit *a, *b;   /* controls only; may be scratch views, may overlap */
+    cq_bit       *diff;    /* a ^ b, W bits                                    */
+    cq_bit       *orr;     /* the OR-prefix, W-1 bits; orr[W-2] IS `a != b`    */
+    int           W;
+} cq_eq_block;
+
+/* `5W - 3` at every W >= 1 — one gate per step, so this is also the gate count
+ * at the all-quantum mask: `(0, 4W-2, W-1)`. At W == 1 Phase B is empty and the
+ * closed form still gives the right 2, so the W == 1 branch is in the INDEXING
+ * and not in the count (K09.md §2.1). */
+int cq_eq_steps(int W);
+
+/* One gate of the block, `u` in [0, cq_eq_steps(W)). Out of range is a hard
+ * error in BOTH configurations, for cq_ult_step's reason. */
+void cq_eq_step(cq_ctx *ctx, const cq_eq_block *k, int u);
+
+/* The raw flag `a != b`, inside the caller's own region. */
+const cq_bit *cq_eq_flag(const cq_eq_block *k);
 
 #endif /* CQOPS_KERNELS_CMP_H */

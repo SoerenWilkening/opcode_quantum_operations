@@ -23,6 +23,8 @@ add_library(cqops_test_support STATIC
     support/refmodel.c      # Step 10 — plain-C semantics, the L1 reference
     support/refmodel_w.c    # bd zmo — the two-word half, split 2026-09-02 on the header's own seam
     support/bitkinds.c      # Step 10 — (value, quantum-mask) -> register
+    support/fpanchors.c     # bd hkg — PRD-v2 §7.12's f64 L1 anchors as bit patterns,
+                            # forced into every draw through cq_kd_shape.anchors
     support/poolcheck.c     # Step 10 — the automatic L2 and L3 assertions
     support/kerneldrv.c     # Step 10 — the shared Phase-B four-level gate
     support/kernelsweep.c   # Step 11 — the sweep shapes (plan §2.2's split seam)
@@ -33,6 +35,15 @@ add_library(cqops_test_support STATIC
                             # split from kerneldrv.c 2026-09-02 on the GATE <->
                             # INSTRUMENT seam; the fixture both share is kernelfix.h
     support/goldens.c       # Step 10 — L4's pinned counts, on disk
+    support/fphost.c        # PRD-v2 §7.4 — the HOST fp probe: round-to-nearest,
+                            # FTZ/DAZ off, the five NaN cells bitwise. TEST-SIDE
+                            # ONLY, and the asymmetry is the proof (as with
+                            # _DEFAULT_SOURCE below): L1's fp ORACLE is the host
+                            # operator, while the library's own fp path is a C
+                            # transcription over uint64_t that never evaluates a
+                            # `double`. cmake/CqopsFpHost.cmake compiles THIS
+                            # FILE at configure time rather than a copy of its
+                            # arms, so the two verdicts cannot drift
 )
 
 ## L4's goldens are DATA, read at run time, so the suite can compare the
@@ -919,7 +930,47 @@ add_cqops_death_test(test_kernel_cmp_death CASES
     the_two_sources_are_the_same_register
     a_width_of_zero
     a_negative_width
+    eq_steps_zero_width
+    eq_step_index_high
+    eq_step_index_negative
 )
+
+## M16's SECOND EXPORT — `cq_eq_steps` / `cq_eq_step`, PRD-v2 §7.10's step block
+## for the fp port. Same argument as cq_sub_step's and cq_ult_step's below: a
+## step function whose caller is a DIFFERENT MODULE mapping its own index space
+## onto this one, where an off-by-one emits a real, plausible gate from the
+## wrong stage rather than failing.
+##
+## WHICH LAYER ABORTED, and here BOTH directions of masking are live at once.
+## (1) The kernel masks the width guard from ABOVE: cq_kernel_eq reaches
+## cq_kernel_check_n before n_compute_of ever calls cq_eq_steps, so a W = 0
+## compare aborts in kernel.h — which is what a_width_of_zero pins — and M16's
+## own width guard is unreachable that way. eq_steps_zero_width therefore calls
+## the exported entry point directly, and must NOT be allowed to pass on either
+## kernel.h message.
+set_tests_properties(test_kernel_cmp_death.eq_steps_zero_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "destination width is not positive;source width is not positive")
+
+## (2) The width guard masks the RANGE check from BELOW, inside one function:
+## cq_eq_step spells its range as [0, cq_eq_steps(W)), so cq_eq_steps' width
+## guard runs first. An index case allowed to pass on "eq: width is not
+## positive" would leave the range check — the guard the whole export exists to
+## have — surviving mutation to always-true.
+##
+## WHAT WAS MEASURED, AND IT IS NOT WHAT THE SHAPE SUGGESTS. Deleting the range
+## check does NOT produce a sanitizer abort: both cases report the death
+## harness's own "expected an abort from:" and exit non-zero, in BOTH
+## configurations. The out-of-bounds `orr[3]` is never touched, because the
+## fixture materialises nothing and cq_emit_cx with a CQ_BIT_ZERO control folds
+## the gate away before it reads the target. So the exit code alone catches a
+## deleted range check; what these regexes catch is the OTHER direction —
+## measured by giving the range check the WIDTH guard's message, which turns
+## both cases red while eq_steps_zero_width stays green.
+set_tests_properties(test_kernel_cmp_death.eq_step_index_high
+                     test_kernel_cmp_death.eq_step_index_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "eq: width is not positive")
 
 ## M17 and M12, Step 14. Same argument as M14's and M16's — with the difference
 ## that M12 could NOT use their trick, and paid for it.
@@ -955,6 +1006,10 @@ add_cqops_death_test(test_kernel_step14_death CASES
     ashr_var_dst_aliases_its_source
     shift_var_the_value_is_the_amount
     shift_var_a_width_of_zero
+    shift_var_barrel_step_index_past_the_end
+    shift_var_barrel_step_index_is_negative
+    shift_var_barrel_region_of_width_zero
+    shift_var_barrel_steps_of_width_zero
 )
 
 ## WHICH LAYER ABORTED, the fifth instance and the first where the case had no
@@ -989,6 +1044,79 @@ set_tests_properties(test_kernel_step14_death.shl_var_dst_aliases_its_source
 ## parenthetical's point survives; it simply is not what decides W = 0 any more.
 ## Both routes reach the same M11 entry point, so the indiscriminability this
 ## block records is unchanged and no ctest property here needed editing.
+
+## M12's EXPORTED BLOCK (2026-09-18). Four guards a consumer reaches and the
+## kernel path cannot: cq_barrel_step's range check, which is ONE `if` with TWO
+## disjuncts and therefore gets two cases, and the two width guards, which are
+## the same condition in two functions and therefore get one case each with
+## DISJOINT library messages (kernels/shift_var.c says why; M15's
+## cq_addacc_check is the precedent).
+##
+## EACH LIST IS COMPOSED ONCE AND IN FULL, because set_tests_properties
+## OVERWRITES a property rather than adding to it — a second block naming any of
+## these four would silently disarm this one and every test would stay green.
+## The shared tripwires are repeated per list for the same reason.
+##
+## THE TWO SANITIZERS ARE LISTED EXPLICITLY AND ARE ALSO AUTOMATIC — checked in
+## cmake/CqopsTest.cmake rather than assumed. Since `bd u76` every death case is
+## born with the tripwire, and cqops_death_arm_sanitizer_tripwire runs under
+## cmake_language(DEFER) after every block in this directory, reads what each
+## case carries and puts it back with the tripwire PREPENDED and
+## list(REMOVE_DUPLICATES) applied. So naming them here is redundant by
+## construction, not load-bearing, and cannot double them.
+##
+## THEY ARE NAMED HERE ANYWAY BECAUSE THIS IS ONE OF THE CASES THAT PROVES WHY
+## THE TRIPWIRE EXISTS, and the measurement belongs next to the case that made
+## it. death.h arms a SIGABRT window and cannot tell WHOSE abort it was, so a
+## sanitizer's own abort() satisfies CQ_EXPECT_ABORT and a case can pass having
+## verified nothing. MEASURED 2026-09-18 with the range check made unreachable:
+## shift_var_barrel_step_index_is_negative indexes a[-1] and the scratch span at [-1], and
+## in Debug ASan reports heap-buffer-overflow and aborts INSIDE the window — so
+## the case is red on "AddressSanitizer" and names the reason, where without the
+## tripwire it would have passed on a library whose guard is gone.
+##
+## AND THE DISCRIMINATORS ARE EXPRESSED NEGATIVELY, never as
+## PASS_REGULAR_EXPRESSION, which DISPLACES the exit-code check and would trade
+## away the death test's own contract. Each list names the layers that must NOT
+## have spoken:
+##
+##   the two step cases   "scratch:" (M08's span bounds check, which a decode
+##                        walking past the end would hit), "shadow:" (M02),
+##                        "emit:" (M05's fold table and §3 distinctness),
+##                        "kernel: D7" (kernel.h's alias guards — a different
+##                        refusal entirely), and "width is not positive" (EITHER
+##                        width guard: a range case that aborted on a width has
+##                        proved nothing about the range check).
+##
+##   "shadow:" WAS ADDED AFTER THE PROVOCATION CAUGHT THE LIST SHORT, and it is
+##   the Release half of the same asymmetry. MEASURED 2026-09-18 with the range
+##   check unreachable: in Debug ASan catches the negative index, but in RELEASE
+##   there is no ASan and the out-of-bounds read walks into M02, which aborts
+##   with "shadow: qubit index out of range (24576, 97)" — INSIDE the window. So
+##   the case PASSED in Release on a library whose guard was gone, claiming a
+##   refusal it had not seen, until this string was in the list. Two
+##   configurations, two different lower layers, and the first draft named
+##   neither.
+##   the two width cases  each names the OTHER guard's message, which is the
+##                        whole point of making them disjoint, plus "constant
+##                        shift:" (M11) and "destination width is not positive"
+##                        (kernel.h's cq_kernel_check_dst — its appearance would
+##                        mean the case had gone through cq_kernel_*_var, which
+##                        is the indiscriminability shift_var_a_width_of_zero
+##                        above is stuck with and these two cases exist to
+##                        avoid).
+set_tests_properties(test_kernel_step14_death.shift_var_barrel_step_index_past_the_end
+                     test_kernel_step14_death.shift_var_barrel_step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;shadow:;emit:;kernel: D7;width is not positive;AddressSanitizer;UndefinedBehaviorSanitizer")
+
+set_tests_properties(test_kernel_step14_death.shift_var_barrel_region_of_width_zero
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "step-count width is not positive;destination width is not positive;constant shift:;scratch:;emit:;AddressSanitizer;UndefinedBehaviorSanitizer")
+
+set_tests_properties(test_kernel_step14_death.shift_var_barrel_steps_of_width_zero
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "region width is not positive;destination width is not positive;constant shift:;scratch:;emit:;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## M15, Step 15. THIS SUITE IS K8's L5. Every other kernel folds an
 ## all-classical operand to zero gates and zero qubits; K8 refuses one, because
@@ -1063,6 +1191,9 @@ add_cqops_death_test(test_kernel_mul_death CASES
     mul_a_width_of_zero
     mul_a_negative_width
     mul_steps_called_directly_with_a_zero_width
+    mul_region_called_directly_with_a_zero_width
+    mul_step_index_past_the_end
+    mul_step_index_is_negative
     mul_scratch_exceeds_the_pool_ceiling
 )
 
@@ -1078,8 +1209,37 @@ set_tests_properties(test_kernel_mul_death.mul_a_width_of_zero
                      "mul: width is not positive")
 
 set_tests_properties(test_kernel_mul_death.mul_steps_called_directly_with_a_zero_width
+                     test_kernel_mul_death.mul_region_called_directly_with_a_zero_width
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "destination width is not positive")
+
+## THE STEP BLOCK's OWN RANGE GUARD (PRD-v2 §5, §7.10), and it needs the
+## discriminator MORE than any other case in this file rather than less.
+##
+## PAST THE END THE PROCESS ABORTS EITHER WAY, so the exit code proves nothing:
+## the index runs off the last block and cq_addacc_step's identical guard fires
+## one layer down — the masked-by-a-LATER-copy shape, measured 2026-09-18 by
+## making cq_mul_step's guard unreachable and watching this case still pass on
+## the abort alone. `addacc:` is what turns it red; the two messages differ only
+## in that prefix, both going through cq_kernel_die. `scratch:` excludes M08's
+## span bounds check for the same reason.
+##
+## AND THE NEGATIVE INDEX NEEDS FOUR MORE EXCLUSIONS THAN IT LOOKS LIKE, every
+## one measured rather than foreseen. It has nothing underneath it at all — it
+## reads a[s] and writes pp[0][s] out of bounds — so with the guard unreachable
+## it aborts from WHATEVER the garbage reached first, and every such abort lands
+## inside death.h's SIGABRT window. Measured 2026-09-18 with the guard made
+## unreachable: in RELEASE it died at `libcqops: FATAL: shadow: qubit index out
+## of range (24576, 17)`, and with only `addacc:;scratch:` pinned the case
+## PASSED having verified nothing. `shadow:`, `qubit pool:`, `emit:` and `reg:`
+## are the other layers a wild index can reach; in DEBUG the same read is an
+## ASan report ending in abort(), which is the same trap by a different route
+## (`bd remember sanitizer-abort-passes-expect-abort`). The guard's own message
+## is "kernel: mul: step index outside …" and matches none of them.
+set_tests_properties(test_kernel_mul_death.mul_step_index_past_the_end
+                     test_kernel_mul_death.mul_step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "addacc:;scratch:;shadow:;qubit pool:;emit:;reg:;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## bd fxz / PRD §15 D25 — D2's ceiling reaching K11's SCRATCH REGION, which no
 ## case anywhere covered: test_qubits_death.ceiling_exceeded pins the pool's own

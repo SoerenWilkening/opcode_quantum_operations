@@ -64,45 +64,75 @@ typedef struct {
     cq_bit       *dst;
     const cq_bit *a, *b;
     cq_ult_block  u;                      /* ult: a, b, nb, carry, axnb, W */
-    cq_bit       *diff, *orr;             /* eq  */
+    cq_eq_block   e;                      /* eq:  a, b, diff, orr, W       */
     cq_bit       *af, *bf;                /* slt */
     const cq_bit *raw;
     int           W;
 } cmp_env;
 
-/* `lower_eq!`, arith.jl:424-447. Phase A builds `diff = a ^ b`; Phase B
- * reduces it with the standard reversible OR — `t ^= x; t ^= y; t ^= x&y` on a
- * zero target is `x | y` — so `orr[W-2]` ends up holding `a != b`.
+/* `lower_eq!`, arith.jl:424-447. Phase A builds `diff = a ^ b` (:427, :428);
+ * Phase B reduces it with the standard reversible OR — `t ^= x; t ^= y;
+ * t ^= x&y` on a zero target is `x | y` — so `orr[W-2]` ends up holding
+ * `a != b`. The trailing `CNOT(or[W-1], r); NOT(r)` (:445) is NOT part of the
+ * compute half: it is the copy-out, which is where Bennett's negation folds
+ * (K09.md §5 delta 2).
  *
  * THE W == 1 BRANCH IS IN THE INDEXING, NOT IN THE COUNT. Bennett special-
  * cases it because `or = allocate!(wa, W-1)` is empty and `or[1]` would read
  * out of bounds; here Phase B is simply empty and the raw flag is `diff[0]`,
  * which is also `a != b`. The closed form 5W-3 evaluates to 2 either way, so
- * there is no golden discontinuity (K09.md §5 delta 7). */
-static void eq_compute(cq_ctx *ctx, void *env, int s)
+ * there is no golden discontinuity (K09.md §5 delta 7).
+ *
+ * THIS IS A PUBLIC BLOCK AS OF PRD-v2 §7.10 and the two entry points below
+ * DISPATCH THROUGH IT — one body, never a second transcription of `lower_eq!`.
+ * See cmp.h for who consumes it and why the flag it leaves is `a != b`. */
+int cq_eq_steps(int W)
 {
-    const cmp_env *e = (const cmp_env *)env;
-    int W = e->W;
+    if (W <= 0) cq_kernel_die("eq: width is not positive");
+    return 5 * W - 3;                      /* 2W diff + 3(W-1) OR-prefix */
+}
 
-    if (s < 2 * W) {
-        int i = s / 2;
+void cq_eq_step(cq_ctx *ctx, const cq_eq_block *k, int u)
+{
+    int W = k->W;
 
-        cq_emit_cx(ctx, (s % 2 == 0) ? &e->a[i] : &e->b[i], &e->diff[i]);
+    /* The width guard is cq_eq_steps'; its message is DISJOINT from this one
+     * so a death test can say which spoke. This range check is the consumer's,
+     * for cq_ult_step's reason: an off-by-one in a mapped run of indices lands
+     * in the OR-prefix and emits a plausible wrong gate rather than failing. */
+    if (u < 0 || u >= cq_eq_steps(W))
+        cq_kernel_die("eq: step index outside [0, cq_eq_steps(W))");
+
+    if (u < 2 * W) {
+        int i = u / 2;
+
+        cq_emit_cx(ctx, (u % 2 == 0) ? &k->a[i] : &k->b[i], &k->diff[i]);
         return;
     }
 
-    /* k == 0 seeds from diff[0]; every later k folds the previous prefix in.
-     * Bennett writes those as two loops over (or[k-1], or[k], diff[k+1]) and
-     * (diff[1], diff[2], or[1]); one control differs, and only at k == 0. */
-    int u = s - 2 * W, k = u / 3;
-    const cq_bit *c1 = (k == 0) ? &e->diff[0] : &e->orr[k - 1];
-    const cq_bit *c2 = &e->diff[k + 1];
+    /* m == 0 seeds from diff[0] (:436-438); every later m folds the previous
+     * prefix in (:440-442). Bennett writes those as two blocks over
+     * (or[k-1], or[k], diff[k+1]) and (diff[1], diff[2], or[1]); one control
+     * differs, and only at m == 0. */
+    int v = u - 2 * W, m = v / 3;
+    const cq_bit *c1 = (m == 0) ? &k->diff[0] : &k->orr[m - 1];
+    const cq_bit *c2 = &k->diff[m + 1];
 
-    switch (u % 3) {
-    case 0:  cq_emit_cx (ctx, c1,     &e->orr[k]); break;
-    case 1:  cq_emit_cx (ctx, c2,     &e->orr[k]); break;
-    default: cq_emit_ccx(ctx, c1, c2, &e->orr[k]); break;
+    switch (v % 3) {
+    case 0:  cq_emit_cx (ctx, c1,     &k->orr[m]); break;
+    case 1:  cq_emit_cx (ctx, c2,     &k->orr[m]); break;
+    default: cq_emit_ccx(ctx, c1, c2, &k->orr[m]); break;
     }
+}
+
+const cq_bit *cq_eq_flag(const cq_eq_block *k)
+{
+    return (k->W == 1) ? &k->diff[0] : &k->orr[k->W - 2];
+}
+
+static void eq_compute(cq_ctx *ctx, void *env, int s)
+{
+    cq_eq_step(ctx, &((const cmp_env *)env)->e, s);
 }
 
 /* `lower_ult!`, arith.jl:449-463. Computes a + ~b + 1 = a - b and keeps the
@@ -211,7 +241,7 @@ static void copyout(cq_ctx *ctx, void *env, int s)
 
 static int n_compute_of(int prim, int W)
 {
-    if (prim == PRIM_EQ)  return 5 * W - 3;              /* 2W + 3(W-1)     */
+    if (prim == PRIM_EQ)  return cq_eq_steps(W);         /* 5W - 3          */
     if (prim == PRIM_ULT) return cq_ult_steps(W);        /* 6W + 1          */
     return 2 * W + 2 + cq_ult_steps(W);                  /* 8W + 3          */
 }
@@ -225,16 +255,21 @@ static void layout(cmp_env *e, cq_scratch *scr, int prim)
 {
     uint32_t W = (uint32_t)e->W;
 
-    e->diff = e->orr = e->af = e->bf = NULL;
+    e->af = e->bf = NULL;
     e->u.nb = e->u.carry = e->u.axnb = NULL;
     e->u.a  = e->u.b = NULL;
     e->u.W  = e->W;
+    e->e.diff = e->e.orr = NULL;
+    e->e.a  = e->e.b = NULL;
+    e->e.W  = e->W;
 
     if (prim == PRIM_EQ) {
         cq_scratch_alloc(scr, 2u * W - 1u);
-        e->diff = cq_scratch_span(scr, 0u, W);
-        e->orr  = cq_scratch_span(scr, W,  W - 1u);      /* empty at W == 1 */
-        e->raw  = (W == 1u) ? &e->diff[0] : &e->orr[W - 2u];
+        e->e.diff = cq_scratch_span(scr, 0u, W);
+        e->e.orr  = cq_scratch_span(scr, W,  W - 1u);    /* empty at W == 1 */
+        e->e.a    = e->a;
+        e->e.b    = e->b;
+        e->raw    = cq_eq_flag(&e->e);   /* `a != b`; the W == 1 branch is here */
         return;
     }
 

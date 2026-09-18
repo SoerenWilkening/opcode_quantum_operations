@@ -157,6 +157,7 @@ jobs:
                 -DCQOPS_SANITIZERS=ON \
                 -DCQOPS_LEAK_CHECK=ON \
                 -DCQOPS_PYTHON=ON \
+                -DCQOPS_FPHOST=ON \
                 2>&1 | tee configure-debug.log
 
       # THE OPT-IN SUITES ARE ABSENT, AND CMAKE SAYS SO — assert that it did.
@@ -243,6 +244,7 @@ jobs:
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_C_COMPILER=${{ matrix.cc }} \
                 -DCQOPS_PYTHON=ON \
+                -DCQOPS_FPHOST=ON \
                 2>&1 | tee configure-release.log
 
       - name: Build Release

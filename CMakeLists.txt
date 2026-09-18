@@ -108,6 +108,11 @@ endif()
 ## CMAKE_MODULE_PATH was already extended above project(), for CqopsDebugToolchain.
 include(CqopsTest)
 include(CqopsSanitizers)
+## Runs its probe at include time and leaves CQOPS_FPHOST_BUILD behind (1 / 0 /
+## -1). PRD-v2 §7.4's host probe: L1's fp oracle is the HOST operator, so
+## round-to-nearest, FTZ/DAZ off and the five NaN cells are facts to measure
+## rather than assume. See the module.
+include(CqopsFpHost)
 include(CqopsPython)
 include(CqopsFreePairingPin)
 
@@ -183,6 +188,13 @@ target_compile_definitions(cqops_build_flags INTERFACE
     # answer: LSan here is an ASAN_OPTIONS setting, so test_skeleton checks it
     # against the environment CTest actually handed the process (`bd kfi`).
     CQOPS_BUILD_LSAN=${CQOPS_LSAN_ENABLED}
+    # And what it believes about the HOST's floating point (PRD-v2 §7.4).
+    # THREE-VALUED: 1 probed and every arm held, 0 probed and an arm failed,
+    # -1 never probed. Compare with >= 0, never with a bare negation — the same
+    # hazard as `!proven_zero`. cmake/CqopsFpHost.cmake measures it; the
+    # rounding mode is run-time state, so tests/support/fphost.c re-checks it in
+    # the process and test_skeleton asserts the two agree.
+    CQOPS_BUILD_FPHOST=${CQOPS_FPHOST_BUILD}
 )
 
 ## ---------------------------------------------------------------------------

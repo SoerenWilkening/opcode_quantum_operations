@@ -39,6 +39,7 @@
 #include "ctx.h"
 #include "emit.h"
 #include "reg.h"
+#include "scratch.h"
 #include "sink_count.h"
 
 #include "support/bitkinds.h"
@@ -446,6 +447,7 @@ CQ_TEST(dst_owns_one_qubit_and_the_scratch_comes_back)
 }
 
 #include "test_kernel_cmp_derivation.inc"
+#include "test_kernel_cmp_block.inc"
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(k9_eq_family_sweep),
@@ -460,5 +462,8 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(a_classical_zero_operand_bit_folds_by_k09s_own_formula),
     CQ_CASE(r9_all_classical_operands_never_enter_the_sandwich),
     CQ_CASE(the_classical_fold_writes_a_real_gate_into_a_quantum_dst),
-    CQ_CASE(the_signed_oracle_agrees_with_plain_c_on_sign_extended_values)
+    CQ_CASE(the_signed_oracle_agrees_with_plain_c_on_sign_extended_values),
+    CQ_CASE(the_eq_block_is_a_palindrome_and_gives_the_pool_back),
+    CQ_CASE(the_eq_kernels_are_the_block_twice_plus_their_copyout),
+    CQ_CASE(the_eq_blocks_flag_is_a_not_equal_b)
 )

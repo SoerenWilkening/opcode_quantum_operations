@@ -34,6 +34,7 @@
 #include "bit.h"
 #include "ctx.h"
 #include "reg.h"
+#include "scratch.h"
 #include "support/bitkinds.h"
 #include "support/death.h"
 
@@ -105,6 +106,58 @@ static void a_negative_width(void)
                                   cq_reg_cbits(&g_ctx.regs, hb), -3));
 }
 
+/* ---- The exported `eq` step block (plan §0.4 / PRD-v2 §7.10). ------------
+ *
+ * THE TWO GUARDS LIVE IN ONE CALL CHAIN AND THE WIDTH ONE IS EARLIER, which is
+ * the Step-15 shape: `cq_eq_step`'s range check is spelled against
+ * `cq_eq_steps(W)`, so the width guard runs first and would answer for the
+ * range check if an index case were allowed to pass on its message. The two
+ * messages are disjoint and tests/CMakeLists.txt pins which one must NOT
+ * appear.
+ *
+ * AND THE WIDTH GUARD IS UNREACHABLE THROUGH THE KERNEL. `cq_kernel_eq` calls
+ * `cq_kernel_check_n` before `n_compute_of` ever reaches `cq_eq_steps`, so a
+ * W = 0 compare aborts in kernel.h with "source width is not positive" — which
+ * is what `a_width_of_zero` above pins and is why this case has to call the
+ * exported entry point DIRECTLY. Without it, M16's own width guard would
+ * survive mutation to always-true.
+ *
+ * Nothing is materialised: both guards fire before any gate is emitted, so the
+ * region is only there to give the block well-formed spans. */
+static cq_scratch g_scr;
+
+static void eq_block(cq_eq_block *k, int W)
+{
+    cq_bit *r;
+
+    setup();
+    cq_scratch_alloc(&g_scr, (uint32_t)(4 * W - 1));
+    r = g_scr.bits;
+    k->a = r; k->b = r + W; k->diff = r + 2 * W; k->orr = r + 3 * W;
+    k->W = W;
+}
+
+static void eq_steps_zero_width(void)
+{
+    CQ_EXPECT_ABORT((void)cq_eq_steps(0));
+}
+
+static void eq_step_index_high(void)
+{
+    cq_eq_block k;
+
+    eq_block(&k, 4);
+    CQ_EXPECT_ABORT(cq_eq_step(&g_ctx, &k, cq_eq_steps(4)));
+}
+
+static void eq_step_index_negative(void)
+{
+    cq_eq_block k;
+
+    eq_block(&k, 4);
+    CQ_EXPECT_ABORT(cq_eq_step(&g_ctx, &k, -1));
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(eq_dst_aliases_a_classical_source),
     CQ_DEATH_CASE(ult_dst_aliases_a_classical_source),
@@ -112,5 +165,8 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(ugt_dst_aliases_a_classical_source),
     CQ_DEATH_CASE(the_two_sources_are_the_same_register),
     CQ_DEATH_CASE(a_width_of_zero),
-    CQ_DEATH_CASE(a_negative_width)
+    CQ_DEATH_CASE(a_negative_width),
+    CQ_DEATH_CASE(eq_steps_zero_width),
+    CQ_DEATH_CASE(eq_step_index_high),
+    CQ_DEATH_CASE(eq_step_index_negative)
 )

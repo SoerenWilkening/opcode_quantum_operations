@@ -3,11 +3,25 @@
  * yet. M01's tri-valued bit arrives at Step 2. */
 
 #include "cqops/cqops.h"
+#include "support/fphost.h"
 #include "support/harness.h"
 
+#include <fenv.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* The negative control below changes the rounding mode at run time, which is
+ * exactly what this pragma licenses: without it a compiler may assume the
+ * default mode and hoist floating-point work across fesetround. Guarded on
+ * __clang__ because gcc answers the pragma with "not supported, ignoring" and
+ * -Werror turns that into a build failure; this tree is clang-only
+ * (.github/workflows/ci.yml), and the guard keeps a gcc box building rather
+ * than silently miscompiling. Measured under -Wall -Wextra -Werror
+ * -Wconversion on Apple clang 17 and Homebrew clang 22: accepted, silently. */
+#if defined(__clang__)
+#  pragma STDC FENV_ACCESS ON
+#endif
 
 CQ_TEST(library_links_and_reports_its_version)
 {
@@ -108,10 +122,90 @@ CQ_TEST(leak_detection_is_what_the_build_claims)
            getenv("ASAN_OPTIONS") ? getenv("ASAN_OPTIONS") : "(unset)");
 }
 
+/* THE FP HOST IS A THIRD THING THE BUILD BELIEVES AND THE BINARY MUST CONFIRM
+ * (PRD-v2 §7.4). L1's fp oracle is the HOST operator with the IEEE-unspecified
+ * cells pinned by table, so a host that rounds somewhere other than to-nearest,
+ * or that flushes subnormals, or whose NaN cells are not x86's, would fail every
+ * fp anchor in the ORACLE rather than in the port — and the failure would read
+ * as our bug. cmake/CqopsFpHost.cmake measures it at configure time and compiles
+ * the verdict in; this case is the cross-check, and it is a SECOND MEASUREMENT
+ * rather than a restatement: the probe builds tests/support/fphost.c with no -O
+ * flag, while this binary carries the configuration's own optimisation level and
+ * sanitizers. The two agreeing is the claim.
+ *
+ * CQOPS_BUILD_FPHOST IS THREE-VALUED, and that is not decoration: 1 the probe
+ * ran and passed, 0 it ran and failed, -1 it never ran (CQOPS_FPHOST=OFF). A
+ * two-valued spelling would make "not measured" indistinguishable from
+ * "measured and false", so a bare `!CQOPS_BUILD_FPHOST` downstream of this is
+ * wrong for the same reason `!proven_zero` was (CLAUDE.md, three-valued proof).
+ * Compare with >= 0, never with a negation. */
+CQ_TEST(fp_host_is_what_the_build_claims)
+{
+    char why[CQ_FPHOST_WHY_MAX];
+    const int live = cq_fphost_check(why, sizeof why);
+
+    if (CQOPS_BUILD_FPHOST >= 0) {
+        CHECK_EQ(live, CQOPS_BUILD_FPHOST);
+    } else {
+        printf("# fp host NOT probed at configure time (CQOPS_FPHOST=OFF)\n");
+    }
+
+    /* Every arm has to have RUN. A deleted arm still returns 1 on a conforming
+     * host and is invisible to the verdict alone — the same hole the childcap
+     * EINTR site count exists to close. */
+    if (live) CHECK_EQ(cq_fphost_arms_run(), CQ_FPHOST_ARMS);
+
+    printf("# fp host live in this binary: %d (build claims %d), %d arm(s) run\n",
+           live, CQOPS_BUILD_FPHOST, cq_fphost_arms_run());
+    printf("# fp host mode: fegetround()=%d FE_TONEAREST=%d; %s\n",
+           fegetround(), FE_TONEAREST, live ? "all arms hold" : why);
+}
+
+/* AN ASSERTION NOBODY HAS SEEN FAIL IS AN ASSERTION NOBODY HAS TESTED. The
+ * whole check is a tripwire for a host this project has never run on, so on
+ * this one it can only ever return 1 — and a cq_fphost_check mutated to
+ * `return 1;` would pass the case above in every configuration.
+ *
+ * fesetround is the one arm that can be provoked portably at run time, and it
+ * is provoked here. The other nine are not reachable without a host-specific
+ * control register (FTZ and DAZ live in MXCSR on x86) or a different machine;
+ * that gap is stated rather than implied. */
+CQ_TEST(the_fp_host_check_can_fail_and_names_the_rounding_arm)
+{
+    static const char sentinel[] = "sentinel-not-overwritten";
+    char why[CQ_FPHOST_WHY_MAX];
+    const int saved = fegetround();
+
+    /* Baseline first, so a red below is the provocation and not the box. */
+    memcpy(why, sentinel, sizeof sentinel);
+    CHECK_EQ(cq_fphost_check(why, sizeof why), 1);
+
+    CHECK_EQ(fesetround(FE_UPWARD), 0);
+    if (fegetround() == FE_UPWARD) {
+        memcpy(why, sentinel, sizeof sentinel);
+        CHECK_EQ(cq_fphost_check(why, sizeof why), 0);
+        /* WHICH arm, not merely that one fired: the check returns 0 for ten
+         * different reasons and a bare 0 cannot tell them apart. */
+        CHECK(strstr(why, "rounding") != NULL);
+        CHECK_EQ(cq_fphost_arms_run(), 0);
+        printf("# fp host negative control: %s\n", why);
+    } else {
+        cq_h_fail(__FILE__, __LINE__,
+                  "fesetround(FE_UPWARD) reported success and did not take "
+                  "effect (fegetround() = %d) — the negative control verified "
+                  "nothing on this host", fegetround());
+    }
+
+    CHECK_EQ(fesetround(saved), 0);
+    CHECK_EQ(cq_fphost_check(why, sizeof why), 1);
+}
+
 CQ_TEST_MAIN(
     CQ_CASE(library_links_and_reports_its_version),
     CQ_CASE(check_macros_pass_on_truth),
     CQ_CASE(debug_invariants_track_the_configuration),
     CQ_CASE(sanitizer_coverage_is_what_the_build_claims),
-    CQ_CASE(leak_detection_is_what_the_build_claims)
+    CQ_CASE(leak_detection_is_what_the_build_claims),
+    CQ_CASE(fp_host_is_what_the_build_claims),
+    CQ_CASE(the_fp_host_check_can_fail_and_names_the_rounding_arm)
 )

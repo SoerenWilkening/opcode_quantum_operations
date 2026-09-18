@@ -57,7 +57,9 @@
 
 #include "bit.h"
 #include "ctx.h"
+#include "emit.h"
 #include "reg.h"
+#include "scratch.h"
 #include "support/bitkinds.h"
 #include "support/death.h"
 
@@ -229,6 +231,93 @@ static void shift_var_a_width_of_zero(void)
                                        cq_reg_cbits(&g_ctx.regs, hb), 0));
 }
 
+/* --- M12's EXPORTED BLOCK: the three guards the kernel path cannot reach. --
+ *
+ * THESE ARE THE FIRST CASES IN THIS FILE THAT ARE NOT ABOUT AN ALIAS, and they
+ * exist because the export moved M12's surface. `cq_barrel_step`'s range check
+ * and the two width guards are reachable ONLY by a consumer calling the block
+ * directly — PRD-v2 §5's M32/M33/M37 — because `cq_kernel_*_var` always passes
+ * an index the driver generated and a width `cq_kernel_check_dst` has already
+ * cleared. Nothing in the suite proper can provoke them: every assertion there
+ * drives the block with well-formed arguments, by construction.
+ *
+ * THE RANGE CHECK IS ONE `if` WITH TWO DISJUNCTS AND GETS TWO CASES. Deleting
+ * `u < 0` leaves `u >= steps` catching nothing for a negative index, and vice
+ * versa — the shape `bd djf` records for the `L == 0 ||` disjunct one function
+ * over. Measured: with the whole check made unreachable, `..._past_the_end`
+ * SURVIVES (the decode walks the stage loop, falls out, and emits nothing),
+ * while `..._negative` indexes `a[-1]` and the scratch span at `[-1]` and is
+ * caught by ASan in Debug — which is why both cases carry `AddressSanitizer`
+ * in their FAIL_REGULAR_EXPRESSION and not only `UndefinedBehaviorSanitizer`.
+ * A death case that passed on ASan's abort would have verified nothing.
+ *
+ * THE TWO WIDTH GUARDS ARE THE SAME CONDITION IN TWO FUNCTIONS, so each gets
+ * its own case and the library gives them DISJOINT messages (kernels/shift_var.c
+ * says why; M15's `cq_addacc_check` is the precedent). `cq_barrel_step` calls
+ * `cq_barrel_steps` before anything else, so the step-count guard is the earlier
+ * copy and would mask the region one for any caller that went through the step
+ * function — which is exactly why neither case goes through it. */
+
+static void shift_var_barrel_step_index_past_the_end(void)
+{
+    setup();
+    cq_scratch scr;
+    cq_barrel_block k;
+    int32_t ha = cq_bk_reg(&g_ctx, 8u, 0x0Fu, 0xFFu);
+    int32_t hb = cq_bk_reg(&g_ctx, 8u, 0x03u, 0xFFu);
+
+    cq_scratch_alloc(&scr, (uint32_t)cq_barrel_region(8));
+    for (uint32_t i = 0; i < scr.n; i++) cq_materialise(&g_ctx, &scr.bits[i]);
+
+    k.a   = cq_reg_cbits(&g_ctx.regs, ha);
+    k.b   = cq_reg_cbits(&g_ctx.regs, hb);
+    k.scr = &scr;
+    k.off = 0u;
+    k.W   = 8;
+    k.dir = CQ_BARREL_SHL;
+
+    CQ_EXPECT_ABORT(cq_barrel_step(&g_ctx, &k,
+                                   cq_barrel_steps(8, CQ_BARREL_SHL)));
+}
+
+static void shift_var_barrel_step_index_is_negative(void)
+{
+    setup();
+    cq_scratch scr;
+    cq_barrel_block k;
+    int32_t ha = cq_bk_reg(&g_ctx, 8u, 0x0Fu, 0xFFu);
+    int32_t hb = cq_bk_reg(&g_ctx, 8u, 0x03u, 0xFFu);
+
+    cq_scratch_alloc(&scr, (uint32_t)cq_barrel_region(8));
+    for (uint32_t i = 0; i < scr.n; i++) cq_materialise(&g_ctx, &scr.bits[i]);
+
+    k.a   = cq_reg_cbits(&g_ctx.regs, ha);
+    k.b   = cq_reg_cbits(&g_ctx.regs, hb);
+    k.scr = &scr;
+    k.off = 0u;
+    k.W   = 8;
+    k.dir = CQ_BARREL_LSHR;
+
+    CQ_EXPECT_ABORT(cq_barrel_step(&g_ctx, &k, -1));
+}
+
+/* `cq_barrel_region(0)` — NOT through a kernel, which is the whole point: the
+ * existing `shift_var_a_width_of_zero` reaches `cq_kernel_check_dst` and
+ * tests/CMakeLists.txt records that it cannot say whether M11 or M12 refused.
+ * This one calls the exported function itself, so "destination width is not
+ * positive" appearing at all would mean the case had gone through the kernel. */
+static void shift_var_barrel_region_of_width_zero(void)
+{
+    setup();
+    CQ_EXPECT_ABORT(cq_barrel_region(0));
+}
+
+static void shift_var_barrel_steps_of_width_zero(void)
+{
+    setup();
+    CQ_EXPECT_ABORT(cq_barrel_steps(0, CQ_BARREL_ASHR));
+}
+
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(mux_dst_aliases_the_true_arm),
     CQ_DEATH_CASE(mux_dst_aliases_the_false_arm),
@@ -240,5 +329,9 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(lshr_var_dst_aliases_its_source),
     CQ_DEATH_CASE(ashr_var_dst_aliases_its_source),
     CQ_DEATH_CASE(shift_var_the_value_is_the_amount),
-    CQ_DEATH_CASE(shift_var_a_width_of_zero)
+    CQ_DEATH_CASE(shift_var_a_width_of_zero),
+    CQ_DEATH_CASE(shift_var_barrel_step_index_past_the_end),
+    CQ_DEATH_CASE(shift_var_barrel_step_index_is_negative),
+    CQ_DEATH_CASE(shift_var_barrel_region_of_width_zero),
+    CQ_DEATH_CASE(shift_var_barrel_steps_of_width_zero)
 )

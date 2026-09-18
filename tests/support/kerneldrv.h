@@ -106,15 +106,65 @@ cq_kd_ctrl  cq_kd_get_ctrl(void);
 const char *cq_kd_ctrl_name(cq_kd_ctrl mode);
 
 
+/* --- L1's ANCHOR PROVIDER (PRD-v2 §7.12, bead hkg). ----------------------
+ *
+ * An ANCHOR is a value tuple FORCED INTO EVERY DRAW. A pool row is not: since
+ * 2026-08-21 L1 is a constant sample budget, so a named row is merely one the
+ * draw MAY reach, and at 32 samples over a 64-bit value space it reaches a
+ * named 64-bit pattern with probability ~0. That is tolerable for the integer
+ * catalogue, where the §3 fold table dispatches on a bit's KIND and never on a
+ * qubit's value (D6), so at the all-quantum mask the circuit is byte-for-byte
+ * identical across every value pair. It is NOT tolerable for fp: the value
+ * space has structure — ±0, ±Inf, quiet and signalling NaNs, the subnormal
+ * boundary, the tie-to-even cases — and every one of those is a BRANCH of the
+ * ported ifelse tree, reached through the CLASSICAL lanes, which is exactly
+ * where values do matter.
+ *
+ * THE CONTRACT, in two calls:
+ *
+ *   anchors(W, -1, NULL)  -> how many anchors exist at this width. `v` may be
+ *                            NULL and nothing is written. 0 means "none here",
+ *                            which is how one provider serves a whole ladder
+ *                            while naming values only at W = 64.
+ *   anchors(W,  i, v)     -> fills the operands it NAMES in v[0..n_src-1] and
+ *                            returns 1; returns 0 if `i` is out of range.
+ *
+ * IT OVERWRITES, IT DOES NOT FILL. The sampler draws a random value per
+ * operand at its own width FIRST and then lets the provider overwrite the
+ * operands it names, so a three-source kernel whose provider names two of them
+ * still gets a drawn third. Filling the rest with zero instead is the recorded
+ * cq_kd_case2 trap — every mux case run with one arm pinned at 0, green, and
+ * half a kernel — and a provider is one edit away from re-acquiring it.
+ *
+ * IT LIVES ON THE SHAPE AND NOT ON cq_kd_spec, AND THAT IS FORCED RATHER THAN
+ * CHOSEN. bd hkg asks for a trailing member of cq_kd_spec; MEASURED on this
+ * box (Apple clang 17, `cc -std=c11 -Wall -Wextra -Werror -Wconversion`), a
+ * 7th member makes every one of the 39 POSITIONAL six-field spec initialisers
+ * across tests/ a hard error — `-Wmissing-field-initializers` is inside
+ * -Wextra and does fire on a trailing omission — so "zero means no anchors"
+ * cannot be had that way without editing twelve unrelated suites. cq_kd_shape
+ * is brace-initialised NOWHERE (it is always built by cq_kd_default_shape and
+ * then mutated), so the same trailing-field property is available there for
+ * free. It is also the better home on the merits: a provider must know the
+ * arity and each operand's width to fill `v`, which is precisely what the
+ * shape carries, and a kernel that needs anchors already declares a shape. */
+typedef int (*cq_kd_anchor_fn)(int W, int i, cq_ref_w *v);
+
 /* The per-width shape of one kernel call. `classical[i]` names the bits of
  * source i that MUST be classical — the driver clears them from every mask it
  * generates, so a constrained operand is never handed a qubit. `~0` means the
- * whole operand (K4's shift amount); 0 means unconstrained (the usual case). */
+ * whole operand (K4's shift amount); 0 means unconstrained (the usual case).
+ *
+ * `anchors` is the trailing member and NULL means "no anchors", which is
+ * today's sampler byte for byte — cq_kd_default_shape nulls it, so a spec that
+ * declares no shape function, or one whose shape starts from the defaults,
+ * cannot acquire anchors by accident. */
 typedef struct {
-    int      n_src;
-    int      w[CQ_KD_MAX_SRC];
-    int      w_dst;
-    uint64_t classical[CQ_KD_MAX_SRC];
+    int             n_src;
+    int             w[CQ_KD_MAX_SRC];
+    int             w_dst;
+    uint64_t        classical[CQ_KD_MAX_SRC];
+    cq_kd_anchor_fn anchors;
 } cq_kd_shape;
 
 typedef void     (*cq_kd_shape_fn)(int W, cq_kd_shape *out);
@@ -172,7 +222,31 @@ int cq_kd_samples(void);
  *
  * Serves every arity and every operand width from the spec's own shape, so a
  * three-source kernel needs no bespoke driver: the old cq_kd_case2 path filled
- * values[2] with ZERO and ran every mux case with one arm pinned at 0. */
+ * values[2] with ZERO and ran every mux case with one arm pinned at 0.
+ *
+ * WHEN THE SHAPE DECLARES ANCHORS the schedule becomes, per width:
+ *
+ *   slot 0              the all-classical mask pair, drawn values  (IS L5)
+ *   slot 1              the all-quantum  mask pair, drawn values   (L4's mask)
+ *   slots 2 .. 2+T-1    the ANCHOR BLOCK — A anchors at each of THREE mask
+ *                       rows, in ROW-MAJOR-BY-ROW order: every anchor at
+ *                       all-classical, then every anchor at a-quantum/
+ *                       b-classical, then every anchor at a-classical/
+ *                       b-quantum. The four value corners are REPLACED.
+ *   slots 2+T .. n-1    the joint random draw, as before.
+ *
+ * THE ROW ORDER IS THE TRUNCATION ORDER, AND THAT IS THE WHOLE REASON FOR IT.
+ * T = min(3A, n-2): the BUDGET WINS, and what the budget drops is whole mask
+ * ROWS rather than whole anchors, so a tight budget still runs EVERY anchor at
+ * the all-classical row — the row where an fp value reaches the kernel's
+ * special-case tree at all. The mixed rows exist because a NaN payload in a
+ * QUANTUM operand exercises the circuit's own path rather than the classical
+ * short-circuit, and they are the first thing a small budget gives up.
+ *
+ * NOTHING IS DROPPED SILENTLY: the printed `#` line names A, T, the number of
+ * anchor cases dropped and how many random draws are left, and CQOPS_L1_SAMPLES
+ * raises the budget. bd hkg's instruction is to widen the ANCHORS and leave the
+ * budget at 32, so a default fp run does drop the mixed rows and says so. */
 void cq_kd_sample_at(const cq_kd_spec *k, int W);
 
 /* The whole L1-L3 sweep for one kernel: cq_kd_sample_at over the standard
