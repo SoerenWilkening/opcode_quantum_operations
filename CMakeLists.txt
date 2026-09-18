@@ -300,6 +300,26 @@ add_library(cqops STATIC
                                # and region arithmetic ASKED of M14/M16/M17/M31,
                                # operand resolution over views and constant
                                # spans, and the one-gate-per-slot dispatch
+    src/kernels/fpround.c      # M32, K23 (v2) — the four ROW TABLES: the shared
+                               # softfloat helpers _sf_normalize_to_bit52,
+                               # _sf_normalize_clz, _sf_handle_subnormal and
+                               # _sf_round_and_pack (softfloat_common.jl:68-105,
+                               # :113-139, :174-191, :198-227), one row per
+                               # operator occurrence and nothing else
+    src/kernels/fpround_step.c # M32, K23 (v2) — the ROW TABLES <-> STEP MACHINE
+                               # seam (M36's D-K18-7): slot and region
+                               # arithmetic ASKED of M12, M14, M16 and M17, and
+                               # operand resolution over collapsing view chains
+                               # and constant spans
+    src/kernels/fpround_emit.c # M32, K23 (v2) — the LAYOUT-AND-OPERANDS <->
+                               # DISPATCH-AND-SURFACE seam (D-K23-10, taken at
+                               # implementation at 418 of Rule 12's 300): the
+                               # one-gate-per-slot dispatch and the four public
+                               # blocks. src/kernels/fpround_int.h is the seam
+    src/kernels/fpround_eval.c # M32, K23 (v2) — the _eval <-> CIRCUIT seam: the
+                               # same four bodies over uint64_t for each
+                               # consumer's R9 row (PRD-v2 §7.4, D-K23-9). NOT
+                               # L1's oracle — that is tests/support/fpref.c
     src/kernels/fcmp_pred.c    # M36, K18 (v2) — PRD-v2 §5's ORDERED CORE <->
                                # PREDICATE TABLE seam: the seven one-line
                                # compositions, instructions.jl's fourteen-row

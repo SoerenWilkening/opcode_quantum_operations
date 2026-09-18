@@ -32,6 +32,18 @@
  * else commutes — phases 1 and 2 are two CX into the same target, and phase 0
  * targets `r[i]`, which nothing before phase 3 reads. So the only reordering
  * that breaks this block is one that moves phase 3 earlier. */
+int cq_mux_steps(int W)
+{
+    if (W <= 0) cq_kernel_die("mux: region width is not positive");
+    return CQ_MUX_STEPS_PER_BIT * W;
+}
+
+int cq_mux_region(int W)
+{
+    if (W <= 0) cq_kernel_die("mux: region width is not positive");
+    return 2 * W;                          /* r ++ d */
+}
+
 void cq_mux_step(cq_ctx *ctx, const cq_mux_block *b, int u)
 {
     int i = u / CQ_MUX_STEPS_PER_BIT;

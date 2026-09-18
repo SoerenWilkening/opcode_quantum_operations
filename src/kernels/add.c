@@ -108,6 +108,12 @@ int cq_add_steps(int W)
     return 5 * W - 2;
 }
 
+int cq_add_region(int W)
+{
+    if (W <= 0) cq_kernel_die("add: region width is not positive");
+    return 2 * W;                          /* t ++ c */
+}
+
 void cq_add_step(cq_ctx *ctx, const cq_add_block *k, int u)
 {
     /* The width guard runs first, inside cq_add_steps, and its message is
@@ -136,6 +142,12 @@ int cq_sub_steps(int W)
 {
     if (W <= 0) cq_kernel_die("sub: width is not positive");
     return 7 * W - 1;                      /* 2W complement + 1 seed + 5W-2 */
+}
+
+int cq_sub_region(int W)
+{
+    if (W <= 0) cq_kernel_die("sub: region width is not positive");
+    return 3 * W;                          /* nb ++ d ++ c */
 }
 
 void cq_sub_step(cq_ctx *ctx, const cq_sub_block *k, int u)

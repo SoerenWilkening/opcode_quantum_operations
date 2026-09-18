@@ -190,6 +190,10 @@ int cq_ult_steps(int W);
  * error in BOTH configurations, for cq_sub_step's reason. */
 void cq_ult_step(cq_ctx *ctx, const cq_ult_block *k, int u);
 
+/* `3W + 1` — `nb ++ carry ++ axnb`, the carry being W+1 and NOT W. Additive,
+ * and for cq_eq_region's reason. */
+int cq_ult_region(int W);
+
 /* --- `lower_eq!`'s compute half, exported for the fp port (PRD-v2 §7.10). --
  *
  * WHO ASKED, AND WHY IT IS A BLOCK RATHER THAN A CALL. PRD-v2 §7.10 measured
@@ -243,6 +247,16 @@ int cq_eq_steps(int W);
 /* One gate of the block, `u` in [0, cq_eq_steps(W)). Out of range is a hard
  * error in BOTH configurations, for cq_ult_step's reason. */
 void cq_eq_step(cq_ctx *ctx, const cq_eq_block *k, int u);
+
+/* `2W - 1` — the bits a consumer's layout must budget for `diff ++ orr`, in
+ * EITHER order. ADDITIVE, 2026-09-18 (bd 9ve.19): the number was published
+ * only in the prose above, so M32's flat scratch would have written `2W - 1`
+ * down at every one of its seventeen `eq` rows. A sibling's layout moving must
+ * redden a case that NAMES the block rather than silently shift 154 offsets —
+ * the same argument the composition-check discipline makes for STEP counts.
+ * No behaviour changed and no golden moved. The `W <= 0` message is DISJOINT
+ * from cq_eq_steps' so a death case can say which of the two spoke. */
+int cq_eq_region(int W);
 
 /* The raw flag `a != b`, inside the caller's own region. */
 const cq_bit *cq_eq_flag(const cq_eq_block *k);
@@ -317,6 +331,12 @@ int cq_slt_steps(int W);
 /* One gate of the block, `u` in [0, cq_slt_steps(W)). Out of range is a hard
  * error in BOTH configurations, for cq_ult_step's reason. */
 void cq_slt_step(cq_ctx *ctx, const cq_slt_block *k, int u);
+
+/* `2W + cq_ult_region(W)` — `af ++ bf` plus the inner comparator's three
+ * vectors. Additive, and for cq_eq_region's reason. The inner term is CALLED,
+ * never written out, so a consumer composing the two cannot disagree with M16
+ * about what the inner block occupies — cq_slt_steps' own shape. */
+int cq_slt_region(int W);
 
 /* The raw flag `a >=s b`, inside the caller's own region. */
 const cq_bit *cq_slt_flag(const cq_slt_block *k);

@@ -1,0 +1,52 @@
+# M32 kernels/fpround*.c — K23, the four shared softfloat helpers as step blocks (COMPUTE HALF, no copy-out)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+# measured-at: PER CALLER-SHAPED MASK (D-K23-7): `fwd@allq` is every input all-quantum; `fwd@caller` is `wr`/`m` quantum with the exponent and the sign CLASSICAL, which is fsqrt's and flog's own call shape. W is 64 (f64 only)
+#
+# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open
+# reads them back, and a checking run fails if either
+# disagrees with the snapshot on disk or with what the suite
+# declares. The mask matters because operand folds still fire
+# (a^0 and x&0 legitimately emit fewer gates, which is what L5
+# proves), so a count is a function of (W, operand mask) — and
+# a golden that does not say which mask it was taken at pins
+# nothing. The line above is per-file for the reason bd 2r5
+# records: as a literal in the writer it was false in four of
+# the twelve files and nothing could contradict it.
+#
+# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with
+# no demotion (D6) a mask can only drift TOWARDS Q, so it is
+# the FIXED POINT, and the one mask where forward and unc
+# agree. A file measured anywhere else says so above, and owes
+# the reader a note saying why.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# M32 ships NO Rule 7 kernel, so these are ONE compute half each and
+# there is no copy-out and no `unc` row: a block's reverse half is the
+# same indices replayed over the same operands, which the palindrome
+# case asserts gate for gate rather than as a count.
+# The counts are FAR below the slot counts — 41 of K23's 154 rows are
+# VIEWS and every constant is a `const cq_bit` SOURCE (PRD-v2 §7.3),
+# so the fold table elides gates at EVERY mask including all-quantum.
+# kernel   pass      W   NOT  CNOT  Toffoli
+norm52    fwd@allq  64   404  4857     2157
+norm52    fwd@caller  64   412  4603     2094
+clz       fwd@allq  64   402  4218     1902
+clz       fwd@caller  64   408  4028     1839
+subnorm   fwd@allq  64   419  5635     2108
+subnorm   fwd@caller  64   427  5379     2108
+round     fwd@allq  64   396  2866     1280
+round     fwd@caller  64   437  2607     1279

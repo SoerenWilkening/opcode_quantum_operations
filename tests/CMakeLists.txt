@@ -25,6 +25,15 @@ add_library(cqops_test_support STATIC
     support/bitkinds.c      # Step 10 — (value, quantum-mask) -> register
     support/fpanchors.c     # bd hkg — PRD-v2 §7.12's f64 L1 anchors as bit patterns,
                             # forced into every draw through cq_kd_shape.anchors
+    support/fpref.c         # bd 9ve.19 / PRD-v2 §7.16 — M32's L1 ORACLE: a
+                            # hand-written IEEE 754 reference model for the four
+                            # shared softfloat helpers, written from the
+                            # standard's rules and NEVER from the Julia. It is
+                            # NOT src/kernels/fpround_eval.c, which is the Julia
+                            # transcription the library's own R9 rows call and
+                            # which this file is the check ON (the Step 18 trap:
+                            # an oracle sharing shape with the implementation is
+                            # blind to what that implementation gets wrong)
     support/poolcheck.c     # Step 10 — the automatic L2 and L3 assertions
     support/kerneldrv.c     # Step 10 — the shared Phase-B four-level gate
     support/kernelsweep.c   # Step 11 — the sweep shapes (plan §2.2's split seam)
@@ -2096,6 +2105,77 @@ set_tests_properties(test_kernel_fcmp_death.oeq_dst_aliases_its_first_source
                      test_kernel_fcmp_death.olt_sources_alias_each_other
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "distinctness;scratch:;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;Assertion failed")
+
+## M32 `fpround` — K23, the four SHARED softfloat helpers as exported step
+## blocks (bd 9ve.19). PRD-v2 §5's M32 row, §7.1's instruments-before-the-
+## blocks, §7.2's literal grain, §7.3's constants-as-sources, §7.4's C
+## transcription, §7.6's two CLAMPED D8 rows, §7.12's anchors, and §7.16's
+## decision that L1 here is a hand-written IEEE-754 reference model.
+##
+## NO RULE 7 KERNEL AND NO WIDTH LADDER, so this suite is SLOW PER CASE and not
+## per width: four helpers at 6,287 to 9,165 SLOTS each, driven by hand over
+## three operand-mask rows and a forced anchor list. §7.13 has already said the
+## wall clock is not a reason to cut the budget.
+add_cqops_test(test_kernel_fpround)
+
+## M32's fail-loud paths. Which layer would answer for each guard, and why the
+## regex names it, is in the death file's header.
+add_cqops_death_test(test_kernel_fpround_death CASES
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    output_of_a_block_that_does_not_fit
+    a_block_with_no_region
+    a_block_id_outside_the_four
+    an_output_that_is_not_declared
+    arity_of_an_unknown_op
+    flushed_with_no_output_array
+    round_has_no_result_sign
+)
+
+## (1) THE STEP-INDEX GUARD IS MASKED FROM BELOW ON BOTH SIDES, and differently
+## on each. A NEGATIVE `u` reaches the first row of every program — an `eq`, an
+## `slt` or a `mux` — whose own range guard aborts, so that case would report
+## green with M32's guard deleted. The HIGH side walks off the end of the row
+## table and dies in M32's OWN fall-off `cq_kernel_die`, a DIFFERENT message
+## from the same module, so that one is pinned absent too and only then is this
+## case a claim about the range check. Every other layer a wild index can reach
+## is named as well, enumerated with
+## `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c`, plus both sanitizer
+## banners and `Assertion failed` — bd 9ve.18's M31 finding, carried here on
+## purpose because a Debug-only assert landing inside the CQ_EXPECT_ABORT
+## window makes a mutant survive in Debug and die in Release.
+set_tests_properties(test_kernel_fpround_death.step_index_past_the_end
+                     test_kernel_fpround_death.step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fpround: the step dispatch fell off;fpround: the block's region;fpround: a one-bit operand;fpround: a 64-lane operand;fpround: an operand names a row;eq: step index outside;ult: step index outside;slt: step index outside;sub: step index outside;add: step index outside;barrel: step index outside;eq: width is not positive;ult: width is not positive;slt: width is not positive;sub: width is not positive;add: width is not positive;mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
+## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
+## outside the region") — a real abort inside the window, in BOTH
+## configurations, naming the REGION rather than the consumer that mis-sized
+## its offset. The accessors carry the same check, which is why the output case
+## is in this group.
+set_tests_properties(test_kernel_fpround_death.block_region_is_one_bit_short
+                     test_kernel_fpround_death.block_offset_runs_off_the_region
+                     test_kernel_fpround_death.output_of_a_block_that_does_not_fit
+                     test_kernel_fpround_death.a_block_with_no_region
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fpround: step index outside;fpround: the step dispatch fell off;eq: step index outside;ult: step index outside;slt: step index outside;sub: step index outside;add: step index outside;barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (3) THE VOCABULARY. Nothing below M32 knows what a block id, a row op or an
+## output index is, so no lower layer can answer for these — but an unknown id
+## falling through would return a NULL table and an undeclared output would
+## index the out-row table out of bounds, so the layers that WOULD then speak
+## are pinned absent to keep each case a claim about M32's own refusal.
+set_tests_properties(test_kernel_fpround_death.a_block_id_outside_the_four
+                     test_kernel_fpround_death.an_output_that_is_not_declared
+                     test_kernel_fpround_death.arity_of_an_unknown_op
+                     test_kernel_fpround_death.flushed_with_no_output_array
+                     test_kernel_fpround_death.round_has_no_result_sign
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fpround: step index outside;fpround: the block's region;eq:;ult:;slt:;sub:;add:;barrel:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
 
 add_cqops_death_test(test_kernel_qrom_death CASES
     an_index_narrower_than_the_tree

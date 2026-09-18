@@ -145,6 +145,18 @@ typedef struct {
  * gives a NEGATIVE Toffoli count at that width. */
 int cq_add_steps(int W);
 
+/* `2W` — the bits a consumer's layout must budget for `t ++ c`, in EITHER
+ * order. ADDITIVE, 2026-09-18 (bd 9ve.19): the number was published only in
+ * the prose above, so M32's flat scratch would have written `2W` down at every
+ * one of its two `add` rows — the thing the composition-check discipline
+ * exists to remove for the STEP counts and removes here for the same reason.
+ * A sibling's layout moving must redden a case that NAMES the block, not
+ * silently shift a consumer's offsets. No behaviour changed and no golden
+ * moved; the same `W <= 0` refusal as cq_add_steps, with a DISJOINT message so
+ * a death case can say which of the two spoke (M15's cq_addacc_check
+ * precedent). */
+int cq_add_region(int W);
+
 /* One gate of the block, `u` in [0, cq_add_steps(W)). Out of range is a hard
  * error in BOTH configurations, for cq_sub_step's reason: a consumer maps a
  * contiguous run of its own step indices onto this one, and an off-by-one
@@ -189,6 +201,9 @@ typedef struct {
  * W = 1 too: `(W+1, 4W, 2W-2)` is `(2, 4, 0)`, and hand-counting `lower_sub!`
  * at W = 1 gives the same six gates (K12.md §3.1). */
 int cq_sub_steps(int W);
+
+/* `3W` — `nb ++ d ++ c`. Additive, and for cq_add_region's reason. */
+int cq_sub_region(int W);
 
 /* One gate of the block, `u` in [0, cq_sub_steps(W)). Out of range is a hard
  * error in BOTH configurations: a consumer maps a contiguous run of its own

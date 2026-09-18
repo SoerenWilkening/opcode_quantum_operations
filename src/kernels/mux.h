@@ -98,4 +98,15 @@ enum { CQ_MUX_STEPS_PER_BIT = 4 };
 /* One gate of the block: `u` in [0, 4W), bit `u / 4`, phase `u % 4`. */
 void cq_mux_step(cq_ctx *ctx, const cq_mux_block *b, int u);
 
+/* `4W` slots and `2W` bits (`r ++ d`), in EITHER order. ADDITIVE, 2026-09-18
+ * (bd 9ve.19). K15.md §3.0 had already noted that `cq_mux_steps(W)` would be
+ * cleaner than multiplying the enum, and M32 composes this block THIRTY-FOUR
+ * times over flat scratch — multiplying a published enum by W is defensible
+ * once and thirty-four copies of `4W` is exactly what the composition-check
+ * discipline exists to remove. `cq_mux_block` carries no `W` (it is a
+ * per-bit block, mux.c), so a consumer running it over a 64-lane span passes
+ * that span's width here. No behaviour changed and no golden moved. */
+int cq_mux_steps (int W);
+int cq_mux_region(int W);
+
 #endif /* CQOPS_KERNELS_MUX_H */

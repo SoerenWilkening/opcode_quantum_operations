@@ -95,6 +95,12 @@ int cq_eq_steps(int W)
     return 5 * W - 3;                      /* 2W diff + 3(W-1) OR-prefix */
 }
 
+int cq_eq_region(int W)
+{
+    if (W <= 0) cq_kernel_die("eq: region width is not positive");
+    return 2 * W - 1;                      /* diff ++ orr, orr being W-1 */
+}
+
 void cq_eq_step(cq_ctx *ctx, const cq_eq_block *k, int u)
 {
     int W = k->W;
@@ -158,6 +164,12 @@ int cq_ult_steps(int W)
     return 6 * W + 1;                      /* 2W complement + 1 seed + 4W */
 }
 
+int cq_ult_region(int W)
+{
+    if (W <= 0) cq_kernel_die("ult: region width is not positive");
+    return 3 * W + 1;                      /* nb ++ carry(W+1) ++ axnb */
+}
+
 void cq_ult_step(cq_ctx *ctx, const cq_ult_block *k, int u)
 {
     int W = k->W;
@@ -219,6 +231,12 @@ int cq_slt_steps(int W)
 {
     if (W <= 0) cq_kernel_die("slt: width is not positive");
     return 2 * W + 2 + cq_ult_steps(W);    /* 2W copy + 2 bias + the inner ult */
+}
+
+int cq_slt_region(int W)
+{
+    if (W <= 0) cq_kernel_die("slt: region width is not positive");
+    return 2 * W + cq_ult_region(W);       /* af ++ bf ++ the inner ult */
 }
 
 void cq_slt_step(cq_ctx *ctx, const cq_slt_block *k, int u)
