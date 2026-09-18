@@ -263,7 +263,7 @@ surface with nothing left over** (§0's fourth row). Grouped by what a port actu
 | conversions | 636 | `fpconv.jl`, `fptosi.jl`, `fptoui.jl`, `sitofp.jl` | `uitofp` is `zext`-to-64 then `soft_sitofp` — upstream's own routing, not our invention |
 | rounding | 120 | `fround.jl` | `floor`/`ceil`/`trunc`/`round`/`rint`/`nearbyint`, **out of grid**. **The names do not map one-to-one (§7.7, 2026-09-18):** `rint`/`nearbyint` are `soft_round` (ties-to-even), C's `round` is `soft_round_away`; there is **no `soft_rint`** — this row named the right file and implied a function that does not exist |
 | `fmin` / `fmax` | 84 | `fmin.jl` | **out of grid**. `llvm.minnum`/`maxnum` are **`soft_fmin`/`soft_fmax`** (NaN-absorbing), NOT the NaN-propagating `soft_fminimum`/`soft_fmaximum` in the same file (§7.7) |
-| `fsqrt` | 79 | `fsqrt.jl` | **out of grid**; digit-by-digit restoring root that *"structurally mirrors `soft_fdiv`'s restoring loop"* (`fsqrt.jl:6-7`). **Had no §5 row until 2026-09-18 — now M40** |
+| `fsqrt` | 79 | `fsqrt.jl` | **out of grid**; digit-by-digit restoring root that *"structurally mirrors `soft_fdiv`'s restoring loop"* (`fsqrt.jl:9` (mirror) / `:11-15` (Kahan) — corrected 2026-09-18 by K21.md from `:6-7`, which was the docstring's opening line). **Had no §5 row until 2026-09-18 — now M40** |
 | `fsqrt` | 79 | `fsqrt.jl` | **out of grid** |
 
 **`frem` is in the grid (60 symbols) and the corpus calls it ZERO times** — and Bennett does not have
@@ -448,15 +448,15 @@ Numbering continues v1's M01–M30.
 | Module | What | Est. LOC | **Seam, recorded in advance** |
 |---|---|---:|---|
 | **M31 `fpfield`** | **K22** (number assigned 2026-09-18 so the K-doc exists). The IEEE field views over a `cq_bit` array — sign / exponent / mantissa as `cq_scratch_span`-shaped read-only views, the implicit-bit rules, and the class predicates (`is_nan`, `is_inf`, `is_zero`, `is_subnormal`) as one-bit kernels | 180 | **VIEWS ↔ CLASS PREDICATES.** The views emit nothing and are pure addressing; the predicates are Rule 7 kernels with `dst` one bit, which is **K9's shape** and needs K9's test adapter. Split at the first predicate |
-| **M32 `fpround`** | **K23** (assigned 2026-09-18). The shared round-and-pack path — `soft_fround`'s `_sf_round_and_pack`, sticky/guard/round bits, the carry-out that bumps subnormal→normal **Widened 2026-09-18 (K15.md risk 5): M32 also owns the shared normalisation helpers `_sf_normalize_clz` and `_sf_handle_subnormal` (`softfloat_common.jl`), which `fadd`/`fmul`/`fdiv`/`fma` all call — assigned here so they are transcribed once as exported step blocks, not four times** | 260 | **PACK ↔ ROUND.** Upstream keeps them in one helper; at our LOC limit the rounding-decision logic splits from the field assembly. Seam is at the point the decision bit is known |
+| **M32 `fpround`** | **K23** (assigned 2026-09-18). The shared round-and-pack path — `soft_fround`'s `_sf_round_and_pack`, sticky/guard/round bits, the carry-out that bumps subnormal→normal **Widened 2026-09-18 (K15.md risk 5): M32 also owns the shared normalisation helpers `_sf_normalize_clz` and `_sf_handle_subnormal` (`softfloat_common.jl`), which `fadd`/`fmul`/`fdiv`/`fma` all call — assigned here so they are transcribed once as exported step blocks, not four times** **— and `_sf_normalize_to_bit52` too (K21.md, 2026-09-18): nine call sites in `fsqrt`/`fmul`/`fdiv`/`fma`/`flog`, and `fsqrt` calls it INSTEAD of the two above (`fsqrt.jl:27-29`, no subnormal result path)** | 260 | **PACK ↔ ROUND.** Upstream keeps them in one helper; at our LOC limit the rounding-decision logic splits from the field assembly. Seam is at the point the decision bit is known |
 | **M33 `fadd`** | K15 — `soft_fadd` / `soft_fsub` | 280 | **ALIGN ↔ ADD-AND-NORMALISE.** The exponent-difference shift is the half that is `O(W)` in its own right and is the half `fma` reuses. **Do not spell `fsub` as `fadd(a, fneg(b))`** — upstream fixed a NaN-RHS sign bug in exactly that composition (`Bennett-m63k`) |
-| **M34 `fmul`** | K16 — `soft_fmul` | 240 | **SIGNIFICAND PRODUCT ↔ EXPONENT/PACK.** The 53×53 product is M18's `mul` over a span; the seam is where the integer kernel ends |
+| **M34 `fmul`** | K16 — `soft_fmul` | 240 | **SIGNIFICAND PRODUCT ↔ EXPONENT/PACK.** The 53×53 product is M18's `mul` over a span; the seam is where the integer kernel ends. **Fixed 2026-09-18 (K16.md): the cut is at `fmul.jl:136`, after the 106-bit `(hi, lo)` assembly — the pair M39 reuses — not at `:81` after the four raw products, so all four `cq_mul_block` offsets stay in one file. Three K16 items settled by this document rather than in code: `ma & 0x03FFFFFF` is a VIEW (§7.3 as amended the same day — constant masks are wiring; this note first said BLOCK for three hours); `fmul.jl:94-102`'s abandoned bindings are TRANSCRIBED and marked dead, on §7.6's discarded-arm rule (the grain is mechanical, and 960 slots is the price of not deciding what is live); K11.md §7.5's `n_a·n_b` product identity does NOT hold inside M34, where a mask block's output is pre-materialised scratch (64 quantum lanes) — slots are unaffected, gates must be measured** |
 | **M35 `fdiv`** | K17 — `soft_fdiv` | 240 | **The 56-bit restoring-division loop ↔ pre-normalisation.** The loop is K12's shape and should **compose M19's exported step block, not transcribe it** (plan §0.4's obligation, and the K11/K12 composition-check trap applies verbatim) |
 | **M36 `fcmp`** | K18 — the 10 ported predicates + the 4 operand-swaps | 200 | **ORDERED CORE ↔ PREDICATE TABLE.** K9's exact shape: *four predicates swap operands and five invert the flag, and the two sets are not the same set*. Expect the fp table to differ; **derive it, do not carry K9's over** |
 | **M37 `fconv`** | K19 — `fptosi` / `fptoui` / `sitofp` / `uitofp` / `fpext` / `fptrunc` | 220 | **INT→FP ↔ FP→INT.** They share nothing but the field views, and only the second has a saturation/undefined story (D3's posture) |
 | **M38 `fmisc`** | `fneg` / `fabs` / `copysign` / `fmin` / `fmax` / rounding | 200 | **SIGN OPS ↔ EVERYTHING ELSE.** The sign ops are zero-Toffoli and have a true L5 row; the rest go through M32 |
-| **M39 `fma`** | K20 — `soft_fma`. **§6.1 took it (2026-09-17), so this row is no longer conditional** | 260 | **Reuses M33's align and M34's product.** Seam is the single-rounding path that is the whole point of an `fma` and is what forbids spelling it `fmul` then `fadd` |
-| **M40 `fsqrt`** | K21 — `soft_fsqrt`. **Added 2026-09-18**: §3.3 listed it and this table had no row for it | 240 | **PRE-NORMALISE ↔ THE DIGIT LOOP.** The loop is `soft_fdiv`'s restoring shape a second time (`fsqrt.jl:6-7`), two bits per iteration over a 128-bit radicand held as a `(hi, lo)` pair — compose M14/M16/M17's step blocks as M35 does, do not transcribe |
+| **M39 `fma`** | K20 — `soft_fma`. **§6.1 took it (2026-09-17), so this row is no longer conditional** | 260 | **Reuses M33's align and M34's product** — **as VOCABULARY, not as blocks (K20.md, 2026-09-18): `fma`'s product is `_sf_widemul_u64_to_128`'s 32/32 split, not `fmul`'s 27/26 (`softfloat_common.jl:261-263`: 27/26 "assumes ≤53-bit inputs" and Berkeley scaling makes `fma`'s 63), and its align is the four-case 128-bit `_shiftRightJam128` ×2, not `fadd`'s one-case 64-bit shift. What it reuses is M18/M12/M16/M17/M14's step blocks, exactly as M34 does; M33/M34 owe it nothing. Its 128-bit adds materialise the carry as a VALUE (compare + mux + a second add), so `cq_add_block` needs no carry-in or carry-out — a carry-chained 128-bit adder would be a re-derivation. Seam fixed between `fma.jl:115` and `:118`: PRODUCT-AND-ALIGN ↔ THE SINGLE-ROUNDING PATH.** The single-rounding path is the whole point of an `fma` and is what forbids spelling it `fmul` then `fadd` |
+| **M40 `fsqrt`** | K21 — `soft_fsqrt`. **Added 2026-09-18**: §3.3 listed it and this table had no row for it | 240 | **PRE-NORMALISE ↔ THE DIGIT LOOP.** The loop is `soft_fdiv`'s restoring shape a second time (`fsqrt.jl:9` (mirror) / `:11-15` (Kahan) — corrected 2026-09-18 by K21.md from `:6-7`, which was the docstring's opening line), two bits per iteration over a 128-bit radicand held as a `(hi, lo)` pair — compose M14/M16/M17's step blocks as M35 does, do not transcribe |
 | *(no module)* | **the fp rail representation** | 0 | §3.1 — there is nothing to build |
 | `cq_runtime_rail.c` / `cq_runtime_gate.c` | the 34 deferred fp-width core symbols | — | **Already recorded in plan §3's Layer-5 seam table**, and the recorded disposition is *"they become real code by WIDENING what already exists"*. No new seam |
 
@@ -640,7 +640,13 @@ each cost 64 of its 29,949 wires. We pass them as `const cq_bit` arrays of `CQ_B
 and the §3 fold table elides every gate they control — a `CCX` with a `ZERO` control is nothing,
 with a `ONE` control a `CX`. **Our peak is therefore BELOW upstream's ancilla figure for the same
 construction**, and the difference is not a bug to chase in either direction. `a & ~SIGN_MASK`
-costs zero gates and zero qubits on classical lanes and one CX per quantum lane.
+costs zero gates and zero qubits on classical lanes and one CX per quantum lane. **AMENDED 2026-09-18 (maintainer's decision at the Wave 2 boundary, bead `9ve.18`): an AND or a shift by a
+COMPILE-TIME CONSTANT is WIRING, not a block — a VIEW keeping the lanes the mask leaves at ONE and
+`CQ_BIT_ZERO` elsewhere, with no copy, no scratch and no gate. So `a & ~SIGN_MASK`, `(a >> 52) & 0x7FF`,
+`ma & 0x03FFFFFF` and every `& FRAC_MASK` cost NOTHING; the "one CX per quantum lane" above was the
+and-BLOCK reading and is retired. M31's `cq_fp_view_*` are the implementation; K15/K16/K18/K20/K21's
+mask rows that were counted as `and`(64) blocks become views (their drafts predate this line). The
+literal grain (§7.2) is untouched for every operator whose operands are not compile-time constants.**
 
 ### 7.4 The classical short-circuit is a C TRANSCRIPTION of the same body over `uint64_t` — the library never does `double` arithmetic
 
@@ -812,6 +818,12 @@ is a dozen `fma`s, on the order of 3M gates before Rule 2 doubles it.
   the day a caller appears.
 - **`fpext`/`fptrunc`** — need an `f32` rail, which cannot exist (`cqrt_alloc_f32` aborts).
 - **`frem`** — §3.3, unchanged.
+- **`uitofp` from `i64` only** (decided 2026-09-18, bead `9ve.34`) — upstream has no `soft_uitofp`;
+  `extract/instructions.jl:7666-7677` routes `UIToFP` to `soft_sitofp`, zext-widening narrower sources
+  (correct) and passing an `i64` source straight through, so `u ≥ 2^63` comes back NEGATIVE. Porting it
+  verbatim is a known miscompile on half the input space (NORTH_STAR condition 2) and correcting it is a
+  re-derivation (Rule 1), so the `i64 → f64` symbols stay loud aborts citing that bead and the defect is
+  reported upstream; `i1`/`i8`/`i16`/`i32` sources port on the zext path.
 
 ### 7.10 What v1 owes the port before the first kernel: three step exports
 

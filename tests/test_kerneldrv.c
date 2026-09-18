@@ -413,6 +413,12 @@ CQ_TEST(cq_pc_indices_are_free_sees_an_index_that_did_not_come_back)
  * the broken-kernel idiom and CQ_TEST are all it borrows from here. */
 #include "test_kerneldrv_anchors.inc"
 
+/* bd 9ve.32's four cases. A SECOND .inc rather than four more cases in the
+ * first: the floor is the anchor block's BUDGET, not part of its schedule, and
+ * the two files share no static. Neither needs a CMake change — both are
+ * #included. */
+#include "test_kerneldrv_budget.inc"
+
 CQ_TEST_MAIN(
     CQ_CASE(the_driver_accepts_a_correct_kernel),
     CQ_CASE(l1_catches_a_wrong_value),
@@ -428,5 +434,9 @@ CQ_TEST_MAIN(
     CQ_CASE(the_anchor_schedule_is_row_major_by_row),
     CQ_CASE(an_unnamed_operand_is_still_drawn_and_not_zero_filled),
     CQ_CASE(anchors_sit_inside_the_budget_and_never_on_top_of_it),
-    CQ_CASE(the_f64_anchor_constants_are_what_they_claim)
+    CQ_CASE(the_f64_anchor_constants_are_what_they_claim),
+    CQ_CASE(a_shape_floor_runs_the_whole_anchor_block_and_drops_none),
+    CQ_CASE(a_shape_with_no_floor_runs_exactly_the_constant_budget),
+    CQ_CASE(the_environment_wins_over_the_floor_in_both_directions),
+    CQ_CASE(a_floor_below_the_constant_budget_is_ignored)
 )

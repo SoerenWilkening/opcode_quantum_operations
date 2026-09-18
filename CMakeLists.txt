@@ -281,6 +281,16 @@ add_library(cqops STATIC
     src/kernels/qstore.c       # M30, Step 27 — K14 shadow store at a quantum
                                # index over M29's tree. NOT a Rule 7 kernel
                                # (D17's shape): push/pop, one tape slot
+    src/kernels/fpfield.c      # M31, K22 (v2) — the IEEE binary64 field VIEWS
+                               # over a cq_bit span. Pure addressing: no gate,
+                               # no qubit, PRD-v2 §7.10's "constant shifts are
+                               # wiring". Layer 3 still: every gate it leads to
+                               # is X/CX/CCX and the shadow stays exact
+    src/kernels/fpclass.c      # M31, K22 (v2) — PRD-v2 §5's recorded seam, the
+                               # PREDICATES half: is_nan/is_inf/is_zero/
+                               # is_subnormal as K9-shape one-bit kernels over
+                               # an exported step block. The first module where
+                               # SLOTS and GATES come apart (D-K18-6)
 
     # Layer 4 — the analog surface. Everything above this line is a classical
     # permutation over {X, CX, CCX} (Rule 4), which is the surface the two-bit

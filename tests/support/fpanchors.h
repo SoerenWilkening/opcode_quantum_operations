@@ -138,4 +138,30 @@ int cq_fp_anchors_binary(int W, int i, cq_ref_w *v);
  * provider can offset its own indices without calling with i < 0 twice. */
 int cq_fp_anchors_binary_count(void);
 
+/* --- The generic UNARY provider (bd 9ve.18, M31's class predicates). ------
+ *
+ * Writes v[0] and NOTHING ELSE, over a tuple the sampler has already drawn, so
+ * a composing provider's other operands stay sampled rather than pinned at 0.
+ * Same two-call contract, same "f64 only" refusal.
+ *
+ * §7.12's SINGLES, not its pairs: ±0, ±Inf, the default NaN, a payload NaN of
+ * each flavour, an sNaN, the largest and smallest subnormal, the smallest
+ * normal, the largest finite, and 1.0. A unary predicate has no operand order
+ * to get wrong, so the ordered-pair argument does not apply — but the SIGN
+ * does, and that is why the two negative rows are here rather than left to the
+ * draw. M31's exponent view is lanes 52..62 and NOT 52..63; a view that
+ * swallowed the sign bit computes `ea == 0x7FF` correctly for every POSITIVE
+ * operand and wrongly for every negative one, so −Inf, −0 and a NEGATIVE
+ * subnormal are the rows that separate the two readings. A table of positive
+ * specials cannot see it, which is the degenerate-pair finding one column
+ * over.
+ *
+ *   cq_fp_anchors_unary(W, -1, NULL)  -> the count; 0 unless W == 64
+ *   cq_fp_anchors_unary(W,  i, v)     -> fills v[0], returns 1
+ */
+int cq_fp_anchors_unary(int W, int i, cq_ref_w *v);
+
+/* How many rows cq_fp_anchors_unary has at f64. */
+int cq_fp_anchors_unary_count(void);
+
 #endif /* CQOPS_TEST_FPANCHORS_H */

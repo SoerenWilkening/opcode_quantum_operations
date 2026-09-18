@@ -1806,6 +1806,84 @@ add_cqops_test(test_kernel_qrom)
 add_cqops_test(test_kernel_qstore)
 add_cqops_test(test_runtime_qram)
 
+## ---------------------------------------------------------------------------
+## M31 `fpfield` + `fpclass` — K22, the FIRST v2 kernel module (bd 9ve.18).
+## PRD-v2 §3.1, §5's VIEWS <-> PREDICATES seam, §7.2's literal grain, §7.3's
+## constants-as-sources, §7.4's C transcription, §7.12's anchors.
+##
+## ONE WIDTH, WHICH IS WHY THIS SUITE IS CHEAP DESPITE THE GATE COUNTS. PRD-v2
+## §1 scopes v2 to f64, so there is no ladder: the four predicates run at 64
+## and nowhere else, and the module names no width parameter at all.
+add_cqops_test(test_kernel_fpfield)
+
+## M31's fail-loud paths. The five guards and why each is not answered for by a
+## lower layer are in the file header; the two blocks below are the two places
+## a LOWER LAYER would answer, pinned absent.
+add_cqops_death_test(test_kernel_fpfield_death CASES
+    view_span_runs_off_the_top
+    view_span_starts_below_zero
+    view_span_is_empty
+    pack_of_a_quantum_lane
+    class_step_index_past_the_end
+    class_step_index_is_negative
+    class_block_region_is_one_bit_short
+    class_block_offset_runs_off_the_region
+    class_flag_of_a_block_that_does_not_fit
+    steps_of_an_unknown_class
+    region_of_an_unknown_class
+    eval_of_an_unknown_class
+    is_nan_dst_aliases_its_source
+)
+
+## (1) THE STEP-INDEX GUARD IS MASKED FROM BELOW BY M16, AND ONLY ON ONE SIDE.
+## `cq_fp_class_step` dispatches a negative `u` straight into `cq_eq_step`,
+## whose own range check aborts with "eq: step index outside …" — so with M31's
+## guard deleted the NEGATIVE case still aborts and would report green. The
+## high case behaves the other way: with the guard gone it falls through the
+## side loop to the `and` slot, emits a real Toffoli and RETURNS, so the death
+## harness's own "expected an abort" catches it by exit code. Both messages are
+## pinned absent regardless, because the two cases share a guard and a future
+## edit could swap which side is which. `sandwich:` and `scratch:` are here for
+## the same reason one layer down.
+set_tests_properties(test_kernel_fpfield_death.class_step_index_past_the_end
+                     test_kernel_fpfield_death.class_step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "eq: step index outside;eq: width is not positive;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness")
+
+## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
+## out-of-region span aborts in cq_scratch_span with "FATAL: scratch: span is
+## outside the region" — a real abort, inside the CQ_EXPECT_ABORT window, in
+## BOTH configurations. The message names the REGION; M31's names the block and
+## its offset, which is the only one that points at the consumer that mis-sized
+## it. Same list for the flag accessor, which carries the same check.
+set_tests_properties(test_kernel_fpfield_death.class_block_region_is_one_bit_short
+                     test_kernel_fpfield_death.class_block_offset_runs_off_the_region
+                     test_kernel_fpfield_death.class_flag_of_a_block_that_does_not_fit
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;eq: step index outside;eq: width is not positive;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness")
+
+## (3) `assert()` IS A THIRD ABORT SOURCE AND THE SANITIZER TRIPWIRE DOES NOT
+## COVER IT — MEASURED HERE, not carried over.
+##
+## The recorded shape is "a SANITIZER's abort() satisfies CQ_EXPECT_ABORT", and
+## cmake/CqopsTest.cmake's auto-prepended tripwire names the two sanitizer
+## banners for exactly that. A plain Debug `assert()` is the same failure with a
+## third banner, and it bites here: delete cq_fp_pack's all-classical guard and
+## the very next line is cq_bit_value, whose precondition is a Debug-only
+## CQ_BIT_ASSERT. Measured — Release kills the mutant (the guard is the only
+## thing between it and a silently wrong uint64_t, so nothing aborts and the
+## harness reports "expected an abort"); DEBUG PASSED, because assert's abort
+## landed inside the window. So "Assertion failed" is pinned absent, and the
+## case is a real claim in both configurations rather than in one.
+##
+## The three cq_fp_view cases need no equivalent: measured, both configurations
+## kill them — Release because an out-of-range view returns normally, Debug
+## because ASan sees the read past the rail and its banner is already in the
+## tripwire.
+set_tests_properties(test_kernel_fpfield_death.pack_of_a_quantum_lane
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "Assertion failed;scratch:;emit:;reg:;shadow:;qubit pool:")
+
 add_cqops_death_test(test_kernel_qrom_death CASES
     an_index_narrower_than_the_tree
     a_count_of_zero

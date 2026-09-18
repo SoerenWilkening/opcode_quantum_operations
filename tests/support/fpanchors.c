@@ -116,3 +116,44 @@ int cq_fp_anchors_binary(int W, int i, cq_ref_w *v)
     v[1] = cq_ref_w_make(FP64_PAIRS[i].b, 0u, 64);
     return 1;
 }
+
+/* --- The SINGLES (bd 9ve.18). ------------------------------------------- */
+
+/* One row per §7.12 clause that names a single value, plus the two NEGATIVE
+ * rows the header argues for. Literals only, as above: no arithmetic, host-
+ * independent, checkable by looking at it. */
+static const uint64_t FP64_SINGLES[] = {
+    CQ_F64_POS_ZERO,       CQ_F64_NEG_ZERO,
+    CQ_F64_POS_INF,        CQ_F64_NEG_INF,
+    CQ_F64_DEFAULT_NAN,
+    CQ_F64_QNAN_A,         CQ_F64_QNAN_B,
+    CQ_F64_SNAN,
+    CQ_F64_MAX_SUBNORMAL,  CQ_F64_MIN_SUBNORMAL,
+    CQ_F64_MIN_NORMAL,
+    CQ_F64_MAX,
+    CQ_F64_ONE,
+
+    /* The two that separate an 11-lane exponent view from a 12-lane one. */
+    CQ_F64_NEG(CQ_F64_MIN_SUBNORMAL),
+    CQ_F64_NEG(CQ_F64_ONE)
+};
+
+enum { N_FP64_SINGLES = (int)(sizeof FP64_SINGLES / sizeof FP64_SINGLES[0]) };
+
+_Static_assert(N_FP64_SINGLES == 15,
+               "PRD-v2 §7.12's singles plus the two sign rows; adding or "
+               "removing one is a deliberate act, so update this number and "
+               "say why in the bead");
+
+int cq_fp_anchors_unary_count(void) { return N_FP64_SINGLES; }
+
+int cq_fp_anchors_unary(int W, int i, cq_ref_w *v)
+{
+    if (W != 64) return 0;
+
+    if (i < 0) return N_FP64_SINGLES;
+    if (i >= N_FP64_SINGLES || v == NULL) return 0;
+
+    v[0] = cq_ref_w_make(FP64_SINGLES[i], 0u, 64);
+    return 1;
+}
