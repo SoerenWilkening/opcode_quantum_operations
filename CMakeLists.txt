@@ -400,6 +400,15 @@ add_library(cqops STATIC
                                # resolution, D7a's refusal, D7b's defensive
                                # copy, minting dst at the RESULT width, and the
                                # §9 region through cq_shim_ctx.c's one bracket
+    shim/cq_template_fp.c      # v2, bead 9ve.28 (2026-09-18) — the fp OPCODE
+                               # surface, on the second seam recorded in
+                               # shim/cq_template_boundary.h: the four
+                               # cq_shim_fcmp_* entry points M28's 56 live
+                               # cq_template_fcmp_*_f64* wrappers call. It owns
+                               # a family's kernel, display name and TAG SPACE
+                               # and nothing else — D7a/D7b, the mint, the §9
+                               # region, D15's record and D21's bracket are all
+                               # cq_tpl_binary's, reached identically
 
     # M28 — THE GENERATED GRID, Step 23.7. LISTED EXPLICITLY AND NEVER
     # file(GLOB): a glob is evaluated at configure time and does not re-run when
@@ -409,9 +418,11 @@ add_library(cqops STATIC
     # checklist item 16 names it. LOC-exempt by extension (tools/check_loc.sh
     # skips *.gen.c), not by location.
     #
-    # 2479 symbols across ten families: 992 integer wrappers that call into
-    # cq_template_impl.c, 603 integer _inv aborts (PRD §15 D14) and 884
-    # fp-touching aborts (PRD §1), every abort naming its own symbol and its
+    # 2479 symbols across ten families. READ THE SPLIT FROM shim/gen_shim.py's
+    # EXPECTED, not from here: it was 992 integer wrappers / 603 integer _inv
+    # aborts (PRD §15 D14) / 884 fp aborts (PRD §1) until PRD-v2's first fp
+    # family landed on 2026-09-18, and it moves again with every entry added to
+    # that file's LANDED table. Every abort still names its own symbol and its
     # bucket through cq_shim_unsupported.
     shim/generated/cq_template_fp_arith.gen.c
     shim/generated/cq_template_fp_compare.gen.c

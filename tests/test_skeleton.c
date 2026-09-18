@@ -46,6 +46,54 @@ CQ_TEST(check_macros_pass_on_truth)
     CHECK_GATES(6, 40, 12,   6, 40, 12);
 }
 
+/* A PROVOCATION WINDOW'S ARITHMETIC, FROM THE GREEN SIDE (`bd 9ve.33`). The
+ * mute/take pair under harness.h's FALSIFIABILITY heading is what every
+ * CQ_EXPECT_CAUGHT / CQ_EXPECT_CLEAN in the tree is built from, and until
+ * 2026-09-18 a take zeroed the case's whole tally rather than only what the
+ * window provoked. This case lives here, in the suite that asserts the harness
+ * itself, rather than in any of the suites that merely use it.
+ *
+ * WHAT IT CAN AND CANNOT SEE, STATED RATHER THAN IMPLIED. It kills a take that
+ * forgot to forgive (after_fail would exceed base), one that counted a
+ * provoked failure twice or not at all (caught != 1), and one that charged the
+ * case for a PASS inside a window. It CANNOT see a take that zeroes the tally
+ * outright — that is only visible when the tally was non-zero on the way in,
+ * and a case cannot carry a surviving failure and still be green. The process
+ * that can is tests/test_harness_negative_window.c, registered WILL_FAIL, and
+ * the two together are the whole claim. */
+CQ_TEST(a_provocation_window_counts_only_what_happens_inside_it)
+{
+    int base, caught, after_fail, clean, after_pass;
+
+    base = cq_h_failures_now();
+
+    /* A failure INSIDE the window: counted once, by the window, and taken back
+     * out of the tally the case will be judged on. */
+    cq_h_mute(1);
+    (void)cq_h_take_failures();
+    CHECK_EQ(1, 2);
+    caught = cq_h_take_failures();
+    cq_h_mute(0);
+    after_fail = cq_h_failures_now();
+
+    /* And a PASS inside one is counted by nobody — the negative control for
+     * the leg above, without which "forgive the window" and "forgive
+     * everything" read the same. */
+    cq_h_mute(1);
+    (void)cq_h_take_failures();
+    CHECK_EQ(1, 1);
+    clean = cq_h_take_failures();
+    cq_h_mute(0);
+    after_pass = cq_h_failures_now();
+
+    /* Asserted after both windows are shut, so a CHECK here can never be the
+     * thing a window is measuring. */
+    CHECK_EQ(caught, 1);
+    CHECK_EQ(after_fail, base);
+    CHECK_EQ(clean, 0);
+    CHECK_EQ(after_pass, base);
+}
+
 CQ_TEST(debug_invariants_track_the_configuration)
 {
     /* Both configurations are legal; what is asserted is that the flag says
@@ -203,6 +251,7 @@ CQ_TEST(the_fp_host_check_can_fail_and_names_the_rounding_arm)
 CQ_TEST_MAIN(
     CQ_CASE(library_links_and_reports_its_version),
     CQ_CASE(check_macros_pass_on_truth),
+    CQ_CASE(a_provocation_window_counts_only_what_happens_inside_it),
     CQ_CASE(debug_invariants_track_the_configuration),
     CQ_CASE(sanitizer_coverage_is_what_the_build_claims),
     CQ_CASE(leak_detection_is_what_the_build_claims),

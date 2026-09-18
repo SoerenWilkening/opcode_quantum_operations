@@ -19,6 +19,16 @@
  *   4. the budget is UNCHANGED: anchors sit inside cq_kd_samples(), never on
  *      top of it, including when the table is three times too big for it.
  *   5. the f64 constants are what they claim, by FIELD rather than by eye.
+ *
+ * THE THREE PREMISE CHECKs BELOW ARE ASSERTIONS AGAIN (`bd 9ve.33`, fixed
+ * 2026-09-18). Each of `cq_kd_samples() >= 11`, `cq_kd_samples() >= 4` and
+ * `3 * cq_fp_anchors_binary_count() > cq_kd_samples()` stands ahead of the
+ * CQ_EXPECT_CLEAN of its case, which is where a premise belongs — and for as
+ * long as a take zeroed the per-case tally, that position made them
+ * unfalsifiable: each would have printed its `# FAIL` line and then been
+ * forgiven by the very macro it guards, leaving the case green and the
+ * schedule below read off slots nobody ran. Nothing here moved; the harness
+ * did. Do not "fix" one by pushing it past the macro.
  */
 
 /* ---- A kernel that is wrong at exactly one value. ----------------------- */

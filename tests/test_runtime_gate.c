@@ -362,6 +362,8 @@ CQ_TEST_MAIN(
     CQ_CASE(ry_controlled_inv_is_ry_controlled_at_a_negated_angle),
     CQ_CASE(a_controlled_ry_taints_its_target_and_a_controlled_rz_does_not),
     CQ_CASE(the_d11_rz_refusal_emits_four_gates_per_wire_below_the_first_constant),
+    CQ_CASE(the_f64_rotations_are_the_i64_rotations_at_a_different_width_token),
+    CQ_CASE(the_controlled_f64_rotations_promote_and_each_inv_negates_theta),
     CQ_CASE(a_child_that_prints_and_exits_nonzero_did_not_abort),
     CQ_CASE(a_child_that_prints_and_dies_on_a_non_sigabrt_signal_did_not_abort),
     CQ_CASE(the_parents_pending_stdout_does_not_reappear_in_the_childs_capture),

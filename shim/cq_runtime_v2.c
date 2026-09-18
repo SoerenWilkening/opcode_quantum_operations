@@ -6,8 +6,11 @@
  * 63 qram bodies into shim/cq_runtime_qram.c; **39 since 2026-09-10** — the ABI
  * was re-vendored at CQ_lang `170ede1` and widened the fp bucket by the four
  * `cqrt_ry_f<W>_controlled` (`bd w9i`, purely additive: `opcode_table.yaml` is
- * byte-identical), so the fp core is 38 rather than 34. Every "109" and "74"
- * below is the 2026-08-27 figure.
+ * byte-identical), so the fp core is 38 rather than 34; **29 since 2026-09-18**
+ * — PRD-v2 §1's `f64` scope took the TEN f64 core symbols into
+ * `shim/cq_runtime_rail.c` and `shim/cq_runtime_gate.c` (bead 9ve.28), leaving
+ * the fp core at 28 across f16/f32/f80. Every "109" and "74" below is the
+ * 2026-08-27 figure.
  *
  * READ THE POPULATION FROM `CQ_V2_N_THUNKS`, NEVER FROM A COMMENT — THAT
  * INSTRUCTION IS THE DURABLE HALF OF THIS PARAGRAPH AND THE NUMBER IS NOT.
@@ -18,16 +21,17 @@
  * occurrence of a figure outliving the first, which is the exact failure mode
  * `CLAUDE.md`'s preamble describes.
  *
- * DERIVING 39 FROM THIS FILE, since a reader will reach for grep. `grep -c
- * cq_shim_unsupported` answers 18, and 18 is a count of LINES: 3 of them are
- * prose (this paragraph, the `(void)`-cast note, and the Ry block's), leaving 15
- * call SITES — 8 inside `CQ_V2_FP_WIDTH` expanded at four widths (32 symbols)
- * plus 7 hand-written (4 `cqrt_ry_f<W>_controlled`, 2 `..._controlled_inv`,
- * `cqrt_alloc_handle`). 32 + 7 = 39, and `nm -g` on this TU's object agrees.
- * The thunk table decomposes the SAME 39 differently — 9 per width x 4, plus 2
- * plus 1, because it folds `t_ryc_f##W` into its per-width macro where this file
- * hand-writes it — which is what makes it an independent check rather than a
- * second transcription.
+ * DERIVING 29 FROM THIS FILE, since a reader will reach for grep. `grep -c
+ * cq_shim_unsupported` answers 17 (re-measured 2026-09-18), and 17 is a count
+ * of LINES: 5 of them are prose (this paragraph, the `(void)`-cast note, the Ry
+ * block's, the f64-departure note and the `_inv` note), leaving 12 call SITES —
+ * 8 inside `CQ_V2_FP_WIDTH` expanded at THREE widths (24 symbols) plus 5
+ * hand-written (3 `cqrt_ry_f<W>_controlled`, 1 `..._controlled_inv`, and
+ * `cqrt_alloc_handle`). 24 + 5 = 29, and `nm -g` on this TU's object agrees
+ * (measured: 29 `T` symbols). The thunk table decomposes the SAME 29
+ * differently — 9 per width x 3, plus 1 plus 1, because it folds `t_ryc_f##W`
+ * into its per-width macro where this file hand-writes it — which is what makes
+ * it an independent check rather than a second transcription.
  *
  * PRD §15 D16 (bd vxk, bd r3y, bd ck6), and the discriminator is CAPABILITY
  * rather than liveness. libcqops DEFINES every `cqrt_*` it could serve —
@@ -149,9 +153,23 @@ static const char *const V2_HANDLE = "a CQ_lang intrinsic or libm template "
     { (void)ctrl; (void)src; (void)dst;                                       \
       cq_shim_unsupported("cqrt_copy_f" #W "_controlled", V2_FP); }
 
+/* f64 IS GONE FROM THIS LIST SINCE 2026-09-18 (bead 9ve.28, PRD-v2 §1 + §3.1).
+ * Its ten core symbols are real code in `shim/cq_runtime_rail.c` and
+ * `shim/cq_runtime_gate.c`, reached by WIDENING those files' macros with a type
+ * token — which is exactly the disposition IMPLEMENTATION_PLAN §3's Layer-5 row
+ * recorded for this block before it was written.
+ *
+ * THE OTHER THREE WIDTHS STAY, AND THE REASON IS NOT TIDINESS. PRD-v2 §1a scopes
+ * v2 to `f64` ALONE; `f80` additionally cannot be a memcpy at all, because
+ * `long double` is an 80-bit value in a 12- or 16-byte object whose padding is
+ * unspecified, so the obvious spelling compiles, runs, and hashes padding into
+ * the rail (§3.1's own note). Deferring `f80` defers that.
+ *
+ * AND THE `_controlled` BLOCK BELOW SHRANK BY TWO ON THE SAME DAY, so this
+ * file's population went 39 -> 29. Read it from `CQ_V2_N_THUNKS`, never from a
+ * comment; every figure in this file's header is that date's measurement. */
 CQ_V2_FP_WIDTH(16, _Float16)
 CQ_V2_FP_WIDTH(32, float)
-CQ_V2_FP_WIDTH(64, double)
 CQ_V2_FP_WIDTH(80, long double)
 
 /* THE Ry AXIS IS 6 HERE AND NOT 8, AND IT IS STILL NOT AN OMISSION. It was 2
@@ -181,10 +199,13 @@ void cqrt_ry_f32_controlled(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
   cq_shim_unsupported("cqrt_ry_f32_controlled", V2_FP); }
 
-void cqrt_ry_f64_controlled(int32_t ctrl, int32_t handle, double angle)
-{ (void)ctrl; (void)handle; (void)angle;
-  cq_shim_unsupported("cqrt_ry_f64_controlled", V2_FP); }
-
+/* `cqrt_ry_f64_controlled` and `cqrt_ry_f64_controlled_inv` LEFT THIS FILE on
+ * 2026-09-18 with the rest of the f64 core; they are `CQ_GATE_ROT_CTRL(f64, 64)`
+ * in shim/cq_runtime_gate.c. The paragraph below still holds for f16/f32/f80 —
+ * including its "an implemented body would land on M07's GENERIC handle error"
+ * argument, which turned on `cqrt_alloc_f<W>` aborting. That premise is now
+ * FALSE at f64 and TRUE at the other three, which is precisely why f64 moved and
+ * they did not. */
 void cqrt_ry_f16_controlled(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
   cq_shim_unsupported("cqrt_ry_f16_controlled", V2_FP); }
@@ -193,13 +214,14 @@ void cqrt_ry_f80_controlled(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
   cq_shim_unsupported("cqrt_ry_f80_controlled", V2_FP); }
 
+/* THE `_inv` HALF IS NOW ONE SYMBOL, AND ITS SIBLING MOVED RATHER THAN VANISHED.
+ * `cqrt_ry_f32_controlled_inv` is the ONLY fp `ry` `_inv` the frozen ABI still
+ * defers: f16 and f80 never declared one, and f64's is implemented. Do not
+ * "restore symmetry" here — the grid is 9 forward + 9 controlled + 7
+ * controlled_inv for Ry against Rz's 9 + 9 + 9, measured from the declarations. */
 void cqrt_ry_f32_controlled_inv(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
   cq_shim_unsupported("cqrt_ry_f32_controlled_inv", V2_FP); }
-
-void cqrt_ry_f64_controlled_inv(int32_t ctrl, int32_t handle, double angle)
-{ (void)ctrl; (void)handle; (void)angle;
-  cq_shim_unsupported("cqrt_ry_f64_controlled_inv", V2_FP); }
 
 /* --- The 63 qram symbols: GONE, 2026-09-02 (PRD §15 D24) ----------------- */
 /* They live in shim/cq_runtime_qram.c as v1.2 — D23's token plus `count`

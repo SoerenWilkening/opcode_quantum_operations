@@ -14,13 +14,18 @@
 # between the braces, and is the ONLY file in M27 that names a libcqops or M26
 # symbol. Import is one-way; the Row record is the whole interface.
 #
-# THE PARTITION IS PRD §1 + §15 D14, and it is asserted rather than assumed:
+# THE PARTITION IS PRD §1 + §15 D14 + PRD-v2 §1, and it is asserted rather than
+# assumed. It was 992 / 603 / 884 until v2's FIRST fp family landed
+# (2026-09-18, bead 9ve.28); the live figures are EXPECTED below and the
+# arithmetic of the move is in LANDED's own comment. Do not quote a number from
+# this paragraph — quote EXPECTED, which the audit enforces.
 #   2479 cq_template_* from opcode_table.yaml
-#   =  992 purely-integer thin WRAPPERS
-#   +  603 purely-integer `_inv` ABORT bodies   (D14: _inv is f-inverse, and
-#                                                f-inverse does not exist for
-#                                                and/or/udiv/trunc/any icmp)
-#   +  884 fp-touching ABORT bodies             (§1: fp is v2)
+#   = wrapper  thin WRAPPERS (integer, plus every LANDED fp family-width)
+#   + inv      `_inv` ABORT bodies   (D14: _inv is f-inverse, and f-inverse does
+#                                     not exist for and/or/udiv/trunc or ANY
+#                                     compare — icmp and fcmp alike)
+#   + fp       fp-touching ABORT bodies for every family-width NOT yet landed
+#                                     (§1/PRD-v2 §1: the rest of fp is still v2)
 # Not 1455 (that excludes i80, which IS in scope), not the 1474 phantom, not
 # 878 (the fp count at revision ce3837bc, stale by the two i80 increments).
 #
@@ -59,6 +64,7 @@ ROW_FIELDS = (
     "bits",      # operand width in BITS, from the yaml's own widths map
     "to_bits",   # cast destination width in bits, else 0
     "ctype",     # C type of the classical operand, from the yaml's widths map
+    "domain",    # the OPERAND width's domain, verbatim from the yaml: int | fp
     "variant",   # the yaml's own variant token: fwd_qq, controlled_inv_hl, ...
     "shape",     # qq | hl | lh | un   (un = arity-1: casts and fneg)
     "axis",      # fwd | unc | controlled
@@ -128,9 +134,31 @@ def signature(kind, shape, axis, ctype):
     return ("void" if axis == "unc" else "int32_t"), ps
 
 
-# --- Buckets (PRD §1 + §15 D14) ----------------------------------------------
-def bucket_of(widths, inv, domains):
-    if any(domains[w] == "fp" for w in widths):
+# --- What has LANDED (PRD-v2 §1, §5, §7.15) ----------------------------------
+# ONE ENTRY PER (yaml FAMILY, yaml WIDTH) WHOSE KERNEL AND M26 ENTRY POINT BOTH
+# EXIST. That pair's rows then take the ORDINARY bucket rule below — a live
+# wrapper, or a D14 `_inv` abort — and every other fp family-width keeps its
+# `"fp is v2"` abort. Adding the next family is ONE LINE here plus its dispatch
+# row; nothing else in this file moves.
+#
+# THE KEY IS A PAIR AND NOT A FAMILY, and that is PRD §15 D16's "family first,
+# WIDTH second" arriving on the template grid. `fp_compare` is in scope; f16,
+# f32 and f80 are not (PRD-v2 §1a), and `cqrt_alloc_f<W>` still aborts at those
+# three widths, so an f16 rail cannot exist to hand a live wrapper.
+#
+# A CAST TOUCHES TWO WIDTHS AND THE RULE BELOW REQUIRES **ALL** OF ITS fp
+# WIDTHS TO BE LANDED. That is the conservative direction: a cross-domain
+# `sitofp_i32_to_f64` stays an abort until `int_to_fp`/`f64` is listed here,
+# rather than going live because one of its two widths is.
+LANDED = frozenset((
+    ("fp_compare", "f64"),      # M36 / K18, bead 9ve.20 — 14 preds x 6 variants
+))                              # = 84 symbols: 56 wrappers + 28 D14 `_inv`
+
+
+# --- Buckets (PRD §1 + §15 D14 + PRD-v2 §1) ----------------------------------
+def bucket_of(widths, inv, domains, family):
+    fp = [w for w in widths if domains[w] == "fp"]
+    if fp and not all((family, w) in LANDED for w in fp):
         return "fp"
     return "inv" if inv else "wrapper"
 
@@ -150,8 +178,9 @@ def expand(table):
             name="cq_template_%s%s" % (base, suffix(shape, axis, inv)),
             kind=kind, family=family, opcode=opcode, pred=pred,
             widths=tuple(widths), bits=bits, to_bits=to_bits, ctype=ctype,
+            domain=dom[widths[0]],
             variant=variant, shape=shape, axis=axis, inv=inv,
-            bucket=bucket_of(widths, inv, dom), ret=ret, params=params))
+            bucket=bucket_of(widths, inv, dom, family), ret=ret, params=params))
 
     for kind, key in (("binary", "binary_opcodes"), ("unary", "unary_opcodes")):
         for e in table[key]:
@@ -180,7 +209,20 @@ def expand(table):
 # live family for an aborting one. The counts are the cheap guard; the SET
 # assertions live in tests/test_gen_shim.py, where the oracle is CQ_lang's own
 # independently generated header rather than this file's reading of the rules.
-EXPECTED = {"total": 2479, "wrapper": 992, "inv": 603, "fp": 884}
+#
+# THE THREE CODE BUCKETS DO NOT SEPARATE INTEGER FROM fp, SO THE AUDIT CARRIES A
+# SECOND, FINER SPLIT. Once a family-width lands, `wrapper` holds integer AND fp
+# wrappers and `inv` holds integer AND fp D14 aborts, so the three coarse
+# figures can stay exact while a family moves domain — which is precisely the
+# "a count is not an identification" failure one line down. The five-way split
+# is what a reader and a reviewer actually need, and it is what the bead reports.
+EXPECTED = {"total": 2479, "wrapper": 1048, "inv": 631, "fp": 800}
+EXPECTED_BY_DOMAIN = {"int_wrapper": 992, "int_inv": 603,
+                      "fp_wrapper": 56, "fp_inv": 28, "fp_abort": 800}
+
+
+def _is_fp(r):
+    return r.bucket == "fp" or any(w.startswith("f") for w in r.widths)
 
 
 def audit(rows):
@@ -192,18 +234,30 @@ def audit(rows):
         got[b] = sum(1 for r in rows if r.bucket == b)
     if got["wrapper"] + got["inv"] + got["fp"] != got["total"]:
         raise SystemExit("gen_shim: buckets do not partition the grid")
-    if got != EXPECTED:
+    fine = {"int_wrapper": 0, "int_inv": 0, "fp_wrapper": 0, "fp_inv": 0,
+            "fp_abort": 0}
+    for r in rows:
+        if r.bucket == "fp":
+            fine["fp_abort"] += 1
+        else:
+            fine[("fp_" if _is_fp(r) else "int_") + r.bucket] += 1
+    if got != EXPECTED or fine != EXPECTED_BY_DOMAIN:
         raise SystemExit("gen_shim: partition audit FAILED\n"
-                         "  expected %r\n  got      %r\n"
-                         "  (PRD §1 + §15 D14; re-pinning opcode_table.yaml is "
-                         "a tracked act — update EXPECTED deliberately)" % (EXPECTED, got))
+                         "  expected %r / %r\n  got      %r / %r\n"
+                         "  (PRD §1 + §15 D14 + PRD-v2 §1; re-pinning "
+                         "opcode_table.yaml or extending LANDED is a tracked "
+                         "act — update both dicts deliberately)"
+                         % (EXPECTED, EXPECTED_BY_DOMAIN, got, fine))
+    got.update(fine)
     return got
 
 
 # --- Emission (R7: one .gen.c per opcode family) -----------------------------
 # Four of the ten families are MIXED (int_arith 342 wrap / 228 abort,
 # int_bitwise 300/200, int_compare 240/120, int_width 110/55), which is exactly
-# why "wrappers <-> aborts" is NOT the file seam.
+# why "wrappers <-> aborts" is NOT the file seam. FIVE since 2026-09-18:
+# `fp_compare` is 56 wrap / 28 D14-inv / 252 still-fp-abort, which also makes it
+# the first family carrying all THREE buckets at once.
 BANNER = ("/* AUTOGENERATED by shim/gen_shim.py — do not edit.\n"
           " * Source: third_party/cq_lang/opcode_table.yaml\n"
           " * yaml-sha256: %s\n"
@@ -281,7 +335,10 @@ def main(argv=None):
     for fn, text in sorted(want.items()):
         open(os.path.join(a.output_dir, fn), "w").write(text)
     sys.stdout.write("gen_shim: %(total)d symbols = %(wrapper)d wrappers + %(inv)d _inv aborts"
-                     " + %(fp)d fp aborts\n" % counts)
+                     " + %(fp)d fp aborts\n"
+                     "          (int %(int_wrapper)d wrap / %(int_inv)d inv;"
+                     " fp %(fp_wrapper)d wrap / %(fp_inv)d inv / %(fp_abort)d abort)\n"
+                     % counts)
     return 0
 
 

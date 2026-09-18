@@ -78,12 +78,30 @@
  * (tape was, until D23 put it in scope, and qram was, until D24 — a `cqrt_tape_` name is v1.1's and a `cqrt_qram_` name is v1.2's now). That order IS the decision `bd vxk` recorded — `cqrt_qram_alloc_f32`
  * is qram's, not fp's — and writing it the other way round is what the case
  * below exists to catch. */
+/* THE f64 ROW IS TESTED BEFORE THE fp ROW AND AFTER THE qram ONE, AND BOTH
+ * ORDERINGS ARE THE DECISION RATHER THAN AN ACCIDENT (2026-09-18, bead 9ve.28).
+ * PRD §15 D16's rule is FAMILY FIRST, WIDTH SECOND, and the two clauses pull in
+ * opposite directions here — which is exactly what makes the order load-bearing:
+ *
+ *   - `cqrt_qram_load_f64` is QRAM's, decided by the FAMILY, so it must be
+ *     caught by the `cqrt_qram_` test before any width token is looked at. That
+ *     was already true and is why this function has always tested qram first.
+ *   - `cqrt_alloc_f64` is fp's family at a width v2 now IMPLEMENTS, so the
+ *     WIDTH is what takes it out of the deferred set — the second of D16's two
+ *     worked examples, running the other way.
+ *
+ * Writing the f64 test after the fp one would put every f64 core symbol back in
+ * the deferred set and the sweep would demand an abort from ten symbols that now
+ * return; writing it BEFORE the qram one would take the four
+ * `cqrt_qram_*_f64` families out of qram's bucket, which D16 forbids. Both
+ * mistakes are one line apart and both are caught below. */
 static const char *bucket_of(const char *name)
 {
     if (strcmp(name, "cqrt_alloc_handle") == 0)  return V2_R_HAND;
     if (strncmp(name, "cqrt_qram_", 10) == 0)    return NULL;   /* v1.2, D24 */
+    if (strstr(name, "_f64"))                    return NULL;   /* v2, PRD-v2 §1 */
     if (strstr(name, "_f16") || strstr(name, "_f32") ||
-        strstr(name, "_f64") || strstr(name, "_f80")) return V2_R_FP;
+        strstr(name, "_f80"))                    return V2_R_FP;
     return NULL;                                  /* v1 serves it */
 }
 
@@ -162,13 +180,13 @@ static uint32_t header_deferred(char out[][V2_NAME_MAX], uint32_t cap)
  * — the case is a claim about the header, not about the shim — which is exactly
  * why it is worth having: it is the tripwire for a re-pin of CQ_lang's ABI
  * quietly widening the population this file is responsible for. */
-CQ_TEST(the_deferred_surface_is_exactly_the_headers_39_declarations)
+CQ_TEST(the_deferred_surface_is_exactly_the_headers_29_declarations)
 {
     char want[128][V2_NAME_MAX];
     const uint32_t nw = header_deferred(want, 128u);
 
-    CHECK_EQ((int)nw, 39);
-    CHECK_EQ((int)CQ_V2_N_THUNKS, 39);
+    CHECK_EQ((int)nw, 29);
+    CHECK_EQ((int)CQ_V2_N_THUNKS, 29);
 
     /* strcmp and not `==`: two occurrences of the same string literal are not
      * required to share an address, so a pointer comparison here is
@@ -182,8 +200,63 @@ CQ_TEST(the_deferred_surface_is_exactly_the_headers_39_declarations)
         if (strcmp(b, V2_R_FP) == 0)         fp++;
         else if (strcmp(b, V2_R_HAND) == 0)  hand++;
     }
-    CHECK_EQ((int)fp, 38);
+    CHECK_EQ((int)fp, 28);
     CHECK_EQ((int)hand, 1);
+}
+
+/* THE TEN f64 CORE SYMBOLS ARE DECLARED, ARE NOT DEFERRED, AND EVERY ONE OF
+ * THEM RETURNS — the positive half of the case above, and it needs to exist
+ * separately because a set difference over a SHRINKING population is
+ * satisfiable by doing nothing at all. If `cqrt_alloc_f64` were still an abort
+ * body and `bucket_of` still called it deferred, the counts would read 39/38
+ * and the case above would simply say so; what no arithmetic there can say is
+ * that these ten symbols are now REACHABLE.
+ *
+ * IT DRIVES THEM RATHER THAN READING THE HEADER, because "declared" was never
+ * the question — `cq_runtime_abi.h` declared all ten on the day they aborted.
+ * `cqrt_alloc_f64` returning a live handle at all is the whole claim; the VALUE
+ * it holds is tests/test_runtime_rail_f64.inc's subject and is not restated.
+ *
+ * AND IT NAMES THE WIDTHS THAT MUST STILL ABORT IN THE SAME CASE. PRD-v2 §1a is
+ * `f64` ONLY, so an implementation that widened the macro across the fp grid —
+ * one plausible edit, `CQ_RAIL_COPY(f32, 32)` — would leave this file's sweep
+ * red (a thunk that does not abort) but would leave the count at 29 only if the
+ * thunk table were edited to match. Asserting the survivors here means the two
+ * halves cannot be brought into agreement by editing one of them. */
+CQ_TEST(the_ten_f64_core_symbols_are_live_and_the_other_fp_widths_are_not)
+{
+    static const char *const f64_core[] = {
+        "cqrt_alloc_f64", "cqrt_measure_f64", "cqrt_ry_f64", "cqrt_rz_f64",
+        "cqrt_rz_f64_controlled", "cqrt_rz_f64_controlled_inv",
+        "cqrt_ry_f64_controlled", "cqrt_ry_f64_controlled_inv",
+        "cqrt_copy_f64", "cqrt_copy_f64_controlled"
+    };
+    char want[128][V2_NAME_MAX];
+    const uint32_t nw = header_deferred(want, 128u);
+
+    for (size_t i = 0; i < sizeof f64_core / sizeof f64_core[0]; i++) {
+        CHECK(bucket_of(f64_core[i]) == NULL);
+        for (uint32_t j = 0; j < nw; j++)
+            if (strcmp(want[j], f64_core[i]) == 0)
+                cq_h_fail(__FILE__, __LINE__,
+                          "`%s` is still in the deferred set", f64_core[i]);
+    }
+
+    /* The SURVIVORS, by width. 28 fp aborts = 8 per width at f16/f32/f80 plus
+     * the three `cqrt_ry_f<W>_controlled` and `cqrt_ry_f32_controlled_inv` — and
+     * the asymmetry in that last term is the ABI's, not ours: f16 and f80 never
+     * declared an `_inv`. */
+    uint32_t n16 = 0u, n32 = 0u, n80 = 0u, n64 = 0u;
+    for (uint32_t j = 0; j < nw; j++) {
+        if (strstr(want[j], "_f16")) n16++;
+        if (strstr(want[j], "_f32")) n32++;
+        if (strstr(want[j], "_f80")) n80++;
+        if (strstr(want[j], "_f64")) n64++;
+    }
+    CHECK_EQ((int)n16, 9);
+    CHECK_EQ((int)n32, 10);
+    CHECK_EQ((int)n80, 9);
+    CHECK_EQ((int)n64, 0);
 }
 
 /* cqrt_h AND cqrt_h_controlled ARE DECLARED AND DELIBERATELY NOT DEFINED, and
@@ -259,7 +332,8 @@ CQ_TEST(cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim)
 #include "test_runtime_v2_message.inc"
 
 CQ_TEST_MAIN(
-    CQ_CASE(the_deferred_surface_is_exactly_the_headers_39_declarations),
+    CQ_CASE(the_deferred_surface_is_exactly_the_headers_29_declarations),
+    CQ_CASE(the_ten_f64_core_symbols_are_live_and_the_other_fp_widths_are_not),
     CQ_CASE(every_deferred_symbol_aborts_with_a_well_formed_message),
     CQ_CASE(the_names_the_bodies_print_are_exactly_the_headers_deferred_set),
     CQ_CASE(each_body_carries_its_own_buckets_reason),

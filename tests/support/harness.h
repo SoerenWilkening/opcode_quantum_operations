@@ -59,15 +59,39 @@ int  cq_h_flag(const char *name);
  * These two let a suite provoke a failure and then assert that it happened.
  * `cq_h_mute` suppresses the printed FAIL lines so a green run is not full of
  * alarming diagnostics; the count still accrues. `cq_h_take_failures` returns
- * the count recorded since the last take and resets it to zero, so the
- * provoked failure does not fail the case that provoked it.
+ * the count recorded since the last take, and REMOVES FROM THE CASE'S TALLY
+ * exactly those of them that were recorded while MUTED — so the provoked
+ * failure does not fail the case that provoked it.
  *
- * USE THEM ONLY IN PAIRS AND ONLY AROUND THE PROVOCATION. A mute left on
- * silences every real failure after it, which would be the vacuous-green
- * failure mode arriving by the back door — see CQ_EXPECT_CAUGHT in
- * tests/test_kerneldrv.c for the shape that cannot leave it on. */
+ * THE SECOND CLAUSE IS NARROWER THAN IT WAS, AND THAT IS THE FIX FOR
+ * `bd 9ve.33` (2026-09-18). A take used to zero the tally outright, so a
+ * window forgave everything the case had recorded BEFORE it opened as well: a
+ * CHECK that failed ahead of a CQ_EXPECT_CLEAN printed its `# FAIL` line, was
+ * forgiven, and the case reported ok. Measured — runs emitting seven `# FAIL`
+ * lines tallied "(2 failed checks)", and tests/test_kerneldrv_anchors.inc's
+ * three premise CHECKs were unfalsifiable for as long as it lasted. Now only a
+ * MUTED failure is forgivable, which is the same thing as "only a failure the
+ * suite deliberately provoked". tests/test_harness_negative_window.c is the
+ * process that goes red if this is undone, and test_skeleton.c's
+ * a_provocation_window_counts_only_what_happens_inside_it pins the arithmetic
+ * from the green side.
+ *
+ * USE THEM ONLY IN PAIRS AND ONLY AROUND THE PROVOCATION. The pairing is now
+ * partly structural — an unmuted failure can no longer be taken away — but
+ * only partly: a mute left on still silences every real failure after it, and
+ * a later take in the same case would then forgive them. That is the
+ * vacuous-green failure mode arriving by the back door; see CQ_EXPECT_CAUGHT
+ * in tests/test_kerneldrv.c for the shape that cannot leave the mute on. A
+ * mute with NO take is loud in the tally even though it is quiet in the log,
+ * which is what tests/test_shim_trace.c's bare mute sites rely on. */
 void cq_h_mute(int on);
 int  cq_h_take_failures(void);
+
+/* The running case's own tally — what cq_h_run reads when the case returns, so
+ * it is the verdict itself rather than a report about it. Read-only, and it
+ * exists so a suite can assert what a provocation window did to that tally
+ * instead of taking the window's word for it (bd 9ve.33). */
+int  cq_h_failures_now(void);
 
 #define CHECK(cond)                                                           \
     do {                                                                      \

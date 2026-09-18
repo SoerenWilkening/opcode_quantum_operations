@@ -109,6 +109,7 @@
 
 #include "cq_runtime_abi.h"
 
+#include "cq_shim.h"
 #include "cq_shim_ctx.h"
 #include <string.h>
 
@@ -283,6 +284,48 @@ CQ_RAIL_ALLOC(16, int16_t, uint16_t)
 CQ_RAIL_ALLOC(32, int32_t, uint32_t)
 CQ_RAIL_ALLOC(64, int64_t, uint64_t)
 
+/* --- f64: the SAME mint, one reinterpretation earlier (PRD-v2 §3.1 item 4) -- */
+
+/* AN f64 RAIL IS v1's REGISTER AT AN fp WIDTH AND NOTHING ABOUT THE
+ * REPRESENTATION CHANGES. PRD-v2 §3.1 is explicit that there is no `fpreg`
+ * module and nothing to build: 64 tri-valued bits holding the IEEE pattern, so
+ * I4 holds (zero qubits here, at every value including a NaN), L5 survives, and
+ * the §3 fold table delivers a fully-classical fp program with no circuit at
+ * all. This is plan §3's recorded Layer-5 disposition — "in v2 they become real
+ * code by WIDENING what already exists" — arriving as three lines beside the
+ * integer macro rather than as a parallel surface.
+ *
+ * IT IS OUTSIDE `CQ_RAIL_ALLOC` FOR ONE REASON AND IT IS NOT STYLE: the
+ * conversion is a REINTERPRETATION, not a cast. `(uint64_t)value` on a `double`
+ * is C's numeric conversion — `3.5` becomes `3` — where the integer widths need
+ * exactly the opposite, a modular narrowing through `(UT)`. One macro cannot
+ * spell both, and the spelling that compiles for both is the wrong one for this
+ * row. `cq_shim_f64_bits` (shim/cq_shim.h) is the same memcpy the `_hl`
+ * template literals use.
+ *
+ * PRD-v2 §7.4's "the library never does `double` ARITHMETIC" is intact and this
+ * is the boundary it names: the value is reinterpreted once, is a `uint64_t`
+ * from here down, and is never added, compared or rounded anywhere in `src/` or
+ * `shim/`.
+ *
+ * AND IT JOINS THE D21 ALLOC EXEMPTION — THE NAMED FAMILY, DECIDED STATICALLY.
+ * `cq_shim_trace.h`'s rule is that the exemption is a NAME and never a runtime
+ * "did it emit?" test, because the latter is not checkable. The static argument
+ * carries over verbatim: `cq_reg_alloc_const` takes the TABLE and not the
+ * context, so this function cannot allocate a qubit or reach a `qec_*` call at
+ * ANY value and ANY width, and the `#REGISTER` snapshot it would take is
+ * necessarily empty. `cqrt_qram_alloc_*` joined the same family under D24 on
+ * the same argument. The family is now the five `cqrt_alloc_i<W>`, the four
+ * `cqrt_qram_alloc_*` and this one. */
+int32_t cqrt_alloc_f64(double value)
+{
+    const uint64_t bits = cq_shim_f64_bits(value);
+    int32_t h = cq_reg_alloc_const(&cq_shim_ctx()->regs, 64u, bits, 0u);
+
+    cq_rec_mint(h, 64u, bits, 0u, 0);
+    return h;
+}
+
 /* --- measure: terminal, per PRD §7 --------------------------------------- */
 
 /* M22 already does all three jobs — it marks the rail MEASURED first (so a
@@ -337,6 +380,29 @@ CQ_RAIL_MEASURE(8,  int8_t,  uint8_t)
 CQ_RAIL_MEASURE(16, int16_t, uint16_t)
 CQ_RAIL_MEASURE(32, int32_t, uint32_t)
 CQ_RAIL_MEASURE(64, int64_t, uint64_t)
+
+/* `cqrt_alloc_f64` INVERTED, THROUGH THE SAME `rail_measure` THE i64 PATH USES.
+ * The width check, the `mz` per qubit, the terminality and the two-word return
+ * are all that function's and are not re-stated; the only f64-specific line is
+ * the memcpy back, which is `cq_shim_f64_bits` read the other way and is the
+ * SECOND and last `double` this file touches (PRD-v2 §7.4).
+ *
+ * NOT `(double)v`. That is a numeric conversion and would return 4.6e18 for
+ * every ordinary pattern; the round trip has to be bit-exact, which is also why
+ * tests/test_runtime_rail_f64.inc compares PATTERNS and never `==` — `NaN != NaN`
+ * and `-0.0 == 0.0`, so a `==` oracle passes on a swapped zero sign and fails on
+ * a correct NaN. */
+double cqrt_measure_f64(int32_t handle)
+{
+    uint64_t v;
+    double   d;
+
+    CQ_TRACE_OP("measure", handle, CQ_REG_NONE, CQ_REG_NONE, handle);
+    v = rail_measure(handle, 64u);
+    cq_trace_end();
+    memcpy(&d, &v, sizeof d);
+    return d;
+}
 
 /* --- free: D15's three-valued verdict, two-valued act -------------------- */
 
@@ -401,8 +467,15 @@ static void rail_copy(uint32_t w, int32_t src, int32_t dst)
  * FILE FOLLOWS EVERYWHERE: a bracket belongs to the OUTERMOST entry point.
  * `rail_copy` is also the controlled family's body, one region deeper, so a
  * bracket there would nest inside the one below and hard-error. */
-#define CQ_RAIL_COPY(W)                                                       \
-    void cqrt_copy_i##W(int32_t src, int32_t dst)                             \
+/* THE MACRO TAKES A TYPE TOKEN AND A WIDTH SEPARATELY SINCE 2026-09-18, WHICH IS
+ * WHAT MAKES `f64` A ROW RATHER THAN A COPY OF A FUNCTION (bead 9ve.28). `T` is
+ * the ABI's width token and `W` the register width in bits; they coincide
+ * numerically for the five integer widths and do not for `f64`, and a copy is
+ * width-generic over `cq_bit` arrays so nothing else in the body changes. Plan
+ * §3's Layer-5 seam row calls this "WIDENING what already exists" and this is
+ * literally it. */
+#define CQ_RAIL_COPY(T, W)                                                    \
+    void cqrt_copy_##T(int32_t src, int32_t dst)                              \
     {                                                                         \
         CQ_TRACE_OP("copy", src, CQ_REG_NONE, CQ_REG_NONE, dst);              \
         rail_copy(W##u, src, dst);                                            \
@@ -410,11 +483,12 @@ static void rail_copy(uint32_t w, int32_t src, int32_t dst)
         rec(CQ_ROP_COPY, src, dst, CQ_REG_NONE, 0u, 0.0, CQ_REG_NONE);        \
     }
 
-CQ_RAIL_COPY(1)
-CQ_RAIL_COPY(8)
-CQ_RAIL_COPY(16)
-CQ_RAIL_COPY(32)
-CQ_RAIL_COPY(64)
+CQ_RAIL_COPY(i1,  1)
+CQ_RAIL_COPY(i8,  8)
+CQ_RAIL_COPY(i16, 16)
+CQ_RAIL_COPY(i32, 32)
+CQ_RAIL_COPY(i64, 64)
+CQ_RAIL_COPY(f64, 64)
 
 /* THE REGION IS OPENED BY THE ONE BRACKET IN THE SHIM AND TAKES THE BODY AS A
  * CALLBACK, which is what makes "a region is exactly one kernel call wide"
@@ -429,8 +503,8 @@ static void rail_copy_body(void *p)
     rail_copy(a->w, a->src, a->dst);
 }
 
-#define CQ_RAIL_COPY_CTRL(W)                                                  \
-    void cqrt_copy_i##W##_controlled(int32_t ctrl, int32_t src, int32_t dst)  \
+#define CQ_RAIL_COPY_CTRL(T, W)                                               \
+    void cqrt_copy_##T##_controlled(int32_t ctrl, int32_t src, int32_t dst)   \
     {                                                                         \
         rail_copy_args a = { W##u, src, dst };                                \
         CQ_TRACE_OP("copy_ctrl", ctrl, src, CQ_REG_NONE, dst);                \
@@ -439,11 +513,12 @@ static void rail_copy_body(void *p)
         rec(CQ_ROP_COPY_CTRL, ctrl, src, dst, 0u, 0.0, ctrl);                 \
     }
 
-CQ_RAIL_COPY_CTRL(1)
-CQ_RAIL_COPY_CTRL(8)
-CQ_RAIL_COPY_CTRL(16)
-CQ_RAIL_COPY_CTRL(32)
-CQ_RAIL_COPY_CTRL(64)
+CQ_RAIL_COPY_CTRL(i1,  1)
+CQ_RAIL_COPY_CTRL(i8,  8)
+CQ_RAIL_COPY_CTRL(i16, 16)
+CQ_RAIL_COPY_CTRL(i32, 32)
+CQ_RAIL_COPY_CTRL(i64, 64)
+CQ_RAIL_COPY_CTRL(f64, 64)
 
 /* --- cswap: where the COST is the specification -------------------------- */
 

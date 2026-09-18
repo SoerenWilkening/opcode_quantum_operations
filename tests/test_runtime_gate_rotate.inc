@@ -426,3 +426,147 @@ CQ_TEST(the_d11_rz_refusal_emits_four_gates_per_wire_below_the_first_constant)
         CHECK_EQ(gates, 4u * j);
     }
 }
+
+/* -------------------------------------------------------------------------
+ * 2b. The f64 rotation family (PRD-v2 §1 and §3.1, bead 9ve.28).
+ * ------------------------------------------------------------------------- */
+
+/* A ROTATION IS A STATEMENT ABOUT A WIRE, so `cqrt_ry_f64` is `cqrt_ry_i64`
+ * with a different width TOKEN and there is nothing fp-aware anywhere below it.
+ * That is PRD-v2 §3.1's claim and the reason this case exists in exactly the
+ * form it does: it asserts the two families are the SAME CIRCUIT rather than
+ * re-deriving §7's cells at a second width.
+ *
+ * WHY THAT COMPARISON AND NOT A PAIR OF PINNED COUNTS. A pinned count at f64
+ * would be green against a `CQ_GATE_ROT(f64, 8)` slip only if the pin happened
+ * to be taken at the same wrong width; comparing against the i64 row taken in
+ * the same case, on rails built from the same mask, makes a width slip show up
+ * as a DIFFERENCE and names which family moved. And it stays true when §7's
+ * cells are revised, which a pinned tuple would not.
+ *
+ * THE MASK PUTS WIRES IN THE SIGN, THE EXPONENT AND THE MANTISSA, because a
+ * wrapper that walked only the low 52 lanes — the plausible "it is a double,
+ * rotate the significand" slip — is green on any mantissa-only fixture. */
+CQ_TEST(the_f64_rotations_are_the_i64_rotations_at_a_different_width_token)
+{
+    cq_mock m; cq_sink s;
+    cq_ctx *ctx = open_with(&m, &s);
+
+    const uint64_t mask = (UINT64_C(1) << 63) | (UINT64_C(1) << 52) | UINT64_C(5);
+    const int32_t  hi64 = cq_bk_reg(ctx, 64u, 0x3FF0000000000000u, mask);
+    const int32_t  hf64 = cq_bk_reg(ctx, 64u, 0x3FF0000000000000u, mask);
+
+    /* Rz FOLDS ON EVERY CONSTANT LANE AND EMITS ON EVERY WIRE (§7, D12): four
+     * wires here, 60 constants, and the constants stay constants — which is
+     * what keeps an f64 rail freeable after an `rz`. */
+    cq_mock_reset(&m);
+    cqrt_rz_i64(hi64, 0.4);
+    const size_t rz_i = cq_mock_count_op(&m, CQ_OP_RZ), all_i = cq_mock_count(&m);
+
+    cq_mock_reset(&m);
+    cqrt_rz_f64(hf64, 0.4);
+    CHECK_EQ(cq_mock_count_op(&m, CQ_OP_RZ), rz_i);
+    CHECK_EQ(cq_mock_count(&m), all_i);
+    CHECK_EQ(rz_i, 4);                       /* non-vacuity: it really emitted */
+    CHECK_EQ(cq_reg_owned_qubits(&ctx->regs, hf64), 4);
+
+    /* The GENERAL Ry materialises every lane first, so both rails end at 64
+     * wires and 64 `ry`. The materialising `X` is D13's and is UNPROMOTED, so
+     * it goes straight to the sink: one per SET constant lane, and the two
+     * families must agree on that too. */
+    cq_mock_reset(&m);
+    cqrt_ry_i64(hi64, 0.7);
+    const size_t ry_i = cq_mock_count_op(&m, CQ_OP_RY), x_i = cq_mock_count_op(&m, CQ_OP_X);
+
+    cq_mock_reset(&m);
+    cqrt_ry_f64(hf64, 0.7);
+    CHECK_EQ(cq_mock_count_op(&m, CQ_OP_RY), ry_i);
+    CHECK_EQ(cq_mock_count_op(&m, CQ_OP_X), x_i);
+    CHECK_EQ(ry_i, 64);
+    CHECK_EQ(cq_reg_owned_qubits(&ctx->regs, hf64), 64);
+
+    CHECK(cq_pc_live_is_exactly(ctx, (const int32_t[]){ hi64, hf64 }, 2u));
+    cq_reg_audit(ctx);
+
+    close_with(&m);
+}
+
+/* THE CONTROLLED f64 ROTATIONS PROMOTE EXACTLY, AND EACH `_inv` IS ITS FORWARD
+ * AT A NEGATED ANGLE — the same claim, and the same instrument, as the integer
+ * pair above: capture the whole stream and compare it with `cq_mock_matches`,
+ * which compares angles BITWISE. A count cannot see a sign at all, and `0.0`
+ * and `-0.0` are equal in C while being different gates to emit.
+ *
+ * ALL FOUR ENTRY POINTS ARE NAMED BECAUSE `cqrt_ry_f64_controlled_inv` EXISTS
+ * AND ITS f16 AND f80 SIBLINGS DO NOT. The ABI's Ry axis is 9 forward + 9
+ * controlled + 7 controlled_inv against Rz's 9 + 9 + 9, so instantiating
+ * `CQ_GATE_ROT_CTRL` at f64 is exactly right and instantiating it across the fp
+ * grid would mint two symbols the frozen ABI does not declare.
+ *
+ * THE RAIL IS ALL-QUANTUM, AND THAT IS FORCED RATHER THAN TIDY: under a quantum
+ * flag D11 refuses §7's Rz constant column, so a rail with any constant lane
+ * aborts partway through. The characterisation case above owns that row. */
+CQ_TEST(the_controlled_f64_rotations_promote_and_each_inv_negates_theta)
+{
+    cq_rec captured[512];                /* 64 lanes x §9's four gates */
+    size_t n_rz = 0u, n_ry = 0u;
+
+    {
+        cq_mock m; cq_sink s;
+        cq_ctx *ctx = open_with(&m, &s);
+        const int32_t flag = wire(ctx, 1u, 1u);
+        const int32_t h    = cq_bk_reg(ctx, 64u, 0u, ~UINT64_C(0));
+
+        cq_mock_reset(&m);
+        cqrt_rz_f64_controlled(flag, h, -0.4);
+        n_rz = cq_mock_count(&m);
+        CHECK_EQ(n_rz, 256);             /* not merely "some": 4 per lane */
+        CHECK_EQ(cq_mock_count_op(&m, CQ_OP_RZ), 128);
+        CHECK_EQ(cq_mock_count_op(&m, CQ_OP_CX), 128);
+        for (size_t i = 0; i < n_rz && i < 512u; i++) captured[i] = *cq_mock_at(&m, i);
+        CHECK(cq_pc_live_is_exactly(ctx, (const int32_t[]){ flag, h }, 2u));
+        cq_reg_audit(ctx);
+        close_with(&m);
+    }
+    {
+        cq_mock m; cq_sink s;
+        cq_ctx *ctx = open_with(&m, &s);
+        const int32_t flag = wire(ctx, 1u, 1u);
+        const int32_t h    = cq_bk_reg(ctx, 64u, 0u, ~UINT64_C(0));
+
+        cq_mock_reset(&m);
+        cqrt_rz_f64_controlled_inv(flag, h, 0.4);
+        CHECK_EQ(cq_mock_count(&m), n_rz);
+        CHECK(cq_mock_matches(&m, captured, n_rz));
+        cq_reg_audit(ctx);
+        close_with(&m);
+    }
+    {
+        cq_mock m; cq_sink s;
+        cq_ctx *ctx = open_with(&m, &s);
+        const int32_t flag = wire(ctx, 1u, 1u);
+        const int32_t h    = cq_bk_reg(ctx, 64u, 0u, ~UINT64_C(0));
+
+        cq_mock_reset(&m);
+        cqrt_ry_f64_controlled(flag, h, -0.7);
+        n_ry = cq_mock_count(&m);
+        CHECK_EQ(n_ry, 256);
+        CHECK_EQ(cq_mock_count_op(&m, CQ_OP_RY), 128);
+        for (size_t i = 0; i < n_ry && i < 512u; i++) captured[i] = *cq_mock_at(&m, i);
+        cq_reg_audit(ctx);
+        close_with(&m);
+    }
+    {
+        cq_mock m; cq_sink s;
+        cq_ctx *ctx = open_with(&m, &s);
+        const int32_t flag = wire(ctx, 1u, 1u);
+        const int32_t h    = cq_bk_reg(ctx, 64u, 0u, ~UINT64_C(0));
+
+        cq_mock_reset(&m);
+        cqrt_ry_f64_controlled_inv(flag, h, 0.7);
+        CHECK_EQ(cq_mock_count(&m), n_ry);
+        CHECK(cq_mock_matches(&m, captured, n_ry));
+        cq_reg_audit(ctx);
+        close_with(&m);
+    }
+}

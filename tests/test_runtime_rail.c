@@ -56,6 +56,7 @@
 #include "cqops/cqops.h"
 
 #include "support/bitkinds.h"
+#include "support/fpanchors.h"   /* §7.12's cells, as LITERAL patterns */
 #include "support/harness.h"
 #include "support/mock_sink.h"
 #include "support/poolcheck.h"
@@ -433,6 +434,14 @@ CQ_TEST(a_mixed_rail_releases_its_provable_lanes_and_strands_the_rest)
 
 #include "test_runtime_rail_write.inc"
 
+/* Subject 4: the f64 CORE surface (PRD-v2 §1 and §3.1, bead 9ve.28). A third
+ * `.inc` on the same footing as the CONTENTS one — this file stood at 245 of
+ * Rule 12's 300 before it — and a subject cut rather than a size cut: every
+ * case in it turns on the REINTERPRETATION at the two ABI doors, which is the
+ * one thing an fp width adds. Everything else about an f64 rail is v1's
+ * register at 64 lanes and is already tested above at i64. */
+#include "test_runtime_rail_f64.inc"
+
 CQ_TEST_MAIN(
     CQ_CASE(the_vendored_abi_header_declares_the_whole_frozen_surface),
     CQ_CASE(alloc_mints_a_rail_of_the_symbols_own_width_at_zero_cost),
@@ -461,5 +470,12 @@ CQ_TEST_MAIN(
     CQ_CASE(addc_on_a_qubit_owning_rail_is_cuccaro_in_place),
     CQ_CASE(addcs_transients_are_certified_by_the_construction_and_come_back),
     CQ_CASE(addc_survives_cqops_free_abort_on_a_rotation_tainted_rail),
-    CQ_CASE(addc_is_width_generic_and_a_negative_immediate_is_the_expensive_half)
+    CQ_CASE(addc_is_width_generic_and_a_negative_immediate_is_the_expensive_half),
+    CQ_CASE(alloc_f64_mints_sixty_four_constant_bits_at_zero_cost),
+    CQ_CASE(an_f64_rails_bits_are_the_ieee_pattern_and_not_a_converted_value),
+    CQ_CASE(an_f64_rail_round_trips_every_pinned_ieee_cell_bit_exactly),
+    CQ_CASE(measure_f64_emits_one_mz_per_wire_and_returns_the_pattern),
+    CQ_CASE(copy_f64_is_physical_at_the_full_sixty_four_lanes),
+    CQ_CASE(copy_f64_controlled_takes_section_nines_row_zero_at_an_fp_width),
+    CQ_CASE(free_of_an_all_constant_f64_rail_costs_nothing_and_strands_nothing)
 )

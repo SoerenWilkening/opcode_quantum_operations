@@ -26,6 +26,7 @@
 #define CQ_SHIM_H
 
 #include <stdint.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,15 +39,52 @@ extern "C" {
  * uint64_t, so C accepts a transposition silently; tests/test_gen_bodies.py
  * pins the whole argument list rather than its membership, and runs the macro.
  *
- * NO fp c_type EVER REACHES HERE, AND THE REASON IS NOT THE ONE THIS COMMENT
- * USED TO GIVE. It said "casts are arity-1" — true, and irrelevant: 328 grid
- * symbols carry an fp CLASSICAL operand (`cq_template_fadd_f32_hl(int32_t,
- * float)` and its kin) and not one of them is a cast. What keeps them away from
- * these macros is that every fp-touching symbol is an ABORT body (PRD §1), so no
- * body of theirs calls one. A v2 that implements fp inherits the real
- * constraint, not the decorative one. */
+ * NO fp c_type EVER REACHES *THESE TWO*, AND THE REASON IS NOT THE ONE THIS
+ * COMMENT USED TO GIVE. It said "casts are arity-1" — true, and irrelevant: 328
+ * grid symbols carry an fp CLASSICAL operand (`cq_template_fadd_f32_hl(int32_t,
+ * float)` and its kin) and not one of them is a cast. What kept them away was
+ * that every fp-touching symbol was an ABORT body (PRD §1), so no body of theirs
+ * called one. **THAT PROTECTION EXPIRED ON 2026-09-18** when `fcmp` at `f64`
+ * landed (PRD-v2 §1, bead 9ve.28) and 28 `_hl` bodies acquired a live
+ * `double b_classical`. The real constraint is below. */
 #define CQ_SHIM_LO(x) ((uint64_t)(unsigned __int128)(x))
 #define CQ_SHIM_HI(x) ((uint64_t)(((unsigned __int128)(x)) >> 64))
+
+/* THE fp LITERAL IS A BIT PATTERN AND `CQ_SHIM_LO` WOULD CONVERT IT. That is
+ * the whole reason this pair exists, and it is the kind of defect this project
+ * has no structural detector for: `CQ_SHIM_LO(3.5)` is a NUMERIC conversion to
+ * `unsigned __int128`, so it yields 3. It compiles clean, it is silent under
+ * -Wconversion because the cast is explicit, the symbol links, the gate count
+ * is unchanged, and the rail holds the integer 3 instead of
+ * 0x400C000000000000. Only an L1-shaped case comparing the rail's BITS can see
+ * it (tests/test_template_fcmp.inc).
+ *
+ * A `memcpy`, NEVER A UNION AND NEVER A POINTER CAST. The union is C-legal but
+ * is the spelling that stops being legal the moment someone "tidies" it into
+ * `*(uint64_t *)&x`, which is a strict-aliasing violation this build's UBSan
+ * does diagnose. Every compiler this project uses folds the memcpy away.
+ *
+ * AND THIS IS PRD-v2 §7.4's BOUNDARY, NOT AN EXCEPTION TO IT. §7.4 forbids
+ * `double` ARITHMETIC in the library and names `cqrt_alloc_f64`/`cqrt_measure_f64`
+ * as the memcpy sites; this is the same memcpy at the same boundary, forced by
+ * the frozen ABI declaring `cq_template_fcmp_oeq_f64_hl(int32_t, double)`. The
+ * value is never added, compared or rounded — it is reinterpreted once and is a
+ * `uint64_t` from here down.
+ *
+ * `_HI` DISCARDS ITS ARGUMENT WITHOUT EVALUATING IT (`sizeof` is unevaluated),
+ * which keeps the two-word call shape uniform with the integer pair at zero
+ * cost and keeps the parameter "used" so -Wunused-parameter stays quiet. f64 is
+ * the only fp width with a macro because f64 is the only fp width v2 ships
+ * (PRD-v2 §1a); gen_bodies.py hard-errors rather than guessing for any other. */
+static inline uint64_t cq_shim_f64_bits(double x)
+{
+    uint64_t u;
+    memcpy(&u, &x, sizeof u);
+    return u;
+}
+
+#define CQ_SHIM_F64_LO(x) cq_shim_f64_bits(x)
+#define CQ_SHIM_F64_HI(x) ((void)sizeof(x), UINT64_C(0))
 
 /* The 13 integer binary opcodes that reach a wrapper. `icmp` is separate (it
  * carries a predicate); the fp opcodes never reach a wrapper at all. The set
@@ -65,6 +103,24 @@ typedef enum {
     CQ_SHIM_PRED_SLE, CQ_SHIM_PRED_SGE, CQ_SHIM_PRED_ULT, CQ_SHIM_PRED_UGT,
     CQ_SHIM_PRED_ULE, CQ_SHIM_PRED_UGE
 } cq_shim_pred;
+
+/* `opcode_table.yaml`'s `predicates: fcmp:` list, IN ITS ORDER — which is NOT
+ * LLVM's numbering and NOT `cq_fcmp_pred`'s (src/kernels/fcmp.h is
+ * OEQ,OGT,OGE,OLT,… while the yaml is OEQ,UNE,OLT,OGT,…). Two enums in two
+ * orders over one predicate set is exactly the icmp situation
+ * tests/test_template.c records, and it is why the dispatch table in
+ * shim/cq_template_dispatch.c is written out row by row rather than indexed.
+ *
+ * A SEPARATE PREFIX FROM `CQ_SHIM_PRED_`, NOT A SHARED ONE. Four mnemonics —
+ * `ult`, `ugt`, `ule`, `uge` — appear in BOTH predicate lists meaning different
+ * things (integer unsigned-less-than vs fp unordered-or-less-than), so one
+ * enumerator name for both would be a silent cross-family dispatch. */
+typedef enum {
+    CQ_SHIM_FPRED_OEQ, CQ_SHIM_FPRED_UNE, CQ_SHIM_FPRED_OLT, CQ_SHIM_FPRED_OGT,
+    CQ_SHIM_FPRED_OLE, CQ_SHIM_FPRED_OGE, CQ_SHIM_FPRED_ONE, CQ_SHIM_FPRED_ORD,
+    CQ_SHIM_FPRED_UNO, CQ_SHIM_FPRED_UEQ, CQ_SHIM_FPRED_UGT, CQ_SHIM_FPRED_UGE,
+    CQ_SHIM_FPRED_ULT, CQ_SHIM_FPRED_ULE
+} cq_shim_fpred;
 
 /* The three integer width casts. fp casts never reach a wrapper. */
 typedef enum { CQ_SHIM_CAST_SEXT, CQ_SHIM_CAST_ZEXT, CQ_SHIM_CAST_TRUNC } cq_shim_cast_kind;
@@ -102,13 +158,29 @@ int32_t cq_shim_icmp_hl(cq_shim_pred pred, int bits, int32_t a_handle, uint64_t 
 void cq_shim_icmp_qq_unc(cq_shim_pred pred, int bits, int32_t out_handle, int32_t a_handle, int32_t b_handle);
 void cq_shim_icmp_hl_unc(cq_shim_pred pred, int bits, int32_t out_handle, int32_t a_handle, uint64_t lo, uint64_t hi);
 
+/* fp compares (PRD-v2 §1, bead 9ve.28): the SAME four shapes as `icmp` over the
+ * SAME handle boundary — result a one-bit flag handle, no controlled axis, no
+ * `_lh` on any axis — and a DIFFERENT predicate enum and a DIFFERENT kernel
+ * table. `bits` is 64 and nothing else: PRD-v2 §1 scopes v2 to `f64`, every
+ * `soft_fcmp_*` upstream is `(UInt64, UInt64)`, and `cq_kernel_fcmp_*` hard-errors
+ * on any other width in BOTH configurations rather than inventing a fiction.
+ *
+ * THE CLASSICAL OPERAND ARRIVES AS A BIT PATTERN, decomposed by CQ_SHIM_F64_LO/HI
+ * and NOT by CQ_SHIM_LO/HI — see those macros for what the wrong pair does. */
+int32_t cq_shim_fcmp_qq(cq_shim_fpred pred, int bits, int32_t a_handle, int32_t b_handle);
+int32_t cq_shim_fcmp_hl(cq_shim_fpred pred, int bits, int32_t a_handle, uint64_t lo, uint64_t hi);
+void cq_shim_fcmp_qq_unc(cq_shim_fpred pred, int bits, int32_t out_handle, int32_t a_handle, int32_t b_handle);
+void cq_shim_fcmp_hl_unc(cq_shim_fpred pred, int bits, int32_t out_handle, int32_t a_handle, uint64_t lo, uint64_t hi);
+
 /* Casts: arity-1, two widths, no classical operand, no controlled axis. */
 int32_t cq_shim_cast(cq_shim_cast_kind kind, int from_bits, int to_bits, int32_t a_handle);
 void cq_shim_cast_unc(cq_shim_cast_kind kind, int from_bits, int to_bits, int32_t out_handle, int32_t a_handle);
 
 /* The v1 boundary, made visible at RUNTIME rather than at link time (PRD §1).
- * `reason` distinguishes the two abort buckets — "fp is v2" (884 symbols) and
- * D14's `_inv` (603) — so a symbol swept into the wrong one says which.
+ * `reason` distinguishes the two abort buckets — "fp is v2" and D14's `_inv` —
+ * so a symbol swept into the wrong one says which. Read the populations from
+ * `shim/gen_shim.py`'s EXPECTED, never from a comment: they were 884 / 603
+ * until `fp_compare`/`f64` landed and they move again with every LANDED line.
  * _Noreturn is what lets a value-returning abort body carry no return. */
 _Noreturn void cq_shim_unsupported(const char *symbol, const char *reason);
 

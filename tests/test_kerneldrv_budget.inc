@@ -21,14 +21,21 @@
  *       `#` line says so.
  *   (d) a floor BELOW the constant budget is ignored — max, never replace.
  *
- * EVERY ASSERTION SITS AFTER THE LAST CQ_EXPECT_CLEAN OF ITS CASE, AND THAT
- * IS NOT STYLE. CQ_EXPECT_CLEAN opens with cq_h_take_failures(), which ZEROES
- * the per-case counter — the same counter CQ_TEST_MAIN reads to decide ok vs
- * not ok. So a CHECK that fails BEFORE one of those macros prints its `# FAIL`
- * line, is forgiven, and the case reports GREEN. Measured here on 2026-09-18
- * while these cases were red: the case tallies printed 2 and 1 where 7 and 2
- * FAIL lines had been emitted. Each case below therefore captures what it
- * measured into locals and asserts at the end.
+ * THE HARNESS BUG THIS FILE WAS WRITTEN AROUND IS FIXED (`bd 9ve.33`, landed
+ * 2026-09-18). CQ_EXPECT_CLEAN used to open with a cq_h_take_failures() that
+ * ZEROED the per-case counter CQ_TEST_MAIN reads, so a CHECK failing BEFORE one
+ * of those macros printed its `# FAIL` line, was forgiven, and the case
+ * reported GREEN — measured here while these cases were red, tallies of 2 and 1
+ * against 7 and 2 emitted FAIL lines. A take now forgives only what the window
+ * itself provoked, so a premise CHECK is falsifiable wherever it stands, and
+ * the two below have been moved back ahead of the provocation they are premises
+ * for.
+ *
+ * WHAT STAYS, AND FOR ITS OWN REASONS RATHER THAN THAT ONE: every case still
+ * captures bud_calls into a local the moment its sampler returns, because the
+ * NEXT CQ_EXPECT_CLEAN (and bud_line_says) resets that static, and it still
+ * asserts after bud_env_restore(), because the environment is part of the
+ * fixture here. Neither is a workaround for the harness.
  *
  * THE ENVIRONMENT IS PART OF THE FIXTURE HERE, which no other case in this
  * binary can say. cq_kd_samples() caches its answer for the life of the
@@ -170,6 +177,13 @@ CQ_TEST(a_shape_floor_runs_the_whole_anchor_block_and_drops_none)
     n_default = cq_kd_samples();
     got_n     = cq_kd_budget(n, &src);
 
+    /* THE PREMISE, ASSERTED, AND ASSERTED BEFORE THE THING IT IS A PREMISE FOR:
+     * without a floor this table is three times over budget. If that ever stops
+     * being true the case is vacuous, and it would be vacuous in the GREEN
+     * direction. It sat at the end of the case until `bd 9ve.33` — where it was
+     * still correct, but a reader had to run the whole sampler to reach it. */
+    CHECK(want > n_default);
+
     bud_calls = 0;
     CQ_EXPECT_CLEAN("the f64 table with a floor sized to hold it",
                     cq_kd_sample_at(&k, 64));
@@ -177,10 +191,6 @@ CQ_TEST(a_shape_floor_runs_the_whole_anchor_block_and_drops_none)
 
     bud_env_restore();
 
-    /* THE PREMISE, ASSERTED: without a floor this table is three times over
-     * budget. If that ever stops being true the case is vacuous, and it would
-     * be vacuous in the GREEN direction. */
-    CHECK(want > n_default);
     CHECK_EQ(got_n, n);
     CHECK_STR_EQ(src, "floor");
     CHECK_EQ(calls, 2 * n);
@@ -344,6 +354,8 @@ CQ_TEST(a_floor_below_the_constant_budget_is_ignored)
     n0    = cq_kd_samples();
     got_n = cq_kd_budget(8, &src);
 
+    CHECK(n0 > 8);                 /* the premise: 8 really is below it */
+
     bud_calls = 0;
     CQ_EXPECT_CLEAN("a floor of 8 under a budget of 32",
                     cq_kd_sample_at(&k, 8));
@@ -354,8 +366,6 @@ CQ_TEST(a_floor_below_the_constant_budget_is_ignored)
      * infer from a case count. */
     bud_line_says("budget=default", &k, 8);
     bud_env_restore();
-
-    CHECK(n0 > 8);                 /* the premise: 8 really is below it */
 
     /* MAX, NEVER REPLACE. A floor that replaced the budget would make a kernel
      * run FEWER cases than every other kernel in the catalogue — a coverage CUT

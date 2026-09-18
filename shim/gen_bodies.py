@@ -20,7 +20,11 @@
 #              forward: for `dst ^= f` it numerically is, and that is the
 #              sentence most likely to be quoted back as licence — it would
 #              ship and_i32_inv = and_i32, a wrong VALUE.
-#   fp       — PRD §1. Floating point is v2, via Bennett's src/softfloat/.
+#   fp       — PRD §1. Floating point is v2, via Bennett's src/softfloat/. A
+#              family-width listed in gen_shim.LANDED is NOT in this bucket: its
+#              non-`_inv` rows are ordinary wrappers and its `_inv` rows are D14
+#              aborts, exactly as an integer family's are. The bucket is
+#              gen_shim's to decide; this file only renders it.
 #
 # THE ABORT IS GROUNDED ON SPECIFIABILITY (D14), never on "it leaks a rail":
 # the rail-leak wording would implicitly settle PRD §15 D15 §4's still-open
@@ -45,10 +49,21 @@ REASON = {
     "inv": "_inv is f-inverse, not f; the data family has no uniform definition (PRD 15 D14)",
 }
 
-# The M26 entry point per (kind, shape, axis). A cast and a compare have no
+# The M26 entry point per (key, shape, axis). A cast and a compare have no
 # controlled axis at all (opcode_table.yaml:45-46) and a cast has no classical
 # operand, so a generator that applied either axis uniformly would mint phantom
 # symbols — which is why this table is explicit and KeyError is the failure.
+#
+# THE KEY IS THE OPCODE FOR A COMPARE AND THE KIND FOR EVERYTHING ELSE, and that
+# is forced rather than tidy: `icmp` and `fcmp` share `kind == "compare"` and
+# reach DIFFERENT M26 entry points over DIFFERENT predicate enums, whose names
+# collide in four rows (`ult`/`ugt`/`ule`/`uge` are LLVM mnemonics in both
+# lists). A single "compare" key would dispatch every fcmp through the integer
+# comparator — right shape, right width, wrong operation, and `nm` cannot see it.
+def entry_key(row):
+    return (row.opcode if row.kind == "compare" else row.kind, row.shape, row.axis)
+
+
 ENTRY = {
     ("binary", "qq", "fwd"): "cq_shim_bin_qq",
     ("binary", "hl", "fwd"): "cq_shim_bin_hl",
@@ -59,16 +74,23 @@ ENTRY = {
     ("binary", "qq", "controlled"): "cq_shim_bin_qq_ctrl",
     ("binary", "hl", "controlled"): "cq_shim_bin_hl_ctrl",
     ("binary", "lh", "controlled"): "cq_shim_bin_lh_ctrl",
-    ("compare", "qq", "fwd"): "cq_shim_icmp_qq",
-    ("compare", "hl", "fwd"): "cq_shim_icmp_hl",
-    ("compare", "qq", "unc"): "cq_shim_icmp_qq_unc",
-    ("compare", "hl", "unc"): "cq_shim_icmp_hl_unc",
+    ("icmp", "qq", "fwd"): "cq_shim_icmp_qq",
+    ("icmp", "hl", "fwd"): "cq_shim_icmp_hl",
+    ("icmp", "qq", "unc"): "cq_shim_icmp_qq_unc",
+    ("icmp", "hl", "unc"): "cq_shim_icmp_hl_unc",
+    ("fcmp", "qq", "fwd"): "cq_shim_fcmp_qq",
+    ("fcmp", "hl", "fwd"): "cq_shim_fcmp_hl",
+    ("fcmp", "qq", "unc"): "cq_shim_fcmp_qq_unc",
+    ("fcmp", "hl", "unc"): "cq_shim_fcmp_hl_unc",
     ("cast", "un", "fwd"): "cq_shim_cast",
     ("cast", "un", "unc"): "cq_shim_cast_unc",
 }
 
 OPCODE_ENUM = "CQ_SHIM_OP_%s"
-PRED_ENUM = "CQ_SHIM_PRED_%s"
+# Two predicate enums, and the prefixes are DELIBERATELY not a shared one: the
+# two lists overlap in `ult`/`ugt`/`ule`/`uge`, so `CQ_SHIM_PRED_ULT` for both
+# would be one enumerator meaning two predicates in two different orders.
+PRED_ENUM = {"icmp": "CQ_SHIM_PRED_%s", "fcmp": "CQ_SHIM_FPRED_%s"}
 CAST_ENUM = "CQ_SHIM_CAST_%s"
 
 
@@ -77,8 +99,27 @@ CAST_ENUM = "CQ_SHIM_CAST_%s"
 # register; i1's is an 8-bit bool carrying a 1-bit one. The C conversion to
 # unsigned __int128 is modular, so a negative int8_t arrives sign-extended and
 # M26 masks it to `bits` — which is the only place the width is known.
-def literal(pname):
-    return "CQ_SHIM_LO(%s), CQ_SHIM_HI(%s)" % (pname, pname)
+#
+# AND AN fp LITERAL TAKES A DIFFERENT MACRO PAIR, WHICH IS THE SHARPEST TRAP IN
+# THIS FILE. `CQ_SHIM_LO(x)` is `(uint64_t)(unsigned __int128)(x)` — a NUMERIC
+# CONVERSION. On a `double` that compiles clean, is silent under -Wconversion
+# because the cast is explicit, and turns `3.5` into `3`: the register would
+# hold the integer 3 rather than the IEEE pattern 0x400C000000000000. The fp
+# pair memcpys instead (PRD-v2 §7.4 — the pattern, never the value), and the
+# discriminator is the yaml's OWN `domain` for the operand width, not the C type
+# and not the spelling of the width token.
+def literal(pname, row):
+    if row.domain != "fp":
+        return "CQ_SHIM_LO(%s), CQ_SHIM_HI(%s)" % (pname, pname)
+    if row.bits != 64:
+        raise SystemExit(
+            "gen_shim: %s has a LANDED fp classical operand at %d bits, and "
+            "only f64 has a bit-pattern macro (PRD-v2 §1 is f64-only). Landing "
+            "%s means adding CQ_SHIM_F%d_LO/HI to shim/cq_shim.h first; do NOT "
+            "let it fall back to CQ_SHIM_LO, which is a numeric conversion and "
+            "would compile clean."
+            % (row.name, row.bits, row.widths[0], row.bits))
+    return "CQ_SHIM_F64_LO(%s), CQ_SHIM_F64_HI(%s)" % (pname, pname)
 
 
 def call_args(row):
@@ -88,7 +129,7 @@ def call_args(row):
         a.append(str(row.bits))
         a.append(str(row.to_bits))
     elif row.kind == "compare":
-        a.append(PRED_ENUM % row.pred.upper())
+        a.append(PRED_ENUM[row.opcode] % row.pred.upper())
         a.append(str(row.bits))
     else:
         a.append(OPCODE_ENUM % row.opcode.upper())
@@ -110,12 +151,12 @@ def call_args(row):
         # comment written to record a fix. Caught by the compile check on the first
         # run (5 args offered, 4 given); INVISIBLE to any name-set or count
         # assertion.
-        a.append(literal(pname) if pname.endswith("_classical") else pname)
+        a.append(literal(pname, row) if pname.endswith("_classical") else pname)
     return a
 
 
 def wrapper(row):
-    entry = ENTRY[(row.kind, row.shape, row.axis)]
+    entry = ENTRY[entry_key(row)]
     call = "%s(%s)" % (entry, ", ".join(call_args(row)))
     # A `_controlled` body is EXACTLY ONE call, over all 214 of them. That is a
     # NECESSARY condition for bd d6m's preferred fix (a) — the ABI offers M26 no

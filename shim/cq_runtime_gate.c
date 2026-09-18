@@ -322,8 +322,21 @@ void cqrt_cnot_controlled(int32_t ctrl, int32_t target_ctrl, int32_t tgt)
  * in M22 because the general row MATERIALISES before it emits, so an
  * emitter-only skip would take W qubits for a region that does not run), and
  * the tombstone. */
-#define CQ_GATE_ROT(W)                                                        \
-    void cqrt_ry_i##W(int32_t handle, double angle)                           \
+/* THE MACRO TAKES A TYPE TOKEN AND A WIDTH SEPARATELY SINCE 2026-09-18, which is
+ * what makes `f64` a ROW rather than a second rotation surface (bead 9ve.28).
+ * `T` is the ABI's width token and `W` the register width in bits.
+ *
+ * AND THE fp ROW NEEDS NO NEW THOUGHT AT ALL, WHICH IS THE POINT OF PRD-v2 §3.1.
+ * §7 specifies a rotation as applying to EVERY BIT of the register with the
+ * column chosen per bit, and an f64 rail is 64 tri-valued bits; the rotation
+ * neither knows nor could know that the pattern happens to be an IEEE double,
+ * because a rotation is a statement about a WIRE. So D11's refusal, D12's
+ * poison, row 0's skip and the general row's promotion are all reached exactly
+ * as at i64, and `cqrt_ry_f64` on a rail whose lanes are all constants is the
+ * same zero-gate fold `cqrt_ry_i64` is. Nothing here is fp-aware and nothing
+ * should become so. */
+#define CQ_GATE_ROT(T, W)                                                     \
+    void cqrt_ry_##T(int32_t handle, double angle)                            \
     {                                                                         \
         cq_ctx *ctx = cq_shim_ctx();                                          \
         gate_rot_width(ctx, handle, W##u);                                    \
@@ -333,7 +346,7 @@ void cqrt_cnot_controlled(int32_t ctrl, int32_t target_ctrl, int32_t tgt)
         rec(CQ_ROP_RY, handle, CQ_REG_NONE, CQ_REG_NONE, angle,               \
             CQ_REG_NONE);                                                     \
     }                                                                         \
-    void cqrt_rz_i##W(int32_t handle, double angle)                           \
+    void cqrt_rz_##T(int32_t handle, double angle)                            \
     {                                                                         \
         cq_ctx *ctx = cq_shim_ctx();                                          \
         gate_rot_width(ctx, handle, W##u);                                    \
@@ -344,11 +357,12 @@ void cqrt_cnot_controlled(int32_t ctrl, int32_t target_ctrl, int32_t tgt)
             CQ_REG_NONE);                                                     \
     }
 
-CQ_GATE_ROT(1)
-CQ_GATE_ROT(8)
-CQ_GATE_ROT(16)
-CQ_GATE_ROT(32)
-CQ_GATE_ROT(64)
+CQ_GATE_ROT(i1,  1)
+CQ_GATE_ROT(i8,  8)
+CQ_GATE_ROT(i16, 16)
+CQ_GATE_ROT(i32, 32)
+CQ_GATE_ROT(i64, 64)
+CQ_GATE_ROT(f64, 64)
 
 /* `_inv` NEGATES THETA (PRD §15 D14), and on these families that is an EXACT
  * inverse rather than an approximation. `cq_angle_rz_row` collapses
@@ -413,8 +427,13 @@ static void gate_ry_body(void *p)
     cq_rotate_ry(cq_shim_ctx(), a->h, a->angle);
 }
 
-#define CQ_GATE_ROT_CTRL(W)                                                   \
-    void cqrt_rz_i##W##_controlled(int32_t ctrl, int32_t handle, double angle)\
+/* ALL FOUR EXIST AT f64 AND THAT IS NOT TRUE OF EVERY fp WIDTH — measured from
+ * the declarations, not assumed: `cqrt_ry_f16_controlled_inv` and
+ * `cqrt_ry_f80_controlled_inv` do NOT exist, so this macro may be instantiated
+ * at `f64` and must NOT be "completed" across the fp grid. That asymmetry is the
+ * one this file's `_inv` block already records for the integer widths. */
+#define CQ_GATE_ROT_CTRL(T, W)                                                \
+    void cqrt_rz_##T##_controlled(int32_t ctrl, int32_t handle, double angle) \
     {                                                                         \
         gate_rot_args a = { handle, angle };                                  \
         gate_rot_width(cq_shim_ctx(), handle, W##u);                          \
@@ -423,8 +442,8 @@ static void gate_ry_body(void *p)
         cq_trace_end();                                                       \
         rec(CQ_ROP_RZ_CTRL, ctrl, handle, CQ_REG_NONE, angle, ctrl);          \
     }                                                                         \
-    void cqrt_rz_i##W##_controlled_inv(int32_t ctrl, int32_t handle,          \
-                                       double angle)                          \
+    void cqrt_rz_##T##_controlled_inv(int32_t ctrl, int32_t handle,           \
+                                      double angle)                           \
     {                                                                         \
         gate_rot_args a = { handle, -angle };                                 \
         gate_rot_width(cq_shim_ctx(), handle, W##u);                          \
@@ -433,7 +452,7 @@ static void gate_ry_body(void *p)
         cq_trace_end();                                                       \
         rec(CQ_ROP_RZ_CTRL_INV, ctrl, handle, CQ_REG_NONE, -angle, ctrl);     \
     }                                                                         \
-    void cqrt_ry_i##W##_controlled(int32_t ctrl, int32_t handle, double angle)\
+    void cqrt_ry_##T##_controlled(int32_t ctrl, int32_t handle, double angle) \
     {                                                                         \
         gate_rot_args a = { handle, angle };                                  \
         gate_rot_width(cq_shim_ctx(), handle, W##u);                          \
@@ -442,8 +461,8 @@ static void gate_ry_body(void *p)
         cq_trace_end();                                                       \
         rec(CQ_ROP_RY_CTRL, ctrl, handle, CQ_REG_NONE, angle, ctrl);          \
     }                                                                         \
-    void cqrt_ry_i##W##_controlled_inv(int32_t ctrl, int32_t handle,          \
-                                       double angle)                          \
+    void cqrt_ry_##T##_controlled_inv(int32_t ctrl, int32_t handle,           \
+                                      double angle)                           \
     {                                                                         \
         gate_rot_args a = { handle, -angle };                                 \
         gate_rot_width(cq_shim_ctx(), handle, W##u);                          \
@@ -453,8 +472,9 @@ static void gate_ry_body(void *p)
         rec(CQ_ROP_RY_CTRL_INV, ctrl, handle, CQ_REG_NONE, -angle, ctrl);     \
     }
 
-CQ_GATE_ROT_CTRL(1)
-CQ_GATE_ROT_CTRL(8)
-CQ_GATE_ROT_CTRL(16)
-CQ_GATE_ROT_CTRL(32)
-CQ_GATE_ROT_CTRL(64)
+CQ_GATE_ROT_CTRL(i1,  1)
+CQ_GATE_ROT_CTRL(i8,  8)
+CQ_GATE_ROT_CTRL(i16, 16)
+CQ_GATE_ROT_CTRL(i32, 32)
+CQ_GATE_ROT_CTRL(i64, 64)
+CQ_GATE_ROT_CTRL(f64, 64)

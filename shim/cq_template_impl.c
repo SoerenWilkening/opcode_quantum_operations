@@ -19,9 +19,23 @@
  *
  * and the DISPATCH half is now `shim/cq_template_dispatch.[ch]` — the three
  * tables, their bounds checks and every `src/kernels/` include. What is left
- * here is the BOUNDARY: `tpl_binary`'s ordered call sequence, D7a's refusal,
+ * here is the BOUNDARY: `cq_tpl_binary`'s ordered call sequence, D7a's refusal,
  * D7b's defensive copy and the §9 region. The discriminator is what makes each
  * half change — the yaml gaining an opcode, versus a DECISION changing.
+ *
+ * A SECOND SEAM WAS TAKEN 2026-09-18 (bead 9ve.28) AND IS RECORDED IN
+ * `shim/cq_template_boundary.h`:
+ *
+ *     the INTEGER opcode surface <-> the fp opcode surface
+ *                                          ->  shim/cq_template_fp.c
+ *
+ * Measured at 288 counted lines of 300 with `fcmp`'s four entry points still to
+ * come. What left this file is `tpl_req` (to the header) and the fp entry
+ * points (which never landed here); what stayed is every step of the ordered
+ * call sequence, so an fp family reaches D7a, D7b, the mint at the RESULT
+ * width, the §9 region, D15's twin record and D21's bracket through exactly the
+ * same code an integer one does. The two exported names are `cq_tpl_req` and
+ * `cq_tpl_binary`; nothing else crosses.
  *
  * LANDING 2's CERTIFICATE DOES NOT LAND HERE. It lands in
  * `shim/cq_shim_proof.[ch]`, which is why this file frees through
@@ -38,6 +52,7 @@
 #include "cq_shim_proof.h"
 #include "cq_shim_record.h"
 #include "cq_shim_trace.h"
+#include "cq_template_boundary.h"
 #include "cq_template_dispatch.h"
 
 #include "bit.h"
@@ -130,31 +145,8 @@ static cq_bit *tpl_out(cq_ctx *ctx, int32_t h, uint32_t w)
     return b;
 }
 
-/* One binary-or-compare call. `a_h`/`b_h` are CQ_REG_NONE on the lane that
- * carries a literal; `out` is CQ_REG_NONE on a forward symbol, which mints one;
- * `ctrl` is CQ_REG_NONE on an uncontrolled one. */
-typedef struct {
-    cq_kernel_fn k;
-    uint32_t w, wout;
-    int32_t  a_h, b_h;
-    uint64_t lo, hi;
-    int32_t  out, ctrl;
-    /* THE TEMPLATE'S OPCODE IDENTITY, for D15's twin match. It is what makes a
-     * forward and its `_unc` the SAME operation rather than merely two calls
-     * naming the same rail: `cq_shim_bin_qq(ADD,32,a,b)` and
-     * `cq_shim_bin_qq_unc(SUB,32,out,a,b)` name identical handles and are not a
-     * pair. It is NOT `r.k`: the compare families all share one kernel slot
-     * shape and two predicates can collide there, and a function pointer is not
-     * a stable identity across a rebuild anyway. */
-    uint32_t tag;
-    /* THE DISPLAY NAME, for D21's `op begin` payload. It is the DISPATCH half's
-     * (cq_template_dispatch.h) for the seam's own reason — a name set that grows
-     * with the yaml, not with a decision — and it rides here rather than being
-     * re-derived because `tpl_binary` has the opcode only as a kernel pointer by
-     * then, and two predicates can share a kernel slot shape. */
-    const char *name;
-} tpl_req;
-
+/* `tpl_req` itself is `shim/cq_template_boundary.h`'s — it is what crosses the
+ * second seam. Everything below is this file's. */
 typedef struct {
     cq_ctx *ctx;
     cq_kernel_fn k;
@@ -229,7 +221,7 @@ static void tpl_run_kernel(void *p)
  *    may happen between the push and the pop, because `cq_ctrl_push` copies the
  *    control BIT and a recycled index makes every later promoted gate control
  *    off a wire someone else now owns. */
-static int32_t tpl_binary(tpl_req r)
+int32_t cq_tpl_binary(tpl_req r)
 {
     cq_ctx  *ctx = cq_shim_ctx();
     cq_bit   lit[CQ_REG_WIDTH_MAX];
@@ -366,14 +358,29 @@ static int32_t tpl_binary(tpl_req r)
     return r.out;
 }
 
-static tpl_req tpl_bin_req(cq_shim_op op, int bits, int32_t a_h, int32_t b_h)
+/* THE NEUTRAL BASE, SHARED WITH `shim/cq_template_fp.c` ACROSS THE SECOND SEAM.
+ * It fills only what the ABI fixes for every arity-2 family and leaves `k`,
+ * `name` and `tag` NULL/0 so that a builder which forgets one is a crash or a
+ * mispairing its own suite sees, rather than a silent inheritance of whatever
+ * family happened to be spelled first. (It used to be exactly that: `tpl_cmp_req`
+ * built on `tpl_bin_req(CQ_SHIM_OP_ADD, …)` and overwrote three fields.) */
+tpl_req cq_tpl_req(int bits, int32_t a_h, int32_t b_h)
 {
     tpl_req r;
-    r.k = cq_tpl_bin_kernel(op);
+    r.k = NULL;
     r.w = r.wout = tpl_width(bits);
     r.a_h = a_h; r.b_h = b_h;
     r.lo = r.hi = 0u;
     r.out = r.ctrl = CQ_REG_NONE;
+    r.tag = 0u;
+    r.name = NULL;
+    return r;
+}
+
+static tpl_req tpl_bin_req(cq_shim_op op, int bits, int32_t a_h, int32_t b_h)
+{
+    tpl_req r = cq_tpl_req(bits, a_h, b_h);
+    r.k = cq_tpl_bin_kernel(op);
     /* The width is folded in because the ABI's `_unc` carries it too, and a
      * forward at i32 is not the adjoint of an `_unc` at i64 on the same
      * handles. The `+ 1` keeps the binary family clear of the compare family's
@@ -387,13 +394,14 @@ static tpl_req tpl_bin_req(cq_shim_op op, int bits, int32_t a_h, int32_t b_h)
  * two differ inside `tpl_req`, and the reason `wout` exists at all. */
 static tpl_req tpl_cmp_req(cq_shim_pred p, int bits, int32_t a_h, int32_t b_h)
 {
-    tpl_req r = tpl_bin_req(CQ_SHIM_OP_ADD, bits, a_h, b_h);
+    tpl_req r = cq_tpl_req(bits, a_h, b_h);
     r.k    = cq_tpl_cmp_kernel(p);
     r.wout = 1u;
-    /* A DISJOINT TAG SPACE FROM THE BINARY FAMILY, not an overlapping one:
-     * `tpl_cmp_req` builds on a binary request whose tag already encodes
-     * CQ_SHIM_OP_ADD, so without this line every predicate would share `add`'s
-     * identity and `icmp_eq_unc` would pair with an `add` forward. */
+    /* A DISJOINT TAG SPACE FROM THE BINARY FAMILY, not an overlapping one: the
+     * binary tags start at `op * 1024`, and without this line every predicate
+     * would collide with the opcode of the same index — `icmp_eq_unc` pairing
+     * with an `add` forward. The four spaces are listed in
+     * shim/cq_template_boundary.h and a fifth family must claim a fifth. */
     r.tag  = 0x40000000u + (uint32_t)p * 1024u + r.w + 1u;
     r.name = cq_tpl_cmp_name(p);
     return r;
@@ -403,7 +411,7 @@ static tpl_req tpl_cmp_req(cq_shim_pred p, int bits, int32_t a_h, int32_t b_h)
 
 int32_t cq_shim_bin_qq(cq_shim_op op, int bits, int32_t a_handle, int32_t b_handle)
 {
-    return tpl_binary(tpl_bin_req(op, bits, a_handle, b_handle));
+    return cq_tpl_binary(tpl_bin_req(op, bits, a_handle, b_handle));
 }
 
 int32_t cq_shim_bin_hl(cq_shim_op op, int bits, int32_t a_handle,
@@ -411,7 +419,7 @@ int32_t cq_shim_bin_hl(cq_shim_op op, int bits, int32_t a_handle,
 {
     tpl_req r = tpl_bin_req(op, bits, a_handle, CQ_REG_NONE);
     r.lo = lo; r.hi = hi;
-    return tpl_binary(r);
+    return cq_tpl_binary(r);
 }
 
 int32_t cq_shim_bin_lh(cq_shim_op op, int bits, uint64_t lo, uint64_t hi,
@@ -419,7 +427,7 @@ int32_t cq_shim_bin_lh(cq_shim_op op, int bits, uint64_t lo, uint64_t hi,
 {
     tpl_req r = tpl_bin_req(op, bits, CQ_REG_NONE, b_handle);
     r.lo = lo; r.hi = hi;
-    return tpl_binary(r);
+    return cq_tpl_binary(r);
 }
 
 void cq_shim_bin_qq_unc(cq_shim_op op, int bits, int32_t out_handle,
@@ -427,7 +435,7 @@ void cq_shim_bin_qq_unc(cq_shim_op op, int bits, int32_t out_handle,
 {
     tpl_req r = tpl_bin_req(op, bits, a_handle, b_handle);
     r.out = out_handle;
-    (void)tpl_binary(r);
+    (void)cq_tpl_binary(r);
 }
 
 void cq_shim_bin_hl_unc(cq_shim_op op, int bits, int32_t out_handle,
@@ -435,7 +443,7 @@ void cq_shim_bin_hl_unc(cq_shim_op op, int bits, int32_t out_handle,
 {
     tpl_req r = tpl_bin_req(op, bits, a_handle, CQ_REG_NONE);
     r.out = out_handle; r.lo = lo; r.hi = hi;
-    (void)tpl_binary(r);
+    (void)cq_tpl_binary(r);
 }
 
 void cq_shim_bin_lh_unc(cq_shim_op op, int bits, int32_t out_handle,
@@ -443,7 +451,7 @@ void cq_shim_bin_lh_unc(cq_shim_op op, int bits, int32_t out_handle,
 {
     tpl_req r = tpl_bin_req(op, bits, CQ_REG_NONE, b_handle);
     r.out = out_handle; r.lo = lo; r.hi = hi;
-    (void)tpl_binary(r);
+    (void)cq_tpl_binary(r);
 }
 
 int32_t cq_shim_bin_qq_ctrl(cq_shim_op op, int bits, int32_t ctrl_flag,
@@ -451,7 +459,7 @@ int32_t cq_shim_bin_qq_ctrl(cq_shim_op op, int bits, int32_t ctrl_flag,
 {
     tpl_req r = tpl_bin_req(op, bits, a_handle, b_handle);
     r.ctrl = ctrl_flag;
-    return tpl_binary(r);
+    return cq_tpl_binary(r);
 }
 
 int32_t cq_shim_bin_hl_ctrl(cq_shim_op op, int bits, int32_t ctrl_flag,
@@ -459,7 +467,7 @@ int32_t cq_shim_bin_hl_ctrl(cq_shim_op op, int bits, int32_t ctrl_flag,
 {
     tpl_req r = tpl_bin_req(op, bits, a_handle, CQ_REG_NONE);
     r.ctrl = ctrl_flag; r.lo = lo; r.hi = hi;
-    return tpl_binary(r);
+    return cq_tpl_binary(r);
 }
 
 int32_t cq_shim_bin_lh_ctrl(cq_shim_op op, int bits, int32_t ctrl_flag,
@@ -467,13 +475,13 @@ int32_t cq_shim_bin_lh_ctrl(cq_shim_op op, int bits, int32_t ctrl_flag,
 {
     tpl_req r = tpl_bin_req(op, bits, CQ_REG_NONE, b_handle);
     r.ctrl = ctrl_flag; r.lo = lo; r.hi = hi;
-    return tpl_binary(r);
+    return cq_tpl_binary(r);
 }
 
 int32_t cq_shim_icmp_qq(cq_shim_pred pred, int bits, int32_t a_handle,
                         int32_t b_handle)
 {
-    return tpl_binary(tpl_cmp_req(pred, bits, a_handle, b_handle));
+    return cq_tpl_binary(tpl_cmp_req(pred, bits, a_handle, b_handle));
 }
 
 int32_t cq_shim_icmp_hl(cq_shim_pred pred, int bits, int32_t a_handle,
@@ -481,7 +489,7 @@ int32_t cq_shim_icmp_hl(cq_shim_pred pred, int bits, int32_t a_handle,
 {
     tpl_req r = tpl_cmp_req(pred, bits, a_handle, CQ_REG_NONE);
     r.lo = lo; r.hi = hi;
-    return tpl_binary(r);
+    return cq_tpl_binary(r);
 }
 
 void cq_shim_icmp_qq_unc(cq_shim_pred pred, int bits, int32_t out_handle,
@@ -489,7 +497,7 @@ void cq_shim_icmp_qq_unc(cq_shim_pred pred, int bits, int32_t out_handle,
 {
     tpl_req r = tpl_cmp_req(pred, bits, a_handle, b_handle);
     r.out = out_handle;
-    (void)tpl_binary(r);
+    (void)cq_tpl_binary(r);
 }
 
 void cq_shim_icmp_hl_unc(cq_shim_pred pred, int bits, int32_t out_handle,
@@ -497,12 +505,12 @@ void cq_shim_icmp_hl_unc(cq_shim_pred pred, int bits, int32_t out_handle,
 {
     tpl_req r = tpl_cmp_req(pred, bits, a_handle, CQ_REG_NONE);
     r.out = out_handle; r.lo = lo; r.hi = hi;
-    (void)tpl_binary(r);
+    (void)cq_tpl_binary(r);
 }
 
 /* A CAST IS ARITY-1, SO IT HAS NEITHER A D7b LANE NOR A CONTROLLED AXIS, and it
  * is the second shape whose result width is not its operand width. It does not
- * go through `tpl_binary`: its kernel takes `(F, T)` where a binary kernel
+ * go through `cq_tpl_binary`: its kernel takes `(F, T)` where a binary kernel
  * takes `W`, and widening `cq_kernel_fn` to reach it is exactly what Rule 7
  * forbids. D7a is still checked, because `_unc` names an `out`. */
 static int32_t tpl_cast(cq_shim_cast_kind kind, int from_bits, int to_bits,

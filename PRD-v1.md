@@ -173,6 +173,16 @@ generated witnesses `cq_link_smoke.c` and `core_abi_link_check.py`):
 | ~~1474~~ | — | **phantom.** Appears at no revision as either a total or an integer count, and matches no alternative partition. A transcription slip from 1455 while drafting §13/§14. Nothing to reconcile — deleted |
 | ~~1455 + 878 = 2333~~ | — | a *correct snapshot* of revision `ce3837bc` (2026-07-06), stale by the two i80 increments of 2026-07-15 |
 
+> **AMENDED 2026-09-18 (v2 Wave 4, bead `9ve.28`) — THE 884 IS NOW A MOVING FIGURE.** The first fp
+> family landed at `f64` (`fcmp`, M36, K18): 84 symbols left the fp abort bucket — 56 real wrappers and
+> 28 D14 `_inv` aborts — so the measured split is **2479 = 992 int wrappers + 603 int `_inv` aborts +
+> 56 fp wrappers + 28 fp `_inv` aborts + 800 fp aborts**, pinned by `shim/gen_shim.py`'s audit
+> (`LANDED`, `EXPECTED_BY_DOMAIN`). The ten `f64` CORE symbols (`cqrt_alloc_f64` as a memcpy into 64
+> constant bits, `measure`, `copy`, `ry`, `rz` and the `_controlled` forms) are real code by WIDENING
+> `shim/cq_runtime_rail.c` / `cq_runtime_gate.c`; `cq_runtime_v2.c` is 29 thunks. Every earlier figure
+> in this document is the dated record of its own step and stands as written; read the live split from
+> the generator, never from prose. The 240 cross-domain casts do not move.
+
 Beware when counting: **240** of the 884 fp-touching symbols are the cross-domain casts
 (`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`), whose names carry *both* an integer and
 a floating-point width. They look integer-ish and are not. (This figure was 234 at the
@@ -2949,6 +2959,9 @@ and diffs — `make shim-check` / `cmake --build <dir> --target shim-check`, i.e
 > **AND HERE THE DEFERRAL IS FORCED RATHER THAN CHOSEN, which is worth recording because
 > "implement all nine uniformly" is the obvious tidy alternative and was weighed.**
 > `cqrt_alloc_f<W>` is itself an abort, so **no fp rail handle can exist at runtime in v1**.
+> **(AMENDED 2026-09-18, `9ve.28`: true at f16/f32/f80, FALSE at f64 — `cqrt_alloc_f64` is real, an f64
+> rail handle exists, and the f64 `ry`/`rz` `_controlled` forms are implemented; the row above reads
+> ~~38~~ **28** fp-width thunks.)**
 > An implemented `cqrt_ry_f32_controlled` would resolve its handle through M07 and take M07's
 > **generic** error rather than `cq_shim_unsupported`'s named one — worse diagnostics for a
 > path nothing can reach, a forward implemented where its own `_inv` is not, and the only

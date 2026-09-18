@@ -32,10 +32,27 @@ sys.path.insert(0, sc.SHIM)
 import gen_shim  # noqa: E402
 
 ABI = sc.manifest_decls()
-INT = {n for n in ABI if not sc.is_fp(n)}
-EXPECT = {"wrapper": INT - {n for n in INT if n.endswith("_inv")},
-          "inv": {n for n in INT if n.endswith("_inv")},
-          "fp": set(ABI) - INT}
+
+# THE THREE CODE BUCKETS ARE NO LONGER "INTEGER, INTEGER-inv, fp" — they are
+# "live, D14-refused, still-deferred" (PRD-v2 §1, bead 9ve.28). A LANDED fp
+# family-width joins the first two on exactly the same rule an integer family
+# does, so the expected sets are built from `is_deferred_fp` rather than from
+# `is_fp`. The `_inv` suffix test is unchanged and is still the ONLY thing
+# separating the first two, which is the half of D14 that is width-blind: an
+# `fcmp` is non-injective at every width, so its `_inv` is refused whether or not
+# its forward ships.
+LIVE = {n for n in ABI if not sc.is_deferred_fp(n)}
+EXPECT = {"wrapper": {n for n in LIVE if not n.endswith("_inv")},
+          "inv": {n for n in LIVE if n.endswith("_inv")},
+          "fp": {n for n in ABI if sc.is_deferred_fp(n)}}
+# The four-way reading a reader and a reviewer actually want, kept as SETS so a
+# family that moved domain is named rather than counted.
+BY_DOMAIN = {
+    "int_wrapper": {n for n in EXPECT["wrapper"] if not sc.is_fp(n)},
+    "int_inv":     {n for n in EXPECT["inv"] if not sc.is_fp(n)},
+    "fp_wrapper":  {n for n in EXPECT["wrapper"] if sc.is_fp(n)},
+    "fp_inv":      {n for n in EXPECT["inv"] if sc.is_fp(n)},
+}
 SHIPPED = sc.parse_definitions(sc.read_dir(sc.GENERATED))
 
 
@@ -73,33 +90,75 @@ def every_emitted_signature_matches_cq_langs_own_declaration():
     sc.check(not bad, "%d signature mismatch(es):\n  %s" % (len(bad), "\n  ".join(bad[:3])))
 
 
-def the_partition_is_992_wrappers_603_inv_aborts_884_fp_aborts():
+def the_partition_is_1048_wrappers_631_inv_aborts_800_fp_aborts():
+    # It was 992 / 603 / 884 until PRD-v2's first fp family landed on
+    # 2026-09-18: 84 `fcmp` symbols at `f64` left the fp bucket, 56 of them as
+    # wrappers and 28 as D14 `_inv` aborts (bead 9ve.28).
     got = {k: len(v) for k, v in buckets(SHIPPED).items()}
-    sc.check(got == {"wrapper": 992, "inv": 603, "fp": 884},
-             "PRD §1 + §15 D14 partition: expected 992/603/884, got %r" % got)
+    sc.check(got == {"wrapper": 1048, "inv": 631, "fp": 800},
+             "PRD §1 + §15 D14 + PRD-v2 §1 partition: expected 1048/631/800, "
+             "got %r" % got)
 
 
-def the_integer_abort_set_is_exactly_the_inv_names():
+def the_four_way_domain_split_is_992_603_56_28_and_800():
+    # A COUNT IS NOT AN IDENTIFICATION, AND THE THREE COARSE BUCKETS NOW HIDE A
+    # DOMAIN MOVE. Once a family-width lands, `wrapper` holds integer AND fp
+    # wrappers, so 1048/631/800 stays exact while, say, `fp_arith`/`f64` goes
+    # live and `int_arith` loses the same number — which the case above cannot
+    # see and this one names. The expected side is the ABI's own spelling
+    # crossed with `is_landed`; gen_shim's audit reaches the same five numbers
+    # down a different route (the yaml's `widths` map and `family` key).
+    got = buckets(SHIPPED)
+    live = {"wrapper": got["wrapper"], "inv": got["inv"]}
+    for key, want in sorted(BY_DOMAIN.items()):
+        dom, bucket = key.split("_", 1)
+        have = {n for n in live[bucket] if (sc.is_fp(n) == (dom == "fp"))}
+        sc.diff_sets(have, want, "%s set" % key)
+    sc.check([len(BY_DOMAIN[k]) for k in
+              ("int_wrapper", "int_inv", "fp_wrapper", "fp_inv")]
+             == [992, 603, 56, 28],
+             "the four-way split moved: %r"
+             % {k: len(v) for k, v in BY_DOMAIN.items()})
+
+
+def the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family():
     # D14's own obligation, and it is a SET so that nothing is swept into the
     # bucket unobserved. The expected side is derived from the ABI's own
-    # spelling — a name is fp-touching iff it carries an f16/f32/f64/f80 token —
-    # never from gen_shim.bucket_of, which walks the yaml's `widths` map.
-    sc.diff_sets(buckets(SHIPPED)["inv"], EXPECT["inv"], "integer _inv abort set")
+    # spelling — a name is fp-touching iff it carries an f16/f32/f64/f80 token,
+    # and a LANDED one iff sc.LANDED_NAME matches — never from
+    # gen_shim.bucket_of, which walks the yaml's `widths` map.
+    sc.diff_sets(buckets(SHIPPED)["inv"], EXPECT["inv"], "_inv abort set")
 
 
-def the_wrapper_set_is_exactly_the_non_inv_integer_names():
-    # Naming only the abort bucket leaves 1876 bodies unconstrained (bd 819).
+def the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family():
+    # Naming only the abort bucket leaves 1679 bodies unconstrained (bd 819).
     sc.diff_sets(buckets(SHIPPED)["wrapper"], EXPECT["wrapper"], "wrapper set")
 
 
-def the_fp_abort_set_is_exactly_the_fp_touching_names():
+def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
     # 240 of these carry an integer width in their NAME as well — the
-    # cross-domain casts — so they look integer-ish and are not (PRD §1).
+    # cross-domain casts — so they look integer-ish and are not (PRD §1). That
+    # figure is UNMOVED by the fcmp landing, which is the point of pinning it
+    # beside a number that did move: `fcmp` carries no integer width token, so a
+    # landing that had wrongly swept a cross-domain cast into the live set would
+    # show up here and nowhere else.
     got = buckets(SHIPPED)["fp"]
     sc.diff_sets(got, EXPECT["fp"], "fp abort set")
     crossdomain = {n for n in got if any("_i%d" % b in n for b in (1, 8, 16, 32, 64, 80, 128))}
     sc.check(len(crossdomain) == 240,
              "expected 240 integer-ish fp symbols, got %d" % len(crossdomain))
+    # AND THE STILL-DEFERRED fp WIDTHS ARE STILL THERE IN FULL. `fcmp` ships at
+    # f64 ALONE (PRD-v2 §1a), so its other three widths must remain aborts —
+    # 14 preds x 6 variants x 3 widths. A "LANDED = the whole family" slip is
+    # invisible to every count above, because it would move 252 symbols out of
+    # `fp` and into `wrapper`/`inv` and the partition case would simply report
+    # three different numbers without saying which family moved.
+    deferred_fcmp = {n for n in got if n.startswith("cq_template_fcmp_")}
+    sc.check(len(deferred_fcmp) == 252,
+             "expected 252 still-deferred fcmp symbols (f16/f32/f80), got %d"
+             % len(deferred_fcmp))
+    sc.check(not any("_f64" in n for n in deferred_fcmp),
+             "an f64 fcmp symbol is still in the `fp is v2` bucket")
 
 
 def no_cqrt_rotation_symbol_appears_anywhere_in_the_emitted_shim():
@@ -137,10 +196,27 @@ def the_shim_enums_match_the_opcodes_the_grid_reaches():
     # a second transcription of the ABI and have to be checked against it.
     header = open(os.path.join(sc.SHIM, "cq_shim.h")).read()
     rows = gen_shim.expand(gen_shim.load(sc.YAML)[0])
+    live = [r for r in rows if r.bucket == "wrapper"]
+    # THE TWO PREDICATE ENUMS ARE SEPARATED BY THE OPCODE AND NOT BY THE KIND,
+    # because `icmp` and `fcmp` share `kind == "compare"` and their predicate
+    # lists OVERLAP in `ult`/`ugt`/`ule`/`uge`. A single `kind == "compare"` arm
+    # would demand all 24 mnemonics of `CQ_SHIM_PRED_*` and find 10 — which is
+    # how this case first went red, and the right fix was the split enum rather
+    # than a union.
+    #
+    # THE `CQ_SHIM_FPRED_` PREFIX IS TESTED FIRST AND THE TEST IS `startswith`,
+    # so the two arms are disjoint only because `CQ_SHIM_FPRED_` does not start
+    # with `CQ_SHIM_PRED_`. It does not — the letters differ at position 9 — and
+    # that is checked here rather than assumed, because a rename to
+    # `CQ_SHIM_PRED_F*` would silently merge the two sets into one green arm.
+    sc.check(not "CQ_SHIM_FPRED_OEQ".startswith("CQ_SHIM_PRED_"),
+             "the two predicate enum prefixes are no longer disjoint; the arms "
+             "below would merge and stop discriminating")
     for prefix, want in (
-            ("CQ_SHIM_OP_", {r.opcode for r in rows if r.bucket == "wrapper" and r.kind == "binary"}),
-            ("CQ_SHIM_PRED_", {r.pred for r in rows if r.bucket == "wrapper" and r.kind == "compare"}),
-            ("CQ_SHIM_CAST_", {r.opcode for r in rows if r.bucket == "wrapper" and r.kind == "cast"})):
+            ("CQ_SHIM_OP_", {r.opcode for r in live if r.kind == "binary"}),
+            ("CQ_SHIM_PRED_", {r.pred for r in live if r.opcode == "icmp"}),
+            ("CQ_SHIM_FPRED_", {r.pred for r in live if r.opcode == "fcmp"}),
+            ("CQ_SHIM_CAST_", {r.opcode for r in live if r.kind == "cast"})):
         got = {t[len(prefix):].lower() for t in header.split() if t.startswith(prefix)}
         got = {t.rstrip(",}") for t in got}
         sc.diff_sets(got, want, "%s* enum" % prefix)
@@ -189,10 +265,14 @@ def the_generated_files_on_disk_are_up_to_date():
 # deliberately wrong bucket assignment and require the gate above to go red AND
 # to name the symbols.
 
-def _rerender(swap=None, demote=None):
+def _rerender(swap=None, demote=None, land=None, promote=None):
     table, sha = gen_shim.load(sc.YAML)
     rows = gen_shim.expand(table)
     for r in rows:
+        if land and r.bucket == "fp" and (r.family, r.widths[0]) in land:
+            r.bucket = "inv" if r.inv else "wrapper"
+        if promote and r.name == promote:
+            r.bucket = "wrapper"
         if swap and r.bucket in ("wrapper", "inv"):
             if r.variant in swap[0]:
                 r.bucket = "inv"
@@ -271,6 +351,62 @@ def a_single_wrapper_demoted_to_an_abort_turns_the_gate_red():
     sc.check(all(victim in r for r in reds), "the failure did not name %s: %s" % (victim, reds))
 
 
+def a_family_width_that_has_not_landed_cannot_be_declared_live():
+    # THE NEW DEFECT CLASS THE `LANDED` TABLE INTRODUCES, and it has no
+    # structural detector of its own: an extra line in gen_shim.LANDED emits 84
+    # live wrappers per family-width whose kernel and dispatch row do not exist.
+    # That is a LINK error today — which is exactly why it must be provoked
+    # rather than trusted to stay one: the day `fp_arith`/`f64` lands, `fadd` at
+    # `f32` becomes one wrong line from shipping a live wrapper that dispatches
+    # a 32-bit operand into a 64-bit kernel, and nothing links-or-not about it.
+    #
+    # TWO PROVOCATIONS, AND THEY FAIL IN GENUINELY DIFFERENT WAYS — which is the
+    # finding rather than a redundancy.
+    #
+    # (1) A NON-f64 fp WIDTH IS REFUSED BY THE GENERATOR ITSELF, before a byte is
+    # written. `gen_bodies.literal` hard-errors because only `f64` has a
+    # bit-pattern macro, so the failure names the symbol, the width and the file
+    # that would have to change first. That is a stronger answer than a red set:
+    # a `SystemExit` cannot be regenerated away, and the alternative — emitting
+    # `CQ_SHIM_LO(b_classical)` on a `float` — is the NUMERIC-CONVERSION defect
+    # `shim/cq_shim.h` exists to prevent, and it would compile clean.
+    for width in ("f16", "f32", "f80"):
+        try:
+            _rerender(land={("fp_compare", width)})
+        except SystemExit as e:
+            bits = {"f16": 16, "f32": 32, "f80": 80}[width]
+            sc.check(width in str(e) and "CQ_SHIM_F%d_LO" % bits in str(e),
+                     "the refusal for %s did not name the width and the "
+                     "missing macro: %s" % (width, e))
+            continue
+        raise sc.Fail("landing fp_compare/%s rendered without a refusal" % width)
+
+    # (2) THE ONE THAT RENDERS PERFECTLY AND MUST STILL GO RED — the cheapest
+    # possible version of the defect and the one no refusal can catch. A `qq`
+    # row has NO classical operand, so the macro guard above never sees it:
+    # `cq_template_fcmp_oeq_f32` promoted to a wrapper emits a syntactically
+    # perfect `cq_shim_fcmp_qq(CQ_SHIM_FPRED_OEQ, 32, …)`, keeps the 2479-name
+    # set, keeps every signature, and dispatches a 32-bit operand into a kernel
+    # that hard-errors on anything but 64. Only the SET sees it, and it names it.
+    victim = "cq_template_fcmp_oeq_f32"
+    defs = _rerender(promote=victim)
+    sc.check(len(defs) == 2479, "promoting %s changed the symbol COUNT" % victim)
+    reds = _reds(defs)
+    sc.check(len(reds) == 1,
+             "promoting %s turned %d of the 2 set assertions red; expected the "
+             "wrapper set alone (it is not an `_inv` name)" % (victim, len(reds)))
+    sc.check(all(victim in r for r in reds),
+             "the failure did not name %s: %s" % (victim, reds))
+
+    # AND A NOTE THAT IS CHEAPER TO RECORD THAN TO REDISCOVER: landing
+    # `fp_arith`/`f64` here raises `KeyError: ('unary', 'un', 'fwd')` from
+    # gen_bodies.ENTRY, because that family carries `fneg`, the yaml's ONE unary
+    # opcode, and no unary entry point exists yet. Landing an arithmetic fp
+    # family is therefore an ENTRY-table change as well as a LANDED line — which
+    # is the KeyError doing its documented job ("this table is explicit and
+    # KeyError is the failure") rather than a gap.
+
+
 def the_check_mode_sees_a_tampered_file():
     # --check is CI's drift gate; a drift gate that cannot report drift is the
     # `set_tests_properties` trap in another dress.
@@ -306,10 +442,11 @@ if __name__ == "__main__":
         the_manifest_is_the_expansion_of_the_pinned_yaml,
         the_emitted_symbol_set_equals_the_abi_in_both_directions,
         every_emitted_signature_matches_cq_langs_own_declaration,
-        the_partition_is_992_wrappers_603_inv_aborts_884_fp_aborts,
-        the_integer_abort_set_is_exactly_the_inv_names,
-        the_wrapper_set_is_exactly_the_non_inv_integer_names,
-        the_fp_abort_set_is_exactly_the_fp_touching_names,
+        the_partition_is_1048_wrappers_631_inv_aborts_800_fp_aborts,
+        the_four_way_domain_split_is_992_603_56_28_and_800,
+        the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family,
+        the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family,
+        the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed,
         no_cqrt_rotation_symbol_appears_anywhere_in_the_emitted_shim,
         the_shim_enums_match_the_opcodes_the_grid_reaches,
         every_family_gets_its_own_file_and_only_its_own_symbols,
@@ -317,5 +454,6 @@ if __name__ == "__main__":
         each_of_the_twenty_same_size_transpositions_turns_the_gate_red,
         the_composite_swap_that_really_does_abort_all_214_controlled_is_caught,
         a_single_wrapper_demoted_to_an_abort_turns_the_gate_red,
+        a_family_width_that_has_not_landed_cannot_be_declared_live,
         the_check_mode_sees_a_tampered_file,
     ]))

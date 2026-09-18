@@ -16,7 +16,21 @@ _Static_assert(CQ_ROP_NONE == 0, "a zeroed cq_call_rec must record nothing");
 
 /* THE EFFECT TABLE. Transcribed from CQ_lang/runtime/cq_runtime.h, slot by
  * slot. `controls` is always a SUBSET of `reads` — asserted below, because the
- * ported engine's co_written_stable rests on it. */
+ * ported engine's co_written_stable rests on it.
+ *
+ * ONLY THE EARLIER RECORD'S `twin_of` IS EVER CONSULTED, AND THAT IS RECORDED
+ * HERE RATHER THAN LEFT AS AN UNTESTED LINE (measured 2026-09-18, bead 9ve.28).
+ * `adjoint_matches(ck, c)` reads `ck`'s row and asks whether `c->op` is its
+ * declared twin, and `cq_shim_reduce.c`'s scan always passes the STACKED write
+ * as `ck` — so for a forward/`_unc` pair it is the FORWARD row's `twin_of` that
+ * decides. Mutating `[CQ_ROP_TPL_UNC].twin_of` to a wrong opcode SURVIVES the
+ * whole suite in Release; mutating `[CQ_ROP_TPL_FWD].twin_of` is killed by
+ * tests/test_shim_cert.c and by test_template's poisoned fcmp round trip. The
+ * paired mutation is what makes the first an EQUIVALENT rather than an untested
+ * line: the `_unc` rows' `twin_of` would become load-bearing the day a caller
+ * emitted an `_unc` BEFORE its forward, which CQ_lang does not, so the rows stay
+ * symmetric on purpose — a reader checking the table must be able to read the
+ * pairing off either end. Do NOT "simplify" them to one direction. */
 static const cq_reff EFF[CQ_ROP__N] = {
 /*                        reads         writes        controls    imms   diag self negA negI twin twin_of */
 [CQ_ROP_NONE]        = {0,              0,            0,          0,     0, 0, 0, 0, 0, 0},

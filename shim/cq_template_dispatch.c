@@ -10,6 +10,7 @@
 #include "kernels/cmp.h"
 #include "kernels/divrem_s.h"
 #include "kernels/divrem_u.h"
+#include "kernels/fcmp.h"
 #include "kernels/mul.h"
 #include "kernels/shift_var.h"
 
@@ -80,6 +81,37 @@ cq_kernel_fn cq_tpl_cmp_kernel(cq_shim_pred pred)
     return K[pred];
 }
 
+/* THE ROW ORDER IS `opcode_table.yaml`'s `predicates: fcmp:` LIST AND NOT LLVM's,
+ * AND THE TWO GENUINELY DISAGREE. `src/kernels/fcmp.h`'s `cq_fcmp_pred` is LLVM's
+ * numbering (OEQ, OGT, OGE, OLT, OLE, ONE, ORD, UNO, UEQ, UGT, UGE, ULT, ULE,
+ * UNE) and `cq_shim_fpred` is the yaml's (OEQ, UNE, OLT, OGT, OLE, OGE, ONE,
+ * ORD, UNO, UEQ, UGT, UGE, ULT, ULE). Only the first row coincides. A table
+ * written by INDEX rather than by name — or a `(cq_fcmp_pred)pred` cast, which
+ * compiles clean — sends `une` to `ogt`, `olt` to `oge` and so on for thirteen of
+ * fourteen rows. Nothing structural can see it: every row emits from the same
+ * program machine, keeps the palindrome and leaves scratch clean, exactly as
+ * K9's `uge`-meaning-`ule` does. Only L1 against `cq_fcmp_eval` tells them apart.
+ *
+ * AND `cq_kernel_fcmp_*` IS WHAT THIS NAMES, NEVER `cq_fcmp_program` — the
+ * kernel is the Rule 7 entry point, sandwich and all; the program is its table. */
+cq_kernel_fn cq_tpl_fcmp_kernel(cq_shim_fpred pred)
+{
+    static const cq_kernel_fn K[] = {
+        cq_kernel_fcmp_oeq, cq_kernel_fcmp_une, cq_kernel_fcmp_olt,
+        cq_kernel_fcmp_ogt, cq_kernel_fcmp_ole, cq_kernel_fcmp_oge,
+        cq_kernel_fcmp_one, cq_kernel_fcmp_ord, cq_kernel_fcmp_uno,
+        cq_kernel_fcmp_ueq, cq_kernel_fcmp_ugt, cq_kernel_fcmp_uge,
+        cq_kernel_fcmp_ult, cq_kernel_fcmp_ule
+    };
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FPRED_ULE + 1u,
+                   "one kernel per cq_shim_fpred, in opcode_table.yaml's order");
+
+    if ((unsigned)pred > (unsigned)CQ_SHIM_FPRED_ULE)
+        cq_disp_die("cq_template_fcmp_* predicate outside the ABI's enum",
+                    (int32_t)pred);
+    return K[pred];
+}
+
 cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind)
 {
     static const cq_tpl_cast_fn K[] = {
@@ -127,6 +159,24 @@ const char *cq_tpl_cmp_name(cq_shim_pred pred)
 
     if ((unsigned)pred > (unsigned)CQ_SHIM_PRED_UGE)
         cq_disp_die("cq_template_icmp_* predicate outside the ABI's enum",
+                    (int32_t)pred);
+    return N[pred];
+}
+
+/* The yaml's order again, and the `fcmp_` prefix keeps a D21 `op begin` payload
+ * distinguishable from `icmp_ult`'s in a viewer that has no type information. */
+const char *cq_tpl_fcmp_name(cq_shim_fpred pred)
+{
+    static const char *const N[] = {
+        "fcmp_oeq", "fcmp_une", "fcmp_olt", "fcmp_ogt", "fcmp_ole",
+        "fcmp_oge", "fcmp_one", "fcmp_ord", "fcmp_uno", "fcmp_ueq",
+        "fcmp_ugt", "fcmp_uge", "fcmp_ult", "fcmp_ule"
+    };
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FPRED_ULE + 1u,
+                   "one display name per cq_shim_fpred, in the yaml's order");
+
+    if ((unsigned)pred > (unsigned)CQ_SHIM_FPRED_ULE)
+        cq_disp_die("cq_template_fcmp_* predicate outside the ABI's enum",
                     (int32_t)pred);
     return N[pred];
 }

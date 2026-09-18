@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+# test_gen_bodies_provoked.py — the PROVOCATIONS half of Step 22's bodies gate,
+# on the seam tests/test_gen_bodies.py recorded in its own header BEFORE this
+# file was needed:
+#
+#     the ASSERTIONS <-> the PROVOCATIONS
+#
+# TAKEN 2026-09-18 (bead 9ve.28) ON THE FIRST MEASUREMENT PAST THE WALL. The
+# `.py` reached 319 counted lines of Rule 12's 300 when PRD-v2's first fp family
+# landed and brought three new dispatch mutants with it; Python has no `.inc`
+# escape hatch (check_loc.sh counts every line of a multi-line string as code),
+# so the seam is a second FILE and a third registered ctest entry, exactly as
+# that header said it would be.
+#
+# THE CUT IS A SUBJECT CUT AND ITS DISCRIMINATOR IS SHARP: everything in the
+# sibling is about the GENERATOR, and everything here is about the SUITE. A case
+# here breaks a definitions dict on purpose and requires a named case over there
+# to go red AND to name the symbol — an assertion nobody has seen fail is an
+# assertion nobody has tested, and mutating an assertion cannot fail against a
+# correct generator, so the instrument is a PROVOCATION rather than a mutant.
+#
+# THE IMPORT IS ONE-WAY. This file imports the sibling's cases; the sibling
+# names nothing here, so its own run is unaffected by anything below. Importing
+# it re-parses shim/generated/*.gen.c once, which is the same work the sibling
+# does and is why both entries take a couple of seconds.
+
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "support"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import shimcheck as sc  # noqa: E402
+import test_gen_bodies as gb  # noqa: E402
+
+SHIPPED = gb.SHIPPED
+no_wrapper_is_inert = gb.no_wrapper_is_inert
+every_wrapper_body_is_exactly_the_call_its_symbol_names = \
+    gb.every_wrapper_body_is_exactly_the_call_its_symbol_names
+
+
+def _broken(name, body):
+    d = dict(SHIPPED)
+    d[name] = (SHIPPED[name][0], body)
+    return d
+
+
+def an_inert_wrapper_body_is_caught():
+    # BOTH DOMAINS, because the wrapper bucket is no longer all-integer: an
+    # inert fp body would leave the 1048 count and the 2479 name set exact just
+    # as an inert integer one does.
+    for victim in ("cq_template_add_i32", "cq_template_fcmp_olt_f64"):
+        for body in ([], ["    return 0;"],
+                     ["    (void)a_handle;", "    return b_handle;"]):
+            try:
+                no_wrapper_is_inert(_broken(victim, body))
+            except sc.Fail as e:
+                sc.check(victim in str(e), "the failure did not name %s: %s" % (victim, e))
+                continue
+            raise sc.Fail("an inert body %r passed no_wrapper_is_inert" % (body,))
+
+
+def every_way_a_wrapper_can_dispatch_wrong_is_caught():
+    # EIGHT PROVOCATIONS, ONE PER THING THE ARGUMENT LIST PINS. The first five
+    # were found by an adversarial pass to survive the whole suite before this
+    # case existed, and each survives EVERY other detector Step 22 and Step 23
+    # have: the 2479-name set, all 2479 signatures, the bucket partition, the
+    # one-call shape, the -Werror compile against CQ_lang's own declarations,
+    # and `nm`.
+    #
+    #   (1) the width sized from sizeof(c_type) — the mutant every width but i1
+    #       and i80 hides, since sizeof and the register width agree elsewhere.
+    #   (2) a collapsed SELECTOR — every wrapper dispatching one opcode. The
+    #       largest miscompile M27 can carry: right symbol, right shape, right
+    #       width, wrong operation, and only M26 would ever know.
+    #   (3) the two literal words transposed. Both are uint64_t, so C is silent;
+    #       at every width <= 64 the HI word is 0, so `x + 5` becomes `x + 0`.
+    #   (4) `qq` operands swapped — `sub_i32(a,b)` dispatching `b - a`. The
+    #       compile check cannot see this one: both operands are int32_t. (It DOES
+    #       see the `_lh` swap, which is why that provocation is a separate case.)
+    #   (5) ctrl_flag in a data slot — PRD §9's control wire arriving as an
+    #       operand, which is bd d6m's failure mode with no diagnostic anywhere.
+    #
+    # THE LAST THREE ARRIVED WITH PRD-v2's FIRST fp FAMILY (2026-09-18) and each
+    # is its own defect class:
+    #   (6) the CROSS-FAMILY predicate — `CQ_SHIM_PRED_ULT` where the enum must
+    #       be `CQ_SHIM_FPRED_ULT`. The mnemonic is spelled identically in both
+    #       lists, so this is the one a reader's eye slides over; it dispatches
+    #       an IEEE pattern into the integer comparator.
+    #   (7) the WRONG fp PREDICATE inside the right enum — K9's
+    #       `uge`-meaning-`ule` in a new column, and nothing but L1 against
+    #       `cq_fcmp_eval` sees it downstream of here.
+    #   (8) the LITERAL MACRO PAIR — `CQ_SHIM_LO` on a `double`, which is a
+    #       NUMERIC CONVERSION. It compiles clean, is silent under -Wconversion
+    #       because the cast inside it is explicit, links, emits the same gate
+    #       count, and puts the integer 3 in the rail where 0x400C000000000000
+    #       belongs.
+    def swap(s, a, b):
+        return s.replace(a, "\0", 1).replace(b, a, 1).replace("\0", b, 1)
+    cases = [
+        ("cq_template_add_i1_hl", lambda s: s.replace(", 1,", ", 8,", 1), "width from sizeof"),
+        ("cq_template_shl_i80_hl", lambda s: s.replace(", 80,", ", 128,", 1), "width from sizeof"),
+        ("cq_template_sub_i32", lambda s: s.replace("CQ_SHIM_OP_SUB", "CQ_SHIM_OP_ADD", 1),
+         "collapsed selector"),
+        ("cq_template_icmp_ult_i32", lambda s: s.replace("CQ_SHIM_PRED_ULT", "CQ_SHIM_PRED_EQ", 1),
+         "collapsed predicate"),
+        ("cq_template_sext_i8_to_i32", lambda s: s.replace("CQ_SHIM_CAST_SEXT", "CQ_SHIM_CAST_ZEXT", 1),
+         "collapsed cast kind"),
+        ("cq_template_add_i8_hl", lambda s: swap(s, "CQ_SHIM_LO(b_classical)", "CQ_SHIM_HI(b_classical)"),
+         "literal words transposed"),
+        ("cq_template_sub_i32", lambda s: swap(s, "a_handle", "b_handle"), "qq operands swapped"),
+        ("cq_template_sub_i32_controlled", lambda s: swap(s, "ctrl_flag", "a_handle"),
+         "ctrl_flag in a data slot"),
+        ("cq_template_sub_i32_unc", lambda s: swap(s, "out_handle", "a_handle"),
+         "out_handle in a source slot"),
+        ("cq_template_fcmp_ult_f64",
+         lambda s: s.replace("CQ_SHIM_FPRED_ULT", "CQ_SHIM_PRED_ULT", 1),
+         "integer predicate enum on an fp compare"),
+        ("cq_template_fcmp_uge_f64",
+         lambda s: s.replace("CQ_SHIM_FPRED_UGE", "CQ_SHIM_FPRED_ULE", 1),
+         "collapsed fp predicate"),
+        ("cq_template_fcmp_oeq_f64_hl",
+         lambda s: s.replace("CQ_SHIM_F64_LO(b_classical), "
+                             "CQ_SHIM_F64_HI(b_classical)",
+                             "CQ_SHIM_LO(b_classical), CQ_SHIM_HI(b_classical)", 1),
+         "fp literal converted instead of reinterpreted"),
+    ]
+    for victim, mutate, what in cases:
+        body = [mutate(SHIPPED[victim][1][0])]
+        sc.check(body != SHIPPED[victim][1], "%s: the %r provocation did not change the body"
+                 % (victim, what))
+        try:
+            every_wrapper_body_is_exactly_the_call_its_symbol_names(_broken(victim, body))
+        except sc.Fail as e:
+            sc.check(victim in str(e), "%s (%s): the failure did not name it: %s"
+                     % (victim, what, e))
+            continue
+        raise sc.Fail("%s with %r survived the argument-list pin: %s" % (victim, what, body[0]))
+
+
+if __name__ == "__main__":
+    sys.exit(sc.run([
+        an_inert_wrapper_body_is_caught,
+        every_way_a_wrapper_can_dispatch_wrong_is_caught,
+    ]))

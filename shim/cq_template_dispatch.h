@@ -41,6 +41,14 @@ cq_kernel_fn   cq_tpl_bin_kernel (cq_shim_op op);
 cq_kernel_fn   cq_tpl_cmp_kernel (cq_shim_pred pred);
 cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind);
 
+/* M36's fourteen `fcmp` kernels, over the yaml's OWN predicate order. It is a
+ * `cq_kernel_fn` like `cq_tpl_cmp_kernel`'s — K9's shape, `dst` one bit and `W`
+ * the operand width — and it is a SEPARATE table for the reason `cq_shim.h`
+ * gives beside `cq_shim_fpred`: four mnemonics appear in both predicate lists
+ * meaning different things, so one table indexed by "a predicate" would
+ * dispatch an fp `ult` to the integer comparator. */
+cq_kernel_fn   cq_tpl_fcmp_kernel(cq_shim_fpred pred);
+
 /* THE DISPLAY NAME OF THE OPERATION, for `bd 76r`'s `# STAGE: op begin` payload
  * (PRD §15 D21). It belongs on THIS side of the seam by the seam's own
  * discriminator — the name set grows when `opcode_table.yaml` gains an opcode, a
@@ -54,5 +62,6 @@ cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind);
 const char *cq_tpl_bin_name (cq_shim_op op);
 const char *cq_tpl_cmp_name (cq_shim_pred pred);
 const char *cq_tpl_cast_name(cq_shim_cast_kind kind);
+const char *cq_tpl_fcmp_name(cq_shim_fpred pred);
 
 #endif /* CQ_TEMPLATE_DISPATCH_H */

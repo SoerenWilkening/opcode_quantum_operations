@@ -30,6 +30,16 @@ MANIFEST = os.path.join(ROOT, "tests", "abi", "cq_templates_abi.txt")
 # gen_shim.bucket_of, whose input is the yaml's `widths` map. Two independent
 # routes to the same 884/1595, which is the point.
 FP_WIDTH = re.compile(r"(?:^|_)(f16|f32|f64|f80)(?:_|$)")
+
+# THE LANDED fp FAMILY-WIDTHS, READ OFF THE NAME — the test side's INDEPENDENT
+# route to shim/gen_shim.py's LANDED, whose input is the yaml's `widths` map and
+# the yaml's `family` key. Neither can reach the other, which is the whole point:
+# if gen_shim listed `fp_arith`/`f64` by mistake, the grid would go live and this
+# predicate would still say only `fcmp` at `f64` had, so every bucket set below
+# goes red and NAMES the symbols.
+#
+# ONE PATTERN PER LANDED FAMILY-WIDTH, added the same day its gen_shim entry is.
+LANDED_NAME = re.compile(r"^cq_template_fcmp_[a-z]+_f64(?:_|$)")
 DECL = re.compile(r"^(int32_t|void) (cq_template_[A-Za-z0-9_]+)\(([^)]*)\);$")
 DEFN = re.compile(r"^(int32_t|void) (cq_template_[A-Za-z0-9_]+)\(([^)]*)\) \{$")
 
@@ -91,6 +101,17 @@ def manifest_decls():
 
 def is_fp(name):
     return FP_WIDTH.search(name) is not None
+
+
+def is_landed(name):
+    # An fp-touching symbol whose family-width v2 has IMPLEMENTED. Such a symbol
+    # is NOT in the `"fp is v2"` bucket: its non-`_inv` rows are live wrappers
+    # and its `_inv` rows are D14 aborts, exactly as an integer family's are.
+    return LANDED_NAME.match(name) is not None
+
+
+def is_deferred_fp(name):
+    return is_fp(name) and not is_landed(name)
 
 
 def generate(outdir=None):

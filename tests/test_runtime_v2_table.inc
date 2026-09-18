@@ -1,8 +1,11 @@
 /* tests/test_runtime_v2_table.inc — one thunk per deferred symbol, and the
- * table that drives the sweep. 39 rows (109 until PRD §15 D23 moved the
- * 11 tape symbols into scope on 2026-09-02, 35 once D24 moved the 63 qram, and
- * 39 since the 2026-09-10 re-vendor of the ABI at CQ_lang `170ede1` widened the
- * fp bucket by the four `cqrt_ry_f<W>_controlled` — `bd w9i`).
+ * table that drives the sweep. 29 rows (109 until PRD §15 D23 moved the
+ * 11 tape symbols into scope on 2026-09-02, 35 once D24 moved the 63 qram,
+ * 39 after the 2026-09-10 re-vendor of the ABI at CQ_lang `170ede1` widened the
+ * fp bucket by the four `cqrt_ry_f<W>_controlled` — `bd w9i` — and 29 since
+ * PRD-v2 §1's `f64` scope took the TEN f64 core symbols into shim/
+ * cq_runtime_rail.c and cq_runtime_gate.c on 2026-09-18, bead 9ve.28). Read the
+ * live figure from `CQ_V2_N_THUNKS`; this sentence is a dated history.
  *
  * EACH THUNK TAKES AN IGNORED `void *` (`bd ula`). It is the shape
  * tests/support/childcap.h's one callback type has, so the sweep passes a
@@ -59,9 +62,15 @@
     static void t_copyc_f##W(void *p)                                         \
     { CQ_V2_IGNORE(p); cqrt_copy_f##W##_controlled(0, 0, 0); }
 
+/* f64 IS ABSENT SINCE 2026-09-18 (bead 9ve.28) AND ITS ABSENCE IS ASSERTED
+ * RATHER THAN LEFT TO THIS COMMENT. Its ten core symbols are real code now, so a
+ * thunk for `cqrt_alloc_f64` would call a function that RETURNS — the sweep's
+ * `aborted` check would go red — and the surface half's name-set diff, which
+ * reads shim/cq_runtime_abi.h and applies the bucket rule, would report it in
+ * both directions. Removing the row is therefore not the kind of edit that can
+ * be forgotten in one place. */
 CQ_V2_T_FP(16, _Float16)
 CQ_V2_T_FP(32, float)
-CQ_V2_T_FP(64, double)
 CQ_V2_T_FP(80, long double)
 
 /* THE FORWARD IS IN THE PER-WIDTH MACRO ABOVE AND THE INVERSE IS NOT, AND THAT
@@ -71,8 +80,6 @@ CQ_V2_T_FP(80, long double)
  * from minting the two symbols the frozen ABI does not declare. */
 static void t_ryci_f32(void *p)
 { CQ_V2_IGNORE(p); cqrt_ry_f32_controlled_inv(0, 0, 0.0); }
-static void t_ryci_f64(void *p)
-{ CQ_V2_IGNORE(p); cqrt_ry_f64_controlled_inv(0, 0, 0.0); }
 
 /* The 63 qram thunks: GONE, 2026-09-02 (PRD §15 D24) — the symbols are
  * real in shim/cq_runtime_qram.c and tests/test_runtime_qram.c drives them. */
@@ -85,8 +92,8 @@ static void t_alloc_handle(void *p)
     t_rzc_f##W, t_rzci_f##W, t_ryc_f##W, t_copy_f##W, t_copyc_f##W
 
 static void (*const CQ_V2_THUNKS[])(void *) = {
-    CQ_V2_ROW_FP(16), CQ_V2_ROW_FP(32), CQ_V2_ROW_FP(64), CQ_V2_ROW_FP(80),
-    t_ryci_f32, t_ryci_f64,
+    CQ_V2_ROW_FP(16), CQ_V2_ROW_FP(32), CQ_V2_ROW_FP(80),
+    t_ryci_f32,
 
     t_alloc_handle
 };

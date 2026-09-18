@@ -12,15 +12,23 @@
 # nobody has tested, and mutating an assertion cannot fail against a correct
 # generator — the instrument is a PROVOCATION (tests/test_kerneldrv.c).
 #
-# SPLIT SEAM, RECORDED BEFORE IT IS NEEDED (Rule 12: a split is scheduled, never
-# improvised): `the ASSERTIONS <-> the PROVOCATIONS`, at the "Negative controls"
-# rule below, moving to tests/test_gen_bodies_provoked.py. This file is at 259 of
-# 300 and the provocation block is ~95 of that, so the seam is where the growth
-# is — and it is the right subject line anyway, since the provocations are about
-# the SUITE while everything above them is about the GENERATOR. Python has no
-# `.inc` escape hatch (check_loc.sh counts every line of a multi-line string as
-# code), so a split here means a third registered ctest test, not a second file
-# on the same one.
+# SPLIT SEAM: TAKEN 2026-09-18, exactly where this header recorded it before it
+# was needed (Rule 12: a split is scheduled, never improvised). The line was
+# `the ASSERTIONS <-> the PROVOCATIONS`, at the "Negative controls" rule below,
+# moving to tests/test_gen_bodies_provoked.py — and it fired when PRD-v2's first
+# fp family (bead 9ve.28) took the file from 259 to 319 counted lines of a
+# 300-line wall. It is the right subject line as well as the right size: the
+# provocations are about the SUITE and everything above them is about the
+# GENERATOR. Python has no `.inc` escape hatch (check_loc.sh counts every line of
+# a multi-line string as code), so the split is a third registered ctest entry
+# and not a second file on the same one.
+#
+# THE NEXT SEAM, RECORDED NOW FOR THE SAME REASON: `the STATIC reading <-> the
+# EXECUTED witnesses` -> tests/test_gen_bodies_run.py. The three cases that
+# COMPILE AND RUN something (`the_generated_bodies_compile_...`,
+# `an_abort_body_really_aborts_...`, `the_two_word_literal_round_trips_...`) are
+# ~90 counted lines of embedded C and are the only ones needing a compiler; the
+# rest read text. Trigger 260.
 
 import os
 import re
@@ -32,11 +40,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "sup
 import shimcheck as sc  # noqa: E402
 
 SHIPPED = sc.parse_definitions(sc.read_dir(sc.GENERATED))
-BITS = {"i1": 1, "i8": 8, "i16": 16, "i32": 32, "i64": 64, "i80": 80, "i128": 128}
-CALL = re.compile(r"^    (?:return )?(cq_shim_[a-z_]+)\((.*)\);$")
+BITS = {"i1": 1, "i8": 8, "i16": 16, "i32": 32, "i64": 64, "i80": 80,
+        "i128": 128, "f64": 64}
+CALL = re.compile(r"^    (?:return )?(cq_shim_[a-z_0-9]+)\((.*)\);$")
 PARAM = re.compile(r"\b([a-z_]+_(?:handle|classical|flag))\b")
 OPCODES = {"add", "sub", "mul", "sdiv", "udiv", "srem", "urem", "and", "or",
-           "xor", "shl", "lshr", "ashr", "icmp", "sext", "zext", "trunc"}
+           "xor", "shl", "lshr", "ashr", "icmp", "sext", "zext", "trunc",
+           "fcmp"}
+# The enum prefix a dispatch SELECTOR may carry, and the opcode each implies.
+# `CQ_SHIM_FPRED_` is tested before `CQ_SHIM_PRED_` would ever match it — they
+# are disjoint, checked in tests/test_gen_shim.py rather than assumed here.
+SELECTORS = (("CQ_SHIM_OP_", None), ("CQ_SHIM_PRED_", "icmp"),
+             ("CQ_SHIM_FPRED_", "fcmp"), ("CQ_SHIM_CAST_", None))
 
 
 def wrappers(defs):
@@ -56,13 +71,6 @@ def one_call(name, body):
     m = CALL.match(body[0])
     sc.check(m is not None, "%s: body calls no libcqops entry point: %r" % (name, body[0]))
     return m.group(1), [a.strip() for a in m.group(2).split(",")]
-
-
-def widths_in(name):
-    m = re.search(r"_(i\d+)_to_(i\d+)", name)
-    if m:
-        return [BITS[m.group(1)], BITS[m.group(2)]]
-    return [BITS[t] for t in re.findall(r"_(i\d+)(?=_|$)", name)]
 
 
 def expected_args(name, decl):
@@ -85,50 +93,92 @@ def expected_args(name, decl):
     elif stem.startswith("icmp_"):
         m = re.match(r"icmp_([a-z]+)_(i\d+)", stem)
         head = ["CQ_SHIM_PRED_%s" % m.group(1).upper(), str(BITS[m.group(2)])]
+    elif stem.startswith("fcmp_"):
+        # A DIFFERENT ENUM AND A DIFFERENT ORDER, AND THIS BRANCH EXISTS TO SAY
+        # SO. `ult`/`ugt`/`ule`/`uge` are mnemonics in BOTH predicate lists, so
+        # an `fcmp` body emitting `CQ_SHIM_PRED_ULT` would compile, link, and
+        # dispatch the integer comparator on an IEEE pattern. Folding this into
+        # the `icmp` branch is how that ships.
+        m = re.match(r"fcmp_([a-z]+)_(f\d+)", stem)
+        head = ["CQ_SHIM_FPRED_%s" % m.group(1).upper(), str(BITS[m.group(2)])]
     else:
         m = re.match(r"([a-z]+)_(i\d+)", stem)
         head = ["CQ_SHIM_OP_%s" % m.group(1).upper(), str(BITS[m.group(2)])]
     # Declaration order IS ABI order: `out_handle`/`ctrl_flag` is argument 0
     # (opcode_table.yaml:43-55), so walking the declaration pins their position
     # in the call too.
+    #
+    # AND THE LITERAL'S MACRO PAIR IS CHOSEN BY THE DECLARED C TYPE, which is the
+    # ONE place in this file where reading the type is right rather than the
+    # recorded trap: gen_bodies picks by the yaml's `domain`, so a type-driven
+    # expectation here is a genuinely independent route to the same answer, and
+    # the two disagree exactly when one of them is wrong. `CQ_SHIM_LO` on a
+    # `double` is a NUMERIC CONVERSION — `3.5` arrives as `3` — and it compiles
+    # clean under -Wconversion because the cast inside it is explicit, so
+    # nothing but this comparison can see it.
+    m2 = re.search(r"(?:\(|, )([A-Za-z_][A-Za-z_0-9 ]*?) [a-z_]+_classical", decl)
+    ctype = m2.group(1) if m2 else ""
+    if ctype in ("float", "double", "long double", "_Float16"):
+        sc.check(ctype == "double",
+                 "%s carries a %s literal; only f64 has a bit-pattern macro "
+                 "(PRD-v2 §1a), so this body should not be a wrapper at all"
+                 % (name, ctype))
+        lo, hi = "CQ_SHIM_F64_LO(%s)", "CQ_SHIM_F64_HI(%s)"
+    else:
+        lo, hi = "CQ_SHIM_LO(%s)", "CQ_SHIM_HI(%s)"
     tail = []
     for p in PARAM.findall(decl.split("(", 1)[1]):
-        tail += ["CQ_SHIM_LO(%s)" % p, "CQ_SHIM_HI(%s)" % p] \
-            if p.endswith("_classical") else [p]
+        tail += [lo % p, hi % p] if p.endswith("_classical") else [p]
     return head + tail
 
 
 # --- The cases ---------------------------------------------------------------
 
 def no_wrapper_is_inert(defs=None):
+    # 992 until PRD-v2's first fp family landed (2026-09-18, bead 9ve.28): the
+    # 56 live `cq_template_fcmp_*_f64[_hl][_unc]` bodies are wrappers on exactly
+    # the same terms, one call each.
     w = wrappers(defs or SHIPPED)
-    sc.check(len(w) == 992, "expected 992 wrappers, got %d" % len(w))
+    sc.check(len(w) == 1048, "expected 1048 wrappers, got %d" % len(w))
     for name, body in sorted(w.items()):
         one_call(name, body)
 
 
-def the_wrapper_calls_cover_all_seventeen_integer_opcodes(defs=None):
+def the_wrapper_calls_cover_all_eighteen_dispatched_opcodes(defs=None):
     # READS THE CALL, NOT THE NAME. Until an adversarial review said so this
     # walked the symbol NAME set — which `the_emitted_symbol_set_equals_the_abi`
     # already pins — so the case could not fail and its own name was a false
     # claim about what it checked.
+    #
+    # AND AN UNRECOGNISED SELECTOR PREFIX CONTRIBUTES NOTHING, WHICH IS HOW THIS
+    # CASE STAYED GREEN THROUGH THE fcmp LANDING WITHOUT SEEING IT. With
+    # `CQ_SHIM_FPRED_` absent from the prefix list, 56 live wrappers dispatched
+    # an opcode this set had never heard of and the diff still matched: the
+    # missing arm makes the case narrower, never red. So the prefixes are now a
+    # table and every selector must match ONE of them.
     seen = set()
     for name, body in wrappers(defs or SHIPPED).items():
         sel = one_call(name, body)[1][0]
-        for prefix in ("CQ_SHIM_OP_", "CQ_SHIM_PRED_", "CQ_SHIM_CAST_"):
-            if sel.startswith(prefix):
-                seen.add("icmp" if prefix == "CQ_SHIM_PRED_" else sel[len(prefix):].lower())
+        hit = [op if op else sel[len(p):].lower()
+               for p, op in SELECTORS if sel.startswith(p)]
+        sc.check(len(hit) == 1, "%s: selector %r matches %d known enum "
+                 "prefixes, expected exactly 1" % (name, sel, len(hit)))
+        seen.add(hit[0])
     sc.diff_sets(seen, OPCODES, "opcodes DISPATCHED by a wrapper body")
 
 
-def the_wrapper_shape_split_is_389_forward_389_unc_214_controlled(defs=None):
+def the_wrapper_shape_split_is_417_forward_417_unc_214_controlled(defs=None):
+    # 389/389/214 until the fcmp landing added 14 `fwd_qq` + 14 `fwd_hl` and
+    # their two `_unc` twins. The CONTROLLED figure is unmoved and must stay so:
+    # compares get no controlled grid on ANY axis (opcode_table.yaml's own
+    # note), so an fcmp appearing here would be a phantom symbol.
     got = {"fwd": 0, "unc": 0, "controlled": 0}
     for name, body in wrappers(defs or SHIPPED).items():
         entry = one_call(name, body)[0]
         got["unc" if entry.endswith("_unc") else
             "controlled" if entry.endswith("_ctrl") else "fwd"] += 1
-    sc.check(got == {"fwd": 389, "unc": 389, "controlled": 214},
-             "shape split: expected 389/389/214, got %r" % got)
+    sc.check(got == {"fwd": 417, "unc": 417, "controlled": 214},
+             "shape split: expected 417/417/214, got %r" % got)
 
 
 def every_wrapper_body_is_exactly_the_call_its_symbol_names(defs=None):
@@ -164,6 +214,22 @@ def the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type(defs=None)
                  "%s: literal is not decomposed into two words: %s" % (name, body[0]))
     n = sum(1 for _n, b in wrappers(defs).items() if "CQ_SHIM_LO(" in b[0])
     sc.check(n == 516, "expected 516 wrappers carrying a classical literal, got %d" % n)
+    # AND THE fp LITERALS ARE A DISJOINT SET OF 28, counted with a macro name
+    # that is not a substring of the integer one — `CQ_SHIM_F64_LO(` does not
+    # contain `CQ_SHIM_LO(`, which is what keeps the two counts independent. The
+    # 28 are the 14 `fcmp` predicates x {`_hl`, `_hl_unc`}; any wrapper carrying
+    # BOTH macro pairs, or an fp body carrying the integer pair, moves one of
+    # these two numbers and not the other.
+    fp = {n2 for n2, b in wrappers(defs).items() if "CQ_SHIM_F64_LO(" in b[0]}
+    sc.check(len(fp) == 28,
+             "expected 28 wrappers carrying an f64 bit-pattern literal, got %d"
+             % len(fp))
+    sc.check(all(n2.startswith("cq_template_fcmp_") and "_f64_hl" in n2 for n2 in fp),
+             "an f64 bit-pattern literal appears outside fcmp's `_hl` shapes: %s"
+             % sorted(fp)[:4])
+    sc.check(not (fp & {n2 for n2, b in wrappers(defs).items()
+                        if "CQ_SHIM_LO(" in b[0]}),
+             "a wrapper carries both the integer and the fp literal macros")
 
 
 def every_abort_body_names_its_own_symbol_and_silences_its_parameters(defs=None):
@@ -184,10 +250,23 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
     # statement, not merely a vague one.
     defs = defs or SHIPPED
     sc.check(sc.FP_REASON != sc.INV_REASON, "the two abort reasons are the same string")
+    # THE DISCRIMINATOR IS `is_deferred_fp`, NOT `is_fp`, SINCE 2026-09-18 — and
+    # the difference is a FALSEHOOD PRINTED AT RUNTIME either way round. A landed
+    # family's `_inv` carries an fp width token and is refused for D14's reason,
+    # not because fp is v2: `cq_template_fcmp_oeq_f64_inv` saying "fp is v2"
+    # would tell a caller to wait for a version that will never define it, since
+    # an `fcmp` is non-injective at every width and in every version.
     for name, body in aborts(defs).items():
-        want = sc.FP_REASON if sc.is_fp(name) else sc.INV_REASON
+        want = sc.FP_REASON if sc.is_deferred_fp(name) else sc.INV_REASON
         sc.check('"%s"' % want in "\n".join(body),
                  "%s: abort reason is not %r" % (name, want))
+    landed_inv = {n for n in aborts(defs) if sc.is_landed(n)}
+    sc.check(len(landed_inv) == 28,
+             "expected 28 D14 aborts inside the landed fp family, got %d"
+             % len(landed_inv))
+    sc.check(all(n.endswith("_inv") for n in landed_inv),
+             "a LANDED fp symbol aborts without being an `_inv`: %s"
+             % sorted(n for n in landed_inv if not n.endswith("_inv"))[:4])
     # PRD §1 fixes the fp wording verbatim; this is that sentence, reassembled.
     sc.check(sc.FP_REASON == "fp is v2", "PRD §1's fp reason clause changed")
     # AND THE `_inv` REASON MUST BE TRUE OF THE WHOLE BUCKET, WHICH IS A LIVE
@@ -289,7 +368,7 @@ def the_two_word_literal_round_trips_at_every_shipped_width(defs=None):
     tmp = tempfile.mkdtemp(prefix="cqops-shim-lit-")
     src = os.path.join(tmp, "lit.c")
     open(src, "w").write(
-        '#include <stdio.h>\n#include <stdint.h>\n#include <stdbool.h>\n'
+        '#include <stdio.h>\n#include <stdint.h>\n#include <stdbool.h>\n#include <string.h>\n'
         '#include "cq_shim.h"\n'
         'static int fail = 0;\n'
         'static void chk(const char *w, int bits, uint64_t lo, uint64_t hi,\n'
@@ -314,6 +393,31 @@ def the_two_word_literal_round_trips_at_every_shipped_width(defs=None):
         '    chk("i80n", 80, CQ_SHIM_LO(neg), CQ_SHIM_HI(neg), 0xffffULL, 0xffffffffffffffffULL);\n'
         '    chk("i128",128, CQ_SHIM_LO(neg), CQ_SHIM_HI(neg),\n'
         '        0xffffffffffffffffULL, 0xffffffffffffffffULL);\n'
+        # THE fp PAIR IS RUN TOO, AND THE NEGATIVE CONTROL IS THE POINT OF IT.
+        # CQ_SHIM_F64_LO must REINTERPRET; CQ_SHIM_LO on the same operand
+        # CONVERTS, and 3.5 is chosen so the two answers are 0x400C…000 and 3 —
+        # different in every bit that matters and both perfectly plausible. The
+        # NaN and the -0.0 rows are built by memcpy FROM a pattern rather than
+        # by `0.0/0.0` or `-0.0`, so the witness does no host fp arithmetic and
+        # reads the same on every host (PRD-v2 §7.4).
+        '    double d35 = 3.5, dnz, dnan;\n'
+        '    uint64_t bnz = 0x8000000000000000ULL,'
+        ' bnan = 0xfff8000000000000ULL;\n'
+        '    memcpy(&dnz, &bnz, sizeof dnz);\n'
+        '    memcpy(&dnan, &bnan, sizeof dnan);\n'
+        '    chk("f64",   64, CQ_SHIM_F64_LO(d35),  CQ_SHIM_F64_HI(d35),\n'
+        '        0, 0x400c000000000000ULL);\n'
+        '    chk("f64nz", 64, CQ_SHIM_F64_LO(dnz),  CQ_SHIM_F64_HI(dnz),\n'
+        '        0, 0x8000000000000000ULL);\n'
+        '    chk("f64nan",64, CQ_SHIM_F64_LO(dnan), CQ_SHIM_F64_HI(dnan),\n'
+        '        0, 0xfff8000000000000ULL);\n'
+        '    if (CQ_SHIM_LO(d35) == CQ_SHIM_F64_LO(d35)) { fail = 1;\n'
+        '        printf("the integer and fp literal macros agree on 3.5; one "\n'
+        '               "of them is not doing its job\\n"); }\n'
+        '    if (CQ_SHIM_LO(d35) != 3ULL) { fail = 1;\n'
+        '        printf("CQ_SHIM_LO(3.5) is %llu, not the 3 a numeric "\n'
+        '               "conversion gives\\n",'
+        ' (unsigned long long)CQ_SHIM_LO(d35)); }\n'
         '    return fail;\n}\n')
     exe = os.path.join(tmp, "lit")
     r = subprocess.run([cc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wconversion",
@@ -324,81 +428,20 @@ def the_two_word_literal_round_trips_at_every_shipped_width(defs=None):
     sc.check(r.returncode == 0, "CQ_SHIM_LO/HI does not round-trip:\n%s" % r.stdout.decode())
 
 
-# --- Negative controls -------------------------------------------------------
-
-def _broken(name, body):
-    d = dict(SHIPPED)
-    d[name] = (SHIPPED[name][0], body)
-    return d
-
-
-def an_inert_wrapper_body_is_caught(defs=None):
-    victim = "cq_template_add_i32"
-    for body in ([], ["    return 0;"], ["    (void)a_handle;", "    return b_handle;"]):
-        try:
-            no_wrapper_is_inert(_broken(victim, body))
-        except sc.Fail as e:
-            sc.check(victim in str(e), "the failure did not name %s: %s" % (victim, e))
-            continue
-        raise sc.Fail("an inert body %r passed no_wrapper_is_inert" % (body,))
-
-
-def every_way_a_wrapper_can_dispatch_wrong_is_caught(defs=None):
-    # FIVE PROVOCATIONS, ONE PER THING THE ARGUMENT LIST PINS. Each was found by
-    # an adversarial pass to survive the whole suite before this case existed, and
-    # each survives EVERY other detector Step 22 and Step 23 have: the 2479-name
-    # set, all 2479 signatures, the bucket partition, the one-call shape, the
-    # -Werror compile against CQ_lang's own declarations, and `nm`.
-    #
-    #   (1) the width sized from sizeof(c_type) — the mutant every width but i1
-    #       and i80 hides, since sizeof and the register width agree elsewhere.
-    #   (2) a collapsed SELECTOR — every wrapper dispatching one opcode. The
-    #       largest miscompile M27 can carry: right symbol, right shape, right
-    #       width, wrong operation, and only M26 would ever know.
-    #   (3) the two literal words transposed. Both are uint64_t, so C is silent;
-    #       at every width <= 64 the HI word is 0, so `x + 5` becomes `x + 0`.
-    #   (4) `qq` operands swapped — `sub_i32(a,b)` dispatching `b - a`. The
-    #       compile check cannot see this one: both operands are int32_t. (It DOES
-    #       see the `_lh` swap, which is why that provocation is a separate case.)
-    #   (5) ctrl_flag in a data slot — PRD §9's control wire arriving as an
-    #       operand, which is bd d6m's failure mode with no diagnostic anywhere.
-    def swap(s, a, b):
-        return s.replace(a, "\0", 1).replace(b, a, 1).replace("\0", b, 1)
-    cases = [
-        ("cq_template_add_i1_hl", lambda s: s.replace(", 1,", ", 8,", 1), "width from sizeof"),
-        ("cq_template_shl_i80_hl", lambda s: s.replace(", 80,", ", 128,", 1), "width from sizeof"),
-        ("cq_template_sub_i32", lambda s: s.replace("CQ_SHIM_OP_SUB", "CQ_SHIM_OP_ADD", 1),
-         "collapsed selector"),
-        ("cq_template_icmp_ult_i32", lambda s: s.replace("CQ_SHIM_PRED_ULT", "CQ_SHIM_PRED_EQ", 1),
-         "collapsed predicate"),
-        ("cq_template_sext_i8_to_i32", lambda s: s.replace("CQ_SHIM_CAST_SEXT", "CQ_SHIM_CAST_ZEXT", 1),
-         "collapsed cast kind"),
-        ("cq_template_add_i8_hl", lambda s: swap(s, "CQ_SHIM_LO(b_classical)", "CQ_SHIM_HI(b_classical)"),
-         "literal words transposed"),
-        ("cq_template_sub_i32", lambda s: swap(s, "a_handle", "b_handle"), "qq operands swapped"),
-        ("cq_template_sub_i32_controlled", lambda s: swap(s, "ctrl_flag", "a_handle"),
-         "ctrl_flag in a data slot"),
-        ("cq_template_sub_i32_unc", lambda s: swap(s, "out_handle", "a_handle"),
-         "out_handle in a source slot"),
-    ]
-    for victim, mutate, what in cases:
-        body = [mutate(SHIPPED[victim][1][0])]
-        sc.check(body != SHIPPED[victim][1], "%s: the %r provocation did not change the body"
-                 % (victim, what))
-        try:
-            every_wrapper_body_is_exactly_the_call_its_symbol_names(_broken(victim, body))
-        except sc.Fail as e:
-            sc.check(victim in str(e), "%s (%s): the failure did not name it: %s"
-                     % (victim, what, e))
-            continue
-        raise sc.Fail("%s with %r survived the argument-list pin: %s" % (victim, what, body[0]))
+# --- Negative controls: GONE, on the recorded seam ---------------------------
+#
+# `an_inert_wrapper_body_is_caught` and `every_way_a_wrapper_can_dispatch_wrong_
+# is_caught` moved to tests/test_gen_bodies_provoked.py on 2026-09-18, at the
+# `the ASSERTIONS <-> the PROVOCATIONS` line this file's header recorded before
+# either was needed. They import the two cases above by name, so a case renamed
+# here is an ImportError there rather than a silently unprovoked assertion.
 
 
 if __name__ == "__main__":
     sys.exit(sc.run([
         no_wrapper_is_inert,
-        the_wrapper_calls_cover_all_seventeen_integer_opcodes,
-        the_wrapper_shape_split_is_389_forward_389_unc_214_controlled,
+        the_wrapper_calls_cover_all_eighteen_dispatched_opcodes,
+        the_wrapper_shape_split_is_417_forward_417_unc_214_controlled,
         every_wrapper_body_is_exactly_the_call_its_symbol_names,
         the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type,
         every_abort_body_names_its_own_symbol_and_silences_its_parameters,
@@ -407,6 +450,4 @@ if __name__ == "__main__":
         a_signature_that_diverges_from_the_abi_is_caught,
         the_two_word_literal_round_trips_at_every_shipped_width,
         an_abort_body_really_aborts_with_prd_1s_message,
-        an_inert_wrapper_body_is_caught,
-        every_way_a_wrapper_can_dispatch_wrong_is_caught,
     ]))

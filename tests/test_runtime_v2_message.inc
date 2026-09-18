@@ -82,21 +82,21 @@ static void v2_sweep(void)
     g_swept = 1;
 }
 
-/* EVERY ONE OF THE 39 ABORTS, AND NAMES ITSELF. The abort is the cheap half;
- * the name is what a death suite could never have checked, and a wrong literal
- * ships several wrong messages at once: measured 2026-09-17, the 39 come from
- * 15 cq_shim_unsupported sites in shim/cq_runtime_v2.c — 8 inside one
- * per-width macro expanded at f16/f32/f64/f80, which is 32 of them, and 7
- * written by hand (the four ry `_controlled`, two ry `_controlled_inv`,
- * cqrt_alloc_handle). So a slip in the macro ships FOUR wrong messages and a
- * slip in a hand-written body ships one.
+/* EVERY ONE OF THEM ABORTS, AND NAMES ITSELF. The abort is the cheap half; the
+ * name is what a death suite could never have checked, and a wrong literal ships
+ * several wrong messages at once: re-measured 2026-09-18, the 29 come from 12
+ * cq_shim_unsupported sites in shim/cq_runtime_v2.c — 8 inside one per-width
+ * macro expanded at f16/f32/f80, which is 24 of them, and 4 written by hand (the
+ * three ry `_controlled`, one ry `_controlled_inv`) plus cqrt_alloc_handle. So a
+ * slip in the macro ships THREE wrong messages and a slip in a hand-written body
+ * ships one.
  *
- * THE COUNT WAS 109, THEN 98, THEN 35, AND IS 39 — D23 moved 11 tape symbols
- * into scope, D24 moved 63 qram, and the 2026-09-10 re-vendor at CQ_lang
- * `170ede1` added 4 (`bd w9i`). Read it from CQ_V2_N_THUNKS, never from a
- * comment: this paragraph said 98 until today, while the sibling table said 39
- * (`bd ula` / `bd 09z`). shim/cq_runtime_v2.c's own header still ends its
- * running history at 35 and is stale by the same +4 — `bd qki`.
+ * THE COUNT WAS 109, THEN 98, THEN 35, THEN 39, AND IS 29 — D23 moved 11 tape
+ * symbols into scope, D24 moved 63 qram, the 2026-09-10 re-vendor at CQ_lang
+ * `170ede1` added 4 (`bd w9i`), and PRD-v2 §1's `f64` scope took the 10 f64 core
+ * symbols on 2026-09-18 (bead 9ve.28). Read it from CQ_V2_N_THUNKS, never from a
+ * comment: this paragraph said 98 while the sibling table said 39 (`bd ula` /
+ * `bd 09z`), and the sibling's own macro count has now been re-derived twice.
  *
  * OBSERVED FAILING (2026-08-27, both configurations): a body rewritten to
  * `return 0;` instead of aborting. */

@@ -1666,6 +1666,16 @@ set_tests_properties(test_qubits_death.ceiling_exceeded_because_nothing_is_recyc
 ## makes every other suite's green meaningful.
 add_cqops_test(test_harness_negative WILL_FAIL)
 
+## And the same argument one step in (`bd 9ve.33`): a CHECK that fails BEFORE a
+## provocation window must still reach the exit code. A SECOND BINARY rather
+## than a second case, because the one above already exits non-zero, so a case
+## added to it could not discriminate — reverting the harness fix would leave
+## that process exiting non-zero all the same. This one's only failure is the
+## one before the window, so it is exactly the entry that goes red if
+## cq_h_take_failures goes back to zeroing the per-case tally. Measured: red
+## before the fix (the binary exited 0), green after (exit 1).
+add_cqops_test(test_harness_negative_window WILL_FAIL)
+
 ## The same argument for LEAK DETECTION (`bd kfi`). detect_leaks=1 is not a
 ## compile flag — it is a string in the ENVIRONMENT property that
 ## cmake/CqopsTest.cmake writes onto every test — so losing it would change
@@ -2559,7 +2569,13 @@ set_tests_properties(test_runtime_gate_death.rz_controlled_on_a_constant_lane_is
 ## is the source root because the generator's default paths are relative to it.
 cqops_select_python(CQOPS_PY)
 if(CQOPS_PY)
-    foreach(pysuite test_gen_shim test_gen_bodies)
+    ## THREE ENTRIES SINCE 2026-09-18, on the seam tests/test_gen_bodies.py
+    ## recorded in its own header: `the ASSERTIONS <-> the PROVOCATIONS`. Python
+    ## has no `.inc` escape hatch, so a Rule 12 split of a .py is necessarily a
+    ## new registered test rather than a second file on one entry — which also
+    ## means the provoked half must be LISTED HERE or it silently stops running,
+    ## the failure mode this block's own warning below exists to prevent.
+    foreach(pysuite test_gen_shim test_gen_bodies test_gen_bodies_provoked)
         add_test(NAME ${pysuite}
                  COMMAND ${CQOPS_PY} "${CMAKE_CURRENT_SOURCE_DIR}/${pysuite}.py"
                  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

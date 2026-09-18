@@ -55,6 +55,8 @@
 #include "cqops/cqops.h"
 
 #include "support/bitkinds.h"
+#include "support/childcap.h"
+#include "support/fpanchors.h"   /* §7.12's cells, as LITERAL patterns */
 #include "support/harness.h"
 #include "support/mock_sink.h"
 #include "support/poolcheck.h"
@@ -424,6 +426,14 @@ CQ_TEST(the_controlled_literal_doors_reach_the_region_with_the_right_lane)
 
 #include "test_template_d7.inc"
 
+/* Subject 5: the fp OPCODE surface (PRD-v2 §1, bead 9ve.28), on a third seam
+ * with the same discriminator the shim took one file over — `the INTEGER opcode
+ * surface <-> the fp opcode surface`. Everything in it turns on something only
+ * an fp family has: a second predicate enum in a different ORDER, a classical
+ * operand that is a BIT PATTERN, and a width the ABI names at four values of
+ * which v2 implements one. */
+#include "test_template_fcmp.inc"
+
 /* -------------------------------------------------------------------------
  * 6. The operand check's READ door — bd tgx, 2026-09-11.
  * ------------------------------------------------------------------------- */
@@ -494,5 +504,13 @@ CQ_TEST_MAIN(
     CQ_CASE(d7b_reaches_the_unc_and_icmp_doors_too),
     CQ_CASE(d7b_on_a_rotation_poisoned_source_is_discharged_by_the_certificate),
     CQ_CASE(the_d7b_copy_brackets_the_region_from_outside_on_both_sides),
-    CQ_CASE(a_measured_rail_is_a_legal_template_source)
+    CQ_CASE(a_measured_rail_is_a_legal_template_source),
+    CQ_CASE(every_fcmp_f64_wrapper_agrees_with_the_host_on_two_constant_rails),
+    CQ_CASE(the_fcmp_hl_shape_carries_the_ieee_pattern_and_not_a_converted_value),
+    CQ_CASE(fcmp_f64_on_two_quantum_rails_gives_the_right_flag_and_one_bit),
+    CQ_CASE(an_fcmp_f64_unc_zeroes_its_out_rail_and_the_free_strands_nothing),
+    CQ_CASE(an_fcmp_f64_unc_on_a_poisoned_source_is_discharged_by_the_certificate),
+    CQ_CASE(an_fcmp_unc_does_not_pair_with_an_icmp_forward_on_the_same_handles),
+    CQ_CASE(an_fcmp_f64_hl_unc_pairs_with_its_forward_at_the_same_literal),
+    CQ_CASE(every_fcmp_f64_inv_aborts_naming_itself_and_d14s_reason)
 )
