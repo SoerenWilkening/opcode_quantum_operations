@@ -420,9 +420,37 @@ void cq_reg_free(cq_ctx *ctx, int32_t h, cq_zero_proof proof)
     r->state = CQ_SLOT_DEAD;
 }
 
+/* IDEMPOTENT ON AN ALREADY-MEASURED RAIL (2026-09-17, bd 30k) — the SAME door
+ * bd tgx moved for the READ, one call over, and for the same reason: this guard
+ * was the last one in the stack still testing LIVENESS where the contract asks
+ * about WRITING and RECLAIMING (reg.h). A repeat measure writes nothing. It
+ * writes no bit (cq_measure resolves through cq_reg_cbits), no pool entry and no
+ * shadow entry, and the one state transition it does make is already at its
+ * fixed point — so the second call's only effect is to re-read wires that are
+ * still wires and to re-emit their `mz`.
+ *
+ * THE LEGALITY IS THE ABI'S, NOT A CONVENIENCE. CQ_lang's own committed golden
+ * tests/e2e/slice_loop_pairing_measure_owned.expected.log emits
+ * `cqrt_measure_i32(h1)` at line 11 AND at line 19 (CQ_lang b1b1dc02, tests/e2e
+ * tracked-clean; its working tree is dirty in docs/ and .gitignore only). That
+ * is not an accident its trace-only stub happens to tolerate: the fixture's own
+ * header admits the rail under `test_C_libtooling-tu9q` clause (ii-c) PRECISELY
+ * because "EVERY user of it is a `cq_measure`" — plural users of one rail is the
+ * defining property of the clause — and `-O1` LICM is what produces them, by
+ * hoisting the loop-invariant `y & 1` into the preheader while the measure stays
+ * in the two-trip body. Physically the repeat is idempotent: a second projective
+ * measurement in the same basis returns the first one's outcome.
+ *
+ * WHAT DID NOT MOVE, AND IT IS THE HALF THAT MATTERS. DEAD still aborts here
+ * (a tombstone's bits are gone and its qubits went back), TOKEN and a poisoned
+ * slot are refused one layer up in cq_reg_slot_mut / cq_reg_slot, and
+ * cq_reg_free's refusal of a MEASURED rail is untouched — terminality is about
+ * reclaiming, which this does not do. No qubit reaches the free list by any
+ * path this opens; Rule 6's prohibition is arithmetically unaffected. */
 void cq_reg_mark_measured(cq_reg_table *t, int32_t h)
 {
     cq_reg *r = cq_reg_slot_mut(t, h);
+    if (r->state == CQ_SLOT_MEASURED) return;
     if (r->state != CQ_SLOT_LIVE)
         cq_reg_die("measure of a rail that is not live", h, r->state);
     r->state = CQ_SLOT_MEASURED;

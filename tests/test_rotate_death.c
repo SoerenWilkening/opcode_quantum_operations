@@ -40,7 +40,14 @@
  *     freed handle, a measured rail — reached through M22's entry points so
  *     that M22 is shown to route to them rather than to have its own copy.
  *
- * (4) MEASUREMENT IS TERMINAL: a free after a measure, and a second measure.
+ * (4) MEASUREMENT IS TERMINAL — FOR THE FREE AND FOR THE WRITE, WHICH IS ALL IT
+ *     EVER MEANT. A free after a measure, and a rotation of a measured rail.
+ *     **A SECOND MEASURE USED TO BE A FIFTH CASE HERE AND IS NOT ONE ANY MORE**
+ *     (2026-09-17, bd 30k): CQ_lang's own golden emits a repeat cqrt_measure on
+ *     one handle, so cq_reg_mark_measured is idempotent on MEASURED and the
+ *     claim is now a POSITIVE one, in tests/test_rotate_measure.inc and
+ *     tests/test_runtime_rail.c. src/reg.c carries the evidence chain. Do not
+ *     re-add a death case here for it without reading that first.
  *
  * NO CQ_DEATH_SKIP_WITHOUT_INVARIANTS ANYWHERE IN THIS FILE, and that is
  * checked rather than assumed: every abort below is a both-configuration one.
@@ -92,14 +99,28 @@ static void nccx(void *u, uint32_t a, uint32_t b, uint32_t t)
 { (void)u; (void)a; (void)b; (void)t; }
 static void nry(void *u, uint32_t q, double th) { (void)u; (void)q; (void)th; }
 static void nrz(void *u, uint32_t q, double ph) { (void)u; (void)q; (void)ph; }
-/* THE MZ TRIPWIRE. `measure_of_a_measured_rail` needs to assert not just that a
- * second measure aborts, but that it aborts having emitted NOTHING — which is
- * what cq_measure's mark-before-read order buys and what a refactor moving the
- * mark below the loop would silently cost. A gate count cannot see it (the
- * process is gone), so the sink itself reports, and ctest's
- * FAIL_REGULAR_EXPRESSION turns that report into a failure. The flag is armed
- * only after the LEGITIMATE first measure, which of course emits `mz` on every
- * qubit — without it the marker would fire on the correct behaviour. */
+/* THE MZ TRIPWIRE: a refusal on the measure path must abort having emitted
+ * NOTHING. A gate count cannot see it (the process is gone), so the sink itself
+ * reports, and ctest's FAIL_REGULAR_EXPRESSION turns that report into a failure.
+ *
+ * RELOCATED 2026-09-17 (bd 30k), AND THE RELOCATION IS THE POINT RATHER THAN A
+ * TIDY-UP. It used to be armed by `measure_of_a_measured_rail`, which asserted
+ * that a SECOND measure aborts before touching the sink. That case is gone: a
+ * repeat cqrt_measure is legal on the frozen ABI (src/reg.c names the golden),
+ * so cq_reg_mark_measured is idempotent and there is no abort left to be early.
+ *
+ * IT DID NOT MOVE TO `measure_of_a_freed_handle`, AND THAT IS MEASURED RATHER
+ * THAN ASSUMED: after the change the only state cq_reg_mark_measured still
+ * refuses is DEAD, and a tombstone has bits == NULL and no qubits — so the loop
+ * it would guard could not emit an `mz` at any ordering, and the tripwire would
+ * be vacuously green there. This project treats an assertion that cannot fail as
+ * worse than none.
+ *
+ * WHERE IT IS STILL CONSTRUCTIBLE is the pair of guards that run BEFORE the
+ * mark and CAN refuse a live, qubit-owning rail: refuse_inside_a_sandwich and
+ * cq_ctrl_refuse_measurement. `measure_inside_a_sandwich_compute_half` arms it,
+ * having first materialised the rail's two bits so that a refusal moved below
+ * the emit loop would fire two `mz` and trip this marker. */
 static int g_mz_forbidden = 0;
 static void nmz(void *u, uint32_t q)
 {
@@ -181,6 +202,17 @@ static void rotate_in_a_sandwich(int what)
     cq_scratch scr;
     cq_scratch_alloc(&scr, 1);
     sw_env env = { &scr, what, cq_reg_alloc_zero(&ctx.regs, 2) };
+
+    /* The rail is materialised ONLY for the measure arm, and only so the mz
+     * tripwire above is non-vacuous: an all-constant rail owns no wire (I4), so
+     * cq_measure would emit nothing whatever the guard order. The two bits are
+     * CQ_BIT_ZERO, so materialising them emits no `x` either. */
+    if (what == SW_MEASURE) {
+        cq_bit *mb = cq_reg_bits(&ctx.regs, env.h);
+        cq_materialise(&ctx, &mb[0]);
+        cq_materialise(&ctx, &mb[1]);
+        g_mz_forbidden = 1;
+    }
 
     CQ_EXPECT_ABORT(cq_sandwich(&ctx, &scr, rotating_step, 1,
                                 copyout_nothing, 0, &env));
@@ -311,35 +343,20 @@ static void rz_of_a_measured_rail(void)
 
 /* --- (4) measurement is terminal ----------------------------------------- */
 
-/* A SECOND MEASURE ABORTS, AND ABORTS HAVING EMITTED ZERO GATES.
+/* A MEASURE OF A TOMBSTONE ABORTS — M07's refusal, reached through M22.
  *
- * The rail is MATERIALISED on purpose. With an all-constant rail — which is what
- * this case used to build — a second measure emits no `mz` under either
- * ordering, so the case could not tell mark-before-read from mark-after-read and
- * the ordering had no detector at all. Measured: a mutant moving
- * cq_reg_mark_measured below the loop survived the entire suite in both
- * configurations. It matters because the sink is LIVE — the printf sink has
- * already flushed those lines and a QEC driver has already committed them — so
- * "aborts having emitted zero gates" is a promise to the caller, not an
- * internal detail. The tripwire is in the sink; see g_mz_forbidden above. */
-static void measure_of_a_measured_rail(void)
-{
-    cq_ctx ctx;
-    open_ctx(&ctx);
-    preflight(&ctx);
-
-    int32_t h = cq_reg_alloc_zero(&ctx.regs, 2);
-    cq_bit *b = cq_reg_bits(&ctx.regs, h);
-    cq_materialise(&ctx, &b[0]);
-    cq_materialise(&ctx, &b[1]);
-
-    uint64_t lo, hi;
-    cq_measure(&ctx, h, &lo, &hi);      /* legitimate: two mz, before arming */
-
-    g_mz_forbidden = 1;
-    CQ_EXPECT_ABORT(cq_measure(&ctx, h, &lo, &hi));
-}
-
+ * THIS COMMENT IS A REPLACEMENT, AND SAYING SO MATTERS. The paragraph that stood
+ * here belonged to `measure_of_a_measured_rail`, deleted 2026-09-17 (bd 30k)
+ * when the repeat measure became legal; removing that case's body would have
+ * left its prose sitting above THIS function, describing a claim this function
+ * does not make — the false-source-comment shape this project has shipped before
+ * and which no test can catch, because nothing reads a comment.
+ *
+ * WHAT THE DELETED PARAGRAPH ARGUED IS NOT LOST, IT MOVED: "a refusal on the
+ * measure path aborts having emitted ZERO gates" is now armed by
+ * `measure_inside_a_sandwich_compute_half`. It could NOT stay here — a tombstone
+ * has bits == NULL and owns no wire, so no ordering of the guard could emit an
+ * `mz` and the tripwire would be vacuously green. See g_mz_forbidden above. */
 static void measure_of_a_freed_handle(void)
 {
     cq_ctx ctx;
@@ -376,7 +393,6 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(rz_of_a_freed_handle),
     CQ_DEATH_CASE(ry_of_a_measured_rail),
     CQ_DEATH_CASE(rz_of_a_measured_rail),
-    CQ_DEATH_CASE(measure_of_a_measured_rail),
     CQ_DEATH_CASE(measure_of_a_freed_handle),
     CQ_DEATH_CASE(free_after_measure)
 )

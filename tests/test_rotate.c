@@ -579,5 +579,6 @@ CQ_TEST_MAIN(
     CQ_CASE(measurement_returns_the_shadow_and_zero_for_unknown),
     CQ_CASE(measurement_of_a_poisoned_bit_is_zero_not_the_stale_value),
     CQ_CASE(measurement_spans_both_words_at_the_widest_register),
-    CQ_CASE(a_measured_rail_keeps_its_qubits_forever)
+    CQ_CASE(a_measured_rail_keeps_its_qubits_forever),
+    CQ_CASE(a_second_measure_of_the_same_rail_is_idempotent)
 )

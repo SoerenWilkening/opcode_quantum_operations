@@ -12,7 +12,7 @@ own argument. So:
 A missing input is a loud skip that names what is missing, never a silent
 fallback to a hard-coded table.
 """
-import os, re, subprocess, sys
+import os, re, subprocess, sys, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT  = os.path.join(ROOT, "docs", "labreport", "data")
@@ -24,7 +24,13 @@ def sh(*cmd, **kw):
 
 
 def provenance():
-    """The SHA the data was taken at — a figure without one pins nothing."""
+    """The WORKING TREE's SHA, at the moment this script runs.
+
+    That is the right stamp for goldens.dat and toffoli.dat, whose source IS
+    the working tree (tests/goldens/*.counts), and whose `(dirty)` flag covers
+    an uncommitted edit to exactly those files. It is NOT a stamp for
+    scratch.dat, which is measured against a BUILT ARCHIVE — see
+    `archive_stamp` below, and `bd 447`."""
     r = sh("git", "rev-parse", "--short", "HEAD")
     head = r.stdout.strip() or "unknown"
     dirty = " (dirty)" if sh("git", "status", "--porcelain").stdout.strip() else ""
@@ -88,6 +94,41 @@ def toffoli(head):
     return None
 
 
+def archive_stamp(lib, head):
+    """scratch.dat's provenance, said in the only terms that are TRUE (bd 447).
+
+    `head` is the WORKING TREE when the probe ran. It does NOT date the
+    ARCHIVE, which may have been built any number of commits earlier. The old
+    line read "libcqops.a at <head>", which asserts a correspondence that need
+    not hold, and a lab-report figure carries its provenance precisely so a
+    reader can check it. bd 447 records two live occurrences during the session
+    that filed it (at 454afa4, dirty tree, archive built earlier); the fix was
+    demonstrated against a fixture archive stamped three days behind HEAD.
+
+    The fix is bd a9e's, applied to a different line: NAME what the figure
+    measured rather than change what it measures. Making the SHA true would
+    mean the BUILD recording its own commit — and this script never configures
+    or builds anything, which is why `scratch` below SKIPS and says "configure
+    and build build-release first" rather than doing it. Refusing on a stale
+    archive was rejected too: build-then-commit is the ordinary workflow, so an
+    archive older than HEAD's commit TIME is usually current, while a dirty
+    tree's archive corresponds to no commit at all — the test false-positives
+    and false-negatives both ways.
+
+    So the line names both facts and says which is which, and carries the
+    archive's mtime — the one thing on disk that DOES date it, so the reader
+    can still check the correspondence instead of taking it on trust. It does
+    NOT close bd bj0's residual about a ctest count from an undated tree: that
+    lives in new_entry.py and would need a reconfigure to detect."""
+    built = time.strftime("%Y-%m-%d %H:%M:%S",
+                          time.localtime(os.path.getmtime(lib)))
+    return ("%s, last built %s (local mtime).\n"
+            "# Working tree at %s when the probe RAN — that SHA dates the RUN,\n"
+            "# not the ARCHIVE. Nothing records the commit the archive was built\n"
+            "# from, so compare the mtime above against that commit's date."
+            % (os.path.relpath(lib, ROOT), built, head))
+
+
 def scratch(head):
     """K11/K12 peak and region, MEASURED by running the probe."""
     lib = os.path.join(REL, "libcqops.a")
@@ -109,9 +150,18 @@ def scratch(head):
         return "probe did not run: " + r.stderr.strip()
     with open(dat) as fh:
         body = fh.read()
+    # The anchor is DERIVED from REL rather than spelled again, and its absence
+    # is a loud skip: str.replace on a string that does not occur returns the
+    # body unchanged, so a probe whose header wording moved would leave a .dat
+    # carrying NO provenance at all and nothing would say so — the same silent
+    # shape bd 447 is about, and against this module's own "a missing input is
+    # a loud skip that names what is missing".
+    anchor = os.path.relpath(lib, ROOT) + "."
+    if anchor not in body:
+        return ("the probe's header no longer contains %r, so the provenance "
+                "stamp would be a silent no-op" % anchor)
     with open(dat, "w") as fh:
-        fh.write(body.replace("build-release/libcqops.a.",
-                              "build-release/libcqops.a at %s.\n#" % head, 1))
+        fh.write(body.replace(anchor, archive_stamp(lib, head), 1))
     return None
 
 

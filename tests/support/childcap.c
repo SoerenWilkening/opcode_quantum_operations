@@ -17,6 +17,28 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* `bd 7b5` — REQUIREMENT 5'S COUNT IS EXECUTED RATHER THAN ASSERTED IN PROSE.
+ *
+ * CQOPS_CHILDCAP_EINTR_SITES is counted OUT OF THIS FILE at configure time
+ * (tests/CMakeLists.txt), so the left side below is what the code has and the
+ * right side is what childcap.h's requirement 5 claims it has. The two are
+ * independent, which is the whole point: `bd ta1` added the poll() retry and
+ * requirement 5 went on naming a pair, in a green tree, because nothing in this
+ * project reads a comment. Adding or deleting a retry site now fails to
+ * COMPILE, and the fix is to re-read requirement 5 and the three-verdict table
+ * in tests/test_childcap_controls.inc before touching the 3.
+ *
+ * The #error arm carries as much as the assert: a drift gate that skips when
+ * its input is missing is a gate that is off. */
+#ifndef CQOPS_CHILDCAP_EINTR_SITES
+#error "CQOPS_CHILDCAP_EINTR_SITES undefined: tests/CMakeLists.txt counts it out of this file and must be what compiles it (`bd 7b5`)."
+#endif
+_Static_assert(CQOPS_CHILDCAP_EINTR_SITES == 3,
+               "childcap.c's retry sites are no longer the THREE that "
+               "childcap.h's requirement 5 enumerates (read, poll, waitpid). "
+               "Re-measure requirement 5 and the three verdicts in "
+               "tests/test_childcap_controls.inc, then change the count.");
+
 /* One capture in flight. `fd < 0` means this stream has ended and is out of
  * the poll set; a stream never selected is born that way. */
 typedef struct {

@@ -33,6 +33,11 @@
  *      DIFFERENT PAIR in two places and neither pair was the set. Nothing was
  *      wrong in the code — the miscount is the point, and it is why the three
  *      sites now get three separate verdicts rather than one sentence.
+ *      THE COUNT IS NOW EXECUTED (`bd 7b5`): tests/CMakeLists.txt counts the
+ *      retry sites out of childcap.c at every configure and childcap.c
+ *      _Static_asserts the result, so a fourth site BREAKS THE BUILD instead
+ *      of quietly falsifying this line a fifth time. WHICH three they are is
+ *      still prose, and so is everything below about what is pinned.
  *
  * Plus the rider: the capture buffers are cleared FIRST, so a failed capture
  * can never report a previous call's bytes.
@@ -50,6 +55,13 @@
  * survivor should be re-measured before it is explained, and that an
  * IMPOSSIBILITY claim is the most expensive kind to get wrong, because it stops
  * the next person trying.
+ *
+ *   WHAT A BUILD CAN CHECK HERE IS THE SITE COUNT, AND SINCE `bd 7b5` IT DOES
+ *   (the _Static_assert in childcap.c). WHICH REQUIREMENT A CASE PINS IS NOT
+ *   THAT KIND OF CLAIM: it is a statement about a mutation battery, which
+ *   measures the mutants someone thought of on a date. So read everything
+ *   below as DATED PROSE to be re-measured, never as the current state of the
+ *   suite — that reading is what went wrong each of the times above.
  *
  *   REQUIREMENT 1 IS PINNED, and it is the strongest thing here. Ignoring the
  *   stream mask, and swapping the two drains, are both KILLED in both

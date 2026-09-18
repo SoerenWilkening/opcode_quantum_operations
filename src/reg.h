@@ -82,7 +82,32 @@ enum {
                             * exact for the FREE and was never right for the
                             * READ: a measured rail is a legal SOURCE, and
                             * cq_reg_check_operands tests its source slot for
-                            * readability rather than for liveness.          */
+                            * readability rather than for liveness.
+                            *
+                            * AMENDED AGAIN 2026-09-17 (bd 30k), and BOTH rows
+                            * above are now re-measured rather than overwritten.
+                            * Against CQ_lang b1b1dc02 (tests/e2e tracked-clean,
+                            * working tree dirty in docs/ and .gitignore only)
+                            * and its 392 goldens: 548 cqrt_measure_* calls, 0
+                            * later freed, and — the flip — ZERO later
+                            * REFERENCED. bd tgx's own witness fixture,
+                            * slice_control_select_bool_round2_window
+                            * .expected.log, was DELETED upstream at 66428ddc,
+                            * so the READ relaxation is now supported by no
+                            * golden at all. It is kept: it was argued from the
+                            * contract (a read is not a write), not from that
+                            * one fixture, and nothing has contradicted it.
+                            *
+                            * WHAT THE SAME SCAN FOUND INSTEAD is a repeat
+                            * MEASURE: exactly one golden measures one handle
+                            * twice — slice_loop_pairing_measure_owned
+                            * .expected.log, cqrt_measure_i32(h1) at line 11 and
+                            * line 19 — and cq_reg_mark_measured is idempotent
+                            * on MEASURED because of it. So "terminal" is exact
+                            * for the FREE and for the WRITE, and was never a
+                            * claim about the READ or about the MEASURE. The
+                            * qubits are still never reclaimed; that is the
+                            * whole of what this state means.                */
     CQ_SLOT_TOKEN    = 4   /* a CLASSICAL RESOURCE TOKEN — `cqrt_tape_alloc`'s
                             * t<N>, and qram's a<N> when it lands (PRD §15 D23,
                             * plan §0.5). NOT A RAIL: width 0, bits NULL, owns
@@ -400,10 +425,15 @@ uint32_t cq_reg_frees_unproven   (const cq_ctx *ctx);
  * corrupts an unrelated rail, and that is the one unforgivable bug. */
 void cq_reg_free(cq_ctx *ctx, int32_t h, cq_zero_proof proof);
 
-/* LIVE -> MEASURED. Keeps the bits and the qubits forever, emits nothing, and
- * touches neither the pool nor the shadow: the measurement gate and the ABI
- * return value are M26's at Step 23. Table-only by signature, so it cannot
- * drift into emitting. */
+/* LIVE -> MEASURED, and MEASURED -> MEASURED. Keeps the bits and the qubits
+ * forever, emits nothing, and touches neither the pool nor the shadow: the
+ * measurement gate and the ABI return value are M26's at Step 23. Table-only by
+ * signature, so it cannot drift into emitting.
+ *
+ * IDEMPOTENT SINCE 2026-09-17 (bd 30k): a rail that is already MEASURED returns
+ * unchanged rather than aborting, because CQ_lang emits a repeat cqrt_measure on
+ * one handle and that is legal on the frozen ABI. DEAD still aborts here; TOKEN
+ * and a poisoned slot are refused one layer up. reg.c carries the evidence. */
 void cq_reg_mark_measured(cq_reg_table *t, int32_t h);
 
 /* dst ^= src, bitwise through cq_emit_cx — so a constant source folds to 0

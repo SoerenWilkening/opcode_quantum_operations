@@ -234,16 +234,6 @@ static void free_of_a_measured_rail_is_m07s_refusal(void)
     CQ_EXPECT_ABORT(cqrt_free(h));
 }
 
-static void a_second_measure_is_m07s_refusal(void)
-{
-    cq_ctx *ctx = open_shim();
-    const int32_t h = cqrt_alloc_i32(0);
-
-    (void)cqrt_measure_i32(h);
-    CQ_DEATH_REQUIRE(cq_reg_state(&ctx->regs, h) == CQ_SLOT_MEASURED);
-    CQ_EXPECT_ABORT((void)cqrt_measure_i32(h));
-}
-
 /* A TOMBSTONE MUST BE M07's DIAGNOSTIC AND NOT A WIDTH BUG, which is why every
  * resolve in the shim goes through `cq_reg_bits` / `cq_reg_cbits` BEFORE
  * comparing the width: `cq_reg_width` goes through `cq_reg_slot`, which admits
@@ -367,7 +357,6 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(cswap_validates_its_operands_even_on_the_zero_row),
     CQ_DEATH_CASE(double_free_is_m07s_refusal),
     CQ_DEATH_CASE(free_of_a_measured_rail_is_m07s_refusal),
-    CQ_DEATH_CASE(a_second_measure_is_m07s_refusal),
     CQ_DEATH_CASE(use_of_a_freed_rail_is_m07s_refusal),
     CQ_DEATH_CASE(xorc_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free),
     CQ_DEATH_CASE(xorc_of_a_measured_rail_is_a_write_refusal),

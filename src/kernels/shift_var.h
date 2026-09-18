@@ -62,4 +62,32 @@ void cq_kernel_lshr_var(cq_ctx *ctx, cq_bit *dst,
 void cq_kernel_ashr_var(cq_ctx *ctx, cq_bit *dst,
                         const cq_bit *a, const cq_bit *b, int W);
 
+/* AND A GREP FOR THOSE THREE NAMES FINDS A CONSUMER IT CANNOT FOLLOW (bd 8u0).
+ * Besides the direct calls in tests/, the three are ROWS of a function-pointer
+ * table — `cq_tpl_bin_kernel`'s `K[]` in shim/cq_template_dispatch.c. The grep
+ * lands on the row and stops there; the table's callers are further hops on and
+ * no spelling of that grep reaches them. SO THE BLAST RADIUS OF A CHANGE HERE IS
+ * NOT A SYMBOL GREP. Walk the hops instead:
+ *
+ *     grep -rn cq_kernel_ashr_var src shim tests   # -> the table row; stops
+ *     grep -rn cq_tpl_bin_kernel shim              # -> cq_template_impl.c
+ *     grep -rn cq_shim_bin_ tests                  # -> that file's public doors
+ *
+ * THE CHAIN IS WHAT IS DURABLE AND THE NAMES AT ITS END ARE NOT, which is why
+ * they are re-derived rather than listed: a suite can be renamed or retired
+ * between one reader and the next, and the hop cannot. Today it ends at
+ * tests/test_template.c, which drives all three shifts through the `qq` door at
+ * W = 8 and the barrel through `_lh` with a quantum amount. That file is not an
+ * incidental consumer but the table's own detector — a TRANSPOSED row emits a
+ * well-formed circuit for a different function, so gate counts, the palindrome,
+ * the pool and the shadow all stay green and only an L1 against an independent
+ * reference sees it.
+ *
+ * NOT CLAIMED HERE: that any suite is green, or what a gate regex should be.
+ * Both rot on the next case added; the hop does not. One rider for reading a
+ * run — M12's death cases share ONE binary with M17's mux cases, so a total
+ * under a `step14` regex is a two-module figure and not M12 coverage. Count per
+ * module, and include the template suite.
+ */
+
 #endif /* CQOPS_KERNELS_SHIFT_VAR_H */

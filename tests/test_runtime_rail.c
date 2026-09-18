@@ -229,6 +229,51 @@ CQ_TEST(measure_emits_one_mz_per_qubit_and_makes_the_rail_terminal)
     close_with(&m);
 }
 
+/* THE REPEAT MEASURE, AT THE ABI BOUNDARY (bd 30k, 2026-09-17). The M07/M22 half
+ * of this claim is tests/test_rotate_measure.inc; this one asserts it through
+ * the frozen symbol a CQ_lang fixture actually calls, because that is the layer
+ * where the abort was observed — L6's e2e-slice-loop-pairing-measure-owned died
+ * on `reg: measure of a rail that is not live (1, 3)` at exactly this call.
+ *
+ * IT REPLACES A DEATH CASE (`a_second_measure_is_m07s_refusal`) AND MUST NOT BE
+ * WEAKENED BACK INTO ONE. A death case that stopped firing would be satisfied by
+ * a second measure that returned the wrong value or measured the wrong wires; so
+ * the value is pinned against the first call's, the mz stream is pinned by COUNT
+ * AND by the rail still owning exactly its own indices, and the pool is pinned
+ * unmoved. The legality is CQ_lang's — its own golden emits the repeat; see
+ * src/reg.c for the chain and for why it is deliberate upstream. */
+CQ_TEST(a_second_cqrt_measure_of_one_handle_is_legal_and_idempotent)
+{
+    cq_mock m; cq_sink s;
+    cq_ctx *ctx = open_with(&m, &s);
+
+    const int32_t h = cq_bk_reg(ctx, 8u, 0xAu, 0xAu);   /* wires on lanes 1, 3 */
+    CHECK_EQ(cq_reg_owned_qubits(&ctx->regs, h), 2);
+
+    cq_mock_reset(&m);
+    const int8_t first = cqrt_measure_i8(h);
+    CHECK_EQ(cq_mock_count_op(&m, CQ_OP_MZ), 2);
+
+    /* The second call: no abort, same value, the same two wires again, and a
+     * pool that did not move. Emitting the `mz` again is the correct answer
+     * rather than a missed peephole — suppressing it would make the gate stream
+     * depend on call history, which v1 does not do (Rule 13). */
+    cq_mock_reset(&m);
+    const int8_t second = cqrt_measure_i8(h);
+
+    CHECK_EQ(second, first);
+    CHECK_EQ(cq_mock_count(&m), 2);
+    CHECK_EQ(cq_mock_count_op(&m, CQ_OP_MZ), 2);
+    CHECK_EQ(cq_reg_state(&ctx->regs, h), CQ_SLOT_MEASURED);
+
+    /* Still terminal in the sense that survives: nothing was reclaimed, and the
+     * rail still names exactly its own live indices. */
+    CHECK(cq_pc_live_is_exactly(ctx, &h, 1u));
+    cq_reg_audit(ctx);
+
+    close_with(&m);
+}
+
 /* -------------------------------------------------------------------------
  * 4. free — D15's three-valued verdict and its two-valued act.
  * ------------------------------------------------------------------------- */
@@ -394,6 +439,7 @@ CQ_TEST_MAIN(
     CQ_CASE(alloc_reads_a_negative_literal_as_its_own_widths_bit_pattern),
     CQ_CASE(measure_round_trips_every_width_at_the_abis_own_signed_type),
     CQ_CASE(measure_emits_one_mz_per_qubit_and_makes_the_rail_terminal),
+    CQ_CASE(a_second_cqrt_measure_of_one_handle_is_legal_and_idempotent),
     CQ_CASE(free_of_an_all_constant_rail_costs_nothing_and_strands_nothing),
     CQ_CASE(free_of_a_determinate_zero_rail_releases_every_index_by_name),
     CQ_CASE(free_of_a_determinate_one_rail_is_convicted_and_strands_by_name),

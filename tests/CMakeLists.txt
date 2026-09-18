@@ -168,6 +168,52 @@ target_link_libraries(cqops_test_support
     PRIVATE cqops_build_flags
 )
 
+## ---------------------------------------------------------------------------
+## `bd 7b5` — THE EINTR SITE COUNT IS MEASURED OUT OF THE FILE, NEVER WRITTEN
+## DOWN.
+##
+## childcap.h's requirement 5 enumerates the blocking calls that must retry on
+## EINTR, and that enumeration has been wrong twice in the same file, naming two
+## DIFFERENT pairs out of a set of three: `bd ta1` ADDED the poll() site and the
+## requirement went on saying read() and waitpid(), while a later paragraph said
+## poll() and read(). Nobody was careless — THE CODE MOVED UNDERNEATH THE
+## COMMENT, which is src/angle.h's defect, and it is caught by nothing, because
+## no test in this project reads a comment.
+##
+## So the count is re-measured at every configure and compiled in, and
+## childcap.c _Static_asserts it against the number its prose claims. A fourth
+## retry site, or a deleted one, now BREAKS THE BUILD — the same reason
+## CQ_BIT_ZERO == 0 and CQ_ANGLE_GENERAL == 0 are static asserts rather than
+## comments. It pins the COUNT and nothing else: WHICH three they are, and which
+## of them a control pins, are claims about the suite that no build can check,
+## and childcap.h marks those as dated prose.
+##
+## CMAKE_CONFIGURE_DEPENDS IS WHAT KEEPS THE MEASUREMENT FROM GOING STALE IN THE
+## BUILD TREE, and without it this whole block would be the defect it exists to
+## prevent: CMake does not re-run because a source file changed, so the -D would
+## keep whatever the count was when the tree was last configured and the gate
+## would report on a file it had not read.
+##
+## Comment lines are dropped before counting (CLAUDE.md: match code, never
+## comments) because childcap.c discusses its own EINTR branches at length; a
+## trailing comment on a code line still counts, which is correct. Measured on
+## cmake 4.3.2 rather than assumed: file(STRINGS ... REGEX) returns these three
+## lines as three list elements and does NOT split them on their embedded
+## semicolons.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             "${CMAKE_CURRENT_SOURCE_DIR}/support/childcap.c")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/support/childcap.c"
+     cqops_childcap_eintr_lines REGEX "errno == EINTR")
+set(cqops_childcap_eintr_sites 0)
+foreach(cqops_childcap_line IN LISTS cqops_childcap_eintr_lines)
+    if(NOT cqops_childcap_line MATCHES "^[ \t]*[*/]")
+        math(EXPR cqops_childcap_eintr_sites
+             "${cqops_childcap_eintr_sites} + 1")
+    endif()
+endforeach()
+target_compile_definitions(cqops_test_support PRIVATE
+    CQOPS_CHILDCAP_EINTR_SITES=${cqops_childcap_eintr_sites})
+
 ## Suites. Layer order mirrors plan §3; each lands with its step.
 
 add_cqops_test(test_skeleton)
@@ -1193,7 +1239,6 @@ add_cqops_death_test(test_rotate_death CASES
     rz_of_a_freed_handle
     ry_of_a_measured_rail
     rz_of_a_measured_rail
-    measure_of_a_measured_rail
     measure_of_a_freed_handle
     free_after_measure
 )
@@ -1215,10 +1260,26 @@ set_tests_properties(test_rotate_death.ry_inside_a_sandwich_compute_half
                      test_rotate_death.rz_of_a_freed_handle
                      test_rotate_death.ry_of_a_measured_rail
                      test_rotate_death.rz_of_a_measured_rail
-                     test_rotate_death.measure_of_a_freed_handle
                      test_rotate_death.free_after_measure
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "PREFLIGHT-")
+
+## WHICH LAYER REFUSED A MEASURE OF A TOMBSTONE, and it is the claim bd 30k's
+## own source comment makes ("DEAD still aborts HERE", src/reg.c). It was NOT
+## pinned: measured 2026-09-17 in review, a mutant widening the new early return
+## to `r->state == CQ_SLOT_MEASURED || r->state == CQ_SLOT_DEAD` SURVIVED 57
+## tests in BOTH configurations, because `cq_reg_cbits` -> `cq_reg_readable`
+## refuses the tombstone one call later and the case could only see THAT it
+## aborted. That is this file's recorded masking shape with the masking copy
+## LATER in the chain rather than earlier. The discriminator is NEGATIVE, so it
+## composes with the exit-code check instead of displacing it the way
+## PASS_REGULAR_EXPRESSION would: on correct code cq_reg_mark_measured speaks
+## first ("measure of a rail that is not live") and the tombstone string never
+## appears. PREFLIGHT- is REPEATED here rather than inherited, because this test
+## is no longer in the group above and a second set_tests_properties OVERWRITES.
+set_tests_properties(test_rotate_death.measure_of_a_freed_handle
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "PREFLIGHT-;use of a freed handle")
 
 ## WHICH GUARD SPOKE, for the measurement sandwich case. Without this pin,
 ## disabling cq_measure's OWN refusal still leaves the case green: rotating_step
@@ -1227,9 +1288,36 @@ set_tests_properties(test_rotate_death.ry_inside_a_sandwich_compute_half
 ## case cannot tell that from M22's guard. Measured — the mutant survived the whole
 ## 174-test suite in both configurations. The ry/rz siblings need no such pin:
 ## without their guard the sandwich RETURNS and cq_death_survived fires.
+##
+## AND THE MZ TRIPWIRE NOW RIDES THIS SAME LIST (2026-09-17, bd 30k), composed in
+## rather than set in a second block — this file's own recorded trap, since a
+## second set_tests_properties OVERWRITES rather than adds. "A refusal on the
+## measure path aborts having emitted ZERO GATES" used to be pinned on
+## test_rotate_death.measure_of_a_measured_rail, which is gone: a repeat
+## cqrt_measure is legal on the frozen ABI (CQ_lang's own golden emits one), so
+## cq_reg_mark_measured is idempotent and there is no second-measure abort left to
+## be early. The property survives on the guards that CAN still refuse a live,
+## qubit-owning rail — and tests/test_rotate_death.c materialises this case's rail
+## so the marker is not vacuous. It did NOT move to measure_of_a_freed_handle,
+## where a tombstone owns no wire and the tripwire could never fire.
+##
+## AND THE FIRST PARAGRAPH ABOVE IS NOW STALE IN ITS MECHANISM, RE-MEASURED
+## 2026-09-17 IN REVIEW RATHER THAN LEFT TO ROT. It says the case stays green
+## without a pin because the reverse replay's SECOND measure aborts in M07's
+## cq_reg_mark_measured inside the armed window. That fallback NO LONGER EXISTS:
+## the second measure is idempotent now, so deleting cq_measure's own
+## refuse_inside_a_sandwich makes the case emit `mz` instead of aborting
+## elsewhere. Measured: with that guard deleted the case goes RED in BOTH
+## configurations on MZ-EMITTED-PAST-THE-ABORT-POINT (three markers), not on
+## cq_death_survived and not on the message pin. CONSEQUENCE: the
+## "measure of a rail that is not live" element below is now UNREACHABLE for
+## this test — mark_measured cannot abort on a LIVE rail — and is kept only as a
+## dead-man's clause against a future guard order that revives it. The live
+## detector is the mz marker. Do not read the paragraph above as still
+## describing why this list exists.
 set_tests_properties(test_rotate_death.measure_inside_a_sandwich_compute_half
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "PREFLIGHT-;measure of a rail that is not live")
+                     "PREFLIGHT-;measure of a rail that is not live;MZ-EMITTED-PAST-THE-ABORT-POINT")
 
 ## WHICH LAYER REFUSED THE FREE. These two abort at the same site with the same
 ## message — cq_reg_clean's `!proof ||` short-circuits at the first qubit-carrying
@@ -1247,18 +1335,6 @@ set_tests_properties(test_rotate_death.ckd18_a_general_ry_rail_cannot_be_freed
                      test_rotate_death.a_null_proof_still_refuses_a_materialised_rail
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "PREFLIGHT-;release of a qubit not proven;UndefinedBehaviorSanitizer")
-
-## "ABORTS HAVING EMITTED ZERO GATES" IS A PROMISE, SO IT NEEDS A DETECTOR.
-## cq_measure marks the rail MEASURED before it reads a single bit, so a second
-## measure aborts before touching the sink. Nothing about that ordering was
-## observable until this pin: the case's rail is materialised, its sink reports any
-## `mz` emitted after the first legitimate measure, and this turns that report into
-## a failure. A refactor moving the mark below the loop — the natural thing to do
-## while taking the recorded `rotation table / measurement` seam — passes every
-## other assertion in the project.
-set_tests_properties(test_rotate_death.measure_of_a_measured_rail
-                     PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "PREFLIGHT-;MZ-EMITTED-PAST-THE-ABORT-POINT")
 
 add_cqops_death_test(test_qubits_death CASES
     ceiling_exceeded
@@ -1674,7 +1750,6 @@ add_cqops_death_test(test_runtime_rail_death CASES
     cswap_validates_its_operands_even_on_the_zero_row
     double_free_is_m07s_refusal
     free_of_a_measured_rail_is_m07s_refusal
-    a_second_measure_is_m07s_refusal
     use_of_a_freed_rail_is_m07s_refusal
     xorc_of_a_freed_rail_of_the_wrong_width_is_a_use_after_free
     xorc_of_a_measured_rail_is_a_write_refusal
@@ -1874,13 +1949,19 @@ set_tests_properties(test_runtime_rail_death.cswap_between_rails_of_different_wi
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cqrt;cswap of a rail with itself;control aliases a rail it writes;cswap control flag rail is not one bit;width mismatch in a rail-to-rail swap")
 
-## THE MIRROR IMAGE: these four MUST be M07's, so the shim's own prefix is
+## THE MIRROR IMAGE: these three MUST be M07's, so the shim's own prefix is
 ## what must not appear. A shim that re-implemented any of them would be the
 ## masking layer this project has recorded four times — and would make M07's
 ## own death cases untestable from here.
+##
+## IT WAS FOUR UNTIL 2026-09-17 (bd 30k). `a_second_measure_is_m07s_refusal` is
+## gone because the refusal is: a repeat cqrt_measure is legal on the frozen ABI
+## and cq_reg_mark_measured is idempotent on MEASURED. Its replacement is a
+## POSITIVE case, test_runtime_rail.a_second_cqrt_measure_of_one_handle_is_legal
+## _and_idempotent, which asserts what the second call returns and emits rather
+## than merely that it stopped aborting.
 set_tests_properties(test_runtime_rail_death.double_free_is_m07s_refusal
                      test_runtime_rail_death.free_of_a_measured_rail_is_m07s_refusal
-                     test_runtime_rail_death.a_second_measure_is_m07s_refusal
                      test_runtime_rail_death.use_of_a_freed_rail_is_m07s_refusal
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;FATAL: shim:")

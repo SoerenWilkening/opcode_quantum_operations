@@ -364,12 +364,20 @@ CQ_TEST(a_child_that_fills_one_pipe_before_finishing_the_other_does_not_deadlock
 /* -------------------------------------------------------------------------
  * REQUIREMENT 5 — the EINTR retries (`bd 698`).
  *
- * THERE ARE THREE EINTR SITES IN childcap.c, NOT TWO, and every document that
- * named them named a different pair. childcap.h's requirement 5 says "read()
- * and waitpid()"; its later paragraph says poll() and read(); the code has
- * read() (cap_step), poll() (drain_both, ADDED by `bd ta1`) and waitpid(). The
- * three are NOT equally reachable and the difference is structural rather than
- * statistical, so they get three different verdicts:
+ * THERE ARE THREE EINTR SITES IN childcap.c, NOT TWO: read() (cap_step),
+ * poll() (drain_both, ADDED by `bd ta1`) and waitpid().
+ *
+ * AND THIS PARAGRAPH WAS ITSELF STALE FOR A WHILE, WHICH IS WHY THE COUNT IS
+ * NOW A BUILD ERROR (`bd 7b5`). It used to report, in the present tense, that
+ * childcap.h's requirement 5 SAID "read() and waitpid()" while a later
+ * paragraph of the same file SAID poll() and read() — three documents naming
+ * three different pairs out of a set of three. `bd 698` corrected both of those
+ * sentences and this one went on describing their old wording, so the defect
+ * reproduced itself one level up in the act of being written down. The COUNT is
+ * now measured out of childcap.c at configure time and _Static_asserted there;
+ * what no build can check is REACHABILITY, which is what the three verdicts
+ * below are about. They are NOT equally reachable, and the difference is
+ * structural rather than statistical:
  *
  *   poll()    — where the parent actually blocks. Pinned below.
  *   waitpid() — reachable whenever the child outlives its own output. Pinned

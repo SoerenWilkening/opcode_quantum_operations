@@ -162,8 +162,15 @@ static cq_bit *rail_w(cq_ctx *ctx, int32_t h, uint32_t w)
 /* A rail this symbol only READS, and the asymmetry is deliberate:
  * `cq_reg_cbits` admits a MEASURED rail because a read is legal on one
  * (src/reg.h), which is the same position shim/cq_shim_ctx.c takes for a
- * control flag. Where a measured rail must still be refused — a second
- * `cqrt_measure` — the refusal is M07's, inside `cq_reg_mark_measured`. */
+ * control flag.
+ *
+ * THIS COMMENT USED TO END "Where a measured rail must still be refused — a
+ * second `cqrt_measure` — the refusal is M07's, inside `cq_reg_mark_measured`."
+ * THAT CLAUSE IS RETIRED (2026-09-17, bd 30k): a repeat `cqrt_measure` on one
+ * handle is LEGAL on the frozen ABI — CQ_lang's own golden emits it — so
+ * `cq_reg_mark_measured` is idempotent on MEASURED and nothing on this path
+ * refuses one. Where a measured rail IS still refused is the WRITE door
+ * (`rail_w` / `cq_reg_bits`) and the FREE (`cq_reg_free`), both unmoved. */
 static const cq_bit *rail_r(cq_ctx *ctx, int32_t h, uint32_t w)
 {
     const cq_bit *b = cq_reg_cbits(&ctx->regs, h);

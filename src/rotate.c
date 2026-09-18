@@ -215,10 +215,24 @@ void cq_measure(cq_ctx *ctx, int32_t h, uint64_t *lo, uint64_t *hi)
     refuse_inside_a_sandwich(ctx, "measure");
     cq_ctrl_refuse_measurement(ctx);
 
-    /* MARK FIRST, AND THE ORDER IS THE POINT. cq_reg_mark_measured refuses any
-     * state but LIVE, so a second measure — or a measure of a tombstone —
-     * aborts having emitted ZERO gates. Marking afterwards would push W `mz`
-     * gates at the sink and then abort. Nothing below can fail on a
+    /* MARK FIRST, AND THE ORDER IS STILL THE POINT — BUT THE CLAIM NARROWED ON
+     * 2026-09-17 (`bd 30k`), AND THE OLD WORDING IS RETIRED RATHER THAN EDITED
+     * AROUND. It read: "cq_reg_mark_measured refuses any state but LIVE, so a
+     * second measure — or a measure of a tombstone — aborts having emitted
+     * ZERO gates". THE SECOND-MEASURE HALF IS FALSE NOW: a repeat
+     * `cqrt_measure` of one handle is legal on the frozen ABI, so
+     * cq_reg_mark_measured is IDEMPOTENT on MEASURED (src/reg.c carries the
+     * evidence chain and PRD §2.2 is the design of record) and a second call
+     * falls through to the loop below and re-emits its `mz` on purpose.
+     *
+     * WHAT SURVIVES IS THE TOMBSTONE HALF, and it is the half the ordering was
+     * ever about: DEAD still aborts inside cq_reg_mark_measured, before this
+     * function has touched the sink. Marking afterwards would push W `mz` gates
+     * at a LIVE sink — already flushed by the printf sink, already committed by
+     * a QEC driver — and only then abort. The detector for that ordering moved
+     * with the deleted case: it is the `g_mz_forbidden` tripwire in
+     * tests/test_rotate_death.c, now armed by
+     * `measure_inside_a_sandwich_compute_half`. Nothing below can fail on a
      * well-formed rail, so there is no half-marked state to worry about. */
     cq_reg_mark_measured(&ctx->regs, h);
 

@@ -148,3 +148,74 @@ CQ_TEST(a_measured_rail_keeps_its_qubits_forever)
     fx_close(&f);
 }
 
+
+/* --- the repeat measure (bd 30k, 2026-09-17) ----------------------------- */
+
+/* THE POSITIVE EXEMPTION CASE for cq_reg_mark_measured's idempotence, and it is
+ * a POSITIVE one deliberately: this claim used to be a death case
+ * (test_rotate_death.measure_of_a_measured_rail) and a death case that merely
+ * STOPPED FIRING would prove nothing at all — it would be satisfied by a
+ * cq_measure that returned garbage, emitted the wrong wires, or quietly released
+ * the rail's qubits. So the assertion is what the second call DOES.
+ *
+ * WHY IT IS LEGAL IS THE ABI'S ANSWER AND NOT OURS: CQ_lang's own committed
+ * golden tests/e2e/slice_loop_pairing_measure_owned.expected.log emits
+ * `cqrt_measure_i32(h1)` twice (lines 11 and 19). src/reg.c carries the full
+ * chain, including why it is deliberate upstream rather than tolerated.
+ *
+ * FOUR CLAUSES, AND THE ORDERED STREAM IS THE ONE THAT CARRIES WEIGHT. A COUNT
+ * of `mz` would be satisfied by a second call measuring the wrong wires — the
+ * exact mutant the first case in this file was written against — so the second
+ * measure's stream is pinned against the SAME qubit indices, in order. The value
+ * must also be bit-identical: a repeat projective measurement in the same basis
+ * returns the first outcome, and our shadow is not mutated by a measure, so
+ * anything else here means someone taught cq_measure to write. */
+CQ_TEST(a_second_measure_of_the_same_rail_is_idempotent)
+{
+    fixture f; fx_open(&f);
+
+    const uint32_t W = 8;
+    int32_t h = cq_bk_reg(&f.ctx, W, 0xB5u, 0xF0u);   /* bits 4..7 quantum */
+    const cq_bit *b = cq_reg_cbits(&f.ctx.regs, h);
+    const cq_rec want[] = {
+        CQ_REC_MZ(cq_bit_qindex(b[4])), CQ_REC_MZ(cq_bit_qindex(b[5])),
+        CQ_REC_MZ(cq_bit_qindex(b[6])), CQ_REC_MZ(cq_bit_qindex(b[7])),
+    };
+
+    cq_mock_reset(&f.mock);
+    uint64_t lo1 = 0, hi1 = 0;
+    cq_measure(&f.ctx, h, &lo1, &hi1);
+    const cq_pc_snap after_first = cq_pc_take(&f.ctx);
+
+    /* (1) It does not abort, and the rail is still MEASURED rather than moved to
+     *     some fifth state. */
+    cq_mock_reset(&f.mock);
+    uint64_t lo2 = 0xDEADu, hi2 = 0xBEEFu;
+    cq_measure(&f.ctx, h, &lo2, &hi2);
+    CHECK_EQ(cq_reg_state(&f.ctx.regs, h), CQ_SLOT_MEASURED);
+
+    /* (2) The value is the first one, bit for bit. */
+    CHECK_EQ(lo2, lo1);
+    CHECK_EQ(hi2, hi1);
+    CHECK_EQ(lo2, 0xB5u);
+
+    /* (3) The `mz` stream is the SAME WIRES IN THE SAME ORDER — not merely four
+     *     of them. Emitting again is the correct answer rather than a missed
+     *     peephole: suppressing it would make the gate stream depend on call
+     *     history, which is an optimisation v1 does not do (Rule 13). */
+    if (!cq_mock_matches(&f.mock, want, 4)) {
+        cq_h_fail(__FILE__, __LINE__, "second measure: wrong mz stream");
+        cq_mock_dump(&f.mock, "second measure");
+    }
+
+    /* (4) THE POOL DID NOT MOVE. A measured rail's qubits are deliberately never
+     *     reclaimed, so a second measure must not release, strand or re-mint one
+     *     — this is the clause that would catch an idempotence implemented by
+     *     re-running the whole lifetime transition. */
+    const cq_pc_snap after_second = cq_pc_take(&f.ctx);
+    CHECK_EQ(after_second.live,   after_first.live);
+    CHECK_EQ(after_second.n_free, after_first.n_free);
+    CHECK_EQ(rt_quantum_bits(&f.ctx, h), 4u);
+
+    fx_close(&f);
+}
