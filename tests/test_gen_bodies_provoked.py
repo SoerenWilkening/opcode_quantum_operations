@@ -32,6 +32,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import shimcheck as sc  # noqa: E402
 import test_gen_bodies as gb  # noqa: E402
 
+sys.path.insert(0, sc.SHIM)
+import gen_bodies  # noqa: E402
+import gen_shim  # noqa: E402
+
 SHIPPED = gb.SHIPPED
 no_wrapper_is_inert = gb.no_wrapper_is_inert
 every_wrapper_body_is_exactly_the_call_its_symbol_names = \
@@ -123,6 +127,37 @@ def every_way_a_wrapper_can_dispatch_wrong_is_caught():
                              "CQ_SHIM_F64_HI(b_classical)",
                              "CQ_SHIM_LO(b_classical), CQ_SHIM_HI(b_classical)", 1),
          "fp literal converted instead of reinterpreted"),
+        # AND FOUR MORE WITH THE fp ARITHMETIC SURFACE (2026-09-19, bead
+        # 9ve.36). Each is a defect class the twelve above cannot reach:
+        #   (13) the fp BINARY selector collapsed — `fsub` dispatching `fadd`.
+        #        M33 runs ONE row program under two prologues, so the two emit
+        #        the same gate tuple at the same width and differ only on ±0
+        #        and the NaN rows; nothing structural sees it downstream.
+        #   (14) the CONVERSION kind collapsed — `sitofp` where `uitofp`
+        #        belongs, which is bead 9ve.34's defect exactly: `uitofp` IS
+        #        `sitofp`'s row program, so the circuits are identical and they
+        #        differ only on sources with the top bit set.
+        #   (15) the two CONVERSION WIDTHS transposed. Unique to the
+        #        cross-domain family: an integer cast's widths are refused by
+        #        the direction guard one layer down, but `f64 -> i8` and
+        #        `i8 -> f64` are BOTH shipped pairs, so a transposition is a
+        #        legal call for a different operation.
+        #   (16) the `_lh` literal words transposed on an fp operand, where the
+        #        HI word is ALWAYS zero (CQ_SHIM_F64_HI discards its argument),
+        #        so the transposition quietly puts 0 where the pattern belongs.
+        ("cq_template_fsub_f64",
+         lambda s: s.replace("CQ_SHIM_FOP_FSUB", "CQ_SHIM_FOP_FADD", 1),
+         "collapsed fp arithmetic selector"),
+        ("cq_template_sitofp_i8_to_f64",
+         lambda s: s.replace("CQ_SHIM_FCAST_SITOFP", "CQ_SHIM_FCAST_UITOFP", 1),
+         "collapsed cross-domain conversion kind"),
+        ("cq_template_fptosi_f64_to_i8",
+         lambda s: s.replace(", 64, 8,", ", 8, 64,", 1),
+         "conversion widths transposed"),
+        ("cq_template_fsub_f64_lh",
+         lambda s: swap(s, "CQ_SHIM_F64_LO(a_classical)",
+                        "CQ_SHIM_F64_HI(a_classical)"),
+         "fp literal words transposed on the `_lh` door"),
     ]
     for victim, mutate, what in cases:
         body = [mutate(SHIPPED[victim][1][0])]
@@ -137,8 +172,47 @@ def every_way_a_wrapper_can_dispatch_wrong_is_caught():
         raise sc.Fail("%s with %r survived the argument-list pin: %s" % (victim, what, body[0]))
 
 
+def a_landed_key_that_sweeps_a_kernel_less_opcode_in_is_refused():
+    # THE DEFECT THAT MADE `gen_shim.LANDED`'s KEY FINER (2026-09-19, bead
+    # 9ve.36), provoked at the two tables that refuse it.
+    #
+    # `fp_arith` is SIX opcodes and only four have kernels. `frem` is a binary
+    # row with none, and `fneg` — the yaml's ONE unary opcode — is in that same
+    # family and has none either. A `LANDED` key of `(family, width)` takes all
+    # six together, and the results are NOT a red test: `frem` would emit
+    # `CQ_SHIM_FOP_FREM`, an enumerator that does not exist, so the failure
+    # would surface as a C compile error in a GENERATED file whose header says
+    # never to edit it; `fneg` would need an entry point that has not been
+    # written. Both tables are explicit precisely so the failure is a KeyError
+    # naming the thing, at the generator, before a byte is written.
+    #
+    # IT DRIVES `gen_bodies.body` DIRECTLY rather than re-rendering the grid,
+    # which is the sharper instrument: it names the exact ROW and the exact
+    # TABLE, and it cannot be satisfied by some other row of the same family
+    # happening to fail first.
+    rows = gen_shim.expand(gen_shim.load(sc.YAML)[0])
+    for opcode, table in (("frem", "frem"), ("fneg", "funary")):
+        victims = [r for r in rows
+                   if r.opcode == opcode and r.widths[0] == "f64" and not r.inv]
+        sc.check(victims, "no %s row at f64 to provoke with" % opcode)
+        r = victims[0]
+        sc.check(r.bucket == "fp",
+                 "%s is not an abort any more; this provocation is stale" % r.name)
+        r.bucket, r.reason = "wrapper", None
+        try:
+            gen_bodies.body(r)
+        except KeyError as e:
+            sc.check(table in str(e),
+                     "%s rendered with %r, which does not name %r"
+                     % (r.name, e, table))
+            continue
+        raise sc.Fail("%s rendered a wrapper body with no kernel behind it: %r"
+                      % (r.name, gen_bodies.body(r)))
+
+
 if __name__ == "__main__":
     sys.exit(sc.run([
         an_inert_wrapper_body_is_caught,
         every_way_a_wrapper_can_dispatch_wrong_is_caught,
+        a_landed_key_that_sweeps_a_kernel_less_opcode_in_is_refused,
     ]))

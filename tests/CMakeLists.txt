@@ -2649,13 +2649,22 @@ set_tests_properties(test_runtime_gate_death.rz_controlled_on_a_constant_lane_is
 ## is the source root because the generator's default paths are relative to it.
 cqops_select_python(CQOPS_PY)
 if(CQOPS_PY)
-    ## THREE ENTRIES SINCE 2026-09-18, on the seam tests/test_gen_bodies.py
-    ## recorded in its own header: `the ASSERTIONS <-> the PROVOCATIONS`. Python
-    ## has no `.inc` escape hatch, so a Rule 12 split of a .py is necessarily a
-    ## new registered test rather than a second file on one entry — which also
-    ## means the provoked half must be LISTED HERE or it silently stops running,
-    ## the failure mode this block's own warning below exists to prevent.
-    foreach(pysuite test_gen_shim test_gen_bodies test_gen_bodies_provoked)
+    ## FIVE ENTRIES SINCE 2026-09-19 (bead 9ve.36), and every one of the four
+    ## splits is a Rule 12 seam RECORDED before it was taken. Python has no
+    ## `.inc` escape hatch — check_loc.sh counts every line of a multi-line
+    ## string as code — so a Rule 12 split of a `.py` is necessarily a new
+    ## registered test rather than a second file on one entry, which also means
+    ## each half must be LISTED HERE or it silently stops running: the exact
+    ## failure mode this block's own warning above exists to prevent.
+    ##
+    ##   test_gen_shim            the GRID: symbol set, signatures, partition
+    ##   test_gen_shim_provoked   ...and the provocations that make those
+    ##                            assertions ones somebody has seen fail
+    ##   test_gen_bodies          what is BETWEEN THE BRACES, read as text
+    ##   test_gen_bodies_run      ...and the four claims that need a COMPILER
+    ##   test_gen_bodies_provoked ...and the provocations for the text half
+    foreach(pysuite test_gen_shim test_gen_shim_provoked
+                    test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked)
         add_test(NAME ${pysuite}
                  COMMAND ${CQOPS_PY} "${CMAKE_CURRENT_SOURCE_DIR}/${pysuite}.py"
                  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
@@ -3377,3 +3386,111 @@ set_tests_properties(test_kernel_fdiv_death.dst_aliases_its_first_source
                      test_kernel_fdiv_death.sources_alias_each_other
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## M26 v2 — bead 9ve.36: the fp ARITHMETIC surface at f64.
+##
+## A SEPARATE BINARY FROM test_template, not a fourth `.inc` of it: that file
+## stood at 279 counted lines of Rule 12's 300 with three `.inc`s already
+## hanging off it. The cut is the one shim/cq_template_fp.c's own header
+## records one level down — `the COMPARE family <-> the ARITHMETIC families` —
+## and every case here turns on something only an arithmetic family has: an
+## `_lh` shape, a §9 controlled axis, a 64-lane result, and a cross-domain cast
+## whose narrow rows are a COMPOSITION at the shim.
+add_cqops_test(test_template_fp)
+
+add_cqops_death_test(test_template_fp_death CASES
+    an_fbin_width_that_is_not_64_is_refused
+    an_fbin_lh_width_that_is_not_64_is_refused
+    a_fun_width_that_is_not_64_is_refused
+    an_fcast_width_pair_that_is_not_shipped_is_refused
+    an_fcast_to_a_width_above_the_abis_range_is_refused
+    uitofp_from_i64_is_refused_at_the_entry_point
+    an_fop_outside_the_abis_enum_is_refused
+    an_fcast_kind_outside_the_abis_enum_is_refused
+    a_fun_op_outside_the_abis_enum_is_refused
+    d7a_out_aliases_the_first_source_of_an_fbin_qq_unc
+    d7a_out_aliases_the_second_source_of_an_fbin_qq_unc
+    d7a_out_aliases_the_only_handle_of_an_fbin_hl_unc
+    d7a_out_aliases_the_only_handle_of_an_fbin_lh_unc
+    d7a_out_aliases_the_source_of_an_fcast_unc
+    d7a_out_aliases_the_source_of_a_fun_unc
+    an_fbin_unc_destination_is_not_the_width_its_symbol_names
+    an_fcast_unc_destination_is_not_the_to_width
+)
+
+## (1) THE WIDTH DOORS ARE HOISTED TO THE ENTRY POINT AND MUST STAY THERE.
+## `cq_kernel_fadd` and `cq_kernel_fsqrt` both hard-error on `W != 64` in BOTH
+## configurations — so deleting the shim's check leaves the program aborting
+## anyway, one layer down, AFTER a rail has been minted and a D21 bracket
+## opened that is never closed. `kernel:` and M31's `fpfield:` are pinned
+## ABSENT for exactly that reason, and so are the enum messages: a dispatch
+## table that refused a legal selector would satisfy these cases while breaking
+## the whole family.
+set_tests_properties(test_template_fp_death.an_fbin_width_that_is_not_64_is_refused
+                     test_template_fp_death.an_fbin_lh_width_that_is_not_64_is_refused
+                     test_template_fp_death.a_fun_width_that_is_not_64_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;conversion names a width pair;bead 9ve.34")
+
+## (2) THE CONVERSION FENCE IS THE SHIM'S OWN LIST OF SEVENTEEN PAIRS. 80 is a
+## real ABI width and f64 is a real ABI width, so nothing below can see that
+## the PAIR is a fiction; `bead 9ve.34` is banned because that is a DIFFERENT
+## refusal about a different (and much sharper) fact, and `outside the ABI`
+## because 80 is inside the range.
+set_tests_properties(test_template_fp_death.an_fcast_width_pair_that_is_not_shipped_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;bead 9ve.34")
+
+## (3) AND THE RANGE IS CHECKED BEFORE THE PAIR IS LOOKED UP, so that a wild
+## width never reaches the `(uint32_t)` conversion. This case is the ORDER
+## claim: `129` is not a shipped pair EITHER, so if the pair check ran first it
+## would answer and the range message would never be reachable at all.
+set_tests_properties(test_template_fp_death.an_fcast_to_a_width_above_the_abis_range_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;is not one of the ABI enumerators;conversion names a width pair;bead 9ve.34")
+
+## (4) BEAD 9ve.34 IS A REFUSAL, NOT A GAP, AND IT MUST BE THE ENTRY POINT'S.
+## `cq_kernel_uitofp` does refuse `F == 64` — one layer down, after the mint
+## and the bracket — so `kernel:` absent is the whole claim. The generic
+## not-shipped message is banned too: (64, 64) is indeed not a shipped uitofp
+## pair, so a check in the wrong ORDER would answer with the vaguer sentence
+## and a maintainer would never see the bead.
+set_tests_properties(test_template_fp_death.uitofp_from_i64_is_refused_at_the_entry_point
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;conversion names a width pair")
+
+## (5) THE ENUM GUARDS MUST BE THE DISPATCH FILE'S. Each names an ENUM, and
+## `cq_template_dispatch.c`'s fp strings are deliberately disjoint from its
+## integer ones AND from the width doors', so swapping two of them is caught
+## here rather than by a reviewer.
+set_tests_properties(test_template_fp_death.an_fop_outside_the_abis_enum_is_refused
+                     test_template_fp_death.an_fcast_kind_outside_the_abis_enum_is_refused
+                     test_template_fp_death.a_fun_op_outside_the_abis_enum_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;symbol names a width;conversion names a width pair;bead 9ve.34")
+
+## (6) D7a IS M07'S REFUSAL AND MUST STAY M07'S. The fp entry points resolve
+## their handles and hand them to `cq_reg_check_operands`; if any of them grew
+## its own copy of the check, the masking-layer trap this project has recorded
+## five times would put the shim's message here instead. So every string the
+## SHIM could have printed is banned — and M05's `distinctness` too, because an
+## unrefused D7a reaches a kernel with `dst == a` and aborts there in DEBUG
+## ONLY, a long way from its cause.
+set_tests_properties(test_template_fp_death.d7a_out_aliases_the_first_source_of_an_fbin_qq_unc
+                     test_template_fp_death.d7a_out_aliases_the_second_source_of_an_fbin_qq_unc
+                     test_template_fp_death.d7a_out_aliases_the_only_handle_of_an_fbin_hl_unc
+                     test_template_fp_death.d7a_out_aliases_the_only_handle_of_an_fbin_lh_unc
+                     test_template_fp_death.d7a_out_aliases_the_source_of_an_fcast_unc
+                     test_template_fp_death.d7a_out_aliases_the_source_of_a_fun_unc
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;FATAL: shim:;distinctness;kernel:;fpfield:;not live")
+
+## (7) THE `_unc` DESTINATION'S WIDTH IS A SEPARATE GUARD FROM THE SOURCES',
+## and on the conversion door it carries the whole of the composition's claim:
+## `fptosi f64 -> i8` mints EIGHT bits, not the sixty-four the workspace holds.
+## It must be the shim's own width token and NOT M07's use-after-free message —
+## both rails here are live — and not the fp doors', which have already passed.
+set_tests_properties(test_template_fp_death.an_fbin_unc_destination_is_not_the_width_its_symbol_names
+                     test_template_fp_death.an_fcast_unc_destination_is_not_the_to_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;symbol names a width;conversion names a width pair;bead 9ve.34")

@@ -496,11 +496,17 @@ CQ_TEST(the_annotation_layer_is_inert_under_every_other_sink)
     CHECK_EQ(cq_trace_open(), 0);
 }
 
+/* D21 OVER THE ARITY-1 SEQUENCE (bead 9ve.36), on the third use of the
+ * `the INTEGER surface <-> the fp surface` cut. See the `.inc`'s own header. */
+#include "test_shim_trace_fp.inc"
+
 CQ_TEST_MAIN(
     CQ_CASE(a_representative_program_produces_a_conformant_annotated_trace),
     CQ_CASE(a_program_whose_rails_all_stay_classical_is_not_shipped),
     CQ_CASE(a_constant_flag_cswap_leaves_the_register_map_a_partition),
     CQ_CASE(an_aliased_template_call_names_the_handle_it_will_mint),
+    CQ_CASE(a_composed_conversion_names_the_handle_past_its_workspace),
+    CQ_CASE(a_flat_conversion_names_the_handle_with_no_workspace_term),
     CQ_CASE(a_multi_lane_register_lists_its_lanes_in_bit_order),
     CQ_CASE(a_controlled_tape_write_registers_the_kept_rail_and_names_no_token),
     CQ_CASE(an_uncontrolled_tape_write_names_the_source_in_and_the_kept_rail_out),

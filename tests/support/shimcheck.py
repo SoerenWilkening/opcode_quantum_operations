@@ -31,15 +31,33 @@ MANIFEST = os.path.join(ROOT, "tests", "abi", "cq_templates_abi.txt")
 # routes to the same 884/1595, which is the point.
 FP_WIDTH = re.compile(r"(?:^|_)(f16|f32|f64|f80)(?:_|$)")
 
-# THE LANDED fp FAMILY-WIDTHS, READ OFF THE NAME — the test side's INDEPENDENT
-# route to shim/gen_shim.py's LANDED, whose input is the yaml's `widths` map and
-# the yaml's `family` key. Neither can reach the other, which is the whole point:
-# if gen_shim listed `fp_arith`/`f64` by mistake, the grid would go live and this
-# predicate would still say only `fcmp` at `f64` had, so every bucket set below
-# goes red and NAMES the symbols.
+# THE LANDED fp ROWS, READ OFF THE NAME — the test side's INDEPENDENT route to
+# shim/gen_shim.py's LANDED, whose input is the yaml's `widths` map and the
+# yaml's own opcode and cast-pair lists. Neither can reach the other, which is
+# the whole point: if gen_shim landed a row by mistake the grid would go live
+# and this predicate would still say it had not, so every bucket set below goes
+# red and NAMES the symbols.
 #
-# ONE PATTERN PER LANDED FAMILY-WIDTH, added the same day its gen_shim entry is.
-LANDED_NAME = re.compile(r"^cq_template_fcmp_[a-z]+_f64(?:_|$)")
+# ONE ALTERNATIVE PER LANDED FAMILY, added the same day its gen_shim entry is,
+# and the WIDTH LISTS ARE SPELLED OUT rather than written `i\d+`: `uitofp` ships
+# from i1, i8, i16 and i32 and NOT from i64 (bead 9ve.34), and a lazy `i\d+`
+# would declare the one row this repo refuses to be live.
+LANDED_NAME = re.compile(
+    r"^cq_template_(?:"
+    r"fcmp_[a-z]+_f64"
+    r"|f(?:add|sub|mul|div)_f64"
+    r"|fptosi_f64_to_i(?:64|32|16|8)"
+    r"|fptoui_f64_to_i(?:64|32|16|8|1)"
+    r"|sitofp_i(?:64|32|16|8)_to_f64"
+    r"|uitofp_i(?:32|16|8|1)_to_f64"
+    r")(?:_|$)")
+
+# THE ROWS THAT ARE REFUSED RATHER THAN UNPORTED — gen_shim.DECLINED's test-side
+# twin, again by NAME. They are NOT landed and they are NOT `"fp is v2"`: f64 is
+# in v2's scope and seventeen sibling conversion pairs already ship, so that
+# sentence would be a falsehood printed at runtime.
+DECLINED_NAME = re.compile(r"^cq_template_uitofp_i64_to_f64(?:_|$)")
+
 DECL = re.compile(r"^(int32_t|void) (cq_template_[A-Za-z0-9_]+)\(([^)]*)\);$")
 DEFN = re.compile(r"^(int32_t|void) (cq_template_[A-Za-z0-9_]+)\(([^)]*)\) \{$")
 
@@ -104,10 +122,17 @@ def is_fp(name):
 
 
 def is_landed(name):
-    # An fp-touching symbol whose family-width v2 has IMPLEMENTED. Such a symbol
-    # is NOT in the `"fp is v2"` bucket: its non-`_inv` rows are live wrappers
-    # and its `_inv` rows are D14 aborts, exactly as an integer family's are.
+    # An fp-touching symbol whose ABI ROW v2 has IMPLEMENTED. Such a symbol is
+    # NOT in the `"fp is v2"` bucket: its non-`_inv` rows are live wrappers and
+    # its `_inv` rows are D14 aborts, exactly as an integer family's are.
     return LANDED_NAME.match(name) is not None
+
+
+def is_declined(name):
+    # Not landed, and NOT `"fp is v2"` either: a row refused for a reason of its
+    # own. It stays in the `fp` BUCKET — the counts and the file banners do not
+    # move — and only the sentence differs.
+    return DECLINED_NAME.match(name) is not None
 
 
 def is_deferred_fp(name):
@@ -155,13 +180,20 @@ def read_dir(directory):
 # from the outside or "the abort set is exactly the 603" cannot be stated.
 FP_REASON = "fp is v2"
 INV_REASON = "_inv is f-inverse, not f; the data family has no uniform definition (PRD 15 D14)"
+# Bead 9ve.34's row (2026-09-19). A THIRD REASON IN THE SAME `fp` BUCKET — not a
+# fourth bucket — so the three coarse counts, the five-way domain split and
+# every `.gen.c` banner are unmoved by it.
+DECLINED_REASON = (
+    "uitofp i64 -> f64 is REFUSED, not unported: upstream routes UIToFP to "
+    "soft_sitofp with no bias correction at this width, so every u >= 2^63 "
+    "would convert as a negative number (bead 9ve.34, PRD-v2 7.9)")
 
 
 def bucket_of_body(body):
     text = "\n".join(body)
     if "cq_shim_unsupported(" not in text:
         return "wrapper"
-    if '"%s"' % FP_REASON in text:
+    if '"%s"' % FP_REASON in text or '"%s"' % DECLINED_REASON in text:
         return "fp"
     if '"%s"' % INV_REASON in text:
         return "inv"

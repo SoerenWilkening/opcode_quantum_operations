@@ -86,7 +86,7 @@ static const char *const TPL_WIDTH =
  * is stale against the resolved i80 decision. Checking it HERE rather than
  * letting `cq_reg_alloc_zero` refuse it is what keeps the negative case out of
  * the `(uint32_t)` conversion below. */
-static uint32_t tpl_width(int bits)
+uint32_t cq_tpl_width(int bits)
 {
     if (bits < 1 || (unsigned)bits > CQ_REG_WIDTH_MAX)
         cq_tpl_die("cq_template_* width outside the ABI's range", CQ_REG_NONE,
@@ -114,7 +114,7 @@ static uint32_t tpl_width(int bits)
  * `cq_reg_check_operands` below these calls, and the death case goes red.
  * Do not "simplify" this into the hoisted form to match the survivor: it would
  * be correct only for as long as the operand check stays where it is. */
-static void tpl_src(cq_ctx *ctx, int32_t h, uint32_t w)
+void cq_tpl_src(cq_ctx *ctx, int32_t h, uint32_t w)
 {
     uint32_t got;
     (void)cq_reg_cbits(&ctx->regs, h);
@@ -136,7 +136,7 @@ static void tpl_src(cq_ctx *ctx, int32_t h, uint32_t w)
  * array is its OWN allocation and is stable for the register's life (reg.h);
  * only `t->slot` is realloc'd on growth, so what must never be held across a
  * mint is a `cq_reg *`, which the public API never exposes. */
-static cq_bit *tpl_out(cq_ctx *ctx, int32_t h, uint32_t w)
+cq_bit *cq_tpl_out(cq_ctx *ctx, int32_t h, uint32_t w)
 {
     cq_bit *b = cq_reg_bits(&ctx->regs, h);
     const uint32_t got = cq_reg_width(&ctx->regs, h);
@@ -236,9 +236,9 @@ int32_t cq_tpl_binary(tpl_req r)
     if (r.b_h != CQ_REG_NONE) srcs[n++] = r.b_h;
     cq_reg_check_operands(&ctx->regs, r.out, srcs, n);
 
-    if (r.a_h != CQ_REG_NONE) tpl_src(ctx, r.a_h, r.w);
-    if (r.b_h != CQ_REG_NONE) tpl_src(ctx, r.b_h, r.w);
-    if (r.out != CQ_REG_NONE) dst = tpl_out(ctx, r.out, r.wout);
+    if (r.a_h != CQ_REG_NONE) cq_tpl_src(ctx, r.a_h, r.w);
+    if (r.b_h != CQ_REG_NONE) cq_tpl_src(ctx, r.b_h, r.w);
+    if (r.out != CQ_REG_NONE) dst = cq_tpl_out(ctx, r.out, r.wout);
 
     /* D21's ANNOTATION BRACKET, OPENED HERE AND NOT THREE STATEMENTS LOWER.
      * D7b's defensive copy is a loop of `cq_emit_cx` and runs BEFORE the mint,
@@ -368,7 +368,7 @@ tpl_req cq_tpl_req(int bits, int32_t a_h, int32_t b_h)
 {
     tpl_req r;
     r.k = NULL;
-    r.w = r.wout = tpl_width(bits);
+    r.w = r.wout = cq_tpl_width(bits);
     r.a_h = a_h; r.b_h = b_h;
     r.lo = r.hi = 0u;
     r.out = r.ctrl = CQ_REG_NONE;
@@ -508,67 +508,12 @@ void cq_shim_icmp_hl_unc(cq_shim_pred pred, int bits, int32_t out_handle,
     (void)cq_tpl_binary(r);
 }
 
-/* A CAST IS ARITY-1, SO IT HAS NEITHER A D7b LANE NOR A CONTROLLED AXIS, and it
- * is the second shape whose result width is not its operand width. It does not
- * go through `cq_tpl_binary`: its kernel takes `(F, T)` where a binary kernel
- * takes `W`, and widening `cq_kernel_fn` to reach it is exactly what Rule 7
- * forbids. D7a is still checked, because `_unc` names an `out`. */
-static int32_t tpl_cast(cq_shim_cast_kind kind, int from_bits, int to_bits,
-                        int32_t out, int32_t a_handle)
-{
-    cq_ctx  *ctx = cq_shim_ctx();
-    uint32_t f = tpl_width(from_bits), t = tpl_width(to_bits);
-    int32_t  srcs[1];
-    int      is_unc = 1;
-
-    cq_bit  *dst;
-
-    srcs[0] = a_handle;
-    cq_reg_check_operands(&ctx->regs, out, srcs, 1u);
-    tpl_src(ctx, a_handle, f);
-
-    /* Arity 1, so there is no D7b lane and no §9 axis; the predicted handle is
-     * `cq_reg_count` with no alias term. */
-    cq_trace_op_tpl(cq_tpl_cast_name(kind), out != CQ_REG_NONE, CQ_REG_NONE,
-                    a_handle, CQ_REG_NONE,
-                    out != CQ_REG_NONE ? out : cq_reg_count(&ctx->regs));
-
-    if (out != CQ_REG_NONE) {
-        dst = tpl_out(ctx, out, t);
-    } else {
-        out = cq_reg_alloc_zero(&ctx->regs, t);
-        dst = cq_reg_bits(&ctx->regs, out);
-        cq_rec_mint(out, t, 0u, 0u, 1);
-        is_unc = 0;
-    }
-
-    cq_tpl_cast_kernel(kind)(ctx, dst, cq_reg_cbits(&ctx->regs, a_handle),
-                             (int)f, (int)t);
-
-    /* THE SAME TWIN SHAPE AS THE BINARY FAMILY, with `b` absent. A cast's tag
-     * folds BOTH widths in: `zext i8->i32` is not the adjoint of `zext i8->i64`
-     * on the same handles, and `trunc` is not `zext`'s. */
-    {
-        cq_call_rec c;
-        memset(&c, 0, sizeof c);
-        c.op   = (uint16_t)(is_unc ? CQ_ROP_TPL_UNC : CQ_ROP_TPL_FWD);
-        c.h[0] = out; c.h[1] = a_handle; c.h[2] = CQ_REG_NONE; c.h[3] = CQ_REG_NONE;
-        c.ctrl = CQ_REG_NONE;
-        c.tag  = 0x80000000u + (uint32_t)kind * 65536u + f * 256u + t;
-        cq_rec_push(&c);
-    }
-    cq_trace_end();
-    return out;
-}
-
-int32_t cq_shim_cast(cq_shim_cast_kind kind, int from_bits, int to_bits,
-                     int32_t a_handle)
-{
-    return tpl_cast(kind, from_bits, to_bits, CQ_REG_NONE, a_handle);
-}
-
-void cq_shim_cast_unc(cq_shim_cast_kind kind, int from_bits, int to_bits,
-                      int32_t out_handle, int32_t a_handle)
-{
-    (void)tpl_cast(kind, from_bits, to_bits, out_handle, a_handle);
-}
+/* A CAST IS ARITY-1 AND IS NO LONGER IN THIS FILE. It has neither a D7b lane
+ * nor a §9 axis, and its kernel takes `(F, T)` where a binary kernel takes `W`
+ * — so it never went through `cq_tpl_binary`, and once the cross-domain
+ * conversions needed a WORKSPACE composition in front of that same sequence,
+ * the two arities stopped being one subject. The cut is
+ * `shim/cq_template_boundary.h`'s third recorded seam and the sequence is
+ * `shim/cq_template_unary.c`'s `cq_tpl_unary`; `cq_shim_cast` and
+ * `cq_shim_cast_unc` went with it. What stayed here is everything the arity-2
+ * shape owns, and the three width doors, which both sequences share. */

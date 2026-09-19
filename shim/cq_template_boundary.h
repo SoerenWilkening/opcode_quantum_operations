@@ -39,9 +39,34 @@
  * discharge a free that nothing uncomputed. The four tag spaces in use are
  * recorded beside `cq_tpl_req`.
  */
+/* A THIRD SEAM WAS TAKEN 2026-09-19 (bead 9ve.36) AND IS RECORDED IN
+ * IMPLEMENTATION_PLAN §3's Layer-5 row:
+ *
+ *     the ARITY-2 ordered call sequence <-> the ARITY-1 ordered call sequence
+ *                                               ->  shim/cq_template_unary.c
+ *
+ * Forced by measurement — `cq_template_impl.c` stood at 288 counted lines of
+ * 300 and the arity-1 sequence had to grow a WORKSPACE composition for the
+ * cross-domain casts — and right by the discriminator this file's siblings use,
+ * WHAT MAKES EACH HALF CHANGE. The arity-2 half changes when a decision about
+ * ALIASING or CONTROL changes: it owns D7b's defensive copy and its un-copy,
+ * the §9 region and the literal lane, none of which an arity-1 operation has.
+ * The arity-1 half changes when a family with a COMPOSITION lands: `fptosi f64
+ * -> i8` is M37's kernel at T = 64 into a workspace and then `cq_kernel_trunc`,
+ * because upstream emits the narrowing as a second IR instruction.
+ *
+ * WHAT DOES *NOT* CROSS IS A SECOND COPY OF ANYTHING. D7a's refusal, the width
+ * doors, the mint, D15's record and D21's bracket are ONE implementation each,
+ * reached by both sequences — which is why the three doors below are exported
+ * rather than re-spelled next to the unary sequence.
+ */
 #ifndef CQ_TEMPLATE_BOUNDARY_H
 #define CQ_TEMPLATE_BOUNDARY_H
 
+#include "cq_template_dispatch.h"   /* cq_tpl_cast_fn, for the arity-1 stages */
+
+#include "bit.h"
+#include "ctx.h"
 #include "kernels/kernel.h"
 
 #include <stdint.h>
@@ -77,12 +102,23 @@ typedef struct {
  * as this function sets them is a defect its own family's suite must catch:
  * `k` is NULL, `name` is NULL and `tag` is 0.
  *
- * THE FOUR TAG SPACES IN USE, and a fifth family must claim a fifth:
+ * THE SEVEN TAG SPACES IN USE, and an eighth family must claim an eighth:
  *
  *     0x00000000 | op   * 1024 + w + 1      binary          (cq_template_impl.c)
+ *     0x10000000 | fop  * 1024 + w + 1      fp_arith binary (cq_template_fparith.c)
+ *     0x20000000 | op   * 1024 + w + 1      fp unary        (cq_template_fparith.c)
+ *     0x30000000 | kind * 65536 + f*256 + t fp conversion   (cq_template_fparith.c)
  *     0x40000000 | pred * 1024 + w + 1      icmp            (cq_template_impl.c)
- *     0x80000000 | kind * 65536 + f*256 + t cast            (cq_template_impl.c)
+ *     0x80000000 | kind * 65536 + f*256 + t cast            (cq_template_unary.c)
  *     0xC0000000 | pred * 1024 + w + 1      fcmp            (cq_template_fp.c)
+ *
+ * THE TOP TWO BITS WERE EXHAUSTED AT FOUR, so the three fp arithmetic families
+ * subdivide rather than claiming a fifth two-bit prefix. That is safe by
+ * measurement rather than by intent: the binary space reaches at most
+ * `12 * 1024 + 128 + 1 = 12417` and the cast space at most
+ * `2 * 65536 + 128 * 256 + 128 = 163968`, both far below `0x10000000`, so the
+ * gaps between the old prefixes are wide and empty. An eighth family must
+ * re-check that arithmetic rather than assume it.
  *
  * The `+ 1` and the width term are not decoration: the width is folded in
  * because the ABI's `_unc` carries it too, and a forward at i32 is not the
@@ -92,5 +128,46 @@ tpl_req cq_tpl_req(int bits, int32_t a_h, int32_t b_h);
 /* The ordered call sequence — seven steps, every one of them a place where
  * getting it wrong is silent. `shim/cq_template_impl.c` documents each. */
 int32_t cq_tpl_binary(tpl_req r);
+
+/* --- the handle boundary's three DOORS, shared across the third seam ------
+ *
+ * They are exported rather than duplicated because a second copy of a guard is
+ * how a deleted one keeps passing (this project's recorded trap, five times
+ * over). `cq_tpl_width` validates a width as a RANGE, never a whitelist;
+ * `cq_tpl_src` is the READ door and ADMITS a measured rail; `cq_tpl_out` is the
+ * WRITE door, REFUSES one, and RETURNS the pointer so that `out` is resolved
+ * exactly once on every path — which is what makes the asymmetry structural
+ * rather than a convention (swap the doors and the const qualifier refuses to
+ * compile). All three carry ONE width message between them. */
+uint32_t cq_tpl_width(int bits);
+void     cq_tpl_src(cq_ctx *ctx, int32_t h, uint32_t w);
+cq_bit  *cq_tpl_out(cq_ctx *ctx, int32_t h, uint32_t w);
+
+/* --- the ARITY-1 ordered call sequence ------------------------------------
+ *
+ * ONE STAGE IS `fn(ctx, dst, src, f, t)` PLUS THE TAG ITS RECORD CARRIES. A
+ * plain arity-1 operation is one OUTER stage reading `a` and writing `out`; a
+ * composed one puts an INNER stage in front of it, from `a` into a 64-bit
+ * WORKSPACE rail, and the outer stage then reads the workspace.
+ *
+ * THE WORKSPACE IS D7b's TEMPORARY IN A SECOND DRESS and is handled the same
+ * way: minted through `cq_reg_alloc_zero`, RECORDED at birth so the certificate
+ * has a history for it, written by a FWD/UNC twin pair so the reduction can
+ * cancel them, and freed through `cq_shim_free_proof` — the same door every
+ * other rail goes through. */
+typedef struct {
+    cq_tpl_cast_fn fn;      /* NULL on `inner` when there is no workspace   */
+    uint32_t f, t;          /* the widths `fn` is CALLED at, in bits        */
+    uint32_t tag;           /* D15's twin identity for THIS stage's record  */
+} tpl_ustage;
+
+typedef struct {
+    tpl_ustage inner, outer;
+    uint32_t   w, wout;     /* the ABI's operand and result widths, in bits */
+    int32_t    a_h, out;    /* `out` is CQ_REG_NONE on a forward symbol     */
+    const char *name;       /* D21's `op begin` payload                     */
+} tpl_ureq;
+
+int32_t cq_tpl_unary(tpl_ureq r);
 
 #endif /* CQ_TEMPLATE_BOUNDARY_H */

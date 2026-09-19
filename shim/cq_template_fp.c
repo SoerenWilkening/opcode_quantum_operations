@@ -29,14 +29,26 @@
  * string in this directory (tests/CMakeLists.txt's FAIL_REGULAR_EXPRESSION pins
  * discriminate on the MESSAGE, not the module).
  *
- * RULE 12. Budget 120, trigger 100 — well under the house 240 because this file
- * is a per-family index and grows by ~35 counted lines per family (§7.15 has
- * six more to come). The seam when it fires is `the COMPARE family <-> the
- * ARITHMETIC families` -> `shim/cq_template_fparith.c`, which is a subject cut
- * on the same discriminator `cq_template_dispatch.h` uses: a compare's result
- * width is one bit and an arithmetic one's is the operand width, and the
+ * RULE 12, AND THE SEAM THIS PARAGRAPH RESERVED WAS TAKEN ON 2026-09-19 (bead
+ * 9ve.36) RATHER THAN DEFERRED. Budget 120, trigger 100 — well under the house
+ * 240 because this file is a per-family index. The cut is the one recorded
+ * here before it was needed:
+ *
+ *     the COMPARE family <-> the ARITHMETIC families
+ *                                 ->  shim/cq_template_fparith.c
+ *
+ * and it fired on measurement: `fadd`/`fsub`/`fmul`/`fdiv`, the cross-domain
+ * conversions and the unary door are thirteen entry points and ~145 counted
+ * lines, against the 64 that were left. It is a SUBJECT cut as well as a size
+ * one, on the same discriminator `cq_template_dispatch.h` uses — a compare's
+ * result width is ONE BIT and an arithmetic one's is the operand width, and the
  * arithmetic families carry the `_lh` shape and the §9 controlled axis that
  * compares have on NO axis (opcode_table.yaml's own note).
+ *
+ * WHAT IS LEFT HERE IS `fcmp` AND ONLY `fcmp`. A future compare-shaped fp
+ * family belongs here; anything with a 64-lane result belongs one file over.
+ * The tag-space table is still shim/cq_template_boundary.h's and now lists
+ * SEVEN.
  */
 
 #include "cq_shim.h"

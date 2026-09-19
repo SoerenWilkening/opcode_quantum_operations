@@ -70,6 +70,7 @@ ROW_FIELDS = (
     "axis",      # fwd | unc | controlled
     "inv",       # bool — the `_inv` axis
     "bucket",    # wrapper | inv | fp
+    "reason",    # None, or an OVERRIDE for this row's abort text (DECLINED)
     "ret",       # int32_t | void
     "params",    # [(ctype, name), ...] in ABI order
 )
@@ -135,30 +136,81 @@ def signature(kind, shape, axis, ctype):
 
 
 # --- What has LANDED (PRD-v2 §1, §5, §7.15) ----------------------------------
-# ONE ENTRY PER (yaml FAMILY, yaml WIDTH) WHOSE KERNEL AND M26 ENTRY POINT BOTH
-# EXIST. That pair's rows then take the ORDINARY bucket rule below — a live
-# wrapper, or a D14 `_inv` abort — and every other fp family-width keeps its
-# `"fp is v2"` abort. Adding the next family is ONE LINE here plus its dispatch
-# row; nothing else in this file moves.
+# ONE ENTRY PER ABI ROW WHOSE KERNEL AND M26 ENTRY POINT BOTH EXIST. That row
+# then takes the ORDINARY bucket rule below — a live wrapper, or a D14 `_inv`
+# abort — and every other fp-touching row keeps its `"fp is v2"` abort. Adding
+# the next family is a LINE here plus its dispatch row; nothing else in this
+# file moves.
 #
-# THE KEY IS A PAIR AND NOT A FAMILY, and that is PRD §15 D16's "family first,
-# WIDTH second" arriving on the template grid. `fp_compare` is in scope; f16,
-# f32 and f80 are not (PRD-v2 §1a), and `cqrt_alloc_f<W>` still aborts at those
-# three widths, so an f16 rail cannot exist to hand a live wrapper.
+# THE KEY IS `(opcode, width)` AND NOT `(family, width)`, AND THE CHANGE WAS
+# FORCED (2026-09-19, bead 9ve.36). `fp_arith` is SIX opcodes: `fadd`, `fsub`,
+# `fmul` and `fdiv` have kernels, `frem` has none, and `fneg` — the yaml's ONE
+# unary opcode — is in that family too and has none either. A family-grained key
+# takes all six together, which for `frem` means a live wrapper emitting
+# `CQ_SHIM_FOP_FREM`, an enumerator that does not exist, and for `fneg` a
+# `KeyError` out of `gen_bodies.ENTRY`. The finer key is also STRICTLY more
+# conservative: it can only ever land fewer rows than the coarse one.
 #
-# A CAST TOUCHES TWO WIDTHS AND THE RULE BELOW REQUIRES **ALL** OF ITS fp
-# WIDTHS TO BE LANDED. That is the conservative direction: a cross-domain
-# `sitofp_i32_to_f64` stays an abort until `int_to_fp`/`f64` is listed here,
-# rather than going live because one of its two widths is.
+# A CAST'S KEY NAMES BOTH WIDTHS, `(opcode, from, to)`, which is the same
+# tightening one step further. `uitofp i64 -> f64` is the row it exists for:
+# every other `uitofp` source width ships and that one is DECLINED below, so no
+# coarser key could express the set at all.
+#
+# THE CONSERVATIVE DIRECTION IS `bucket_of`'s: a row touching ANY fp width is an
+# abort unless its key is listed here. It is a whitelist, never a filter.
 LANDED = frozenset((
-    ("fp_compare", "f64"),      # M36 / K18, bead 9ve.20 — 14 preds x 6 variants
-))                              # = 84 symbols: 56 wrappers + 28 D14 `_inv`
+    ("fcmp", "f64"),            # M36 / K18, bead 9ve.20 — 14 preds x 6 variants
+    ("fadd", "f64"),            # M33 / K15, bead 9ve.21
+    ("fsub", "f64"),            # M33 / K15, bead 9ve.21
+    ("fmul", "f64"),            # M34 / K16, bead 9ve.22
+    ("fdiv", "f64"),            # M35 / K17, bead 9ve.25
+    # M37 / K19, bead 9ve.23 — the seventeen shipped conversion pairs. The
+    # narrow rows are a COMPOSITION at the shim on upstream's own shape, not a
+    # kernel each; see shim/cq_template_fparith.c.
+    ("fptosi", "f64", "i8"),  ("fptosi", "f64", "i16"),
+    ("fptosi", "f64", "i32"), ("fptosi", "f64", "i64"),
+    ("fptoui", "f64", "i1"),  ("fptoui", "f64", "i8"),
+    ("fptoui", "f64", "i16"), ("fptoui", "f64", "i32"),
+    ("fptoui", "f64", "i64"),
+    ("sitofp", "i8", "f64"),  ("sitofp", "i16", "f64"),
+    ("sitofp", "i32", "f64"), ("sitofp", "i64", "f64"),
+    ("uitofp", "i1", "f64"),  ("uitofp", "i8", "f64"),
+    ("uitofp", "i16", "f64"), ("uitofp", "i32", "f64"),
+    # ("uitofp", "i64", "f64") IS DELIBERATELY ABSENT — bead 9ve.34; see below.
+))
+
+# --- Rows that are REFUSED rather than unported ------------------------------
+# A KEY HERE IS NOT LANDED AND CARRIES ITS OWN ABORT TEXT. The default `"fp is
+# v2"` would be a FALSEHOOD PRINTED AT RUNTIME for these: f64 IS v2 and is
+# already shipping for the other seventeen conversion pairs, so a caller told to
+# wait for the fp release is being pointed at a release that has happened.
+#
+# ALL THREE OF THE ROW'S SYMBOLS TAKE THIS REASON, INCLUDING `_inv`. D14's
+# sentence attaches to a LANDED family-width — it is what an `_inv` of a family
+# whose forward SHIPS is refused for — and this pair has not landed at all, so
+# its `_inv` is not a D14 row. The reason a body prints must be TRUE of that
+# body (gen_bodies' own recorded lesson, which cost 119 symbols a falsehood),
+# and the bead is true of all three.
+DECLINED = {
+    ("uitofp", "i64", "f64"):
+        "uitofp i64 -> f64 is REFUSED, not unported: upstream routes UIToFP to "
+        "soft_sitofp with no bias correction at this width, so every u >= 2^63 "
+        "would convert as a negative number (bead 9ve.34, PRD-v2 7.9)",
+}
 
 
 # --- Buckets (PRD §1 + §15 D14 + PRD-v2 §1) ----------------------------------
-def bucket_of(widths, inv, domains, family):
-    fp = [w for w in widths if domains[w] == "fp"]
-    if fp and not all((family, w) in LANDED for w in fp):
+# ONE RULE, NO PER-SYMBOL SPECIAL CASE: a row touching an fp width is an abort
+# unless its key is LANDED; otherwise it is D14's `_inv` abort or a wrapper.
+# `DECLINED` changes only the TEXT of an abort, never which bucket it is in.
+def landed_key(kind, opcode, widths):
+    if kind == "cast":
+        return (opcode, widths[0], widths[1])
+    return (opcode, widths[0])
+
+
+def bucket_of(key, widths, inv, domains):
+    if any(domains[w] == "fp" for w in widths) and key not in LANDED:
         return "fp"
     return "inv" if inv else "wrapper"
 
@@ -174,13 +226,17 @@ def expand(table):
         shape, axis, inv = variant_axes(variant)
         ctype = W[widths[0]]["c_type"]
         ret, params = signature(kind, shape, axis, ctype)
+        key = landed_key(kind, opcode, widths)
+        bucket = bucket_of(key, widths, inv, dom)
         rows.append(Row(
             name="cq_template_%s%s" % (base, suffix(shape, axis, inv)),
             kind=kind, family=family, opcode=opcode, pred=pred,
             widths=tuple(widths), bits=bits, to_bits=to_bits, ctype=ctype,
             domain=dom[widths[0]],
             variant=variant, shape=shape, axis=axis, inv=inv,
-            bucket=bucket_of(widths, inv, dom, family), ret=ret, params=params))
+            bucket=bucket,
+            reason=DECLINED.get(key) if bucket == "fp" else None,
+            ret=ret, params=params))
 
     for kind, key in (("binary", "binary_opcodes"), ("unary", "unary_opcodes")):
         for e in table[key]:
@@ -216,9 +272,9 @@ def expand(table):
 # figures can stay exact while a family moves domain — which is precisely the
 # "a count is not an identification" failure one line down. The five-way split
 # is what a reader and a reviewer actually need, and it is what the bead reports.
-EXPECTED = {"total": 2479, "wrapper": 1048, "inv": 631, "fp": 800}
+EXPECTED = {"total": 2479, "wrapper": 1112, "inv": 668, "fp": 699}
 EXPECTED_BY_DOMAIN = {"int_wrapper": 992, "int_inv": 603,
-                      "fp_wrapper": 56, "fp_inv": 28, "fp_abort": 800}
+                      "fp_wrapper": 120, "fp_inv": 65, "fp_abort": 699}
 
 
 def _is_fp(r):

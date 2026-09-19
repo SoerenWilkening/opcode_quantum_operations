@@ -182,6 +182,18 @@ generated witnesses `cq_link_smoke.c` and `core_abi_link_check.py`):
 > `shim/cq_runtime_rail.c` / `cq_runtime_gate.c`; `cq_runtime_v2.c` is 29 thunks. Every earlier figure
 > in this document is the dated record of its own step and stands as written; read the live split from
 > the generator, never from prose. The 240 cross-domain casts do not move.
+>
+> **AMENDED 2026-09-19 (v2 Wave 8, bead `9ve.36`) — THE SECOND LANDING, AND THE KEY IS NOW A ROW.**
+> `fadd`/`fsub`/`fmul`/`fdiv` at `f64` and seventeen conversion pairs (`fptosi`/`fptoui` from `f64`,
+> `sitofp`/`uitofp` to `f64`) went live through the generator: 101 symbols left the fp abort bucket — 64
+> wrappers and 37 D14 `_inv` aborts — so the measured split is **2479 = 992 int wrappers + 603 int
+> `_inv` aborts + 120 fp wrappers + 65 fp `_inv` aborts + 699 fp aborts**. `LANDED`'s key is `(opcode,
+> width)` / `(opcode, from, to)` rather than `(family, width)`, forced because `frem` and `fneg` share
+> `fp_arith` with the four that landed; `uitofp i64 → f64` is a `DECLINED` row carrying bead `9ve.34`'s
+> reason in the same bucket. The 240 cross-domain casts still do not move as a POPULATION — seventeen
+> of their pairs are now wrappers. Entry points: `shim/cq_template_fparith.c` over
+> `shim/cq_template_unary.c`'s arity-1 sequence (PRD-v2 §5); `fsqrt`'s unary door is built and reached
+> by no generated symbol until §6.1's vendoring (`9ve.24`); `fneg` stays an abort (`9ve.27`).
 
 Beware when counting: **240** of the 884 fp-touching symbols are the cross-domain casts
 (`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`), whose names carry *both* an integer and

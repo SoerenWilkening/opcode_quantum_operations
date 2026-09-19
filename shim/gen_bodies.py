@@ -44,6 +44,13 @@
 # generated file ships a live wrapper for). What replaces it is D14's own
 # summary sentence, which is true of the whole bucket: "No uniform definition of
 # the data family is possible in ANY version."
+#
+# AND A ROW MAY CARRY ITS OWN REASON, WHICH IS AN OVERRIDE AND NOT A FOURTH
+# BUCKET. `gen_shim.DECLINED` names the ABI rows that are REFUSED rather than
+# unported — `uitofp i64 -> f64`, bead 9ve.34 — and sets `row.reason`. The
+# bucket stays `fp` (it is an fp-touching row that has not landed), so every
+# count and every file banner is unmoved; what changes is the sentence, because
+# "fp is v2" would be false for a width v2 already ships.
 REASON = {
     "fp": "fp is v2",
     "inv": "_inv is f-inverse, not f; the data family has no uniform definition (PRD 15 D14)",
@@ -60,8 +67,26 @@ REASON = {
 # collide in four rows (`ult`/`ugt`/`ule`/`uge` are LLVM mnemonics in both
 # lists). A single "compare" key would dispatch every fcmp through the integer
 # comparator — right shape, right width, wrong operation, and `nm` cannot see it.
+#
+# AND THE DOMAIN SPLITS `binary` AND `cast` FOR THE SAME REASON ONE STEP OUT
+# (2026-09-19, bead 9ve.36). An fp `fadd` and an integer `add` share
+# `kind == "binary"` and reach DIFFERENT entry points over DIFFERENT selector
+# enums; a cross-domain `sitofp` and an integer `zext` share `kind == "cast"`
+# and reach different ones again. The discriminator for a BINARY row is the
+# yaml's own `domain` for the operand width; for a CAST it is the yaml's own
+# cast `kind`, because a cross-domain cast's operand domain is `int` on one
+# direction and `fp` on the other and neither answer is about the family.
+def entry_family(row):
+    if row.kind == "compare":
+        return row.opcode                       # icmp | fcmp
+    if row.kind == "cast":
+        return "fcast" if row.family in ("int_to_fp", "fp_to_int") else "cast"
+    return ("f" if row.domain == "fp" else "") + row.kind   # binary | fbinary
+                                                            # unary  | funary
+
+
 def entry_key(row):
-    return (row.opcode if row.kind == "compare" else row.kind, row.shape, row.axis)
+    return (entry_family(row), row.shape, row.axis)
 
 
 ENTRY = {
@@ -84,14 +109,51 @@ ENTRY = {
     ("fcmp", "hl", "unc"): "cq_shim_fcmp_hl_unc",
     ("cast", "un", "fwd"): "cq_shim_cast",
     ("cast", "un", "unc"): "cq_shim_cast_unc",
+    ("fbinary", "qq", "fwd"): "cq_shim_fbin_qq",
+    ("fbinary", "hl", "fwd"): "cq_shim_fbin_hl",
+    ("fbinary", "lh", "fwd"): "cq_shim_fbin_lh",
+    ("fbinary", "qq", "unc"): "cq_shim_fbin_qq_unc",
+    ("fbinary", "hl", "unc"): "cq_shim_fbin_hl_unc",
+    ("fbinary", "lh", "unc"): "cq_shim_fbin_lh_unc",
+    ("fbinary", "qq", "controlled"): "cq_shim_fbin_qq_ctrl",
+    ("fbinary", "hl", "controlled"): "cq_shim_fbin_hl_ctrl",
+    ("fbinary", "lh", "controlled"): "cq_shim_fbin_lh_ctrl",
+    ("fcast", "un", "fwd"): "cq_shim_fcast",
+    ("fcast", "un", "unc"): "cq_shim_fcast_unc",
+    # NO `("funary", ...)` ROW, AND THE ABSENCE IS THE DOCUMENTED FAILURE. The
+    # yaml's ONE unary opcode is `fneg`, whose kernel is bead 9ve.27's and does
+    # not exist, so `fneg` keeps its abort. `cq_shim_fun` IS built (M40's fsqrt
+    # reaches it by name from tests/test_template_fp.c) and is deliberately
+    # unreachable from the grid: `fsqrt` is `llvm.sqrt` in CQ_lang's
+    # intrinsic_table.yaml, which M27 does not generate from. Landing `fneg`
+    # means adding its row HERE as well as a LANDED line, and until then the
+    # KeyError is what says so.
 }
 
-OPCODE_ENUM = "CQ_SHIM_OP_%s"
+# THE SELECTOR PER OPCODE, AS A TABLE WHOSE KeyError IS THE FAILURE — the same
+# posture `ENTRY` has, and it is what stops a `LANDED` key widened back to
+# `(family, width)` from emitting `CQ_SHIM_FOP_FREM` or `CQ_SHIM_FCAST_FPEXT`.
+# Those are enumerators that do not exist, so the defect would surface as a C
+# compile error in a GENERATED file — three steps too late, and in a file whose
+# header says never to edit it — rather than as a generator refusal naming the
+# symbol.
+SELECTOR = {
+    "binary": {op: "CQ_SHIM_OP_%s" % op.upper() for op in (
+        "add", "sub", "mul", "sdiv", "udiv", "srem", "urem",
+        "and", "or", "xor", "shl", "lshr", "ashr")},
+    "fbinary": {op: "CQ_SHIM_FOP_%s" % op.upper() for op in (
+        "fadd", "fsub", "fmul", "fdiv")},
+    "cast": {k: "CQ_SHIM_CAST_%s" % k.upper() for k in ("sext", "zext", "trunc")},
+    "fcast": {k: "CQ_SHIM_FCAST_%s" % k.upper() for k in (
+        "fptosi", "fptoui", "sitofp", "uitofp")},
+}
+
 # Two predicate enums, and the prefixes are DELIBERATELY not a shared one: the
 # two lists overlap in `ult`/`ugt`/`ule`/`uge`, so `CQ_SHIM_PRED_ULT` for both
-# would be one enumerator meaning two predicates in two different orders.
+# would be one enumerator meaning two predicates in two different orders. The
+# same holds one family over for `CQ_SHIM_OP_` versus `CQ_SHIM_FOP_` and for
+# `CQ_SHIM_CAST_` versus `CQ_SHIM_FCAST_`.
 PRED_ENUM = {"icmp": "CQ_SHIM_PRED_%s", "fcmp": "CQ_SHIM_FPRED_%s"}
-CAST_ENUM = "CQ_SHIM_CAST_%s"
 
 
 # THE CLASSICAL LITERAL IS DECOMPOSED FROM THE WIDTH'S BITS, NEVER FROM
@@ -124,16 +186,15 @@ def literal(pname, row):
 
 def call_args(row):
     a = []
-    if row.kind == "cast":
-        a.append(CAST_ENUM % row.opcode.upper())
-        a.append(str(row.bits))
-        a.append(str(row.to_bits))
-    elif row.kind == "compare":
-        a.append(PRED_ENUM[row.opcode] % row.pred.upper())
+    fam = entry_family(row)
+    if fam in ("icmp", "fcmp"):
+        a.append(PRED_ENUM[fam] % row.pred.upper())
         a.append(str(row.bits))
     else:
-        a.append(OPCODE_ENUM % row.opcode.upper())
+        a.append(SELECTOR[fam][row.opcode])
         a.append(str(row.bits))
+        if row.kind == "cast":
+            a.append(str(row.to_bits))
     if row.axis == "unc":
         a.append("out_handle")
     elif row.axis == "controlled":
@@ -174,7 +235,8 @@ def abort(row):
     voids = "".join("    (void)%s;\n" % p[1] for p in row.params)
     # cq_shim_unsupported is _Noreturn, so a value-returning body needs no
     # return statement and cannot fall off the end.
-    return voids + '    cq_shim_unsupported("%s", "%s");\n' % (row.name, REASON[row.bucket])
+    why = row.reason if row.reason else REASON[row.bucket]
+    return voids + '    cq_shim_unsupported("%s", "%s");\n' % (row.name, why)
 
 
 def body(row):

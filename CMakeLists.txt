@@ -557,6 +557,22 @@ add_library(cqops STATIC
                                # and nothing else — D7a/D7b, the mint, the §9
                                # region, D15's record and D21's bracket are all
                                # cq_tpl_binary's, reached identically
+    shim/cq_template_unary.c   # v2, bead 9ve.36 (2026-09-19) — the ARITY-1
+                               # ordered call sequence, on the THIRD seam
+                               # shim/cq_template_boundary.h records. It owns
+                               # the WORKSPACE stage the cross-domain
+                               # conversions need (upstream emits a narrowing
+                               # as a second IR instruction) and the three
+                               # integer cast entry points, which came with it;
+                               # every guard it uses is cq_template_impl.c's
+    shim/cq_template_fparith.c # v2, bead 9ve.36 — the fp ARITHMETIC surface, on
+                               # cq_template_fp.c's own recorded COMPARE <->
+                               # ARITHMETIC seam: the nine cq_shim_fbin_*, the
+                               # two cq_shim_fcast* and the two cq_shim_fun*
+                               # entry points, their three TAG SPACES, and the
+                               # seventeen shipped conversion pairs. Bead
+                               # 9ve.34's uitofp-from-i64 refusal lives here,
+                               # at the ABI edge rather than in the kernel
 
     # M28 — THE GENERATED GRID, Step 23.7. LISTED EXPLICITLY AND NEVER
     # file(GLOB): a glob is evaluated at configure time and does not re-run when

@@ -122,8 +122,51 @@ typedef enum {
     CQ_SHIM_FPRED_ULT, CQ_SHIM_FPRED_ULE
 } cq_shim_fpred;
 
-/* The three integer width casts. fp casts never reach a wrapper. */
+/* `opcode_table.yaml`'s `fp_arith` BINARY opcodes that reach a wrapper, in the
+ * yaml's own order (`:200-204`).
+ *
+ * TWO OF THAT FAMILY'S SIX OPCODES ARE ABSENT AND THE ABSENCE IS THE POINT.
+ * `frem` is a `fp_arith` binary row with no kernel, and `fneg` is the yaml's
+ * ONE unary opcode and also in `fp_arith`; both keep their `"fp is v2"` abort.
+ * That is why `gen_shim.LANDED`'s key is `(opcode, width)` and not
+ * `(family, width)` — a family-grained key would take all six together, which
+ * for `frem` means a live wrapper dispatching an opcode no table has a row for.
+ *
+ * A SEPARATE PREFIX FROM `CQ_SHIM_OP_`, on `cq_shim_fpred`'s ground: an fp
+ * `fadd` and an integer `add` are different operations over different kernels,
+ * and one enumerator space for both is a silent cross-domain dispatch. */
+typedef enum {
+    CQ_SHIM_FOP_FADD, CQ_SHIM_FOP_FSUB, CQ_SHIM_FOP_FMUL, CQ_SHIM_FOP_FDIV
+} cq_shim_fop;
+
+/* The three integer width casts. */
 typedef enum { CQ_SHIM_CAST_SEXT, CQ_SHIM_CAST_ZEXT, CQ_SHIM_CAST_TRUNC } cq_shim_cast_kind;
+
+/* The four CROSS-DOMAIN casts (`opcode_table.yaml`'s `int_to_fp` and
+ * `fp_to_int` kinds). A SEPARATE ENUM FROM `cq_shim_cast_kind`, not four more
+ * enumerators in it: the two reach different dispatch tables over different
+ * kernel types — M13's `(F, T)` shape in both cases, but M37's kernels and
+ * M13's are not interchangeable — and the width PAIRS each admits are
+ * disjoint. The order groups by direction rather than following the yaml's
+ * `cast_opcodes` list; `tests/test_gen_shim.py` pins the SET against the yaml,
+ * not the order.
+ *
+ * `fpext` AND `fptrunc` ARE NOT HERE. They are `fp_width` casts and would need
+ * an f32 rail, which v2 does not have (PRD-v2 §7.9), so they keep their abort
+ * and there is no enumerator for them to be dispatched through. */
+typedef enum {
+    CQ_SHIM_FCAST_FPTOSI, CQ_SHIM_FCAST_FPTOUI,
+    CQ_SHIM_FCAST_SITOFP, CQ_SHIM_FCAST_UITOFP
+} cq_shim_fcast_kind;
+
+/* The UNARY fp operations. `fsqrt` is `llvm.sqrt` in CQ_lang's
+ * intrinsic_table.yaml, which M27 does not generate from (PRD §1: scope is
+ * `opcode_table.yaml` ONLY), so NO generated wrapper reaches this enum today —
+ * the door is built, tested by name from tests/test_template_fp.c, and
+ * unreached. `fneg`, the yaml's one unary opcode, is NOT here: its kernel is
+ * bead 9ve.27's and does not exist, so it keeps its abort and
+ * `gen_bodies.ENTRY` has no `("funary", ...)` row at all. */
+typedef enum { CQ_SHIM_FUN_FSQRT } cq_shim_fun_op;
 
 /* Forward: mint a fresh rail holding f(a, b) and return its handle. */
 int32_t cq_shim_bin_qq(cq_shim_op op, int bits, int32_t a_handle, int32_t b_handle);
@@ -172,9 +215,62 @@ int32_t cq_shim_fcmp_hl(cq_shim_fpred pred, int bits, int32_t a_handle, uint64_t
 void cq_shim_fcmp_qq_unc(cq_shim_fpred pred, int bits, int32_t out_handle, int32_t a_handle, int32_t b_handle);
 void cq_shim_fcmp_hl_unc(cq_shim_fpred pred, int bits, int32_t out_handle, int32_t a_handle, uint64_t lo, uint64_t hi);
 
+/* fp ARITHMETIC (PRD-v2 §5 / §7.15, bead 9ve.36): the SAME nine shapes as the
+ * integer binary family over the SAME handle boundary, at `bits == 64` and
+ * nothing else. Unlike the compares, `fp_arith` DOES carry the `_lh` shape and
+ * DOES carry the §9 controlled axis — `opcode_table.yaml:201,203` give `fsub`
+ * and `fdiv` fifteen variants each — which is exactly the difference
+ * `shim/cq_template_fp.c`'s recorded COMPARE<->ARITHMETIC seam turns on.
+ *
+ * `fadd` AND `fmul` HAVE NO `_lh` SYMBOL (they are commutative and the yaml
+ * gives them ten variants), so `cq_shim_fbin_lh` is reached only by `fsub` and
+ * `fdiv`. That is the ABI's shape, not a restriction here: the entry point
+ * takes any `cq_shim_fop`, and no wrapper for the other two exists to call it.
+ *
+ * THE CLASSICAL OPERAND ARRIVES AS A BIT PATTERN, decomposed by
+ * CQ_SHIM_F64_LO/HI and NOT by CQ_SHIM_LO/HI — see those macros. */
+int32_t cq_shim_fbin_qq(cq_shim_fop op, int bits, int32_t a_handle, int32_t b_handle);
+int32_t cq_shim_fbin_hl(cq_shim_fop op, int bits, int32_t a_handle, uint64_t lo, uint64_t hi);
+int32_t cq_shim_fbin_lh(cq_shim_fop op, int bits, uint64_t lo, uint64_t hi, int32_t b_handle);
+
+void cq_shim_fbin_qq_unc(cq_shim_fop op, int bits, int32_t out_handle, int32_t a_handle, int32_t b_handle);
+void cq_shim_fbin_hl_unc(cq_shim_fop op, int bits, int32_t out_handle, int32_t a_handle, uint64_t lo, uint64_t hi);
+void cq_shim_fbin_lh_unc(cq_shim_fop op, int bits, int32_t out_handle, uint64_t lo, uint64_t hi, int32_t b_handle);
+
+int32_t cq_shim_fbin_qq_ctrl(cq_shim_fop op, int bits, int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
+int32_t cq_shim_fbin_hl_ctrl(cq_shim_fop op, int bits, int32_t ctrl_flag, int32_t a_handle, uint64_t lo, uint64_t hi);
+int32_t cq_shim_fbin_lh_ctrl(cq_shim_fop op, int bits, int32_t ctrl_flag, uint64_t lo, uint64_t hi, int32_t b_handle);
+
 /* Casts: arity-1, two widths, no classical operand, no controlled axis. */
 int32_t cq_shim_cast(cq_shim_cast_kind kind, int from_bits, int to_bits, int32_t a_handle);
 void cq_shim_cast_unc(cq_shim_cast_kind kind, int from_bits, int to_bits, int32_t out_handle, int32_t a_handle);
+
+/* CROSS-DOMAIN casts: the same arity-1 shape, and SEVENTEEN width pairs rather
+ * than a rectangle. The NARROW ones are a COMPOSITION at the shim on upstream's
+ * own shape — `instructions.jl:7649-7658` emits the narrowing as a SECOND IR
+ * instruction — so `fptosi f64 -> i8` is M37's kernel at `T = 64` into a
+ * workspace rail followed by `cq_kernel_trunc`, and `sitofp i8 -> f64` is
+ * `cq_kernel_sext` into a workspace followed by the kernel at `F = 64`.
+ * `uitofp`'s narrow rows take `F` directly, because there the widening is
+ * WIRING inside M37 and costs nothing (PRD-v2 §7.3).
+ *
+ * `uitofp` FROM i64 IS REFUSED HERE, NOT ROUTED. Bead 9ve.34 / PRD-v2 §7.9:
+ * upstream passes a 64-bit UIToFP source straight to `soft_sitofp`, which reads
+ * bit 63 as a sign, so every `u >= 2^63` would convert negative. The generated
+ * body for that row is an abort, so no wrapper can reach this door with it —
+ * and the door refuses it anyway, because `cq_kernel_uitofp`'s own refusal
+ * fires one layer down, AFTER a rail has been minted and a D21 bracket
+ * opened. */
+int32_t cq_shim_fcast(cq_shim_fcast_kind kind, int from_bits, int to_bits, int32_t a_handle);
+void cq_shim_fcast_unc(cq_shim_fcast_kind kind, int from_bits, int to_bits, int32_t out_handle, int32_t a_handle);
+
+/* The UNARY fp door. One source, one width, a 64-lane result — the shape
+ * PRD-v2 §7.11 predicts for the whole of M38 (`fneg`/`fabs`/the rounding
+ * family), so what lands here is what they reuse. No classical operand and no
+ * controlled axis: the yaml gives `fneg` three variants (fwd/inv/unc) and
+ * nothing else. */
+int32_t cq_shim_fun(cq_shim_fun_op op, int bits, int32_t a_handle);
+void cq_shim_fun_unc(cq_shim_fun_op op, int bits, int32_t out_handle, int32_t a_handle);
 
 /* The v1 boundary, made visible at RUNTIME rather than at link time (PRD §1).
  * `reason` distinguishes the two abort buckets — "fp is v2" and D14's `_inv` —

@@ -214,7 +214,17 @@ jobs:
           # accepted terminator and why `test_sink_qec_death` is listed by name.
           pin='^ *Test +#[0-9]+: *'
           fail=0
-          for t in test_gen_shim test_gen_bodies test_lsan_negative; do
+          # ALL FIVE PYTHON SUITES BY NAME, and the anchor is why each needs its
+          # own entry: `(\.|$)` makes `test_gen_shim` NOT match
+          # `test_gen_shim_provoked`. That is the property this loop wants —
+          # Rule 12 splits a `.py` into a new REGISTERED TEST (Python has no
+          # `.inc` escape hatch), so a half left out of tests/CMakeLists.txt
+          # stops running with nothing to say so. Four such splits exist as of
+          # bead 9ve.36 and this is what keeps them honest on the machine whose
+          # report people trust.
+          for t in test_gen_shim test_gen_shim_provoked \
+                   test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked \
+                   test_lsan_negative; do
               if ! grep -qE "${pin}${t}(\.|\$)" ctest-N-debug.txt; then
                   echo "CI: $t is NOT registered in Debug"; fail=1
               fi
@@ -261,7 +271,8 @@ jobs:
           ctest --test-dir build-ci-release -N | tee ctest-N-release.txt | tail -3
           pin='^ *Test +#[0-9]+: *'
           fail=0
-          for t in test_gen_shim test_gen_bodies; do
+          for t in test_gen_shim test_gen_shim_provoked \
+                   test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked; do
               if ! grep -qE "${pin}${t}(\.|\$)" ctest-N-release.txt; then
                   echo "CI: $t is NOT registered in Release"; fail=1
               fi

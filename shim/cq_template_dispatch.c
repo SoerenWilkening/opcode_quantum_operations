@@ -10,7 +10,12 @@
 #include "kernels/cmp.h"
 #include "kernels/divrem_s.h"
 #include "kernels/divrem_u.h"
+#include "kernels/fadd.h"
 #include "kernels/fcmp.h"
+#include "kernels/fconv.h"
+#include "kernels/fdiv.h"
+#include "kernels/fmul.h"
+#include "kernels/fsqrt.h"
 #include "kernels/mul.h"
 #include "kernels/shift_var.h"
 
@@ -112,6 +117,82 @@ cq_kernel_fn cq_tpl_fcmp_kernel(cq_shim_fpred pred)
     return K[pred];
 }
 
+/* THE fp ARITHMETIC ROW ORDER IS `opcode_table.yaml:200-204`'s OWN — fadd,
+ * fsub, fmul, fdiv — with `frem` absent because it has no kernel. Unlike the
+ * predicate tables above, the names here coincide with the enumerators, so a
+ * transposition is a visible swap rather than a silent renumbering; the reason
+ * to write it out row by row anyway is the `_Static_assert`, which is what makes
+ * a FIFTH opcode arriving without its kernel break the BUILD.
+ *
+ * `cq_kernel_fsub` IS NOT `cq_kernel_fadd`, AND NOTHING STRUCTURAL SEES THE
+ * DIFFERENCE. M33 runs ONE row program under two prologues, so the two emit the
+ * same gate tuple at the same width, keep the palindrome and leave scratch
+ * clean. Only an L1 against `cq_fsub_eval` on operands where they disagree —
+ * ±0 and the NaN rows — tells them apart. K9's `uge`-meaning-`ule`, again. */
+cq_kernel_fn cq_tpl_fbin_kernel(cq_shim_fop op)
+{
+    static const cq_kernel_fn K[] = {
+        cq_kernel_fadd, cq_kernel_fsub, cq_kernel_fmul, cq_kernel_fdiv
+    };
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FOP_FDIV + 1u,
+                   "one kernel per cq_shim_fop, in opcode_table.yaml's order");
+
+    if ((unsigned)op > (unsigned)CQ_SHIM_FOP_FDIV)
+        cq_disp_die("the fp arithmetic opcode is not one of the ABI enumerators",
+                    (int32_t)op);
+    return K[op];
+}
+
+/* M37's four conversions, in `cq_shim_fcast_kind`'s order. Each takes `(F, T)`
+ * exactly as M13's casts do, which is why they share the pointer type and NOT
+ * the table: `cq_kernel_sext` and `cq_kernel_sitofp` are both
+ * `void (*)(ctx, dst, a, F, T)` and are interchangeable to a compiler, so one
+ * table indexed by "a cast kind" would send `sitofp i8 -> f64` to `cq_kernel_zext`
+ * — right shape, right widths, a 64-lane result, and a value that is the integer
+ * rather than its IEEE encoding. Only L1 sees it. */
+cq_tpl_cast_fn cq_tpl_fcast_kernel(cq_shim_fcast_kind kind)
+{
+    static const cq_tpl_cast_fn K[] = {
+        cq_kernel_fptosi, cq_kernel_fptoui, cq_kernel_sitofp, cq_kernel_uitofp
+    };
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FCAST_UITOFP + 1u,
+                   "one kernel per cq_shim_fcast_kind");
+
+    if ((unsigned)kind > (unsigned)CQ_SHIM_FCAST_UITOFP)
+        cq_disp_die("the fp conversion kind is not one of the ABI enumerators",
+                    (int32_t)kind);
+    return K[kind];
+}
+
+/* THE UNARY ADAPTER, AND IT IS WHERE `ckd.15` IS PAID FOR. `cq_kernel_fsqrt` is
+ * `(ctx, dst, a, W)` — one source, ONE width — so it does not fit either
+ * pointer type the tables above use. Rule 7 fixes the SEMANTICS and not the
+ * parameter list, so the kernel is right and the boundary adapts: the arity-1
+ * ordered call sequence is written over `(F, T)` because the CASTS need two
+ * widths, and a one-width operation passes the same number twice.
+ *
+ * `T` IS DISCARDED AND THAT IS SAFE HERE AND ONLY HERE. `cq_shim_fun` sets both
+ * widths from its single `bits` argument after refusing anything but 64, so the
+ * two cannot disagree; a future unary family with a result width of its own
+ * would need its own adapter rather than a `T`-aware version of this one. */
+static void fun_fsqrt(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, int F, int T)
+{
+    (void)T;
+    cq_kernel_fsqrt(ctx, dst, a, F);
+}
+
+cq_tpl_cast_fn cq_tpl_fun_kernel(cq_shim_fun_op op)
+{
+    static const cq_tpl_cast_fn K[] = { fun_fsqrt };
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FUN_FSQRT + 1u,
+                   "one kernel per cq_shim_fun_op");
+
+    if ((unsigned)op > (unsigned)CQ_SHIM_FUN_FSQRT)
+        cq_disp_die("the fp unary opcode is not one of the ABI enumerators",
+                    (int32_t)op);
+    return K[op];
+}
+
 cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind)
 {
     static const cq_tpl_cast_fn K[] = {
@@ -191,4 +272,44 @@ const char *cq_tpl_cast_name(cq_shim_cast_kind kind)
         cq_disp_die("cq_template_* cast kind outside the ABI's enum",
                     (int32_t)kind);
     return N[kind];
+}
+
+/* The three fp families' D21 payload names, in their enums' own orders. They
+ * are the ABI's own opcode spellings and stay inside handoff §5's charset; the
+ * viewer has no operation vocabulary, so all a name has to be is recognisable
+ * to a reader of CQ_lang's IR. */
+const char *cq_tpl_fbin_name(cq_shim_fop op)
+{
+    static const char *const N[] = { "fadd", "fsub", "fmul", "fdiv" };
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FOP_FDIV + 1u,
+                   "one display name per cq_shim_fop, in the yaml's order");
+
+    if ((unsigned)op > (unsigned)CQ_SHIM_FOP_FDIV)
+        cq_disp_die("the fp arithmetic opcode is not one of the ABI enumerators",
+                    (int32_t)op);
+    return N[op];
+}
+
+const char *cq_tpl_fcast_name(cq_shim_fcast_kind kind)
+{
+    static const char *const N[] = { "fptosi", "fptoui", "sitofp", "uitofp" };
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FCAST_UITOFP + 1u,
+                   "one display name per cq_shim_fcast_kind");
+
+    if ((unsigned)kind > (unsigned)CQ_SHIM_FCAST_UITOFP)
+        cq_disp_die("the fp conversion kind is not one of the ABI enumerators",
+                    (int32_t)kind);
+    return N[kind];
+}
+
+const char *cq_tpl_fun_name(cq_shim_fun_op op)
+{
+    static const char *const N[] = { "fsqrt" };
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FUN_FSQRT + 1u,
+                   "one display name per cq_shim_fun_op");
+
+    if ((unsigned)op > (unsigned)CQ_SHIM_FUN_FSQRT)
+        cq_disp_die("the fp unary opcode is not one of the ABI enumerators",
+                    (int32_t)op);
+    return N[op];
 }

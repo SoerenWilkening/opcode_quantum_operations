@@ -585,7 +585,7 @@ nothing in this repo pins. Quote a ratio and a pointer, never a number.
 | `ckd.17a`, `ckd.14` | PRD §10 / plan §0.1 (Step 8) | **One involution per step** — the driver re-calls `compute(env, s)` with the same argument. The certificate is an **ACT**, not a stored fact; `cq_shadow_retire` runs strictly *after* `cq_qubits_release`, so it never touches a live qubit. A live qubit may **never** be certified: read as a control it would stop poison propagating |
 | `vxk`, `r3y`, `ck6` | **PRD §15 D16** | The fp/`qram`/`tape`/`alloc_handle` disposition. Its **implemented** half is `cq_runtime_gate.c`; the loud-abort bucket is `shim/cq_runtime_v2.c`, shrunk twice as **D23** took the `tape` family in scope (`shim/cq_runtime_tape.c`) and **D24** the `qram` family at all nine widths (`shim/cq_runtime_qram.c`, an fp-width cell being a bit pattern), then GROWN once when the ABI was re-vendored at CQ_lang `170ede1` and widened by the nine `cqrt_ry_<W>_controlled` (purely additive, `opcode_table.yaml` byte-identical; `bd w9i`). Read the current counts from `nm`, not from here. The buckets are **by FAMILY first and by WIDTH second**, and the two worked examples run OPPOSITE ways: `cqrt_qram_alloc_f32` says qram and not fp (there is no addressable quantum array at i1 either), while `cqrt_ry_f32_controlled` says fp — the family is in scope and the WIDTH defers it, **forced**, since `cqrt_alloc_f<W>` is itself an abort so no fp rail handle can exist in v1. **AMENDED 2026-09-18 (`9ve.28`, v2 Wave 4): that clause is now TRUE AT f16/f32/f80 AND FALSE AT f64** — `cqrt_alloc_f64` / `measure` / `copy` / `ry` / `rz` and their `_controlled` forms are real code by WIDENING `cq_runtime_rail.c` / `cq_runtime_gate.c`, an f64 rail handle exists, and the bucket in `cq_runtime_v2.c` shrank accordingly. Read the count from `nm` |
 | `dzj` | **PRD §15 D17** | `cqrt_addc` is M15's Cuccaro accumulator in place, **never sandwiched** — Rule 8's driver would replay the compute half and undo the in-place write |
-| `819`, `3ep` | Step 22's name-rule partition | **2479 = 992 integer wrappers + 603 integer `_inv` aborts + 884 fp aborts** at v1, from `opcode_table.yaml` **only**. A symbol is fp-touching iff its **name** carries an `f16/f32/f64/f80` token. **Since 2026-09-18 (`9ve.28`) the fp bucket SHRINKS as each `(family, f64)` pair lands** — `shim/gen_shim.py`'s `LANDED` set names the pairs, its audit pins the split (`EXPECTED_BY_DOMAIN`), and a landed compare family also owes D14's `_inv` aborts. **Read the live split from `python3 shim/gen_shim.py`, never from here**; the first landing (`fcmp` at f64) moved 84 symbols |
+| `819`, `3ep` | Step 22's name-rule partition | **2479 = 992 integer wrappers + 603 integer `_inv` aborts + 884 fp aborts** at v1, from `opcode_table.yaml` **only**. A symbol is fp-touching iff its **name** carries an `f16/f32/f64/f80` token. **Since 2026-09-18 (`9ve.28`) the fp bucket SHRINKS as each `(family, f64)` pair lands** — `shim/gen_shim.py`'s `LANDED` set names the pairs, its audit pins the split (`EXPECTED_BY_DOMAIN`), and a landed compare family also owes D14's `_inv` aborts. **Read the live split from `python3 shim/gen_shim.py`, never from here**; the first landing (`fcmp` at f64) moved 84 symbols. **Since 2026-09-19 (`9ve.36`) the key is a ROW, finer than a pair** — `(opcode, width)` for binary/unary/compare rows and `(opcode, from, to)` for casts, forced because `frem` and `fneg` share `fp_arith` with the four opcodes that landed; `DECLINED` gives one row its own abort reason without a fourth bucket (`uitofp i64 → f64`, `9ve.34`); the second landing (`fadd`/`fsub`/`fmul`/`fdiv` at f64 and seventeen conversion pairs) moved 101 symbols, and the audit's five-way split is what to quote |
 | `ckd.19` / `_unc` ownership | PRD §10 (2026-08-14) | **`cqrt_free` is the SOLE deallocator.** `_unc` zeroes values in place and reclaims **nothing** — no pool operation, no bit-kind rewrite, no handle-table change. Forced empirically: the same `_unc` symbol appears both freed and deliberately never freed, the latter on a rail CQ_lang has proven entangled. **A rail `_unc`'d and never freed stays allocated for good — the intended Rule-6 safe leak, not a bug** |
 
 **Also settled 2026-08-14 and easy to re-open by accident.** i80 is **IN** scope; the two
@@ -1650,8 +1650,10 @@ ctest --test-dir build-release -R l7
   (`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`) carry *both* an integer and a
   floating-point width. The v1 partition that balances is **1595 + 884 = 2479**; older figures in
   the PRD are stale by the i80 increments (PRD §1, `docs/cqrt_census.txt`). **The 884 is v2's
-  moving figure** (`9ve.28`): each landed `(family, f64)` pair leaves it, the 240 does not move,
-  and the generator's audit is the live count.
+  moving figure** (`9ve.28`): each landed ROW leaves it — `(family, f64)` at the first landing,
+  `(opcode, width)` / `(opcode, from, to)` since `9ve.36` (2026-09-19), when seventeen of the 240
+  cross-domain cast PAIRS went live and `uitofp i64 → f64` became a DECLINED row with its own
+  reason — and the generator's audit is the live count.
 - **The prescribed `cqrt_*` census command does not work.**
   `grep -rhoE '"cqrt_[a-z0-9_]*"' ir-pass/src` returns **18 results, and they are PREFIXES** —
   the pass concatenates the width suffix at emit time, so no expansion of that grep can yield a
@@ -1713,13 +1715,15 @@ ctest --test-dir build-release -R l7
 - **Do NOT implement gate-level optimisation** (cancellation, commutation, peephole
   fusion) in v1 — and no circuit optimiser before a working baseline.
 - **Do NOT implement floating point OUTSIDE the v2 port (PRD-v2), and never at f16/f32/f80.**
-  Every fp-touching symbol whose `(family, f64)` pair has not LANDED (`shim/gen_shim.py`) keeps
-  its loud abort naming the symbol, so the link always succeeds and the v2 boundary is visible at
+  Every fp-touching symbol whose ROW has not LANDED (`shim/gen_shim.py`; a row is `(opcode, width)`
+  or `(opcode, from, to)` since `9ve.36`, 2026-09-19 — `frem` and `fneg` stay aborts beside the four
+  `fp_arith` opcodes that ship, and `uitofp i64 → f64` is DECLINED with its own reason, never routed
+  to `sitofp`) keeps its loud abort naming the symbol, so the link always succeeds and the v2 boundary is visible at
   runtime instead of at link time; a landed pair is one generator line, never a hand-written
   wrapper. **And the abort bucket is not only fp:** the **603**
   purely-integer `cq_template_*_inv` bodies abort too (PRD §15 **D14**), so the integer grid is
-  **992 wrappers + 603 aborts**, never 1595 wrappers — and a landed fp compare family owes the
-  same `_inv` aborts.
+  **992 wrappers + 603 aborts**, never 1595 wrappers — and every landed fp row owes the same
+  `_inv` aborts.
 - **Do NOT implement any part of error correction.** We call the QEC library; we do
   not implement it. Angle-representation conversion is the **QEC sink's** problem —
   the `Ry` sink entry stays `double` all the way down.

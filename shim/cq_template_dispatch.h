@@ -49,6 +49,27 @@ cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind);
  * dispatch an fp `ult` to the integer comparator. */
 cq_kernel_fn   cq_tpl_fcmp_kernel(cq_shim_fpred pred);
 
+/* M33/M34/M35's four fp ARITHMETIC kernels, over `opcode_table.yaml`'s own
+ * `fp_arith` order. Each is Rule 7's CANONICAL shape — arity 2, one width, a
+ * 64-lane `dst` — so they store in a `cq_kernel_fn` with no adapter, which the
+ * one-bit-`dst` compares above also do and for a different reason.
+ *
+ * `frem` HAS NO ROW AND MUST NOT ACQUIRE ONE UNTIL IT HAS A KERNEL. It is the
+ * fifth `fp_arith` binary opcode and there is no `CQ_SHIM_FOP_FREM` to index
+ * with, which is what makes the omission a COMPILE error rather than a table
+ * one enumerator short. */
+cq_kernel_fn   cq_tpl_fbin_kernel(cq_shim_fop op);
+
+/* M37's four CROSS-DOMAIN conversions and M40's `fsqrt`, both in M13's `(F, T)`
+ * pointer type. `cq_tpl_fun_kernel` returns that type too, which is an ADAPTER
+ * rather than a claim about `cq_kernel_fsqrt`: that kernel is one source and
+ * ONE width (Rule 7 fixes the semantics, not the parameter list — `ckd.15`),
+ * and the adapter passes `F`, with `F == T` guaranteed by the entry point's own
+ * refusal of any width but 64. Reaching for `cq_kernel_fn` instead would be the
+ * widening Rule 7 forbids in as many words. */
+cq_tpl_cast_fn cq_tpl_fcast_kernel(cq_shim_fcast_kind kind);
+cq_tpl_cast_fn cq_tpl_fun_kernel  (cq_shim_fun_op op);
+
 /* THE DISPLAY NAME OF THE OPERATION, for `bd 76r`'s `# STAGE: op begin` payload
  * (PRD §15 D21). It belongs on THIS side of the seam by the seam's own
  * discriminator — the name set grows when `opcode_table.yaml` gains an opcode, a
@@ -59,9 +80,12 @@ cq_kernel_fn   cq_tpl_fcmp_kernel(cq_shim_fpred pred);
  * §5's charset `[A-Za-z0-9_.$\[\]-]+`; the viewer has NO operation vocabulary,
  * so `add` and `Frobnicate` render identically well and the only thing a name
  * has to be is recognisable to a reader of CQ_lang's IR. */
-const char *cq_tpl_bin_name (cq_shim_op op);
-const char *cq_tpl_cmp_name (cq_shim_pred pred);
-const char *cq_tpl_cast_name(cq_shim_cast_kind kind);
-const char *cq_tpl_fcmp_name(cq_shim_fpred pred);
+const char *cq_tpl_bin_name  (cq_shim_op op);
+const char *cq_tpl_cmp_name  (cq_shim_pred pred);
+const char *cq_tpl_cast_name (cq_shim_cast_kind kind);
+const char *cq_tpl_fcmp_name (cq_shim_fpred pred);
+const char *cq_tpl_fbin_name (cq_shim_fop op);
+const char *cq_tpl_fcast_name(cq_shim_fcast_kind kind);
+const char *cq_tpl_fun_name  (cq_shim_fun_op op);
 
 #endif /* CQ_TEMPLATE_DISPATCH_H */
