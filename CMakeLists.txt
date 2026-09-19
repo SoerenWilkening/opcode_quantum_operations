@@ -320,6 +320,54 @@ add_library(cqops STATIC
                                # same four bodies over uint64_t for each
                                # consumer's R9 row (PRD-v2 §7.4, D-K23-9). NOT
                                # L1's oracle — that is tests/support/fpref.c
+    src/kernels/fmul.c         # M34, K16 (v2) — the ROW TABLE: soft_fmul
+                               # (fmul.jl:14-215) one row per operator
+                               # occurrence in source order, including the
+                               # seven DEAD rows of :94-102 (PRD-v2 §7.6's
+                               # discarded-arm rule) and nothing else
+    src/kernels/fmul_step.c    # M34, K16 (v2) — the ROW TABLES <-> STEP
+                               # MACHINE seam (M36's D-K18-7): slot and region
+                               # arithmetic ASKED of M14/M16/M17/M18/M32, the
+                               # collapsing view chain, the constant
+                               # vocabulary and the hand-off projections
+    src/kernels/fmul_emit.c    # M34, K16 (v2) — the LAYOUT-AND-OPERANDS <->
+                               # DISPATCH-AND-SURFACE seam (M32's D-K23-10,
+                               # recorded in advance this time): the
+                               # one-gate-per-slot dispatch, the public block
+                               # and the Rule 7 kernel. src/kernels/fmul_int.h
+                               # is the seam
+    src/kernels/fmul_eval.c    # M34, K16 (v2) — the _eval <-> CIRCUIT seam:
+                               # soft_fmul over uint64_t for the R9 row,
+                               # composing M32's four *_eval bodies (PRD-v2
+                               # §7.4). NEVER the host double operator
+    src/kernels/fadd.c         # M33, K15 (v2) — the two ROW TABLES: soft_fadd
+                               # (fadd.jl:16-136, 124 rows) and soft_fsub's
+                               # prologue (fsub.jl:21-24 + fneg.jl:6, 9 rows),
+                               # one row per operator occurrence, plus the
+                               # assembly that rebases the fadd body onto
+                               # fsub's b_eff. fsub is NOT fadd(a, fneg(b))
+    src/kernels/fadd_step.c    # M33, K15 (v2) — the ROW TABLES <-> STEP MACHINE
+                               # seam (M36's D-K18-7): slot and region
+                               # arithmetic ASKED of M12, M14, M16, M17, M31
+                               # and M32, and operand resolution over
+                               # collapsing view chains, constant spans and
+                               # M32's four-way destructured hand-offs
+    src/kernels/fadd_operand.c # M33, K15 (v2) — the COSTS-AND-LAYOUT <-> OPERAND
+                               # RESOLUTION seam, taken at implementation at 326
+                               # of Rule 12's 300: the collapsing view chain,
+                               # the constant vocabulary, the block outputs, the
+                               # flags, and M32's three destructured hand-offs
+    src/kernels/fadd_emit.c    # M33, K15 (v2) — the LAYOUT-AND-OPERANDS <->
+                               # DISPATCH-AND-SURFACE seam (D-K23-10, recorded
+                               # in advance here): the one-gate-per-slot
+                               # dispatch, the exported cq_fsub_block that K19's
+                               # fptoui composes, and the two Rule 7 kernels.
+                               # src/kernels/fadd_int.h is the seam
+    src/kernels/fadd_eval.c    # M33, K15 (v2) — the _eval <-> CIRCUIT seam: the
+                               # same two bodies over uint64_t for the R9 row
+                               # (PRD-v2 §7.4), composing M31's class eval and
+                               # M32's four. NOT L1's oracle: that is the HOST
+                               # operator with §7.4's cells pinned by table
     src/kernels/fcmp_pred.c    # M36, K18 (v2) — PRD-v2 §5's ORDERED CORE <->
                                # PREDICATE TABLE seam: the seven one-line
                                # compositions, instructions.jl's fourteen-row
