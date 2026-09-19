@@ -102,23 +102,31 @@ typedef struct {
  * as this function sets them is a defect its own family's suite must catch:
  * `k` is NULL, `name` is NULL and `tag` is 0.
  *
- * THE SEVEN TAG SPACES IN USE, and an eighth family must claim an eighth:
+ * THE EIGHT TAG SPACES IN USE, and a ninth family must claim a ninth:
  *
  *     0x00000000 | op   * 1024 + w + 1      binary          (cq_template_impl.c)
  *     0x10000000 | fop  * 1024 + w + 1      fp_arith binary (cq_template_fparith.c)
  *     0x20000000 | op   * 1024 + w + 1      fp unary        (cq_template_fparith.c)
  *     0x30000000 | kind * 65536 + f*256 + t fp conversion   (cq_template_fparith.c)
  *     0x40000000 | pred * 1024 + w + 1      icmp            (cq_template_impl.c)
+ *     0x50000000 | op   * 1024 + w + 1      fp TERNARY      (cq_template_ternary.c)
  *     0x80000000 | kind * 65536 + f*256 + t cast            (cq_template_unary.c)
  *     0xC0000000 | pred * 1024 + w + 1      fcmp            (cq_template_fp.c)
  *
- * THE TOP TWO BITS WERE EXHAUSTED AT FOUR, so the three fp arithmetic families
- * subdivide rather than claiming a fifth two-bit prefix. That is safe by
- * measurement rather than by intent: the binary space reaches at most
- * `12 * 1024 + 128 + 1 = 12417` and the cast space at most
- * `2 * 65536 + 128 * 256 + 128 = 163968`, both far below `0x10000000`, so the
- * gaps between the old prefixes are wide and empty. An eighth family must
- * re-check that arithmetic rather than assume it.
+ * THE TOP TWO BITS WERE EXHAUSTED AT FOUR, so the fp families subdivide rather
+ * than claiming a fifth two-bit prefix. That is safe by measurement rather than
+ * by intent: the binary space reaches at most `12 * 1024 + 128 + 1 = 12417` and
+ * the cast space at most `2 * 65536 + 128 * 256 + 128 = 163968`, both far below
+ * `0x10000000`, so the gaps between the old prefixes are wide and empty.
+ *
+ * RE-CHECKED FOR THE EIGHTH (bead 9ve.24, 2026-09-19), as the sentence this
+ * paragraph used to end with required. `0x50000000` is the first free
+ * `0x10000000`-granular prefix above `icmp`'s, and the ternary space reaches at
+ * most `0 * 1024 + 64 + 1 = 65` because `cq_shim_fma_op` has ONE enumerator and
+ * the width is f64 only — five orders of magnitude of headroom below the next
+ * prefix. `0x60000000`, `0x70000000`, `0x90000000`, `0xA0000000`, `0xB0000000`,
+ * `0xD0000000`, `0xE0000000` and `0xF0000000` remain free. A ninth family must
+ * re-check this arithmetic rather than assume it.
  *
  * The `+ 1` and the width term are not decoration: the width is folded in
  * because the ABI's `_unc` carries it too, and a forward at i32 is not the
@@ -169,5 +177,46 @@ typedef struct {
 } tpl_ureq;
 
 int32_t cq_tpl_unary(tpl_ureq r);
+
+/* D7b's RECORD, exported rather than copied. `cq_tpl_binary` and
+ * `cq_tpl_ternary` both push a `CQ_ROP_COPY` for each half of a defensive
+ * copy, and the argument order is the ABI's (`cqrt_copy_<W>(src, dst)`) rather
+ * than `cq_reg_xor_into`'s, which is the reverse. A second spelling of that in
+ * the ternary file would be a second chance to get the order backwards — and a
+ * backwards COPY record still reduces, just against the wrong rail. */
+void cq_tpl_rec_copy(int32_t src, int32_t dst);
+
+/* --- the ARITY-3 ordered call sequence ------------------------------------
+ *
+ * ONE FAMILY REACHES IT — `fma`, `intrinsic_table.yaml`'s only `arity:
+ * ternary` opcode (PRD-v2 §6.1's vendoring, bead 9ve.24). Four shapes, because
+ * two of the three operands may arrive as literals: `qqq` (the BARE base
+ * symbol), `qql`, `qlq` and `qll`, each with an `_unc` twin. There is NO
+ * `_controlled` axis and no `_inv` anywhere in that table's `fma` row, so this
+ * sequence opens no §9 region and owes no D14 abort.
+ *
+ * TWO LITERAL LANES IS WHY THIS IS NOT `tpl_req` WITH A THIRD HANDLE.
+ * `tpl_req` carries ONE `(lo, hi)` pair, which `qll` needs two of. Each lane
+ * gets its own pair below and its own `cq_bit` buffer at the call site; a
+ * single shared buffer would make `fma(a, 2.0, 3.0)` compute `fma(a, 3.0, 3.0)`
+ * — right shape, right gate count, wrong value, and only L1 sees it.
+ *
+ * D7b HAS SIX PAIRS AT THIS ARITY AND `cq_reg_sources_alias` ANSWERS A BARE
+ * 0/1. Three sources can collide in four distinguishable ways (a==b, a==c,
+ * b==c, all three) needing ONE or TWO temporaries, so this sequence does its
+ * own pairwise scan; the binary door's trick of adding that predicate's 0/1 to
+ * `cq_reg_count` for the D21 prediction is arity-2's and does not carry. */
+typedef struct {
+    cq_tpl_fma_fn k;         /* the kernel; NULL from no builder here       */
+    uint32_t w;              /* operand width == result width, in bits      */
+    int32_t  a_h, b_h, c_h;  /* CQ_REG_NONE on a lane carrying a literal    */
+    uint64_t b_lo, b_hi;     /* lane b's classical operand, two-word LE     */
+    uint64_t c_lo, c_hi;     /* lane c's                                     */
+    int32_t  out;            /* CQ_REG_NONE on a forward symbol             */
+    uint32_t tag;            /* D15's twin identity — NOT the kernel        */
+    const char *name;        /* D21's `op begin` payload                    */
+} tpl3_req;
+
+int32_t cq_tpl_ternary(tpl3_req r);
 
 #endif /* CQ_TEMPLATE_BOUNDARY_H */

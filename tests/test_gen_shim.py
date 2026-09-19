@@ -45,17 +45,28 @@ ABI = sc.manifest_decls()
 # separating the first two, which is the half of D14 that is width-blind: an
 # `fcmp` is non-injective at every width, so its `_inv` is refused whether or not
 # its forward ships.
-LIVE = {n for n in ABI if not sc.is_deferred_fp(n)}
+# A FOURTH BUCKET SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24). `defer` is
+# everything that aborts for a reason that is neither D14 nor "fp is v2" — the
+# integer `llvm.*` intrinsics (bead 9ve.29) and libm's `lrint`/`llrint`
+# (§7.9). It is a BUCKET rather than a third reason inside `fp` because the
+# bucket is what the audit counts and what each `.gen.c` banner prints, so
+# folding 249 symbols into `fp` would make every published fp figure wrong.
+DEFER = {n for n in ABI if sc.is_defer(n) and not sc.is_landed(n)}
+LIVE = {n for n in ABI if not sc.is_deferred_fp(n) and n not in DEFER}
 EXPECT = {"wrapper": {n for n in LIVE if not n.endswith("_inv")},
           "inv": {n for n in LIVE if n.endswith("_inv")},
-          "fp": {n for n in ABI if sc.is_deferred_fp(n)}}
-# The four-way reading a reader and a reviewer actually want, kept as SETS so a
-# family that moved domain is named rather than counted.
+          "fp": {n for n in ABI if sc.is_deferred_fp(n) and n not in DEFER},
+          "defer": DEFER}
+# The reading a reader and a reviewer actually want, kept as SETS so a family
+# that moved domain is named rather than counted. SEVEN populations now: the
+# three new ones are what makes the vendoring visible at all.
 BY_DOMAIN = {
     "int_wrapper": {n for n in EXPECT["wrapper"] if not sc.is_fp(n)},
     "int_inv":     {n for n in EXPECT["inv"] if not sc.is_fp(n)},
+    "int_defer":   {n for n in DEFER if not sc.is_fp(n)},
     "fp_wrapper":  {n for n in EXPECT["wrapper"] if sc.is_fp(n)},
     "fp_inv":      {n for n in EXPECT["inv"] if sc.is_fp(n)},
+    "fp_defer":    {n for n in DEFER if sc.is_fp(n)},
 }
 SHIPPED = sc.parse_definitions(sc.read_dir(sc.GENERATED))
 
@@ -72,13 +83,24 @@ def the_manifest_is_the_expansion_of_the_pinned_yaml():
     # has moved past third_party/cq_lang/COMMIT — so the manifest's authority
     # rests entirely on this equality, exactly as the L4 goldens' rests on the
     # Bennett COMMIT check (risk R3). Re-pinning the yaml must turn this red.
-    sha = hashlib.sha256(open(sc.YAML, "rb").read()).hexdigest()
-    sc.check(sha == sc.manifest_yaml_sha(),
-             "tests/abi manifest was extracted from a DIFFERENT opcode_table.yaml:\n"
-             "  pinned yaml : %s\n  manifest    : %s\n"
-             "  Re-extract from CQ_lang's regenerated header; do not edit either."
-             % (sha, sc.manifest_yaml_sha()))
-    sc.check(len(ABI) == 2479, "manifest holds %d declarations, expected 2479" % len(ABI))
+    # THREE PAIRS SINCE THE VENDORING, EACH CHECKED AGAINST ITS OWN YAML.
+    for yaml_path, manifest, n_want in sc.SOURCES:
+        sha = hashlib.sha256(open(yaml_path, "rb").read()).hexdigest()
+        rec = sc.manifest_yaml_sha(manifest)
+        sc.check(sha == rec,
+                 "%s was extracted from a DIFFERENT %s:\n"
+                 "  pinned yaml : %s\n  manifest    : %s\n"
+                 "  Re-extract from CQ_lang's regenerated header; do not edit "
+                 "either." % (os.path.basename(manifest),
+                              os.path.basename(yaml_path), sha, rec))
+    sc.check(len(ABI) == 2880,
+             "the three manifests hold %d declarations, expected 2880"
+             % len(ABI))
+    # AND THEY ARE PAIRWISE DISJOINT, which is what makes 2479 + 389 + 12 a
+    # SUM rather than an upper bound. sc.manifest_decls asserts it on every
+    # load; this restates it as the claim the grid's size rests on.
+    sc.check(sum(n for _, _, n in sc.SOURCES) == 2880,
+             "the three manifests' own counts do not sum to 2880")
 
 
 def the_emitted_symbol_set_equals_the_abi_in_both_directions():
@@ -94,18 +116,19 @@ def every_emitted_signature_matches_cq_langs_own_declaration():
     sc.check(not bad, "%d signature mismatch(es):\n  %s" % (len(bad), "\n  ".join(bad[:3])))
 
 
-def the_partition_is_1112_wrappers_668_inv_aborts_699_fp_aborts():
+def the_partition_is_1122_wrappers_668_inv_841_fp_and_249_deferred():
     # 992 / 603 / 884 until PRD-v2's first fp family landed (2026-09-18), then
-    # 1048 / 631 / 800; bead 9ve.36 moved a further 101 symbols out of the fp
-    # bucket — `fadd`/`fsub`/`fmul`/`fdiv` at f64 (50) and the seventeen shipped
-    # conversion pairs (51).
+    # 1048 / 631 / 800, then 1112 / 668 / 699 at bead 9ve.36. Bead 9ve.24's
+    # vendoring ADDS 401 symbols rather than moving any: 10 land as wrappers
+    # (`fma` x8 and `sqrt` x2 at f64), 142 join the fp aborts, and 249 are the
+    # new fourth bucket.
     got = {k: len(v) for k, v in buckets(SHIPPED).items()}
-    sc.check(got == {"wrapper": 1112, "inv": 668, "fp": 699},
-             "PRD §1 + §15 D14 + PRD-v2 §1 partition: expected 1112/668/699, "
-             "got %r" % got)
+    sc.check(got == {"wrapper": 1122, "inv": 668, "fp": 841, "defer": 249},
+             "PRD §1 + §15 D14 + PRD-v2 §1 + §6.1 partition: expected "
+             "1122/668/841/249, got %r" % got)
 
 
-def the_four_way_domain_split_is_992_603_120_65_and_699():
+def the_domain_split_is_992_603_237_130_65_and_12():
     # A COUNT IS NOT AN IDENTIFICATION, AND THE THREE COARSE BUCKETS NOW HIDE A
     # DOMAIN MOVE. Once a family-width lands, `wrapper` holds integer AND fp
     # wrappers, so 1048/631/800 stays exact while, say, `fp_arith`/`f64` goes
@@ -114,15 +137,15 @@ def the_four_way_domain_split_is_992_603_120_65_and_699():
     # crossed with `is_landed`; gen_shim's audit reaches the same five numbers
     # down a different route (the yaml's `widths` map and `family` key).
     got = buckets(SHIPPED)
-    live = {"wrapper": got["wrapper"], "inv": got["inv"]}
     for key, want in sorted(BY_DOMAIN.items()):
         dom, bucket = key.split("_", 1)
-        have = {n for n in live[bucket] if (sc.is_fp(n) == (dom == "fp"))}
+        have = {n for n in got[bucket] if (sc.is_fp(n) == (dom == "fp"))}
         sc.diff_sets(have, want, "%s set" % key)
     sc.check([len(BY_DOMAIN[k]) for k in
-              ("int_wrapper", "int_inv", "fp_wrapper", "fp_inv")]
-             == [992, 603, 120, 65],
-             "the four-way split moved: %r"
+              ("int_wrapper", "int_inv", "int_defer",
+               "fp_wrapper", "fp_inv", "fp_defer")]
+             == [992, 603, 237, 130, 65, 12],
+             "the domain split moved: %r"
              % {k: len(v) for k, v in BY_DOMAIN.items()})
 
 
@@ -176,10 +199,22 @@ def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
     for n in f64_left:
         by_op.setdefault(n.split("cq_template_")[1].split("_")[0], 0)
         by_op[n.split("cq_template_")[1].split("_")[0]] += 1
+    # M38's TEN OPCODES JOINED THAT CENSUS AT THE VENDORING (bead 9ve.24) and
+    # they are the half a reader is likeliest to misread: `trunc` here is the
+    # intrinsic table's fp round-toward-zero at f64, NOT `opcode_table.yaml`'s
+    # integer cast, which is `trunc_i64_to_i32` and carries no `_f64` token at
+    # all. They are bead 9ve.27's and abort until it runs. `fma` and `sqrt` are
+    # ABSENT from this census, which is the assertion that they LANDED.
     sc.check(by_op == {"frem": 15, "fneg": 3, "uitofp": 3,
-                       "fpext": 9, "fptrunc": 9, "bitcast": 6},
+                       "fpext": 9, "fptrunc": 9, "bitcast": 6,
+                       "ceil": 2, "copysign": 6, "fabs": 2, "floor": 2,
+                       "fmax": 4, "fmin": 4, "nearbyint": 2, "rint": 2,
+                       "round": 2, "trunc": 2},
              "the f64 symbols still aborting are not the expected census: %r"
              % by_op)
+    sc.check("fma" not in by_op and "sqrt" not in by_op,
+             "an f64 `fma` or `sqrt` symbol is still in the `fp is v2` bucket; "
+             "bead 9ve.24 landed both")
 
 
 def the_three_declined_symbols_are_in_the_fp_bucket_with_their_own_reason():
@@ -315,10 +350,24 @@ def every_family_gets_its_own_file_and_only_its_own_symbols():
     # R7 is a COMPILE-TIME risk, so nothing about correctness goes red when it is
     # violated — which is exactly why it needs a detector of its own rather than
     # riding on one.
+    # ALL THREE GRIDS, because the vendoring added three families and a check
+    # built from `opcode_table.yaml` alone would call them strays.
     rows = gen_shim.expand(gen_shim.load(sc.YAML)[0])
+    itab = gen_shim.load(sc.SOURCES[1][0])[0]
+    ltab = gen_shim.load(sc.SOURCES[2][0])[0]
+    gen_shim.gen_intrinsics.expand_intrinsic(itab, gen_shim._emitter(rows, itab["widths"]))
+    gen_shim.gen_intrinsics.expand_libm(ltab, gen_shim._emitter(rows, ltab["widths"]))
     want = {"cq_template_%s.gen.c" % f for f in {r.family for r in rows}}
     sc.diff_sets(set(sc.read_dir(sc.GENERATED)), want, "emitted file set")
-    sc.check(len(want) == 10, "expected 10 opcode families, got %d" % len(want))
+    sc.check(len(want) == 13, "expected 13 opcode families, got %d" % len(want))
+    # AND EACH FILE IS FED BY EXACTLY ONE YAML, which `render` refuses to
+    # violate because a banner can only name one provenance. Stated here too:
+    # the banner is prose and nothing else reads it.
+    src_of = {}
+    for r in rows:
+        src_of.setdefault(r.family, set()).add(r.source)
+    mixed = sorted(f for f, v in src_of.items() if len(v) != 1)
+    sc.check(not mixed, "family/families fed by more than one yaml: %s" % mixed)
     # ...and each file holds ONLY its own family, which a file-set check alone
     # does not give: a generator could emit ten correctly-named files with the
     # symbols shuffled between them.
@@ -361,8 +410,8 @@ CASES = [
     the_manifest_is_the_expansion_of_the_pinned_yaml,
     the_emitted_symbol_set_equals_the_abi_in_both_directions,
     every_emitted_signature_matches_cq_langs_own_declaration,
-    the_partition_is_1112_wrappers_668_inv_aborts_699_fp_aborts,
-    the_four_way_domain_split_is_992_603_120_65_and_699,
+    the_partition_is_1122_wrappers_668_inv_841_fp_and_249_deferred,
+    the_domain_split_is_992_603_237_130_65_and_12,
     the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family,
     the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family,
     the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed,

@@ -48,11 +48,24 @@ foreach(_l IN LISTS _lines)
     endif()
 endforeach()
 
-file(STRINGS ${MANIFEST} _decls REGEX "^[A-Za-z_].*cq_template_")
+# THE `want` SET IS THE UNION OF ALL THREE MANIFESTS (PRD-v2 §6.1's vendoring,
+# bead 9ve.24). `MANIFEST` is a SEMICOLON-SEPARATED LIST now rather than one
+# path — cq_templates_abi.txt, cq_intrinsic_templates_abi.txt and
+# cq_libm_templates_abi.txt, 2479 + 389 + 12 = 2880 declarations, pairwise
+# disjoint.
+#
+# AND THAT IS WHAT MAKES THE OUTWARD ARM MEAN SOMETHING AGAIN. This file's own
+# header records the measured case: adding `cq_template_lrint_f64_to_i64` — a
+# real libm_table.yaml name — left the link GREEN and only a set difference saw
+# it. That symbol is now IN the grid, so the example has inverted: what the
+# outward arm catches today is a definition outside all three tables.
 set(_want_t "")
-foreach(_d IN LISTS _decls)
-    string(REGEX MATCH "cq_template_[A-Za-z0-9_]+" _n "${_d}")
-    list(APPEND _want_t "${_n}")
+foreach(_mf IN LISTS MANIFEST)
+    file(STRINGS "${_mf}" _decls REGEX "^[A-Za-z_].*cq_template_")
+    foreach(_d IN LISTS _decls)
+        string(REGEX MATCH "cq_template_[A-Za-z0-9_]+" _n "${_d}")
+        list(APPEND _want_t "${_n}")
+    endforeach()
 endforeach()
 
 file(STRINGS ${ABI} _cdecls REGEX "^[A-Za-z_].*cqrt_[a-z0-9_]+[ \t]*\\(")

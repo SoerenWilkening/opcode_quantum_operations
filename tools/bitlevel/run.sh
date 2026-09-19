@@ -38,8 +38,11 @@ printf "clang %s\npass %s\ncc %s\n" "$(echo "$t1 - $t0" | bc)" \
 "$LINKCC" -c $LDX -std=c11 -I"$REPO/src" -I"$REPO/shim" -I"$REPO/include" \
          "$HERE/pool_probe.c" -o "$OUT.probe.o" 2>> "$OUT.link"
 # shellcheck disable=SC2086
-"$LINKCC" $LDX "$OUT.o" "$OBJDIR/cq_intrinsic_templates.c.o" \
-         "$OBJDIR/cq_libm_templates.c.o" "$OUT.residue.o" "$OUT.probe.o" \
+# The two CQ_lang stub objects are gone from this line for the reason
+# tools/l6/run_slice_cqops.sh states at length (PRD-v2 §6.1, bead 9ve.24):
+# libcqops defines all 2,880 cq_template_* symbols now, so passing them as well
+# is a duplicate-symbol hard error.
+"$LINKCC" $LDX "$OUT.o" "$OUT.residue.o" "$OUT.probe.o" \
          "$CQOPS" $LDLIBS -Wl,-map,"$OUT.map" -o "$OUT.bin" 2>> "$OUT.link"
 set +f
 if grep -Eq 'libcq_templates\.a|libcq_runtime\.a' "$OUT.map"; then

@@ -1,0 +1,34 @@
+# cq_libm_templates_abi.txt -- the libm half of the cq_template_* ABI,
+# 12 declarations VERBATIM.
+#
+# THE SMALLEST OF THE THREE MANIFESTS AND THE ONE WHOSE SCHEMA SHARES LEAST
+# WITH THE OTHER TWO. libm_table.yaml has no `variants` key at all: its two
+# entries are {op, kind, froms, to} and `cross_unary` means fwd + unc and
+# nothing else, which shim/gen_intrinsics.py hard-codes from the yaml's own
+# prose. That is the one place the generator reads a sentence rather than a
+# field, so this manifest is the only thing that can contradict it.
+#
+# PROVENANCE, and the R3-shaped drift check that rides on it:
+#   source        : CQ_lang runtime/cq_libm_templates.h (generated)
+#   CQ_lang HEAD  : c4dc68df935aa11d2d0496dbb8755855cda9f530
+#   yaml-sha256   : c3be3d4379757c2d078ba0e54cb9ceafbbae0adca33367c7e92b8df0a630a41b
+#
+# The sha above is the banner of that generated header AND the sha256 of our
+# pinned third_party/cq_lang/libm_table.yaml. third_party/cq_lang/
+# COMMIT.intrinsics records the pin; cmake/CqopsIntrinsicPin.cmake makes a
+# drift in it a CONFIGURE-TIME hard error.
+#
+# To refresh: re-pin libm_table.yaml first, then re-extract from CQ_lang's
+# regenerated header. Never hand-edit a declaration.
+int32_t cq_template_llrint_f32_to_i64(int32_t a_handle);
+void cq_template_llrint_f32_to_i64_unc(int32_t out_handle, int32_t a_handle);
+int32_t cq_template_llrint_f64_to_i64(int32_t a_handle);
+void cq_template_llrint_f64_to_i64_unc(int32_t out_handle, int32_t a_handle);
+int32_t cq_template_llrint_f80_to_i64(int32_t a_handle);
+void cq_template_llrint_f80_to_i64_unc(int32_t out_handle, int32_t a_handle);
+int32_t cq_template_lrint_f32_to_i64(int32_t a_handle);
+void cq_template_lrint_f32_to_i64_unc(int32_t out_handle, int32_t a_handle);
+int32_t cq_template_lrint_f64_to_i64(int32_t a_handle);
+void cq_template_lrint_f64_to_i64_unc(int32_t out_handle, int32_t a_handle);
+int32_t cq_template_lrint_f80_to_i64(int32_t a_handle);
+void cq_template_lrint_f80_to_i64_unc(int32_t out_handle, int32_t a_handle);

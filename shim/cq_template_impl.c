@@ -160,7 +160,7 @@ typedef struct {
  * between the two (the ABI is (src, dst) and ours is (dst, src)) and both sides
  * are int32_t, which is why this wrapper exists rather than an inline record at
  * each site: one place to get the order right. */
-static void rec_copy(int32_t src, int32_t dst)
+void cq_tpl_rec_copy(int32_t src, int32_t dst)
 {
     cq_call_rec c;
     memset(&c, 0, sizeof c);
@@ -276,7 +276,7 @@ int32_t cq_tpl_binary(tpl_req r)
          * examined. That is the "always yes" degeneration `bd 06t` names a
          * negative control against, arriving through omission rather than
          * through a wrong rule. */
-        rec_copy(tmp_src, tmp);
+        cq_tpl_rec_copy(tmp_src, tmp);
         r.b_h   = tmp;
     }
 
@@ -345,7 +345,7 @@ int32_t cq_tpl_binary(tpl_req r)
 
     if (tmp != CQ_REG_NONE) {
         cq_reg_xor_into(ctx, tmp, tmp_src);
-        rec_copy(tmp_src, tmp);
+        cq_tpl_rec_copy(tmp_src, tmp);
         cq_reg_free(ctx, tmp, cq_shim_free_proof);
         cq_rec_retire(tmp);
     }

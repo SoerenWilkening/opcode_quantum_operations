@@ -1,0 +1,54 @@
+# tools/libm_table.yaml — cross-width rounding TEMPLATE surface (p119).
+#
+# HISTORY: this file used to curate the DIRECT-`@name` libm math.h functions
+# (cbrt/erf/atan2/hypot/ilogb/ldexp/frexp/modf/remquo/…, the 3c6m.2 name-matcher).
+# Under Rule 18 (p119) those are LIBRARY functions — compiled by SOURCE INJECTION,
+# not by name-recognition — so the `LibmLowering` name-matcher and the `ByRefMath`
+# by-ref subsystem were DELETED, and every direct-libm row here was removed.
+#
+# What REMAINS: only `lrint`/`llrint`. On the project pipeline (native `clang -O1`,
+# `-fno-math-errno` default) these lower to `@llvm.lrint.i64.f<W>` /
+# `@llvm.llrint.i64.f<W>` INTRINSICS (recognized in IntrinsicLowering by
+# Intrinsic::ID, NOT here) that codegen to the HARDWARE `cvtsd2si` instruction
+# (round-to-nearest-even) — so they are hardware-backed survivors we keep. (On a
+# `-fmath-errno` target clang emits a direct `@lrint` libcall instead → the
+# recognizer does not fire and the call over-declines, the safe side.) They share this table's cross-width TEMPLATE surface
+# (`cq_template_<stem>_<from>_to_<to>`, the CAST naming grammar) purely because a
+# template is a symbol and generation is independent of recognition. `lround`/
+# `llround` (round-half-away) were removed — they have no HW fp→int form → libcall.
+#
+# Drives the SAME generator (tools/gen_templates.py::enumerate_libm) into:
+#   - runtime/cq_libm_templates.h   (extern "C" declarations)
+#   - runtime/cq_libm_templates.c   (printf-trace stubs)
+# with its OWN yaml-sha256 banner, compiled into the SAME libcq_templates.a. The
+# whole-DAG uncompute spine reverses each symbol by prefix (`cq_template_`) with
+# ZERO new code (EmitInverse mints the `_unc` twin by string-append).
+#
+# ----------------------------------------------------------------------------
+# CURATION GUARD (Prime Directive): each row is a pure, mostly-total function
+# lowered as a Class-2 ADDITIVE PRODUCER (fresh out rail, sources kept LIVE) so the
+# generic `_unc(out, srcs…)` zeroes the out rail by recomputing f(sources) — it
+# NEVER recovers an input (R-E source-liveness, Rule 8). The integer result is
+# DATA, never an angle (the angle fence is positional, upstream in RotationLowering).
+#
+# SHAPE (reuse VARIANT_INFO + abi_codegen a1/ua1 — NO new abi_codegen shape):
+#   cross_unary — fp -> INTEGER of a DIFFERENT width. Reuses the CAST naming
+#                 grammar `cq_template_<op>_<from>_to_<to>` (a1/ua1 — the handle is
+#                 i32 on both sides). NON-injective (round) → fwd+unc.
+# ----------------------------------------------------------------------------
+widths:
+  i32: { bits: 32, c_type: "int32_t", domain: "int" }
+  i64: { bits: 64, c_type: "int64_t", domain: "int" }
+  f32: { bits: 32, c_type: "float",   domain: "fp"  }
+  f64: { bits: 64, c_type: "double",  domain: "fp"  }
+  # f80: long double on x86-64 (the `lrintl`/`llrintl` → @llvm.lrint.i64.f80 form).
+  f80:  { bits: 80,  c_type: "long double", domain: "fp" }
+
+libm:
+  # ---- cross-width unary fp -> i64 (Class 2, fwd/unc) ----------------------
+  # lrint/llrint (round-to-nearest-even) — @llvm.<fn>.i64.f<W> INTRINSICS
+  # (recognized in IntrinsicLowering::isCrossWidthLibmIntrinsic) that codegen to
+  # cvtsd2si (HARDWARE) → kept survivors. `to` is the i64 LP64 result width.
+  - { op: lrint,   kind: cross_unary, froms: [f32, f64, f80], to: i64 }
+  - { op: llrint,  kind: cross_unary, froms: [f32, f64, f80], to: i64 }
+# -- End of libm table ---------------------------------------------------------

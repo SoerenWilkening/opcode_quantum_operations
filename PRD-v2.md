@@ -455,7 +455,7 @@ Numbering continues v1's M01–M30.
 | **M36 `fcmp`** | K18 — the 10 ported predicates + the 4 operand-swaps | 200 | **ORDERED CORE ↔ PREDICATE TABLE.** K9's exact shape: *four predicates swap operands and five invert the flag, and the two sets are not the same set*. Expect the fp table to differ; **derive it, do not carry K9's over** **LANDED 2026-09-18 (Wave 3, bead `9ve.20`, K18.md): the recorded seam was taken AND a second one, ROW TABLES ↔ STEP MACHINE (K18.md D-K18-7) — `fcmp.c` (the three row tables), `fcmp_step.c` (slot/region arithmetic, operand resolution, dispatch), `fcmp_pred.c` (the ten concatenations, fourteen entry points, the C short-circuit). The ordered-core half alone measured 298/300, so the second cut was forced, not chosen. Every M33+ kernel is bigger than `fcmp` and should record the same two seams IN ADVANCE. Ten predicates × forward/`_unc` pinned in `tests/goldens/fcmp.counts`; slots and gates come apart 25–35 % at the all-quantum mask, exactly as K18 D-K18-6 predicted.** |
 | **M37 `fconv`** | K19 — `fptosi` / `fptoui` / `sitofp` / `uitofp` / `fpext` / `fptrunc` | 220 | **INT→FP ↔ FP→INT.** They share nothing but the field views, and only the second has a saturation/undefined story (D3's posture) **LANDED 2026-09-19 (Wave 7, bead `9ve.23`): `fconv.{h,c}` + `fconv_int.h` + `fconv_step.c` + `fconv_emit.c` + `fconv_eval.c`. Seams taken: ROW TABLES ↔ STEP MACHINE, LAYOUT-AND-OPERANDS ↔ DISPATCH-AND-SURFACE, `_eval` ↔ THE CIRCUIT; M33's fourth seam recorded and NOT taken; the INT→FP ↔ FP→INT seam above is RETIRED as a file cut and kept as the asserted boundary between the two tables. 31 / 74 / 75 rows against K19's drafted 27 / 12 / 66 (views amendment, `lower_not1!` as a row, and `fptoui` INLINES the `fptosi` table twice); 9,665 / 69,253 / 13,094 slots; ten goldens in `tests/goldens/fconv.counts`; `uitofp` is `sitofp`'s program under zext views at i1/i8/i16/i32 and at i64 is `9ve.34`'s loud abort; `fpext`/`fptrunc` stay aborts; the 37-cell §7.5 pin table confirmed first run. R11 is live at ~34,800 qubits per `fptoui`. Debug wall clock 73 min for the suite.** |
 | **M38 `fmisc`** | `fneg` / `fabs` / `copysign` / `fmin` / `fmax` / rounding | 200 | **SIGN OPS ↔ EVERYTHING ELSE.** The sign ops are zero-Toffoli and have a true L5 row; the rest go through M32 |
-| **M39 `fma`** | K20 — `soft_fma`. **§6.1 took it (2026-09-17), so this row is no longer conditional** | 260 | **Reuses M33's align and M34's product** — **as VOCABULARY, not as blocks (K20.md, 2026-09-18): `fma`'s product is `_sf_widemul_u64_to_128`'s 32/32 split, not `fmul`'s 27/26 (`softfloat_common.jl:261-263`: 27/26 "assumes ≤53-bit inputs" and Berkeley scaling makes `fma`'s 63), and its align is the four-case 128-bit `_shiftRightJam128` ×2, not `fadd`'s one-case 64-bit shift. What it reuses is M18/M12/M16/M17/M14's step blocks, exactly as M34 does; M33/M34 owe it nothing. Its 128-bit adds materialise the carry as a VALUE (compare + mux + a second add), so `cq_add_block` needs no carry-in or carry-out — a carry-chained 128-bit adder would be a re-derivation. Seam fixed between `fma.jl:115` and `:118`: PRODUCT-AND-ALIGN ↔ THE SINGLE-ROUNDING PATH.** The single-rounding path is the whole point of an `fma` and is what forbids spelling it `fmul` then `fadd` |
+| **M39 `fma`** | K20 — `soft_fma`. **§6.1 took it (2026-09-17), so this row is no longer conditional** | 260 | **Reuses M33's align and M34's product** — **as VOCABULARY, not as blocks (K20.md, 2026-09-18): `fma`'s product is `_sf_widemul_u64_to_128`'s 32/32 split, not `fmul`'s 27/26 (`softfloat_common.jl:261-263`: 27/26 "assumes ≤53-bit inputs" and Berkeley scaling makes `fma`'s 63), and its align is the four-case 128-bit `_shiftRightJam128` ×2, not `fadd`'s one-case 64-bit shift. What it reuses is M18/M12/M16/M17/M14's step blocks, exactly as M34 does; M33/M34 owe it nothing. Its 128-bit adds materialise the carry as a VALUE (compare + mux + a second add), so `cq_add_block` needs no carry-in or carry-out — a carry-chained 128-bit adder would be a re-derivation. Seam fixed between `fma.jl:115` and `:118`: PRODUCT-AND-ALIGN ↔ THE SINGLE-ROUNDING PATH.** The single-rounding path is the whole point of an `fma` and is what forbids spelling it `fmul` then `fadd` **LANDED 2026-09-19 (Wave 9, bead `9ve.24`), WITH §6.1's VENDORING IN THE SAME COMMIT (R16): `fma.{h,c}` + `fma_rows.inc` + `fma_int.h` + `fma_step.c` + `fma_operand.c` + `fma_emit.c` + `fma_eval.c`. FIVE seams taken, all recorded in advance — M33's four plus PROGRAM TEXT ↔ PROGRAM ACCESSORS, an `.inc` under Rule 12's own exemption for a large static table, which is what keeps ONE prefix sum in ONE place. The `fma.jl:115`/`:118` seam is NOT a file cut and is the named row boundary `cq_fma_seam_row()` (213), pinned by a case that also asserts exactly ONE round-and-pack below it. 395 rows over 21 ops (307 emitting, 73 views, 15 projections) against the draft's 376; 241,083 slots, 84,606 scratch bits, 426,996 gates forward and `_unc` alike, two goldens in `tests/goldens/fma.counts`. Three pre-implementation predictions held EXACTLY — `cq_add_block` ×12 with no carry-in, `cq_slt_block` ×15, twelve barrels from §7.6's `_shiftRightJam128` audit taken twice. Findings: `soft_fma` does NOT call `_sf_normalize_clz`, so M32's `cq_clz_block` is absent and `_sf_clz128_to_hi_bit61` is inlined as 66 rows; `BIAS` (`:29`) is assigned and never read, K16's `SIGN_MASK` shape; and the op-enum prefix had to become `CQ_FUOP_`/`CQ_FU_` because M33 owns `CQ_FAOP_`/`CQ_FA_` — M36's recorded collision, caught by the compiler. AND A 395-ROW FLAT TABLE NEEDS M40's MEMOISED PREFIX MAP, which M34's 128-row shape does not: rebuilding the prefix array and then re-walking the table to find the row is 790 module calls per gate, and measured the suite did not finish. `cq_fu_map_get` plus a binary search over the slot boundaries gives 65 s in Release at the full 167-case anchor floor, with the same thirteen cases and the same goldens; `k->off` is still applied in exactly one place.** |
 | **M40 `fsqrt`** | K21 — `soft_fsqrt`. **Added 2026-09-18**: §3.3 listed it and this table had no row for it | 240 | **PRE-NORMALISE ↔ THE DIGIT LOOP.** The loop is `soft_fdiv`'s restoring shape a second time (`fsqrt.jl:9` (mirror) / `:11-15` (Kahan) — corrected 2026-09-18 by K21.md from `:6-7`, which was the docstring's opening line), two bits per iteration over a 128-bit radicand held as a `(hi, lo)` pair — compose M14/M16/M17's step blocks as M35 does, do not transcribe **LANDED 2026-09-19 (Wave 7, bead `9ve.26`): `fsqrt.{h,c}` + `fsqrt_int.h` + `fsqrt_step.c` + `fsqrt_operand.c` + `fsqrt_emit.c` + `fsqrt_eval.c`. Seams taken: ROW TABLES ↔ STEP MACHINE, COSTS-AND-LAYOUT ↔ OPERAND RESOLUTION, LAYOUT-AND-OPERANDS ↔ DISPATCH-AND-SURFACE, `_eval` ↔ THE CIRCUIT; PRE-NORMALISE ↔ THE DIGIT LOOP is RETIRED as a file seam and kept as `cq_fsqrt_seam_row()`. UNARY (§7.11), `cq_kernel_fn` not widened. 1,070 rows (522 views + one ARITHMETIC-shift view kind, 6 projections) with the digit loop unrolled into 64 × 16 distinct rows; 157,108 slots, 67,405 bits, 229,302 gates forward and `_unc` alike, two goldens in `tests/goldens/fsqrt.counts`. Three K21 draft items overturned: mask rows are views, D9(d) does not reach `r_0`/`q_0` (constants), `fsqrt.jl:60`'s arithmetic `>>` needs its own view kind. Kahan's `grs != 4` proved by execution.** |
 | *(no module)* | **the fp rail representation** | 0 | §3.1 — there is nothing to build |
 | `cq_runtime_rail.c` / `cq_runtime_gate.c` | the 34 deferred fp-width core symbols | — | **Already recorded in plan §3's Layer-5 seam table**, and the recorded disposition is *"they become real code by WIDENING what already exists"*. No new seam |
@@ -557,6 +557,44 @@ because they are bit operations. **M39 is no longer conditional** — §5's *"K2
 (`ctlz`/`ctpop`/`bswap`/`fshl`/`umin`/`umax`) are a **v1-shaped** gap that this decision exposes
 rather than closes — they need a bead of their own, because they are reachable today and are not
 floating point.
+
+**DONE 2026-09-19 (Wave 9, bead `9ve.24`), with M39 in the same commit as R16 requires.** Both
+tables are vendored at the sha256s `COMMIT` has recorded since 2026-08-14 — unchanged at CQ_lang
+`c4dc68df` — in `third_party/cq_lang/intrinsic_table.yaml` and `libm_table.yaml`, beside a
+**second** provenance record `COMMIT.intrinsics` rather than an edit to `COMMIT` (Rule 1 clause 1;
+the three artefacts pin at three different revisions and one file cannot say so). Its sha256s are a
+configure-time hard error through `cmake/CqopsIntrinsicPin.cmake`, six arms of which were provoked
+against a **scratch copy** of the tree region. `git diff --stat -- third_party/` shows no modified
+byte.
+
+**THE GENERATOR LEARNED THE TWO SCHEMAS ON A SECOND EXPANSION PATH, `shim/gen_intrinsics.py`,
+behind the SAME `Row` model** — one naming rule, one signature rule, one bucket rule. Three new
+shape tokens (`qql`, `qlq`, `qll`), a BARE `qqq` exactly as `qq` is bare, `_Float16`/`long double`
+operand types, and `fshl`/`fshr` appearing TWICE at two arities, so the unique key is `(op, arity)`.
+Three new families and three new `.gen.c` files, listed explicitly in the root `CMakeLists.txt`.
+
+**THE PARTITION IS NOW FOUR BUCKETS AND THE FOURTH IS FORCED.** `"fp is v2"` printed at
+`cq_template_ctpop_i32` would be a falsehood — an integer opcode at an integer width that no fp
+release reaches — and `lrint f64 → i64` touches a width that already ships. So `defer` is a bucket
+rather than a third reason inside `fp`, because the bucket is what the audit counts and what each
+banner prints. **MEASURED: 2880 = 1122 wrappers + 668 `_inv` aborts + 841 fp aborts + 249 deferred;
+by domain 992 / 603 / 237 int and 130 / 65 / 841 / 12 fp.** Read it from
+`python3 shim/gen_shim.py`, never from here.
+
+**TWO ROWS LANDED FROM THAT TABLE AND NO MORE:** `(fma, f64)` — 4 forward + 4 `_unc`, no `_inv`,
+no controlled axis, reached through a new `cq_tpl_ternary` — and `(sqrt, f64)`, which needed no new
+code at all because Wave 8's `cq_shim_fun` door was already built and merely unreachable from the
+grid. M38's ten opcodes and the thirteen integer intrinsics keep aborts whose reason is TRUE of
+them, citing `9ve.27` and `9ve.29`.
+
+**AND THE LINK SURFACE MOVED, WHICH IS THE HALF THAT IS EASY TO DROP.** `tests/abi/` gained two
+manifests extracted VERBATIM from CQ_lang's own generated headers, each carrying its yaml's sha256;
+`cmake/CqopsLinkWitness.cmake`'s R3 arm became a macro applied to three (manifest, yaml) PAIRS and
+its witness is 2,880 rows; `cmake/CqopsSymbolSets.cmake`'s `want` set is the union of the three,
+set-identical to the archive in both directions. `tools/l6/run_slice_cqops.sh` and
+`tools/bitlevel/run.sh` no longer pass `cq_intrinsic_templates.c.o` and `cq_libm_templates.c.o` —
+once libcqops defines those symbols the loose objects are a duplicate-symbol hard error, which is
+why that edit had to land in the same commit.
 
 ### 6.2–6.6 Still open — decide each in a document, never in code
 
@@ -896,8 +934,11 @@ population.
 8. §7.14's integer intrinsics, on their own bead.
 
 **Progress note 2026-09-19.** Items 2–5 and 7 landed in Waves 1–7 (kernels only), and the ABI wiring
-for items 5 and 7 landed as bead `9ve.36` (Wave 8, §5's `cq_template_fparith.c` row). Item 6 is next:
-`fma` with §6.1's vendoring (`9ve.24`), then `fmisc` (`9ve.27`); item 8 is `9ve.29`.
+for items 5 and 7 landed as bead `9ve.36` (Wave 8, §5's `cq_template_fparith.c` row). **Item 6's
+first half landed as Wave 9 (`9ve.24`): `fma` WITH §6.1's vendoring and its eight ABI entry points,
+in one commit as R16 requires.** `fmisc` (`9ve.27`) is the rest of item 6; item 8 is `9ve.29`, and
+the vendoring is what makes both of them a generator line plus a kernel rather than a scope
+question.
 
 ### 7.16 Two decisions at the Wave 4 boundary — 2026-09-18, the maintainer's
 

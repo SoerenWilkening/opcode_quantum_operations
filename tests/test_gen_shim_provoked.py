@@ -45,8 +45,20 @@ buckets = gs.buckets
 
 
 def _rerender(swap=None, demote=None, land=None, promote=None):
+    # ALL THREE GRIDS, because since PRD-v2 §6.1's vendoring (bead 9ve.24) a
+    # render needs every family — `files()` refuses a family fed by two yamls,
+    # and an opcode-only expansion would simply not emit the three intrinsic
+    # ones, making the set difference report 401 missing symbols on every
+    # provocation and burying the one the case is about.
     table, sha = gen_shim.load(sc.YAML)
+    itab, isha = gen_shim.load(sc.SOURCES[1][0])
+    ltab, lsha = gen_shim.load(sc.SOURCES[2][0])
+    shas = {"opcode": sha, "intrinsic": isha, "libm": lsha}
     rows = gen_shim.expand(table)
+    gen_shim.gen_intrinsics.expand_intrinsic(
+        itab, gen_shim._emitter(rows, itab["widths"]))
+    gen_shim.gen_intrinsics.expand_libm(
+        ltab, gen_shim._emitter(rows, ltab["widths"]))
     for r in rows:
         # THE KEY IS gen_shim's OWN since 2026-09-19 — `(opcode, width)`, or
         # `(opcode, from, to)` for a cast — so a provocation lands exactly the
@@ -64,7 +76,7 @@ def _rerender(swap=None, demote=None, land=None, promote=None):
                 r.bucket = "wrapper"
         if demote and r.name == demote:
             r.bucket = "inv"
-    return sc.parse_definitions(gen_shim.files(rows, sha))
+    return sc.parse_definitions(gen_shim.files(rows, shas))
 
 
 def _reds(defs):
@@ -98,7 +110,7 @@ def each_of_the_twenty_same_size_transpositions_turns_the_gate_red():
              "controlled_qq <-> controlled_inv_qq at 86 is not among the 20")
     for a, b, n in pairs:
         defs = _rerender(swap=((a,), (b,)))
-        sc.check(len(defs) == 2479, "%s<->%s changed the symbol COUNT" % (a, b))
+        sc.check(len(defs) == 2880, "%s<->%s changed the symbol COUNT" % (a, b))
         reds = _reds(defs)
         sc.check(len(reds) == 2,
                  "%s <-> %s (%d each) left the gate GREEN — only %d of 2 set "
@@ -181,7 +193,7 @@ def a_family_width_that_has_not_landed_cannot_be_declared_live():
     # that hard-errors on anything but 64. Only the SET sees it, and it names it.
     victim = "cq_template_fcmp_oeq_f32"
     defs = _rerender(promote=victim)
-    sc.check(len(defs) == 2479, "promoting %s changed the symbol COUNT" % victim)
+    sc.check(len(defs) == 2880, "promoting %s changed the symbol COUNT" % victim)
     reds = _reds(defs)
     sc.check(len(reds) == 1,
              "promoting %s turned %d of the 2 set assertions red; expected the "
@@ -204,7 +216,7 @@ def a_family_width_that_has_not_landed_cannot_be_declared_live():
     # u >= 2^63 negative. Only the SET sees it, and it names it.
     victim = "cq_template_uitofp_i64_to_f64"
     defs = _rerender(land={("uitofp", "i64", "f64")})
-    sc.check(len(defs) == 2479, "landing %s changed the symbol COUNT" % victim)
+    sc.check(len(defs) == 2880, "landing %s changed the symbol COUNT" % victim)
     reds = _reds(defs)
     sc.check(len(reds) == 2,
              "landing %s left %d of the 2 set assertions red; expected both "

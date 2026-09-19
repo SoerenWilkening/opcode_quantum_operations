@@ -44,7 +44,7 @@ routine that leaks a dirty ancilla is a **silent miscompile, not a leak**
 > | Path | What |
 > |---|---|
 > | `third_party/bennett/` | Bennett.jl @ `980805de85314b3da7ac25cf6454b56566f8e609` — a stripped snapshot (no `.git`, no `.beads`) plus `COMMIT` and `.provenance/MANIFEST.txt`. **READ-ONLY, including `COMMIT` and including its own `CLAUDE.md`** (Rule 1). `git log` inside it reports the **parent** repo's HEAD; read `COMMIT` to check the pin — the SHA is on its `commit:` line, not its first |
-> | `third_party/cq_lang/` | `opcode_table.yaml` verbatim @ CQ_lang `a6a92fe`, plus `COMMIT`. **Never edit it.** CQ_lang itself is **unpinned** and its HEAD has moved past that `COMMIT` while the yaml has not, so the **yaml sha256** — not the checkout — is what proves a manifest expands the grid we ship |
+> | `third_party/cq_lang/` | `opcode_table.yaml` verbatim @ CQ_lang `a6a92fe`, plus `COMMIT`. **Never edit it.** CQ_lang itself is **unpinned** and its HEAD has moved past that `COMMIT` while the yaml has not, so the **yaml sha256** — not the checkout — is what proves a manifest expands the grid we ship. **Since 2026-09-19 (`9ve.24`, PRD-v2 §6.1) it also holds `intrinsic_table.yaml` and `libm_table.yaml` verbatim, pinned by a SECOND provenance file `COMMIT.intrinsics`** (added, never an edit to `COMMIT`; `cmake/CqopsIntrinsicPin.cmake` makes their sha256s a configure-time hard error), so the `cq_template_*` grid the shim satisfies is **2880 = 2479 + 389 + 12** and `tests/abi/` carries three manifests |
 > | `third_party/cq_free_pairing/` | CQ_lang's `tools/free_pairing_check.py` verbatim, plus `COMMIT`. **The ANALYSIS D15's certificate is PORTED from** — vendored 2026-08-27 because `bd 06t` and PRD §15 D15 §2 both say "port the reduction, do not re-derive the parity" and, measured, not one of the four guards they name appeared anywhere under `third_party/`. `cmake/CqopsFreePairingPin.cmake` makes its sha256 a **configure-time hard error**. Same rules as Bennett: READ-ONLY in the bytes, the pin and the prose. **Do NOT run it or add it to any build** — it is reading material, it imports CQ_lang's own modules and it expects CQ_lang's lowered IR |
 > | `docs/constructions/K01..K12.md` | The ported construction specs, each with a gate-count formula in `W`; `BASELINES.md` for upstream baselines |
 > | `docs/cqrt_census.txt` | The real `cqrt_*` census (**173** symbols) and the resolved template counts |
@@ -585,7 +585,7 @@ nothing in this repo pins. Quote a ratio and a pointer, never a number.
 | `ckd.17a`, `ckd.14` | PRD §10 / plan §0.1 (Step 8) | **One involution per step** — the driver re-calls `compute(env, s)` with the same argument. The certificate is an **ACT**, not a stored fact; `cq_shadow_retire` runs strictly *after* `cq_qubits_release`, so it never touches a live qubit. A live qubit may **never** be certified: read as a control it would stop poison propagating |
 | `vxk`, `r3y`, `ck6` | **PRD §15 D16** | The fp/`qram`/`tape`/`alloc_handle` disposition. Its **implemented** half is `cq_runtime_gate.c`; the loud-abort bucket is `shim/cq_runtime_v2.c`, shrunk twice as **D23** took the `tape` family in scope (`shim/cq_runtime_tape.c`) and **D24** the `qram` family at all nine widths (`shim/cq_runtime_qram.c`, an fp-width cell being a bit pattern), then GROWN once when the ABI was re-vendored at CQ_lang `170ede1` and widened by the nine `cqrt_ry_<W>_controlled` (purely additive, `opcode_table.yaml` byte-identical; `bd w9i`). Read the current counts from `nm`, not from here. The buckets are **by FAMILY first and by WIDTH second**, and the two worked examples run OPPOSITE ways: `cqrt_qram_alloc_f32` says qram and not fp (there is no addressable quantum array at i1 either), while `cqrt_ry_f32_controlled` says fp — the family is in scope and the WIDTH defers it, **forced**, since `cqrt_alloc_f<W>` is itself an abort so no fp rail handle can exist in v1. **AMENDED 2026-09-18 (`9ve.28`, v2 Wave 4): that clause is now TRUE AT f16/f32/f80 AND FALSE AT f64** — `cqrt_alloc_f64` / `measure` / `copy` / `ry` / `rz` and their `_controlled` forms are real code by WIDENING `cq_runtime_rail.c` / `cq_runtime_gate.c`, an f64 rail handle exists, and the bucket in `cq_runtime_v2.c` shrank accordingly. Read the count from `nm` |
 | `dzj` | **PRD §15 D17** | `cqrt_addc` is M15's Cuccaro accumulator in place, **never sandwiched** — Rule 8's driver would replay the compute half and undo the in-place write |
-| `819`, `3ep` | Step 22's name-rule partition | **2479 = 992 integer wrappers + 603 integer `_inv` aborts + 884 fp aborts** at v1, from `opcode_table.yaml` **only**. A symbol is fp-touching iff its **name** carries an `f16/f32/f64/f80` token. **Since 2026-09-18 (`9ve.28`) the fp bucket SHRINKS as each `(family, f64)` pair lands** — `shim/gen_shim.py`'s `LANDED` set names the pairs, its audit pins the split (`EXPECTED_BY_DOMAIN`), and a landed compare family also owes D14's `_inv` aborts. **Read the live split from `python3 shim/gen_shim.py`, never from here**; the first landing (`fcmp` at f64) moved 84 symbols. **Since 2026-09-19 (`9ve.36`) the key is a ROW, finer than a pair** — `(opcode, width)` for binary/unary/compare rows and `(opcode, from, to)` for casts, forced because `frem` and `fneg` share `fp_arith` with the four opcodes that landed; `DECLINED` gives one row its own abort reason without a fourth bucket (`uitofp i64 → f64`, `9ve.34`); the second landing (`fadd`/`fsub`/`fmul`/`fdiv` at f64 and seventeen conversion pairs) moved 101 symbols, and the audit's five-way split is what to quote |
+| `819`, `3ep` | Step 22's name-rule partition | **2479 = 992 integer wrappers + 603 integer `_inv` aborts + 884 fp aborts** at v1, from `opcode_table.yaml` **only**. A symbol is fp-touching iff its **name** carries an `f16/f32/f64/f80` token. **Since 2026-09-18 (`9ve.28`) the fp bucket SHRINKS as each `(family, f64)` pair lands** — `shim/gen_shim.py`'s `LANDED` set names the pairs, its audit pins the split (`EXPECTED_BY_DOMAIN`), and a landed compare family also owes D14's `_inv` aborts. **Read the live split from `python3 shim/gen_shim.py`, never from here**; the first landing (`fcmp` at f64) moved 84 symbols. **Since 2026-09-19 (`9ve.36`) the key is a ROW, finer than a pair** — `(opcode, width)` for binary/unary/compare rows and `(opcode, from, to)` for casts, forced because `frem` and `fneg` share `fp_arith` with the four opcodes that landed; `DECLINED` gives one row its own abort reason without a fourth bucket (`uitofp i64 → f64`, `9ve.34`); the second landing (`fadd`/`fsub`/`fmul`/`fdiv` at f64 and seventeen conversion pairs) moved 101 symbols, and the audit's five-way split is what to quote. **Since 2026-09-19 (`9ve.24`) the grid is 2880, not 2479** — PRD-v2 §6.1's two vendored tables add 389 + 12 rows expanded by `shim/gen_intrinsics.py` behind the same `Row` model, with a FOURTH bucket `defer` (the integer intrinsics, `9ve.29`, and `lrint`/`llrint`, §7.9) whose reason strings are true of those bodies where "fp is v2" would not be; `fma` and `sqrt` at f64 are the landed rows. The audit is now seven populations |
 | `ckd.19` / `_unc` ownership | PRD §10 (2026-08-14) | **`cqrt_free` is the SOLE deallocator.** `_unc` zeroes values in place and reclaims **nothing** — no pool operation, no bit-kind rewrite, no handle-table change. Forced empirically: the same `_unc` symbol appears both freed and deliberately never freed, the latter on a rail CQ_lang has proven entangled. **A rail `_unc`'d and never freed stays allocated for good — the intended Rule-6 safe leak, not a bug** |
 
 **Also settled 2026-08-14 and easy to re-open by accident.** i80 is **IN** scope; the two
@@ -659,8 +659,9 @@ ctest --test-dir build-release -j 8 --output-on-failure
 make lint
 cmake --build build-debug --target lint
 
-# The shim drift gate (bd kju): regenerate the 2479-symbol grid from the pinned
-# third_party/cq_lang/opcode_table.yaml and diff it against shim/generated/*.gen.c.
+# The shim drift gate (bd kju): regenerate the 2880-symbol grid (2479 until 9ve.24,
+# 2026-09-19) from the three pinned third_party/cq_lang/*.yaml and diff it against
+# shim/generated/*.gen.c.
 # `gen_shim.py --check` writes nothing, and HARD-FAILS rather than skipping when
 # python3 or PyYAML is missing — a drift gate that skips is one that is off.
 make shim-check
@@ -1648,7 +1649,7 @@ ctest --test-dir build-release -R l7
   the `_hl` shape.
 - **240 of the fp-touching symbols look integer-ish and are not** — the cross-domain casts
   (`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`) carry *both* an integer and a
-  floating-point width. The v1 partition that balances is **1595 + 884 = 2479**; older figures in
+  floating-point width. The v1 partition that balances is **1595 + 884 = 2479** (the OPCODE grid; the whole `cq_template_*` surface is 2880 since `9ve.24`); older figures in
   the PRD are stale by the i80 increments (PRD §1, `docs/cqrt_census.txt`). **The 884 is v2's
   moving figure** (`9ve.28`): each landed ROW leaves it — `(family, f64)` at the first landing,
   `(opcode, width)` / `(opcode, from, to)` since `9ve.36` (2026-09-19), when seventeen of the 240
@@ -1698,10 +1699,11 @@ ctest --test-dir build-release -R l7
 - **Do NOT add `H`, `T`, or any gate above 2 controls to the classical path** (Rule 4).
 - **Do NOT introduce a packed `uint64_t` classical/qmask scalar** anywhere (I5).
 - **Do NOT hand-write or fork the shim.** It is generated from CQ_lang's own
-  `opcode_table.yaml` so the symbol grid cannot drift from the ABI it must satisfy.
-  Edit **the generator** — never the generated `*.gen.c`, and never the pinned
-  `opcode_table.yaml` copy, which is a verbatim mirror of CQ_lang's frozen ABI. To
-  pick up an ABI change, re-copy it at a new pinned CQ_lang revision.
+  `opcode_table.yaml` — and, since 2026-09-19 (`9ve.24`, PRD-v2 §6.1), `intrinsic_table.yaml`
+  and `libm_table.yaml` — so the symbol grid cannot drift from the ABI it must satisfy.
+  Edit **the generator** — never the generated `*.gen.c`, and never a pinned yaml copy,
+  each a verbatim mirror of CQ_lang's frozen ABI. To pick up an ABI change, re-copy it at
+  a new pinned CQ_lang revision and record it in the matching `COMMIT*` file.
 - **Do NOT hand-write a reverse pass in a kernel** — use `cq_sandwich` (Rule 8).
 - **Do NOT add a `_controlled` variant of a kernel** — the axis is an emitter mode
   (Rule 9).

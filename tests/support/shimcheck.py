@@ -22,8 +22,23 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SHIM = os.path.join(ROOT, "shim")
 GENERATED = os.path.join(SHIM, "generated")
-YAML = os.path.join(ROOT, "third_party", "cq_lang", "opcode_table.yaml")
-MANIFEST = os.path.join(ROOT, "tests", "abi", "cq_templates_abi.txt")
+# THREE (yaml, manifest) PAIRS SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24), and
+# they are a LIST OF PAIRS rather than two parallel lists for the reason the
+# CMake side gives at more length: three manifests and three yamls is nine
+# pairings, of which three are right, and an arm that checked the intrinsic
+# manifest against the opcode yaml would be red on a correct tree.
+SOURCES = (
+    (os.path.join(ROOT, "third_party", "cq_lang", "opcode_table.yaml"),
+     os.path.join(ROOT, "tests", "abi", "cq_templates_abi.txt"), 2479),
+    (os.path.join(ROOT, "third_party", "cq_lang", "intrinsic_table.yaml"),
+     os.path.join(ROOT, "tests", "abi", "cq_intrinsic_templates_abi.txt"), 389),
+    (os.path.join(ROOT, "third_party", "cq_lang", "libm_table.yaml"),
+     os.path.join(ROOT, "tests", "abi", "cq_libm_templates_abi.txt"), 12),
+)
+N_GRID = sum(n for _, _, n in SOURCES)          # 2880
+
+YAML = SOURCES[0][0]
+MANIFEST = SOURCES[0][1]
 
 # A width token in a symbol NAME, which is how the fp/integer partition is
 # derived on the test side — from the ABI's own spelling, never from
@@ -50,6 +65,11 @@ LANDED_NAME = re.compile(
     r"|fptoui_f64_to_i(?:64|32|16|8|1)"
     r"|sitofp_i(?:64|32|16|8)_to_f64"
     r"|uitofp_i(?:32|16|8|1)_to_f64"
+    # --- intrinsic_table.yaml, vendored 2026-09-19 (bead 9ve.24). The four
+    # `fma` shapes at f64 and `sqrt` at f64; NOTHING at f16/f32/f80 and no
+    # other opcode from that table.
+    r"|fma_f64"
+    r"|sqrt_f64"
     r")(?:_|$)")
 
 # THE ROWS THAT ARE REFUSED RATHER THAN UNPORTED — gen_shim.DECLINED's test-side
@@ -80,8 +100,8 @@ def diff_sets(got, want, what):
           % (what, len(missing), missing[:4], len(extra), extra[:4]))
 
 
-def manifest_yaml_sha():
-    for line in open(MANIFEST):
+def manifest_yaml_sha(manifest=None):
+    for line in open(manifest or MANIFEST):
         m = re.match(r"^#\s+yaml-sha256\s*:\s*([0-9a-f]{64})$", line)
         if m:
             return m.group(1)
@@ -101,19 +121,32 @@ def manifest_decls():
     # the R3 comparison honest: the L4 goldens' COMMIT check hard-errors before
     # a golden is read, and a check that only sits in a case lets every other
     # case run against an unverified oracle.
-    sha = hashlib.sha256(open(YAML, "rb").read()).hexdigest()
-    recorded = manifest_yaml_sha()
-    check(sha == recorded,
-          "tests/abi manifest was extracted from a DIFFERENT opcode_table.yaml:\n"
-          "  pinned yaml : %s\n  manifest    : %s\n"
-          "  Re-pin, then re-extract from CQ_lang's regenerated header." % (sha, recorded))
     out = {}
-    for line in open(MANIFEST):
-        m = DECL.match(line.rstrip("\n"))
-        if m:
-            check(m.group(2) not in out, "duplicate declaration in the manifest: %s" % m.group(2))
-            out[m.group(2)] = line.rstrip("\n").rstrip(";")
-    check(len(out) == 2479, "manifest holds %d declarations, expected 2479" % len(out))
+    for yaml_path, manifest, n_want in SOURCES:
+        sha = hashlib.sha256(open(yaml_path, "rb").read()).hexdigest()
+        recorded = manifest_yaml_sha(manifest)
+        check(sha == recorded,
+              "%s was extracted from a DIFFERENT %s:\n"
+              "  pinned yaml : %s\n  manifest    : %s\n"
+              "  Re-pin, then re-extract from CQ_lang's regenerated header."
+              % (os.path.basename(manifest), os.path.basename(yaml_path),
+                 sha, recorded))
+        n = 0
+        for line in open(manifest):
+            m = DECL.match(line.rstrip("\n"))
+            if m:
+                # ACROSS ALL THREE, which is also the DISJOINTNESS claim: the
+                # three grids share no symbol name, measured at the vendoring
+                # and asserted here on every load.
+                check(m.group(2) not in out,
+                      "duplicate declaration across the manifests: %s" % m.group(2))
+                out[m.group(2)] = line.rstrip("\n").rstrip(";")
+                n += 1
+        check(n == n_want, "%s holds %d declarations, expected %d"
+              % (os.path.basename(manifest), n, n_want))
+    check(len(out) == N_GRID,
+          "the three manifests hold %d declarations, expected %d"
+          % (len(out), N_GRID))
     return out
 
 
@@ -189,6 +222,22 @@ DECLINED_REASON = (
     "would convert as a negative number (bead 9ve.34, PRD-v2 7.9)")
 
 
+# THE FOURTH BUCKET (bead 9ve.24). `"fp is v2"` printed at
+# `cq_template_ctpop_i32` would be a falsehood — an INTEGER opcode at an
+# INTEGER width that no amount of fp work reaches — and `lrint f64 -> i64`
+# touches a width that already SHIPS, so neither can honestly take the fp
+# reason. Both are transcribed here rather than imported from gen_shim, which
+# is what makes this an independent reading of what actually shipped.
+DEFER_INTRINSIC_REASON = (
+    "the integer llvm.* intrinsics are a v1-shaped port that has not run yet "
+    "— Bennett expands ctpop/ctlz/bswap/fshl in its extractor, so Rule 1 is "
+    "satisfiable (bead 9ve.29, PRD-v2 7.14)")
+DEFER_LIBM_REASON = (
+    "lrint/llrint have no soft_lrint upstream and ZERO corpus calls; they are "
+    "composable as soft_round then soft_fptosi the day a caller appears "
+    "(PRD-v2 7.9)")
+
+
 def bucket_of_body(body):
     text = "\n".join(body)
     if "cq_shim_unsupported(" not in text:
@@ -197,7 +246,25 @@ def bucket_of_body(body):
         return "fp"
     if '"%s"' % INV_REASON in text:
         return "inv"
+    if ('"%s"' % DEFER_INTRINSIC_REASON in text
+            or '"%s"' % DEFER_LIBM_REASON in text):
+        return "defer"
     return "abort-with-an-unrecognised-reason"
+
+
+# A NAME-BASED TWIN FOR THE FOURTH BUCKET, sharing nothing with the yamls. The
+# integer intrinsics and the two libm opcodes, by the only thing the test side
+# can see from outside: the symbol's own stem.
+DEFER_NAME = re.compile(
+    r"^cq_template_(?:"
+    r"bswap|bitreverse|fshl|fshr|ctpop|ctlz|cttz|abs"
+    r"|smin|smax|umin|umax|uadd_sat|sadd_sat|usub_sat|ssub_sat"
+    r"|lrint|llrint"
+    r")_")
+
+
+def is_defer(name):
+    return bool(DEFER_NAME.match(name))
 
 
 def run(cases, argv=None):

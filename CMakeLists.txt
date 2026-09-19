@@ -115,6 +115,7 @@ include(CqopsSanitizers)
 include(CqopsFpHost)
 include(CqopsPython)
 include(CqopsFreePairingPin)
+include(CqopsIntrinsicPin)
 
 # R3 for the VENDORED ANALYSIS, at configure time. The certificate in shim/ is a
 # PORT of third_party/cq_free_pairing/free_pairing_check.py (PRD §15 D15 §2,
@@ -122,6 +123,13 @@ include(CqopsFreePairingPin)
 # a kernel — and until now nothing checked them. See the module for why this is a
 # hard configure error and not a test.
 cqops_check_free_pairing_pin()
+
+# R3 for the VENDORED INTRINSIC AND LIBM TABLES (PRD-v2 §6.1, bead 9ve.24).
+# Same shape, applied twice: shim/gen_shim.py now EXPANDS those two yamls into
+# 401 of the 2,880 symbols the archive defines, so their bytes are exactly as
+# load-bearing as opcode_table.yaml's — which has had CqopsLinkWitness.cmake's
+# R3 arm behind it since Step 22.
+cqops_check_intrinsic_pin()
 
 enable_testing()
 
@@ -453,6 +461,28 @@ add_library(cqops STATIC
                                # compositions, instructions.jl's fourteen-row
                                # dispatch (four swaps, zero inversions), the
                                # fourteen entry points and the classical row
+    src/kernels/fma.c          # M39, K20 (v2) — the PROGRAM's ACCESSORS. The
+                               # 395-row table is src/kernels/fma_rows.inc, on
+                               # the fifth seam fma.h records (PROGRAM TEXT <->
+                               # PROGRAM ACCESSORS); `.inc` is Rule 12's own
+                               # exemption for a large static table, and the
+                               # alternative is ONE prefix sum in two files
+    src/kernels/fma_step.c     # M39, K20 (v2) — the ROW TABLES <-> STEP
+                               # MACHINE seam: the costs (asked of M12, M14,
+                               # M16, M17, M18, M31 and M32) and the layout
+    src/kernels/fma_operand.c  # M39, K20 (v2) — M33's COSTS-AND-LAYOUT <->
+                               # OPERAND RESOLUTION seam: the collapsing view
+                               # chain, the constants, the block outputs, the
+                               # three hand-off projections and the flags
+    src/kernels/fma_emit.c     # M39, K20 (v2) — the LAYOUT-AND-OPERANDS <->
+                               # DISPATCH-AND-SURFACE seam: one gate per slot
+                               # over sixteen offset blocks, and the
+                               # three-source kernel. src/kernels/fma_int.h is
+                               # the seam
+    src/kernels/fma_eval.c     # M39, K20 (v2) — the _eval <-> CIRCUIT seam:
+                               # soft_fma over uint64_t with a (hi, lo) pair
+                               # for the 128-bit intermediate, NEVER
+                               # unsigned __int128 and NEVER the host fma()
 
     # Layer 4 — the analog surface. Everything above this line is a classical
     # permutation over {X, CX, CCX} (Rule 4), which is the surface the two-bit
@@ -565,6 +595,15 @@ add_library(cqops STATIC
                                # as a second IR instruction) and the three
                                # integer cast entry points, which came with it;
                                # every guard it uses is cq_template_impl.c's
+    shim/cq_template_ternary.c # v2, bead 9ve.24 (2026-09-19) — the ARITY-3
+                               # ordered call sequence, on a FOURTH seam off
+                               # cq_template_impl.c recorded in
+                               # shim/cq_template_boundary.h before it was
+                               # taken. ONE family reaches it: `fma`,
+                               # intrinsic_table.yaml's only ternary opcode,
+                               # in four shapes with two literal lanes. No §9
+                               # region and no D14 `_inv` — that row has
+                               # neither variant. Eighth tag space, 0x50000000
     shim/cq_template_fparith.c # v2, bead 9ve.36 — the fp ARITHMETIC surface, on
                                # cq_template_fp.c's own recorded COMPARE <->
                                # ARITHMETIC seam: the nine cq_shim_fbin_*, the
@@ -598,6 +637,15 @@ add_library(cqops STATIC
     shim/generated/cq_template_int_to_fp.gen.c
     shim/generated/cq_template_int_width.gen.c
     shim/generated/cq_template_reinterpret.gen.c
+    # PRD-v2 §6.1's vendoring (bead 9ve.24, 2026-09-19): three MORE families,
+    # from third_party/cq_lang/intrinsic_table.yaml (389 symbols) and
+    # libm_table.yaml (12). 2479 + 389 + 12 = 2880, the whole cq_template_*
+    # link surface, and the three sets are pairwise DISJOINT. Listed
+    # explicitly for the reason above — a glob does not re-run when a family
+    # file DISAPPEARS.
+    shim/generated/cq_template_intrinsic_fp.gen.c
+    shim/generated/cq_template_intrinsic_int.gen.c
+    shim/generated/cq_template_libm.gen.c
 )
 
 target_include_directories(cqops

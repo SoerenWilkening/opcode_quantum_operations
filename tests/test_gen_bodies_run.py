@@ -72,9 +72,23 @@ def a_signature_that_diverges_from_the_abi_is_caught(defs=None):
 
     tmp = tempfile.mkdtemp(prefix="cqops-shim-bad-")
     try:
+        # ALL THREE GRIDS since PRD-v2 §6.1's vendoring (bead 9ve.24), and
+        # `files()` takes a sha PER SOURCE now because a banner can only name
+        # one provenance. The swap still lands only on `_lh` rows, which are
+        # `opcode_table.yaml`'s alone — the intrinsic table has no `lh`
+        # variant — so what the extra families add here is the compile of 401
+        # more bodies against the same ABI header, not a second provocation.
         gen_shim.signature = swapped
         table, sha = gen_shim.load(sc.YAML)
-        for fn, text in gen_shim.files(gen_shim.expand(table), sha).items():
+        itab, isha = gen_shim.load(sc.SOURCES[1][0])
+        ltab, lsha = gen_shim.load(sc.SOURCES[2][0])
+        rows = gen_shim.expand(table)
+        gen_shim.gen_intrinsics.expand_intrinsic(
+            itab, gen_shim._emitter(rows, itab["widths"]))
+        gen_shim.gen_intrinsics.expand_libm(
+            ltab, gen_shim._emitter(rows, ltab["widths"]))
+        shas = {"opcode": sha, "intrinsic": isha, "libm": lsha}
+        for fn, text in gen_shim.files(rows, shas).items():
             open(os.path.join(tmp, fn), "w").write(text)
     finally:
         gen_shim.signature = real

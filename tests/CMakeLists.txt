@@ -2955,6 +2955,161 @@ set_tests_properties(test_kernel_fadd_death.fadd_dst_aliases_its_first_source
 ## pairs at three mask rows. The wall clock is not a reason to cut the budget.
 add_cqops_test(test_kernel_fmul)
 
+## M39 `fma` — K20, `soft_fma` at f64: the LARGEST single transcription in the
+## catalogue (395 rows over 21 ops) and the FIRST three-source fp kernel
+## (bd 9ve.24). PRD-v2 §5's M39 row and its PRODUCT-AND-ALIGN <-> SINGLE-
+## ROUNDING seam, §6.1's vendoring (which is what puts `fma` on the link
+## surface at all), §7.1-7.4, §7.6's `_shiftRightJam128` D8 rows, §7.11's
+## three-source signature and §7.12's anchors.
+##
+## THIS IS THE SLOWEST SUITE IN THE PROJECT AND §7.13 SAYS SO IN ADVANCE:
+## 241,083 compute-half slots, twice per call under Rule 2, times a forced
+## anchor block of 53 triples at three mask rows. The wall clock is not a
+## reason to cut the budget.
+add_cqops_test(test_kernel_fma)
+
+## M39's fail-loud paths. THREE SOURCES MAKE SIX ALIASING PAIRS WHERE TWO MAKE
+## ONE, and each is driven separately because a guard written for the arity-2
+## shape and extended by copy-and-paste passes five of the six.
+add_cqops_death_test(test_kernel_fma_death CASES
+    width_is_not_64
+    width_is_128
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    a_block_with_no_region
+    a_block_with_no_operand_c
+    arity_of_an_unknown_op
+    row_width_outside_the_program
+    a_projection_of_a_row_that_returns_no_tuple
+    a_projection_of_a_row_that_is_not_earlier
+    an_operand_names_a_row_outside_the_program
+    a_64_lane_operand_names_a_one_bit_row
+    a_one_bit_operand_is_not_a_row_of_this_program
+    a_one_bit_operand_names_a_64_lane_row
+    an_unknown_64_lane_operand_code
+    the_cost_of_an_unknown_row_op
+    the_region_of_an_unknown_row_op
+    the_width_of_an_unknown_row_op
+    a_barrel_direction_asked_of_a_row_that_is_no_barrel
+    dst_aliases_its_first_source
+    dst_aliases_its_second_source
+    dst_aliases_its_third_source
+    sources_a_and_b_alias
+    sources_a_and_c_alias
+    sources_b_and_c_alias
+)
+
+## THE WIDTH REFUSAL IS M39'S OWN AND MUST STAY THERE. M31's `cq_fp_pack` and
+## `cq_fp_view` both abort on a width that is not 64, one layer down and after
+## the region has been drawn from the pool, so `fpfield:` and `fpclass:` are
+## pinned ABSENT. So is every sibling kernel's identical message: a dispatch
+## that reached `cq_kernel_fmul` instead would satisfy a bare abort assertion.
+set_tests_properties(test_kernel_fma_death.width_is_not_64
+                     test_kernel_fma_death.width_is_128
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fpfield:;fpclass:;fmul:;fadd:;fdiv:;fsqrt:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## THE STRUCTURAL GUARDS ARE M39'S AND NOT M08'S. `cq_scratch_span` names the
+## REGION rather than the consumer that mis-sized its offset, and a NULL `scr`
+## reaches it as a SIGSEGV in Release — which is not a SIGABRT and so is not a
+## death the window can see at all. `a_block_with_no_operand_c` additionally
+## pins that the THIRD rail is checked: a guard copied from the arity-2 shape
+## would resolve `a` and `b`, find them non-NULL, and hand the emitter a null
+## dereference instead of a diagnostic.
+set_tests_properties(test_kernel_fma_death.step_index_past_the_end
+                     test_kernel_fma_death.step_index_is_negative
+                     test_kernel_fma_death.block_region_is_one_bit_short
+                     test_kernel_fma_death.block_offset_runs_off_the_region
+                     test_kernel_fma_death.a_block_with_no_region
+                     test_kernel_fma_death.a_block_with_no_operand_c
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fma: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## D7a AND D7b ARE `cq_kernel_check_n`'s, AND THE WHOLE POINT OF DRIVING SIX
+## PAIRS IS THAT THE N-ARY GUARD SIZES EVERY RANGE PER OPERAND. M05's
+## Debug-gated distinctness assert is pinned absent because an unrefused alias
+## reaches a kernel with two coincident controls and aborts there in DEBUG
+## ONLY, a long way from its cause — and in Release emits `ccx q0 q0 q2` and
+## says nothing (bd d7-at-the-kernel-boundary).
+set_tests_properties(test_kernel_fma_death.dst_aliases_its_first_source
+                     test_kernel_fma_death.dst_aliases_its_second_source
+                     test_kernel_fma_death.dst_aliases_its_third_source
+                     test_kernel_fma_death.sources_a_and_b_alias
+                     test_kernel_fma_death.sources_a_and_c_alias
+                     test_kernel_fma_death.sources_b_and_c_alias
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "distinctness;emit:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;fma: W must be 64;fpfield:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## THE TABLE'S OWN ACCESSORS. Each names the PROGRAM and not a layout, because
+## fma.c is the file that knows which hand-off returns a tuple and fma_step.c's
+## contract is that not one line of it does.
+set_tests_properties(test_kernel_fma_death.arity_of_an_unknown_op
+                     test_kernel_fma_death.row_width_outside_the_program
+                     test_kernel_fma_death.a_projection_of_a_row_that_returns_no_tuple
+                     test_kernel_fma_death.a_projection_of_a_row_that_is_not_earlier
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fma: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## THE OPERAND-RESOLUTION REFUSALS (review round 1). A ROW INDEX AND AN OPERAND
+## CODE ARE M39'S OWN VOCABULARY, so nothing below can answer for any of these
+## — which makes the discriminator the OTHER `kernel:` sentences rather than
+## another layer's prefix. Each list therefore bans the five sibling messages
+## this pair of files owns, and the two `cq_fu_val64` rows ban the two
+## `cq_fu_flag_of` rows and vice versa: the four are one copy-and-paste apart,
+## and swapping `!= W64` for `!= 1` in either is the exact defect
+## fma_int.h calls "the refusal that gets forgotten" (measured on M36).
+set_tests_properties(test_kernel_fma_death.an_operand_names_a_row_outside_the_program
+                     test_kernel_fma_death.a_64_lane_operand_names_a_one_bit_row
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;one-bit operand;unknown 64-lane operand code;view chain;barrel direction;unknown op in the program;a row index outside the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+set_tests_properties(test_kernel_fma_death.a_one_bit_operand_is_not_a_row_of_this_program
+                     test_kernel_fma_death.a_one_bit_operand_names_a_64_lane_row
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;64-lane operand names;operand names a row outside the program;unknown 64-lane operand code;view chain;barrel direction;unknown op in the program;a row index outside the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## THE CONSTANT VOCABULARY. `CQ_FU_N_CODE`'s new `_Static_assert` pins the
+## SIZE of the enum and can say nothing about a caller that invents a code, so
+## this is the only detector; the row-index sentences are banned because a
+## negative code that fell into the row path would abort with one of them.
+set_tests_properties(test_kernel_fma_death.an_unknown_64_lane_operand_code
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;operand names a row;one-bit operand;the block has no operand;view chain;barrel direction;unknown op in the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## THE THREE ROW-OP SWITCHES, AND THEIR MESSAGES WERE MADE DISJOINT TO WRITE
+## THESE. All three take a ROW and all three now die on their `default:`;
+## `cq_fma_row_width`'s did not until this review, and a `default:` that
+## RETURNS makes a twenty-second op silently 64 lanes wide — the answer that
+## `cq_fu_val64` accepts and `cq_fu_flag_of` rejects, i.e. a wrong operand and
+## not a refusal. `cq_fu_row_steps`, `cq_fu_row_region` and `emit_row` all said
+## "unknown op in the program" until this review, three copies of one sentence
+## across two files, so no pin could tell which had spoken; they are now "the
+## cost of", "the region of" and the original, and each case below bans the
+## other four so that re-collapsing any two is caught here. That is M15's
+## remedy for `cq_addacc_check`, applied before the cases were written rather
+## than after one of them passed for the wrong reason.
+set_tests_properties(test_kernel_fma_death.the_cost_of_an_unknown_row_op
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the region of an unknown row op;the width of an unknown row op;arity of an unknown row op;unknown op in the program;barrel direction;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+set_tests_properties(test_kernel_fma_death.the_region_of_an_unknown_row_op
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the cost of an unknown row op;the width of an unknown row op;arity of an unknown row op;unknown op in the program;barrel direction;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+set_tests_properties(test_kernel_fma_death.the_width_of_an_unknown_row_op
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the cost of an unknown row op;the region of an unknown row op;arity of an unknown row op;unknown op in the program;a row index outside the program;barrel direction;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## AND THE BARREL DIRECTION, WHICH THE COST HALF AND THE DISPATCH HALF SHARE.
+## A silent `CQ_BARREL_SHL` for a row that is no barrel is a wrong step count
+## AND a wrong gate, and neither is visible at a count.
+set_tests_properties(test_kernel_fma_death.a_barrel_direction_asked_of_a_row_that_is_no_barrel
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;unknown op in the program;the cost of an unknown row op;the region of an unknown row op;the width of an unknown row op;arity of an unknown row op;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+
 ## M34's fail-loud paths. Which layer would answer for each guard, and why the
 ## regex names it, is in the death file's header.
 add_cqops_death_test(test_kernel_fmul_death CASES
@@ -3398,6 +3553,14 @@ set_tests_properties(test_kernel_fdiv_death.dst_aliases_its_first_source
 ## whose narrow rows are a COMPOSITION at the shim.
 add_cqops_test(test_template_fp)
 
+## M26 v2 — bead 9ve.24: the ARITY-3 surface. A separate binary from
+## test_template_fp for the same reason that one split off test_template: this
+## family's novelties are things no arity-2 family has — TWO literal lanes, SIX
+## aliasing pairs, a FOURTH slot in D15's record and an EIGHTH tag space — and
+## every case turns on one of them. test_template_fp.c stood at 279 counted
+## lines of Rule 12's 300 with three `.inc`s already on it.
+add_cqops_test(test_template_fma)
+
 add_cqops_death_test(test_template_fp_death CASES
     an_fbin_width_that_is_not_64_is_refused
     an_fbin_lh_width_that_is_not_64_is_refused
@@ -3494,3 +3657,82 @@ set_tests_properties(test_template_fp_death.an_fbin_unc_destination_is_not_the_w
                      test_template_fp_death.an_fcast_unc_destination_is_not_the_to_width
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;symbol names a width;conversion names a width pair;bead 9ve.34")
+
+## M39's ABI-side fail-loud paths — the ARITY-3 door (bd 9ve.24, review round
+## 1). A FIFTH DEATH BINARY, and separate from test_template_fp_death for the
+## reason that file is separate from test_template_death: its pins are written
+## against messages these cases must NOT produce, and every novelty here is one
+## arity 2 does not have — two literal lanes, three D7a lanes, and two enum
+## tables consulted in a fixed order by one request builder.
+add_cqops_death_test(test_template_fma_death CASES
+    a_ternary_width_that_is_not_64_is_refused
+    a_ternary_unc_width_that_is_not_64_is_refused
+    a_ternary_opcode_outside_the_abis_enum_is_refused
+    the_ternary_name_table_refuses_an_index_past_its_end
+    the_ternary_kernel_table_refuses_an_index_past_its_end
+    d7a_out_aliases_a_of_a_ternary_qqq_unc
+    d7a_out_aliases_b_of_a_ternary_qqq_unc
+    d7a_out_aliases_c_of_a_ternary_qqq_unc
+    d7a_out_aliases_b_of_a_ternary_qql_unc
+    d7a_out_aliases_c_of_a_ternary_qlq_unc
+    d7a_out_aliases_the_only_handle_of_a_ternary_qll_unc
+    a_ternary_unc_destination_is_not_the_width_its_symbol_names
+)
+
+## (1) THE TERNARY WIDTH DOOR IS HOISTED TO THE ENTRY POINT AND MUST STAY
+## THERE, and `kernel:` IS THE BAN THAT CARRIES THE WHOLE CLAIM.
+## `cq_kernel_fma` refuses `W != 64` in BOTH configurations — one layer down,
+## after `cq_tpl_ternary` has minted a rail and opened a D21 bracket it will
+## never close, which handoff §9 makes a FATAL parse error rather than a
+## cosmetic gap. Without that one ban, deleting `fma_width` leaves both cases
+## green. M31's `fpfield:`/`fpclass:` are banned on the same ground one layer
+## further down, and every SIBLING fp door's width sentence is banned because a
+## request builder wired to the wrong family would satisfy a bare abort.
+set_tests_properties(test_template_fma_death.a_ternary_width_that_is_not_64_is_refused
+                     test_template_fma_death.a_ternary_unc_width_that_is_not_64_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;fpclass:;sandwich:;scratch:;FATAL: reg:;distinctness;not the width its cq_template;is not one of the ABI enumerators;outside the ABI;arithmetic symbol names a width;unary symbol names a width;conversion names a width pair;bead 9ve.34")
+
+## (2) THE TWO ENUM TABLES ARE ONE MESSAGE, AND THE ENTRY POINT IDENTIFIES
+## NEITHER. `fma_req` consults `cq_tpl_fma_name` and then `cq_tpl_fma_kernel`
+## and both refuse the same value with the same sentence, so whichever is still
+## present satisfies the entry-point case — MEASURED both ways by widening one
+## threshold at a time, and each mutant reddened exactly one of the two direct
+## cases. They are the remedy CLAUDE.md records for `cq_addacc_check`, applied
+## to the SYMMETRIC form of the masking trap. Every SIBLING enum
+## sentence is banned — the fp families' and the integer ones' — because a
+## dispatch table that refused a legal selector, or one that answered from the
+## wrong family, would satisfy a bare abort assertion while breaking the door.
+set_tests_properties(test_template_fma_death.a_ternary_opcode_outside_the_abis_enum_is_refused
+                     test_template_fma_death.the_ternary_name_table_refuses_an_index_past_its_end
+                     test_template_fma_death.the_ternary_kernel_table_refuses_an_index_past_its_end
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;ternary symbol names a width;not the width its cq_template;outside the ABI;conversion names a width pair;bead 9ve.34;fp arithmetic opcode;fp conversion kind;fp unary opcode")
+
+## (3) D7a IS M07'S REFUSAL AND MUST STAY M07'S, on all four `_unc` shapes.
+## `FATAL: shim:` is banned outright — that one prefix covers `cq_t3_die`, the
+## width door, `cq_tpl_die`'s width token and the dispatch tables at once, so
+## the ternary file growing its own copy of the check is caught here rather
+## than by a reviewer. `operand check:` is banned because it prefixes every
+## reg_check message that is NOT D7a (not-live, freed rail, classical token)
+## and D7a's own sentence does not carry it, so a case that aborted for a
+## different reason inside the same function still fails. And `distinctness`,
+## because an unrefused D7a reaches `cq_kernel_check_n` with `dst == a` and
+## aborts there in DEBUG ONLY, a long way from its cause.
+set_tests_properties(test_template_fma_death.d7a_out_aliases_a_of_a_ternary_qqq_unc
+                     test_template_fma_death.d7a_out_aliases_b_of_a_ternary_qqq_unc
+                     test_template_fma_death.d7a_out_aliases_c_of_a_ternary_qqq_unc
+                     test_template_fma_death.d7a_out_aliases_b_of_a_ternary_qql_unc
+                     test_template_fma_death.d7a_out_aliases_c_of_a_ternary_qlq_unc
+                     test_template_fma_death.d7a_out_aliases_the_only_handle_of_a_ternary_qll_unc
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;FATAL: shim:;distinctness;kernel:;fpfield:;operand check:;I1:;I2:")
+
+## (4) THE `_unc` DESTINATION'S WIDTH IS A SEPARATE GUARD FROM THE SOURCES'.
+## All three sources here are f64 and pass the read door, so `cq_tpl_out` is
+## the only layer that can speak; the ternary width door is banned because
+## `bits == 64` has already passed it, and `FATAL: reg:` because all four rails
+## are live and M07 has nothing to say.
+set_tests_properties(test_template_fma_death.a_ternary_unc_destination_is_not_the_width_its_symbol_names
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;ternary symbol names a width;is not one of the ABI enumerators;outside the ABI;conversion names a width pair;bead 9ve.34")

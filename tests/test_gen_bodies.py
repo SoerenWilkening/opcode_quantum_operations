@@ -62,14 +62,27 @@ PARAM = re.compile(r"\b([a-z_]+_(?:handle|classical|flag))\b")
 OPCODES = {"add", "sub", "mul", "sdiv", "udiv", "srem", "urem", "and", "or",
            "xor", "shl", "lshr", "ashr", "icmp", "sext", "zext", "trunc",
            "fcmp", "fadd", "fsub", "fmul", "fdiv",
-           "fptosi", "fptoui", "sitofp", "uitofp"}
+           "fptosi", "fptoui", "sitofp", "uitofp",
+           # PRD-v2 §6.1's vendoring (bead 9ve.24): the two opcodes from
+           # intrinsic_table.yaml that LANDED.
+           "fma", "sqrt"}
+
+# THE TWO INTRINSIC SELECTORS, TRANSCRIBED INDEPENDENTLY. `fma`'s enumerator
+# happens to be the opcode upper-cased and `sqrt`'s is NOT — `CQ_SHIM_FUN_FSQRT`
+# carries the `f` the ABI's opcode token drops — so a rule that upper-cased the
+# stem would emit `CQ_SHIM_FUN_SQRT`, an enumerator that does not exist. The
+# mapping is spelled out for exactly that reason.
+INTRINSIC_SEL = {"fma": "CQ_SHIM_FMA_FMA", "sqrt": "CQ_SHIM_FUN_FSQRT"}
 # The enum prefix a dispatch SELECTOR may carry, and the opcode each implies.
 # The four `F*` prefixes are pairwise disjoint from their integer siblings —
 # checked in tests/test_gen_shim.py rather than assumed here — so the order of
 # this table is not load-bearing and `len(hit) == 1` below is what enforces it.
 SELECTORS = (("CQ_SHIM_OP_", None), ("CQ_SHIM_FOP_", None),
              ("CQ_SHIM_PRED_", "icmp"), ("CQ_SHIM_FPRED_", "fcmp"),
-             ("CQ_SHIM_CAST_", None), ("CQ_SHIM_FCAST_", None))
+             ("CQ_SHIM_CAST_", None), ("CQ_SHIM_FCAST_", None),
+             # The two intrinsic prefixes. `fma` takes the None rule (its
+             # enumerator IS its opcode); `sqrt` cannot, so it is named.
+             ("CQ_SHIM_FMA_", None), ("CQ_SHIM_FUN_", "sqrt"))
 
 
 def wrappers(defs):
@@ -131,9 +144,14 @@ def expected_args(name, decl):
         # token is the discriminator here, where gen_bodies uses the yaml's
         # `domain`, so the two routes are independent and disagree exactly when
         # one of them is wrong.
-        m = re.match(r"([a-z]+)_([if]\d+)", stem)
-        pre = "CQ_SHIM_FOP_" if m.group(1) in FP_BINOPS else "CQ_SHIM_OP_"
-        head = [pre + m.group(1).upper(), str(BITS[m.group(2)])]
+        m = re.match(r"([a-z_]+?)_([if]\d+)", stem)
+        if m.group(1) in INTRINSIC_SEL:
+            # THE TWO LANDED INTRINSICS, whose selector is a NAMED constant
+            # rather than a derived one — see INTRINSIC_SEL.
+            head = [INTRINSIC_SEL[m.group(1)], str(BITS[m.group(2)])]
+        else:
+            pre = "CQ_SHIM_FOP_" if m.group(1) in FP_BINOPS else "CQ_SHIM_OP_"
+            head = [pre + m.group(1).upper(), str(BITS[m.group(2)])]
     # Declaration order IS ABI order: `out_handle`/`ctrl_flag` is argument 0
     # (opcode_table.yaml:43-55), so walking the declaration pins their position
     # in the call too.
@@ -169,8 +187,9 @@ def no_wrapper_is_inert(defs=None):
     # 1048 until bead 9ve.36 added the fp ARITHMETIC surface: 30 `fp_arith`
     # bodies at f64 and 34 cross-domain conversion bodies, wrappers on exactly
     # the same terms as an integer one, ONE CALL EACH.
+    # AND 1122 SINCE bead 9ve.24's VENDORING: `fma` x8 and `sqrt` x2 at f64.
     w = wrappers(defs or SHIPPED)
-    sc.check(len(w) == 1112, "expected 1112 wrappers, got %d" % len(w))
+    sc.check(len(w) == 1122, "expected 1122 wrappers, got %d" % len(w))
     for name, body in sorted(w.items()):
         one_call(name, body)
 
@@ -198,7 +217,7 @@ def the_wrapper_calls_cover_all_twenty_six_dispatched_opcodes(defs=None):
     sc.diff_sets(seen, OPCODES, "opcodes DISPATCHED by a wrapper body")
 
 
-def the_wrapper_shape_split_is_444_forward_444_unc_224_controlled(defs=None):
+def the_wrapper_shape_split_is_449_forward_449_unc_224_controlled(defs=None):
     # 389/389/214, then 417/417/214 when `fcmp` landed (its 28 new wrappers are
     # forwards and `_unc`s and the CONTROLLED figure did not move, because
     # compares get no controlled grid on ANY axis). Bead 9ve.36 is the first
@@ -212,8 +231,8 @@ def the_wrapper_shape_split_is_444_forward_444_unc_224_controlled(defs=None):
         entry = one_call(name, body)[0]
         got["unc" if entry.endswith("_unc") else
             "controlled" if entry.endswith("_ctrl") else "fwd"] += 1
-    sc.check(got == {"fwd": 444, "unc": 444, "controlled": 224},
-             "shape split: expected 444/444/224, got %r" % got)
+    sc.check(got == {"fwd": 449, "unc": 449, "controlled": 224},
+             "shape split: expected 449/449/224, got %r" % got)
     ctrl = {n for n, b in wrappers(defs or SHIPPED).items()
             if one_call(n, b)[0].endswith("_ctrl")}
     sc.check(not any("cmp_" in n for n in ctrl),
@@ -263,19 +282,26 @@ def the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type(defs=None)
     # carrying BOTH macro pairs, or an fp body carrying the integer pair, moves
     # one of these two numbers and not the other.
     fp = {n2 for n2, b in wrappers(defs).items() if "CQ_SHIM_F64_LO(" in b[0]}
-    sc.check(len(fp) == 46,
-             "expected 46 wrappers carrying an f64 bit-pattern literal, got %d"
+    sc.check(len(fp) == 52,
+             "expected 52 wrappers carrying an f64 bit-pattern literal, got %d"
              % len(fp))
-    sc.check(all("_f64_hl" in n2 or "_f64_lh" in n2 for n2 in fp),
-             "an f64 bit-pattern literal appears outside an `_hl`/`_lh` shape "
-             "at f64: %s" % sorted(fp)[:4])
+    # SIX MORE SHAPES SINCE bead 9ve.24, and they are the reason this list is
+    # not `_hl`/`_lh`: a TERNARY carries its literal in the `b` lane, the `c`
+    # lane or both, so the shape tokens are `_qql`, `_qlq` and `_qll`. `_qll`
+    # carries TWO — one pair per lane — and one shared pair would make
+    # `fma(a, 2.0, 3.0)` compute `fma(a, 3.0, 3.0)`.
+    sc.check(all(any(t in n2 for t in ("_f64_hl", "_f64_lh", "_f64_qql",
+                                       "_f64_qlq", "_f64_qll"))
+                 for n2 in fp),
+             "an f64 bit-pattern literal appears outside a literal-carrying "
+             "shape at f64: %s" % sorted(fp)[:4])
     # AND IT IS THE TWO FAMILIES IT SHOULD BE. A cross-domain CAST has no
     # classical operand at all, so one appearing here would mean the generator
     # had invented a literal for an arity-1 symbol.
-    sc.check(sorted({n2.split("_")[2] for n2 in fp}) == ["fadd", "fcmp",
-                                                         "fdiv", "fmul", "fsub"],
+    sc.check(sorted({n2.split("_")[2] for n2 in fp}) == ["fadd", "fcmp", "fdiv",
+                                                         "fma", "fmul", "fsub"],
              "the f64 literal carriers are not fcmp + the four fp_arith "
-             "opcodes: %s" % sorted({n2.split("_")[2] for n2 in fp}))
+             "opcodes + fma: %s" % sorted({n2.split("_")[2] for n2 in fp}))
     sc.check(not (fp & {n2 for n2, b in wrappers(defs).items()
                         if "CQ_SHIM_LO(" in b[0]}),
              "a wrapper carries both the integer and the fp literal macros")
@@ -312,13 +338,33 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
     # and seventeen sibling conversion pairs already ship. All THREE of its
     # symbols take the bead's reason, including the `_inv`, because D14's
     # sentence attaches to a family-width that has LANDED and this one has not.
+    # AND A FOURTH AND FIFTH SINCE 2026-09-19 (bead 9ve.24), WHICH ARE A FOURTH
+    # BUCKET. PRD-v2 §6.1's vendoring brought in 389 + 12 symbols, and `"fp is
+    # v2"` is FALSE of most of them: `cq_template_ctpop_i32` is an integer
+    # opcode at an integer width that no fp release reaches, and
+    # `cq_template_lrint_f64_to_i64` touches a width that already SHIPS. The
+    # integer intrinsics cite bead 9ve.29 and the two libm opcodes cite §7.9.
     for name, body in aborts(defs).items():
         if sc.is_declined(name):
             want = sc.DECLINED_REASON
+        elif sc.is_defer(name):
+            want = (sc.DEFER_LIBM_REASON
+                    if name.startswith(("cq_template_lrint",
+                                        "cq_template_llrint"))
+                    else sc.DEFER_INTRINSIC_REASON)
         else:
             want = sc.FP_REASON if sc.is_deferred_fp(name) else sc.INV_REASON
         sc.check('"%s"' % want in "\n".join(body),
                  "%s: abort reason is not %r" % (name, want))
+    # THE FOUR REASONS ARE PAIRWISE DISTINCT, which is what makes
+    # `bucket_of_body` a partition rather than a first-match.
+    reasons = [sc.FP_REASON, sc.INV_REASON, sc.DECLINED_REASON,
+               sc.DEFER_INTRINSIC_REASON, sc.DEFER_LIBM_REASON]
+    sc.check(len(set(reasons)) == len(reasons),
+             "two abort reasons are the same string")
+    deferred = {n for n in aborts(defs) if sc.is_defer(n)}
+    sc.check(len(deferred) == 249,
+             "expected 249 deferred aborts, got %d" % len(deferred))
     declined = {n for n in aborts(defs) if sc.is_declined(n)}
     sc.check(len(declined) == 3,
              "expected 3 declined aborts, got %d" % len(declined))
@@ -433,7 +479,7 @@ def the_new_fp_shapes_are_pinned_body_by_body(defs=None):
 CASES = [
     no_wrapper_is_inert,
     the_wrapper_calls_cover_all_twenty_six_dispatched_opcodes,
-    the_wrapper_shape_split_is_444_forward_444_unc_224_controlled,
+    the_wrapper_shape_split_is_449_forward_449_unc_224_controlled,
     every_wrapper_body_is_exactly_the_call_its_symbol_names,
     the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type,
     every_abort_body_names_its_own_symbol_and_silences_its_parameters,

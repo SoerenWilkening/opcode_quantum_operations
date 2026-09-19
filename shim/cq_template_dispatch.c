@@ -15,6 +15,7 @@
 #include "kernels/fconv.h"
 #include "kernels/fdiv.h"
 #include "kernels/fmul.h"
+#include "kernels/fma.h"
 #include "kernels/fsqrt.h"
 #include "kernels/mul.h"
 #include "kernels/shift_var.h"
@@ -193,6 +194,21 @@ cq_tpl_cast_fn cq_tpl_fun_kernel(cq_shim_fun_op op)
     return K[op];
 }
 
+/* THE ARITY-3 TABLE. One row, and the `_Static_assert` is what makes a second
+ * ternary opcode arriving upstream break the BUILD rather than read past the
+ * end — the reason every other table here carries one. */
+cq_tpl_fma_fn cq_tpl_fma_kernel(cq_shim_fma_op op)
+{
+    static const cq_tpl_fma_fn K[] = { cq_kernel_fma };
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FMA_FMA + 1u,
+                   "one kernel per cq_shim_fma_op");
+
+    if ((unsigned)op > (unsigned)CQ_SHIM_FMA_FMA)
+        cq_disp_die("the fp ternary opcode is not one of the ABI enumerators",
+                    (int32_t)op);
+    return K[op];
+}
+
 cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind)
 {
     static const cq_tpl_cast_fn K[] = {
@@ -300,6 +316,18 @@ const char *cq_tpl_fcast_name(cq_shim_fcast_kind kind)
         cq_disp_die("the fp conversion kind is not one of the ABI enumerators",
                     (int32_t)kind);
     return N[kind];
+}
+
+const char *cq_tpl_fma_name(cq_shim_fma_op op)
+{
+    static const char *const N[] = { "fma" };
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FMA_FMA + 1u,
+                   "one display name per cq_shim_fma_op");
+
+    if ((unsigned)op > (unsigned)CQ_SHIM_FMA_FMA)
+        cq_disp_die("the fp ternary opcode is not one of the ABI enumerators",
+                    (int32_t)op);
+    return N[op];
 }
 
 const char *cq_tpl_fun_name(cq_shim_fun_op op)

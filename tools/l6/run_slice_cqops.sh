@@ -108,9 +108,21 @@ set -f
 # shellcheck disable=SC2086
 "$LINKCC" -c $LDX -I"$REPO/include" "$HERE/l6_residue.c" \
          -o "$TMP/l6_residue.o" 2>> "$OUT.link"
+# THE TWO CQ_lang STUB OBJECTS ARE GONE FROM THIS LINE (PRD-v2 §6.1, bead
+# 9ve.24), AND THEIR ABSENCE IS THE POINT OF THE VENDORING. Until 2026-09-19
+# libcqops left `intrinsic_table.yaml`'s 389 and `libm_table.yaml`'s 12
+# `cq_template_*` symbols undefined, so every fixture that called `ctlz`,
+# `ctpop`, `bswap`, `fshl` or `fma` needed CQ_lang's own trace-only bodies —
+# whose minting arms call `cqrt_alloc_handle`, which PRD §15 D16 makes a loud
+# abort. §6.1's decision was to OWN those symbols; the archive now defines all
+# 2,880, so passing the stub objects as well is a DUPLICATE-SYMBOL hard error.
+# Loud, at the link stage, and the good failure mode — but it has to go in the
+# same commit as the definitions, which is why this edit is not optional.
+#
+# `l6_run.py` and `l7_run.py` no longer extract them either, and
+# `tools/bitlevel/run.sh` carries the same change for the same reason.
 # shellcheck disable=SC2086
-"$LINKCC" $LDX "$TMP/s2.o" "$OBJDIR/cq_intrinsic_templates.c.o" \
-         "$OBJDIR/cq_libm_templates.c.o" "$TMP/l6_residue.o" "$CQOPS" $LDLIBS \
+"$LINKCC" $LDX "$TMP/s2.o" "$TMP/l6_residue.o" "$CQOPS" $LDLIBS \
          -Wl,-map,"$OUT.map" -o "$OUT.bin" 2>> "$OUT.link"
 set +f
 

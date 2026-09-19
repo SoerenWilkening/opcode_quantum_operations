@@ -1,0 +1,193 @@
+# tools/intrinsic_table.yaml — curated reversible llvm.* idiom intrinsics
+# (Phase 7.1 Increment E). SIBLING of opcode_table.yaml; the 1732 opcode-table
+# symbol count is UNTOUCHED. Drives the same generator
+# (tools/gen_templates.py::enumerate_intrinsics) into a SEPARATE artifact:
+#   - runtime/cq_intrinsic_templates.h   (extern "C" declarations)
+#   - runtime/cq_intrinsic_templates.c   (printf-trace stubs)
+# with its OWN yaml-sha256 banner, compiled into the SAME libcq_templates.a.
+#
+# Every emitted symbol is `cq_template_<op>_<W>[...]` (the SAME prefix as the
+# opcode templates) so the whole-DAG uncompute spine recognizes them by prefix
+# with ZERO new code: DagTraversal::isTemplateProducer / isDataProducer (producer
+# recovery), EmitInverse's `_unc` branch (whole-DAG reversal), the Uncomputation
+# invertibility pre-scan, and the WidthDispatch Shape::{Unary,QQ,HL,LH} callees.
+# Each intrinsic is lowered as an ADDITIVE PRODUCER (fresh out rail, sources kept
+# live) so the generic `_unc(out, srcs…)` zeros the out rail by recomputing
+# f(sources) — never recovering the input (R-E source-liveness, Rule 8).
+#
+# ----------------------------------------------------------------------------
+# CURATION GUARD (Prime Directive): a row enters ONLY with a written analytic
+# adjoint proof. See docs/prd/phase-07-expressiveness/INTRINSIC_TABLE_CLEARANCE.md.
+#   class 1 — bijection: fwd + inv + unc.
+#       self_inverse  — involution, f⁻¹ = f (bswap, bitreverse). `_inv` re-applies.
+#       rotate_back   — fshl/fshr rotation (arg0==arg1, constant amount n):
+#                       (fshl by n)⁻¹ = rotate by (W−n). `_inv` rotates back.
+#   class 2 — non-injective but pure total: fwd + unc only (NO inv — not
+#       invertible). Reversibilizable PRECISELY because `_unc` recomputes
+#       f(sources) from the still-LIVE source operands and XORs the out rail to
+#       |0⟩ — it never recovers the input. The fence is SOURCE-LIVENESS.
+#
+# SHAPES (reuse VARIANT_INFO + abi_codegen a1/ua1/qq/hl/lh/uqq/uhl/ulh; the
+# ternary fma shapes qqq/qql/qlq/qll add the ONE abi_codegen edit, wd2p). `arity`:
+#   unary   — one data handle: shape a1 (fwd/inv) / ua1 (unc). Width from the
+#             intrinsic RESULT type (a real iN). For abs/ctlz/cttz the trailing
+#             i1 immarg flag (poison-on-INT_MIN / zero-is-undef) is a CONSTANT
+#             dropped at lowering — the lowered op is the TOTAL reversible
+#             function; both fwd and `_unc` use the same total f, so the rail
+#             zeroes correctly (poison-on-edge-input is a valid refinement of the
+#             source UB). bswap requires a 16-bit-multiple width (no bswap.i8).
+#   binary  — two operands: QQ/HL/LH exactly like add/mul. Commutative ops carry
+#             qq+hl only; non-commutative add the lh shape.
+#   rotate  — fshl/fshr: a single data handle + a constant rotation amount n,
+#             lowered as the _hl shape (handle, iN n). A dynamic (tainted) n or
+#             arg0!=arg1 is NOT this idiom and declines.
+#   ternary — fma/fmuladd: a*b + c. The product pair (a,b) is COMMUTATIVE
+#             (canonicalized handle-before-literal so the first slot is always a
+#             handle); the addend c is POSITIONAL. 4 shapes qqq/qql/qlq/qll keyed
+#             by (pair) x (addend) — the all-literal product folds to a constant
+#             (never an fma). The void `_unc` twin (uqqq/uqql/uqlq/uqll) prepends
+#             `out` and recomputes f(sources) — the SAME Class-2 model as binary.
+#
+# ----------------------------------------------------------------------------
+# fp-MATH family (p119, Rule 18): ONLY the HARDWARE-BACKED fp intrinsics are
+# curated — sqrt + the rounding family (floor/ceil/trunc/round/rint/nearbyint) +
+# fabs/copysign + fmin/fmax + fma/fmuladd — at f16/f32/f64 and (bd 3c6m.4) the
+# long-double f80 (the `…l` variants; f128 deferred). These codegen to a hardware
+# instruction (sqrtsd/roundsd/andpd/mulsd+addsd) with NO libcall, so they have no
+# injectable body. They are Class-2 recompute-from-live-source producers (a tainted
+# math result reaching a rotation arg-1 STILL loud-declines — the angle fence is
+# positional, enforced upstream by declineTaintedAngle, NOT here; see bd
+# [fp-angle-fence-ordering-invariant]). fp admission is PER-ID in widthInTableSet —
+# NEVER a blanket fp open (the f64 angle/data miscompile family). The ternary
+# fma/fmuladd family (wd2p) is curated below.
+#
+# EXCLUDED — LIBRARY functions, compiled by SOURCE INJECTION not recognition
+# (p119): the transcendentals sin/cos/tan/asin/acos/atan/sinh/cosh/tanh/exp/exp2/
+# log/log2/log10 and pow (all tail-call a libcall) — a tainted un-injected call to
+# these declines loudly (kMsgUnknownCallee). Also excluded: *.with.overflow
+# ({iN,i1} aggregate), direct-libm @calls (cbrt/erf/atan2/hypot/…), vector/`i128`-fp
+# widths, the general (x!=y) funnel shift. Curation is by EXACT Intrinsic::ID —
+# NEVER by name prefix.
+# ============================================================================
+
+version: "1"
+phase: "phase7.1-E"
+
+# Widths reference (subset of opcode_table widths). INT widths drive the
+# Increment-E idiom intrinsics; the fp widths (f16/f32/f64/f80) drive the
+# iw81.4.b fp-math family (f80 = long double on x86-64, bd 3c6m.4; f128 deferred).
+# abi_codegen.py carries the _Float16/float/double/long-double ctypes (the
+# f64/angle fence lives in the IR pass, not the C ABI).
+widths:
+  i1:  { bits: 1,  c_type: "bool",     domain: "int" }
+  i8:  { bits: 8,  c_type: "int8_t",   domain: "int" }
+  i16: { bits: 16, c_type: "int16_t",  domain: "int" }
+  i32: { bits: 32, c_type: "int32_t",  domain: "int" }
+  i64: { bits: 64, c_type: "int64_t",  domain: "int" }
+  f16: { bits: 16, c_type: "_Float16", domain: "fp"  }
+  f32: { bits: 32, c_type: "float",    domain: "fp"  }
+  f64: { bits: 64, c_type: "double",   domain: "fp"  }
+  # f80 (bd 3c6m.4): the long-double width for the `…l` fp-math intrinsics
+  # (sinl/sqrtl/powl/fmal/… → @llvm.<fn>.f80 on x86-64). c_type `long double`.
+  # f128 (AArch64) deferred — not shipped (a tainted fp128 declines upstream).
+  f80:  { bits: 80,  c_type: "long double", domain: "fp" }
+
+# Curated intrinsics. `op` is the symbol stem; `llvm_id` documents the
+# Intrinsic:: name the TaintPropagation accept-list keys on (exact ID, never
+# prefix). `commutative` (binary only) selects the qq+hl vs qq+hl+lh grid.
+intrinsics:
+  # ---- Class 1: bijections (fwd / inv / unc) -------------------------------
+  # bswap — byte reversal, an INVOLUTION (bswap(bswap(x))==x). 16-bit-multiple
+  # widths only (llvm.bswap rejects i8). Adjoint: self-inverse.
+  - { op: bswap, llvm_id: bswap, class: 1, reversibility: self_inverse, arity: unary, widths: [i16,i32,i64], variants: [fwd, inv, unc] }
+  # bitreverse — bit reversal, an INVOLUTION (bitreverse(bitreverse(x))==x); any
+  # width. Adjoint: self-inverse.
+  - { op: bitreverse, llvm_id: bitreverse, class: 1, reversibility: self_inverse, arity: unary, widths: [i8,i16,i32,i64], variants: [fwd, inv, unc] }
+  # fshl/fshr — funnel shift in the ROTATION case (arg0==arg1, constant amount).
+  # A bijection; adjoint rotates back ((fshl by n)⁻¹ = fshr by n = fshl by W−n).
+  - { op: fshl, llvm_id: fshl, class: 1, reversibility: rotate_back, arity: rotate, widths: [i8,i16,i32,i64], variants: [fwd_hl, inv_hl, unc_hl] }
+  - { op: fshr, llvm_id: fshr, class: 1, reversibility: rotate_back, arity: rotate, widths: [i8,i16,i32,i64], variants: [fwd_hl, inv_hl, unc_hl] }
+
+  # ---- Class 2: non-injective but pure total (fwd / unc only) --------------
+  # fshl/fshr in the GENERAL funnel case (arg0!=arg1, constant amount, BOTH data
+  # operands runtime quantum handles) — the (ix<<16)|(i0>>16) ld80 word-extract
+  # idiom (s_erfl.c:264/343, erfl/erfcl). fshl(a,b,n) = (a<<n)|(b>>(W-n)):
+  # NON-injective jointly over (a,b) (it keeps the low W-n bits of a and the high
+  # n bits of b, discarding the rest), so it is Class-2 — NO `_inv` twin. It is a
+  # reversible ADDITIVE PRODUCER exactly like fma: |a>|b>|0> -> |a>|b>|fshl(a,b,n)>,
+  # the void `_unc(out,a,b,n)` recomputes fshl(a,b,n) from the still-LIVE a,b,n and
+  # XORs the out rail to |0> (source-liveness, Rule 8; it NEVER recovers an input).
+  # The constant amount n is a COMPILE-TIME literal (needed statically for the
+  # recompute); it rides the qql literal slot. REUSES the ternary qql SHAPE (Rule
+  # 14) — a distinct symbol stem (`fshl`/`fshr`) gives a distinct symbol from the
+  # fma qql, and the uncompute spine / WidthDispatch / EmitInverse all handle it
+  # with ZERO new code. ONLY the QQ case (both data operands handles) is generated:
+  # a funnel with a ConstantInt data operand is folded by instcombine to a plain
+  # shl/or (never arises); a tainted+classical-runtime mix declines loudly at the
+  # rewriter (diagnoseNoTemplate); a dynamic amount / non-table width rides the
+  # loud escape decline. See docs/prd/phase-07-expressiveness/INTRINSIC_TABLE_CLEARANCE.md.
+  - { op: fshl, llvm_id: fshl, class: 2, reversibility: pure_noninjective, arity: funnel, widths: [i8,i16,i32,i64], variants: [fwd_qql, unc_qql] }
+  - { op: fshr, llvm_id: fshr, class: 2, reversibility: pure_noninjective, arity: funnel, widths: [i8,i16,i32,i64], variants: [fwd_qql, unc_qql] }
+
+  # ---- Class 2: non-injective but pure total (fwd / unc only) --------------
+  # popcount / count-leading-zeros / count-trailing-zeros / absolute value —
+  # unary, non-injective. Reversible via recompute-from-live-source `_unc`.
+  - { op: ctpop, llvm_id: ctpop, class: 2, reversibility: pure_noninjective, arity: unary, widths: [i8,i16,i32,i64], variants: [fwd, unc] }
+  - { op: ctlz,  llvm_id: ctlz,  class: 2, reversibility: pure_noninjective, arity: unary, widths: [i8,i16,i32,i64], variants: [fwd, unc] }
+  - { op: cttz,  llvm_id: cttz,  class: 2, reversibility: pure_noninjective, arity: unary, widths: [i8,i16,i32,i64], variants: [fwd, unc] }
+  - { op: abs,   llvm_id: abs,   class: 2, reversibility: pure_noninjective, arity: unary, widths: [i8,i16,i32,i64], variants: [fwd, unc] }
+  # min/max — binary, COMMUTATIVE, non-injective. Reversible via recompute `_unc`.
+  - { op: smin, llvm_id: smin, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  - { op: smax, llvm_id: smax, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  - { op: umin, llvm_id: umin, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  - { op: umax, llvm_id: umax, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  # saturating add/sub — binary, non-injective. add.sat COMMUTATIVE; sub.sat NOT
+  # (a-b != b-a) so it adds the lh shape.
+  - { op: uadd_sat, llvm_id: uadd_sat, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  - { op: sadd_sat, llvm_id: sadd_sat, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  - { op: usub_sat, llvm_id: usub_sat, class: 2, reversibility: pure_noninjective, arity: binary, commutative: false, widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, fwd_lh, unc_qq, unc_hl, unc_lh] }
+  - { op: ssub_sat, llvm_id: ssub_sat, class: 2, reversibility: pure_noninjective, arity: binary, commutative: false, widths: [i8,i16,i32,i64], variants: [fwd_qq, fwd_hl, fwd_lh, unc_qq, unc_hl, unc_lh] }
+
+  # ---- iw81.4.b: fp-math family (Class 2, fwd / unc only) ------------------
+  # 22 unary transcendental / round / fabs intrinsics. All non-injective pure
+  # total fp functions (sqrt is injective on its domain but is uniformly Class-2
+  # — its `_unc` recomputes sqrt(live source) and XORs the out rail to |0⟩, never
+  # recovering the input). The arg is a single fp data handle; the angle fence is
+  # positional and enforced upstream (declineTaintedAngle), never in this table.
+  # Domain-restricted fns (log/sqrt/asin) are curated at recognition (the trace
+  # computes no NaN; |0⟩-rail domain proof is a deferred Phase-9 backend concern,
+  # mirroring the shipped abs-on-INT_MIN precedent). f16 rows ride decline-safe if
+  # clang promotes _Float16 transcendentals to f32 (the f16 form simply never arises).
+  # p119 (Rule 18): the transcendentals (sin/cos/tan/asin/acos/atan/sinh/cosh/tanh/
+  # exp/exp2/log/log2/log10) were REMOVED — they codegen to a libcall (no hardware
+  # instruction) so they are LIBRARY functions, compiled by SOURCE INJECTION, not by
+  # name-recognition. Only the hardware-backed fp intrinsics remain (sqrt + rounding
+  # family + fabs/copysign + fmin/fmax + fma).
+  - { op: sqrt,      llvm_id: sqrt,      class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  - { op: floor,     llvm_id: floor,     class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  - { op: ceil,      llvm_id: ceil,      class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  - { op: trunc,     llvm_id: trunc,     class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  - { op: round,     llvm_id: round,     class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  - { op: rint,      llvm_id: rint,      class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  - { op: nearbyint, llvm_id: nearbyint, class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  - { op: fabs,      llvm_id: fabs,      class: 2, reversibility: pure_noninjective, arity: unary, widths: [f16,f32,f64,f80], variants: [fwd, unc] }
+  # binary COMMUTATIVE fp (fmin/fmax = llvm.minnum/maxnum), qq+hl:
+  - { op: fmin, llvm_id: minnum, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [f16,f32,f64,f80], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  - { op: fmax, llvm_id: maxnum, class: 2, reversibility: pure_noninjective, arity: binary, commutative: true,  widths: [f16,f32,f64,f80], variants: [fwd_qq, fwd_hl, unc_qq, unc_hl] }
+  # binary NON-commutative fp copysign (operand order is semantic), qq+hl+lh.
+  # p119: pow REMOVED — it codegens to a libcall (library function, source-injected).
+  - { op: copysign, llvm_id: copysign, class: 2, reversibility: pure_noninjective, arity: binary, commutative: false, widths: [f16,f32,f64,f80], variants: [fwd_qq, fwd_hl, fwd_lh, unc_qq, unc_hl, unc_lh] }
+
+  # ---- wd2p: ternary fp fma/fmuladd (Class 2, fwd / unc only) --------------
+  # fma(a,b,c) = a*b + c. BOTH llvm.fma (must-fuse) and llvm.fmuladd (may-fuse,
+  # the default -O1 contraction of `a*b+c`) map to this single `fma` stem — the
+  # trace-only runtime does not distinguish the rounding mode (a Phase-9 backend
+  # concern). The product pair (a,b) is COMMUTATIVE; the addend c is POSITIONAL.
+  # The recognizer canonicalizes the pair handle-before-literal, so the first slot
+  # is ALWAYS a handle → exactly 4 shapes qqq/qql/qlq/qll (the all-literal product
+  # folds to a constant, no fma). Class-2 recompute-from-live-source: the void
+  # `_unc(out,a,b,c)` recomputes a*b+c from the still-LIVE sources and XORs the out
+  # rail to |0> (it NEVER recovers an input — source-liveness, Rule 8). This is the
+  # FIRST 3-operand template shape (the one abi_codegen edit, PRD-iw81.4 §4.3).
+  - { op: fma, llvm_id: fma, class: 2, reversibility: pure_noninjective, arity: ternary, widths: [f16,f32,f64,f80], variants: [fwd_qqq, fwd_qql, fwd_qlq, fwd_qll, unc_qqq, unc_qql, unc_qlq, unc_qll] }
+# -- End of intrinsic table ----------------------------------------------------

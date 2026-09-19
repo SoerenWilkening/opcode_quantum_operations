@@ -68,8 +68,25 @@ static const cq_reff EFF[CQ_ROP__N] = {
 [CQ_ROP_QRAM_STORE_CTRL_UNC] = {R(0)|R(1)|R(2)|R(3), R(0)|R(3), 0,   0,     0, 0, 0, 0, 1, CQ_ROP_QRAM_STORE_CTRL},
 [CQ_ROP_ADDC]        = {0,              R(0),         0,          R(1),  0, 0, 0, 1, 0, 0},
 [CQ_ROP_XORC]        = {0,              R(0),         0,          R(1),  0, 1, 0, 0, 0, 0},
-[CQ_ROP_TPL_FWD]     = {R(1)|R(2),      R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_TPL_UNC},
-[CQ_ROP_TPL_UNC]     = {R(1)|R(2),      R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_TPL_FWD},
+/* SLOT 3 IS A READ SINCE bead 9ve.24, AND THAT IS A SLOT-SHAPE WIDENING RATHER
+ * THAN A NEW OPCODE. These two rows model operand SLOTS, so an arity-1
+ * operation simply leaves slots 2 and 3 absent and an arity-3 one fills them
+ * (cq_template_unary.c says the same of slot 2). Declaring R(3) a read is sound
+ * for every arity-1 and arity-2 producer because BOTH of them set `h[3]`
+ * explicitly to CQ_REG_NONE and EVERY consumer guards `h < 0` before touching a
+ * slot — cq_rec_push's operand, write and rotation loops, note_write,
+ * pair_operands_unchanged's read and co-written loops, and commutes. A reads
+ * bit on a -1 slot is therefore a no-op, which is what makes this a widening
+ * and not a behaviour change; CQ_ROP_QRAM_STORE_UNC has read R(3) since D24, so
+ * the four-slot read path is exercised code rather than a new one.
+ *
+ * WITHOUT IT AN fma's THIRD SOURCE IS INVISIBLE TO THE CERTIFICATE. `c` would
+ * never bump `last_read`, so a forward, an X on `c`, and the `_unc` would
+ * reduce to identity and RELEASE a rail the two halves no longer cancel on.
+ * tests/test_template_fma.c's poisoned case is the detector and it is the only
+ * one — the shadow answers first on every unpoisoned input. */
+[CQ_ROP_TPL_FWD]     = {R(1)|R(2)|R(3), R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_TPL_UNC},
+[CQ_ROP_TPL_UNC]     = {R(1)|R(2)|R(3), R(0),         0,          0,     0, 0, 0, 0, 1, CQ_ROP_TPL_FWD},
 };
 
 /* CONTROLS ⊆ READS, ONE ROW AT A TIME. Not a loop and not a comment: the

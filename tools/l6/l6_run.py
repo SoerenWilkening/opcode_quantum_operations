@@ -103,7 +103,13 @@ def extract_intrinsics(cqdir, builddir, out):
     if os.path.exists(d):
         shutil.rmtree(d)
     os.makedirs(d)
-    members = ["cq_intrinsic_templates.c.o", "cq_libm_templates.c.o"]
+    # EMPTY SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24): libcqops now defines
+    # all 2,880 `cq_template_*` symbols, so extracting CQ_lang's two stub
+    # objects and putting them on the link line is a duplicate-symbol hard
+    # error. The list is kept rather than deleted so the `ar x` plumbing and
+    # its "extracted fresh on every run" discipline survive for the next
+    # member that needs it.
+    members = []
     r = subprocess.run(["ar", "x", src] + members, cwd=d, capture_output=True,
                        text=True)
     if r.returncode != 0:
@@ -120,8 +126,8 @@ def main():
     ap.add_argument("--cqbuild", default="build")
     ap.add_argument("--archive", default="build-release/libcqops.a")
     ap.add_argument("--objdir", default="",
-                    help="where to put cq_intrinsic_templates.c.o and "
-                         "cq_libm_templates.c.o; extracted fresh with `ar x` on "
+                    help="where CQ_lang archive members would be extracted; "
+                         "EMPTY since bead 9ve.24 — extracted fresh with `ar x` on "
                          "every run unless the directory is supplied ready-made")
     ap.add_argument("--out", required=True)
     ap.add_argument("--sink", default="counter")

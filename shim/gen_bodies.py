@@ -81,8 +81,13 @@ def entry_family(row):
         return row.opcode                       # icmp | fcmp
     if row.kind == "cast":
         return "fcast" if row.family in ("int_to_fp", "fp_to_int") else "cast"
+    if row.kind == "cross_unary":
+        return "libm"                           # never LANDED; no entry point
+    if row.kind in ("rotate", "funnel"):
+        return "shift_intrinsic"                # bead 9ve.29; no entry point
     return ("f" if row.domain == "fp" else "") + row.kind   # binary | fbinary
                                                             # unary  | funary
+                                                            # ternary| fternary
 
 
 def entry_key(row):
@@ -120,14 +125,35 @@ ENTRY = {
     ("fbinary", "lh", "controlled"): "cq_shim_fbin_lh_ctrl",
     ("fcast", "un", "fwd"): "cq_shim_fcast",
     ("fcast", "un", "unc"): "cq_shim_fcast_unc",
-    # NO `("funary", ...)` ROW, AND THE ABSENCE IS THE DOCUMENTED FAILURE. The
-    # yaml's ONE unary opcode is `fneg`, whose kernel is bead 9ve.27's and does
-    # not exist, so `fneg` keeps its abort. `cq_shim_fun` IS built (M40's fsqrt
-    # reaches it by name from tests/test_template_fp.c) and is deliberately
-    # unreachable from the grid: `fsqrt` is `llvm.sqrt` in CQ_lang's
-    # intrinsic_table.yaml, which M27 does not generate from. Landing `fneg`
-    # means adding its row HERE as well as a LANDED line, and until then the
-    # KeyError is what says so.
+    # --- intrinsic_table.yaml, vendored 2026-09-19 (PRD-v2 §6.1, 9ve.24).
+    #
+    # `funary` EXISTS NOW AND `fneg` STILL DOES NOT REACH IT. The door was
+    # built at Wave 8 for M40's `fsqrt` and was unreachable from the grid only
+    # because `sqrt` lives in a yaml M27 did not read; the vendoring is what
+    # connects them. `fneg` is `fp_arith`'s unary opcode in the OTHER yaml, its
+    # kernel is bead 9ve.27's, and `LANDED` does not carry it — so it takes the
+    # bucket rule and aborts, and these two rows are never reached for it.
+    ("funary", "un", "fwd"): "cq_shim_fun",
+    ("funary", "un", "unc"): "cq_shim_fun_unc",
+    # `fternary` IS `fma` AND ONLY `fma` — the yaml's one ternary opcode. Four
+    # shapes because two of the three operands may be literals; `qqq` is the
+    # bare base symbol exactly as `qq` is.
+    ("fternary", "qqq", "fwd"): "cq_shim_fma_qqq",
+    ("fternary", "qql", "fwd"): "cq_shim_fma_qql",
+    ("fternary", "qlq", "fwd"): "cq_shim_fma_qlq",
+    ("fternary", "qll", "fwd"): "cq_shim_fma_qll",
+    ("fternary", "qqq", "unc"): "cq_shim_fma_qqq_unc",
+    ("fternary", "qql", "unc"): "cq_shim_fma_qql_unc",
+    ("fternary", "qlq", "unc"): "cq_shim_fma_qlq_unc",
+    ("fternary", "qll", "unc"): "cq_shim_fma_qll_unc",
+    # THERE IS NO `("unary", ...)`, `("shift_intrinsic", ...)` OR `("libm", ...)`
+    # ROW, AND EACH ABSENCE IS A DOCUMENTED FAILURE. The integer intrinsics
+    # (`ctpop`, `ctlz`, `cttz`, `bswap`, `bitreverse`, `abs`, the four min/max
+    # and the four saturating adds, plus `fshl`/`fshr` in both their arities)
+    # are bead 9ve.29's and `lrint`/`llrint` are PRD-v2 §7.9's; none is in
+    # `LANDED`, so none reaches `wrapper` and none reaches this table. Landing
+    # any of them means a row HERE as well as a `LANDED` line, and until then
+    # the KeyError is what says so.
 }
 
 # THE SELECTOR PER OPCODE, AS A TABLE WHOSE KeyError IS THE FAILURE — the same
@@ -146,6 +172,13 @@ SELECTOR = {
     "cast": {k: "CQ_SHIM_CAST_%s" % k.upper() for k in ("sext", "zext", "trunc")},
     "fcast": {k: "CQ_SHIM_FCAST_%s" % k.upper() for k in (
         "fptosi", "fptoui", "sitofp", "uitofp")},
+    # --- intrinsic_table.yaml (PRD-v2 §6.1, bead 9ve.24). ONE ENTRY EACH, and
+    # the one-entry-ness is the point: `funary` is the whole of M40's surface
+    # from that table and `fternary` is the whole of M39's, so a second opcode
+    # arriving in either family is a KeyError here rather than an enumerator
+    # that does not exist in a generated file.
+    "funary": {"sqrt": "CQ_SHIM_FUN_FSQRT"},
+    "fternary": {"fma": "CQ_SHIM_FMA_FMA"},
 }
 
 # Two predicate enums, and the prefixes are DELIBERATELY not a shared one: the

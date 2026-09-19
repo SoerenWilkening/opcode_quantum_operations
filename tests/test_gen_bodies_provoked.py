@@ -190,13 +190,31 @@ def a_landed_key_that_sweeps_a_kernel_less_opcode_in_is_refused():
     # which is the sharper instrument: it names the exact ROW and the exact
     # TABLE, and it cannot be satisfied by some other row of the same family
     # happening to fail first.
+    # `fneg`'s REFUSAL MOVED TABLES AT bead 9ve.24 AND DID NOT WEAKEN. Before
+    # the vendoring `ENTRY` had no `("funary", ...)` row at all, so a swept-in
+    # `fneg` failed there; the vendoring gave `funary` its two rows for M40's
+    # `sqrt`, so the refusal is now `SELECTOR["funary"]["fneg"]` — one table
+    # later and NAMING THE OPCODE rather than the family, which is strictly
+    # sharper. `frem` is unmoved. The expectation below is what each table's
+    # KeyError actually says, so a row silently acquiring an entry point in
+    # EITHER table still turns this red.
+    #
+    # THE THIRD ROW IS NEW AND IT IS THE VENDORING'S OWN SHAPE: `ctpop` at i32
+    # is an INTEGER intrinsic in the `defer` bucket, and sweeping it live is
+    # the bead 9ve.29 mistake. It has no `unary` entry at all, so `ENTRY` is
+    # what refuses it.
     rows = gen_shim.expand(gen_shim.load(sc.YAML)[0])
-    for opcode, table in (("frem", "frem"), ("fneg", "funary")):
+    itab = gen_shim.load(sc.SOURCES[1][0])[0]
+    gen_shim.gen_intrinsics.expand_intrinsic(
+        itab, gen_shim._emitter(rows, itab["widths"]))
+    for opcode, table in (("frem", "frem"), ("fneg", "fneg"),
+                          ("ctpop", "unary")):
+        w = "i32" if opcode == "ctpop" else "f64"
         victims = [r for r in rows
-                   if r.opcode == opcode and r.widths[0] == "f64" and not r.inv]
-        sc.check(victims, "no %s row at f64 to provoke with" % opcode)
+                   if r.opcode == opcode and r.widths[0] == w and not r.inv]
+        sc.check(victims, "no %s row at %s to provoke with" % (opcode, w))
         r = victims[0]
-        sc.check(r.bucket == "fp",
+        sc.check(r.bucket in ("fp", "defer"),
                  "%s is not an abort any more; this provocation is stale" % r.name)
         r.bucket, r.reason = "wrapper", None
         try:

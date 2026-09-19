@@ -72,10 +72,59 @@
 #    the yaml and the ABI header are added to CMAKE_CONFIGURE_DEPENDS so a re-pin
 #    re-runs it.
 
+# --- R3, ONE ARM PER (manifest, yaml) PAIR ----------------------------------
+# A manifest's provenance line must equal the sha256 of the yaml we actually
+# pin. CQ_lang is UNPINNED and its HEAD has already moved past
+# third_party/cq_lang/COMMIT while the yamls have not, so the YAML SHA — not
+# the checkout — is what proves a manifest is the expansion of the grid we
+# ship. Re-pinning turns this red LOUDLY instead of silently witnessing the new
+# grid against the old ABI.
+#
+# A MACRO BECAUSE THERE ARE THREE PAIRS NOW AND NINE WAYS TO PAIR THEM
+# (PRD-v2 §6.1's vendoring, bead 9ve.24). A copy-and-pasted arm that checked
+# the intrinsic manifest against the OPCODE yaml would be red on a correct tree
+# and — worse — an arm that checked the opcode manifest twice would be green on
+# a tree whose intrinsic manifest had drifted. One body, three call sites.
+#
+# STRIP THE LABEL, DO NOT PATTERN-MATCH THE HASH. CMake's regex has no `{n}`
+# repetition, so the obvious `[0-9a-f][0-9a-f]+` matches "a256" out of the word
+# "yaml-sha256" itself and reports a drift that is not there — observed on the
+# first configure, which is this arm firing for the wrong reason and is worth
+# keeping as a comment rather than as a memory.
+macro(cqops_r3_arm _mf _yl)
+    file(SHA256 "${_yl}" _r3_yaml_sha)
+    file(STRINGS "${_mf}" _r3_prov REGEX "yaml-sha256")
+    if(NOT _r3_prov)
+        message(FATAL_ERROR
+            "link witness: ${_mf} carries no yaml-sha256 provenance line")
+    endif()
+    list(LENGTH _r3_prov _r3_n)
+    if(NOT _r3_n EQUAL 1)
+        message(FATAL_ERROR
+            "link witness: ${_mf} carries ${_r3_n} yaml-sha256 lines; this arm "
+            "compares exactly one. A manifest describes exactly one yaml.")
+    endif()
+    string(REGEX REPLACE "^.*yaml-sha256[^:]*:[ \t]*" "" _r3_claim "${_r3_prov}")
+    string(STRIP "${_r3_claim}" _r3_claim)
+    if(NOT _r3_claim STREQUAL _r3_yaml_sha)
+        message(FATAL_ERROR
+            "link witness: R3 DRIFT. ${_mf} claims yaml-sha256 ${_r3_claim} "
+            "but ${_yl} hashes to ${_r3_yaml_sha}. Re-pin the yaml FIRST, then "
+            "re-extract the manifest from CQ_lang's regenerated header. Never "
+            "edit either to make this green.")
+    endif()
+endmacro()
+
 function(cqops_add_link_witness)
     set(_manifest ${CMAKE_SOURCE_DIR}/tests/abi/cq_templates_abi.txt)
     set(_yaml     ${CMAKE_SOURCE_DIR}/third_party/cq_lang/opcode_table.yaml)
     set(_abi      ${CMAKE_SOURCE_DIR}/shim/cq_runtime_abi.h)
+    # PRD-v2 §6.1's two vendored tables (bead 9ve.24). THREE MANIFESTS AND
+    # THREE YAMLS: the grid is 2,880 and no one manifest can witness it.
+    set(_imanifest ${CMAKE_SOURCE_DIR}/tests/abi/cq_intrinsic_templates_abi.txt)
+    set(_iyaml     ${CMAKE_SOURCE_DIR}/third_party/cq_lang/intrinsic_table.yaml)
+    set(_lmanifest ${CMAKE_SOURCE_DIR}/tests/abi/cq_libm_templates_abi.txt)
+    set(_lyaml     ${CMAKE_SOURCE_DIR}/third_party/cq_lang/libm_table.yaml)
 
     # --- R3, INSIDE THE GENERATOR. The manifest's provenance line must equal the
     # sha256 of the yaml we actually pin. CQ_lang is UNPINNED and its HEAD has
@@ -83,39 +132,34 @@ function(cqops_add_link_witness)
     # the YAML SHA — not the checkout — is what proves this manifest is the
     # expansion of the grid we ship. Re-pinning turns this red LOUDLY instead of
     # silently witnessing the new grid against the old ABI.
-    file(SHA256 ${_yaml} _yaml_sha)
-    file(STRINGS ${_manifest} _prov REGEX "yaml-sha256")
-    if(NOT _prov)
-        message(FATAL_ERROR "link witness: ${_manifest} carries no yaml-sha256 provenance line")
-    endif()
-    # STRIP THE LABEL, DO NOT PATTERN-MATCH THE HASH. CMake's regex has no
-    # `{n}` repetition, so the obvious `[0-9a-f][0-9a-f]+` matches "a256" out of
-    # the word "yaml-sha256" itself and reports a drift that is not there —
-    # observed on the first configure, which is this arm firing for the wrong
-    # reason and is worth keeping as a comment rather than as a memory.
-    string(REGEX REPLACE "^.*yaml-sha256[^:]*:[ \t]*" "" _claim "${_prov}")
-    string(STRIP "${_claim}" _claim)
-    if(NOT _claim STREQUAL _yaml_sha)
-        message(FATAL_ERROR
-            "link witness: R3 DRIFT. ${_manifest} claims yaml-sha256 ${_claim} "
-            "but third_party/cq_lang/opcode_table.yaml hashes to ${_yaml_sha}. "
-            "Re-pin the yaml FIRST, then re-extract the manifest from CQ_lang's "
-            "regenerated header. Never edit either to make this green.")
-    endif()
+    cqops_r3_arm("${_manifest}"  "${_yaml}")
+    cqops_r3_arm("${_imanifest}" "${_iyaml}")
+    cqops_r3_arm("${_lmanifest}" "${_lyaml}")
 
-    # --- Table 1: the 2479 grid symbols, DECLARED FROM THE MANIFEST'S OWN BYTES.
-    # Emitting CQ_lang's declarations verbatim rather than re-deriving them is
-    # what keeps this an independent oracle: a re-expansion here would share
-    # every transcription slip shim/gen_shim.py made.
-    file(STRINGS ${_manifest} _decls REGEX "^[A-Za-z_].*cq_template_")
+    # --- Table 1: the 2880 grid symbols, DECLARED FROM THE MANIFESTS' OWN
+    # BYTES. Emitting CQ_lang's declarations verbatim rather than re-deriving
+    # them is what keeps this an independent oracle: a re-expansion here would
+    # share every transcription slip shim/gen_shim.py made — and since the
+    # vendoring it would share shim/gen_intrinsics.py's reading of THREE new
+    # shape spellings and a BARE `qqq` as well.
+    # EACH MANIFEST IS READ AND CONSUMED INSIDE THE LOOP, NEVER CONCATENATED.
+    # `file(STRINGS)` ESCAPES the `;` that ends every declaration so the result
+    # is one list element per line; `set(_all ${_a} ${_b})` UNESCAPES them and
+    # the 2,880 declarations become ~5,760 fragments, of which the odd ones are
+    # bare `);`. Measured: the generated witness then fails to compile with
+    # "expected ';' after top level declarator" on its third line. Re-reading
+    # per manifest keeps each list intact.
     set(_t_decls "")
     set(_t_rows  "")
     set(_t_n 0)
-    foreach(_d IN LISTS _decls)
-        string(REGEX MATCH "cq_template_[A-Za-z0-9_]+" _n "${_d}")
-        string(APPEND _t_decls "${_d}\n")
-        string(APPEND _t_rows  "    (cq_link_fn)&${_n},\n")
-        math(EXPR _t_n "${_t_n} + 1")
+    foreach(_mf ${_manifest} ${_imanifest} ${_lmanifest})
+        file(STRINGS "${_mf}" _decls REGEX "^[A-Za-z_].*cq_template_")
+        foreach(_d IN LISTS _decls)
+            string(REGEX MATCH "cq_template_[A-Za-z0-9_]+" _n "${_d}")
+            string(APPEND _t_decls "${_d}\n")
+            string(APPEND _t_rows  "    (cq_link_fn)&${_n},\n")
+            math(EXPR _t_n "${_t_n} + 1")
+        endforeach()
     endforeach()
 
     # --- Table 2: the cqrt_* the LIBRARY defines. `cqrt_h` and
@@ -181,7 +225,7 @@ _Static_assert(sizeof cq_link_smoke_templates / sizeof *cq_link_smoke_templates
 _Static_assert(sizeof cq_link_smoke_cqrt / sizeof *cq_link_smoke_cqrt
                == CQ_LINK_C_ROWS,
                \"every cqrt_* libcqops defines\");
-_Static_assert(CQ_LINK_T_ROWS == 2479, \"PRD 1 and 15 D14: 992 + 603 + 884\");
+_Static_assert(CQ_LINK_T_ROWS == 2880, \"PRD 1 + PRD-v2 6.1: 2479 + 389 + 12\");
 _Static_assert(CQ_LINK_C_ROWS == 180,  \"PRD 15 D16: 182 minus the two cqrt_h*\");
 
 /* THE READ IS INDEXED BY A RUNTIME VALUE, and that is the whole difference
@@ -231,7 +275,7 @@ int main(int argc, char **argv)
     add_test(NAME test_link_symbol_sets
              COMMAND ${CMAKE_COMMAND}
                      -DARCHIVE=$<TARGET_FILE:cqops>
-                     -DMANIFEST=${_manifest}
+                     "-DMANIFEST=${_manifest};${_imanifest};${_lmanifest}"
                      -DABI=${_abi}
                      -DNM=${CQOPS_NM}
                      -P ${CMAKE_SOURCE_DIR}/cmake/CqopsSymbolSets.cmake)

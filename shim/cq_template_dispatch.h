@@ -88,4 +88,17 @@ const char *cq_tpl_fbin_name (cq_shim_fop op);
 const char *cq_tpl_fcast_name(cq_shim_fcast_kind kind);
 const char *cq_tpl_fun_name  (cq_shim_fun_op op);
 
+/* --- the ARITY-3 kernel, which needs its own pointer type ------------------
+ *
+ * `cq_kernel_fn` IS ARITY 2 AND MUST NOT BE WIDENED (Rule 7, `ckd.15`): what
+ * the rule fixes is `dst ^= f(sources)` with the sources unchanged and every
+ * ancilla back at |0>, and the parameter list is not part of it. M17's mux and
+ * M39's fma both declare their own shape for that reason, and `cq_tpl_cast_fn`
+ * next door is the same escape hatch one arity down. */
+typedef void (*cq_tpl_fma_fn)(cq_ctx *, cq_bit *, const cq_bit *,
+                              const cq_bit *, const cq_bit *, int);
+
+cq_tpl_fma_fn cq_tpl_fma_kernel(cq_shim_fma_op op);
+const char   *cq_tpl_fma_name  (cq_shim_fma_op op);
+
 #endif /* CQ_TEMPLATE_DISPATCH_H */

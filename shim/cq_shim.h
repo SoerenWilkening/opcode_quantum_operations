@@ -269,6 +269,44 @@ void cq_shim_fcast_unc(cq_shim_fcast_kind kind, int from_bits, int to_bits, int3
  * family), so what lands here is what they reuse. No classical operand and no
  * controlled axis: the yaml gives `fneg` three variants (fwd/inv/unc) and
  * nothing else. */
+/* --- the fp TERNARY family (PRD-v2 §6.1's vendoring, bead 9ve.24) ---------
+ *
+ * ONE ENUMERATOR, AND IT IS STILL AN ENUM RATHER THAN A BARE `bits`. The tag
+ * space folds the OPCODE and the width together exactly as every other
+ * family's does (cq_template_boundary.h), so a second ternary opcode arriving
+ * upstream has a slot to occupy and cannot silently share `fma`'s twin
+ * identity. `intrinsic_table.yaml` has exactly one `arity: ternary` row today
+ * and `gen_bodies.SELECTOR["fternary"]` has exactly one entry, so a second one
+ * is a generator KeyError before it is anything else.
+ *
+ * THE FOUR SHAPES ARE THE ABI's, not a convenience: `fma(a, b, c)` may take a
+ * literal in the `b` lane, the `c` lane, or both, and upstream canonicalises
+ * the PRODUCT pair handle-before-literal so there is no `lqq` or `lql`. Each
+ * literal lane carries its own two-word pair; ONE shared pair would make
+ * `fma(a, 2.0, 3.0)` compute `fma(a, 3.0, 3.0)`. */
+typedef enum { CQ_SHIM_FMA_FMA } cq_shim_fma_op;
+
+int32_t cq_shim_fma_qqq(cq_shim_fma_op op, int bits, int32_t a_handle,
+                        int32_t b_handle, int32_t c_handle);
+int32_t cq_shim_fma_qql(cq_shim_fma_op op, int bits, int32_t a_handle,
+                        int32_t b_handle, uint64_t c_lo, uint64_t c_hi);
+int32_t cq_shim_fma_qlq(cq_shim_fma_op op, int bits, int32_t a_handle,
+                        uint64_t b_lo, uint64_t b_hi, int32_t c_handle);
+int32_t cq_shim_fma_qll(cq_shim_fma_op op, int bits, int32_t a_handle,
+                        uint64_t b_lo, uint64_t b_hi,
+                        uint64_t c_lo, uint64_t c_hi);
+void cq_shim_fma_qqq_unc(cq_shim_fma_op op, int bits, int32_t out_handle,
+                         int32_t a_handle, int32_t b_handle, int32_t c_handle);
+void cq_shim_fma_qql_unc(cq_shim_fma_op op, int bits, int32_t out_handle,
+                         int32_t a_handle, int32_t b_handle,
+                         uint64_t c_lo, uint64_t c_hi);
+void cq_shim_fma_qlq_unc(cq_shim_fma_op op, int bits, int32_t out_handle,
+                         int32_t a_handle, uint64_t b_lo, uint64_t b_hi,
+                         int32_t c_handle);
+void cq_shim_fma_qll_unc(cq_shim_fma_op op, int bits, int32_t out_handle,
+                         int32_t a_handle, uint64_t b_lo, uint64_t b_hi,
+                         uint64_t c_lo, uint64_t c_hi);
+
 int32_t cq_shim_fun(cq_shim_fun_op op, int bits, int32_t a_handle);
 void cq_shim_fun_unc(cq_shim_fun_op op, int bits, int32_t out_handle, int32_t a_handle);
 

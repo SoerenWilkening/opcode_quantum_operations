@@ -32,6 +32,19 @@
  * the default 20 against `config.json`. Precision is an accuracy knob for the
  * SYNTHESIS and nothing here reads an angle, so 0 costs the suite nothing.
  *
+ * THE NEXT SEAM IS RECORDED HERE BECAUSE THIS FILE IS THREE LINES FROM RULE
+ * 12's LIMIT (297 counted at bd 9ve.24's review round 1, up from 295 when the
+ * arity-3 pair joined `test_shim_trace_fp.inc`). The cut is
+ * `the ANNOTATION CASES <-> the CONFORMANCE READER AND THE SINK SWITCH`: the
+ * last two cases, `the_conformance_reader_catches_what_it_is_written_to_catch`
+ * and `the_annotation_layer_is_inert_under_every_other_sink`, are about the
+ * ORACLE and about the ACTIVATION TEST rather than about a picture, share none
+ * of the `trace_begin` / `cq_conf_ok` shape the rest use, and move for
+ * different reasons. They go to `test_shim_trace_meta.inc`. Do NOT instead cut
+ * by family again — `the INTEGER surface <-> the fp surface` is already spent
+ * on `test_shim_trace_fp.inc`, and a third file along that axis would put two
+ * cases about the same D21 clause in two places.
+ *
  * n_logical = 3 IS THE POOL CEILING AND EVERY CASE IS WRITTEN AGAINST IT.
  * Under this sink D2's ceiling is `qec_n_logical` and D21 (b) turns RECYCLING
  * OFF, so the budget is three qubits for the whole case, not three at a time.
@@ -507,6 +520,8 @@ CQ_TEST_MAIN(
     CQ_CASE(an_aliased_template_call_names_the_handle_it_will_mint),
     CQ_CASE(a_composed_conversion_names_the_handle_past_its_workspace),
     CQ_CASE(a_flat_conversion_names_the_handle_with_no_workspace_term),
+    CQ_CASE(a_ternary_call_names_the_handle_with_no_temporary_term),
+    CQ_CASE(an_aliased_ternary_call_names_the_handle_past_its_one_temporary),
     CQ_CASE(a_multi_lane_register_lists_its_lanes_in_bit_order),
     CQ_CASE(a_controlled_tape_write_registers_the_kept_rail_and_names_no_token),
     CQ_CASE(an_uncontrolled_tape_write_names_the_source_in_and_the_kept_rail_out),

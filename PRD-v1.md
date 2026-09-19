@@ -194,6 +194,18 @@ generated witnesses `cq_link_smoke.c` and `core_abi_link_check.py`):
 > of their pairs are now wrappers. Entry points: `shim/cq_template_fparith.c` over
 > `shim/cq_template_unary.c`'s arity-1 sequence (PRD-v2 §5); `fsqrt`'s unary door is built and reached
 > by no generated symbol until §6.1's vendoring (`9ve.24`); `fneg` stays an abort (`9ve.27`).
+>
+> **AMENDED 2026-09-19 (v2 Wave 9, bead `9ve.24`) — THE GRID IS 2880.** PRD-v2 §6.1's vendoring landed
+> with M39 `fma`: `intrinsic_table.yaml` (389) and `libm_table.yaml` (12) are mirrored under
+> `third_party/cq_lang/` beside a second provenance file, and the whole `cq_template_*` surface is
+> **2880 = 2479 + 389 + 12**, asserted set-identical both ways by `cmake/CqopsSymbolSets.cmake` over
+> three `tests/abi/` manifests. The generator's audit is now seven populations — measured:
+> **1122 wrappers + 668 D14 `_inv` aborts + 841 fp aborts + 249 `defer`** (int 992 / 603 / 237; fp
+> 130 / 65 / 841 / 12) — where `defer` is a FOURTH bucket for the integer intrinsics (`9ve.29`) and
+> `lrint`/`llrint` (PRD-v2 §7.9), because "fp is v2" is false of those bodies. Landed there: `fma` at
+> f64 (eight symbols, four shapes × forward/`_unc`, no `_inv`, through `shim/cq_template_ternary.c`
+> and an eighth tag space) and `sqrt` at f64 (two, through the unary door). The 2479 above is the
+> OPCODE grid and every figure in this section still describes it.
 
 Beware when counting: **240** of the 884 fp-touching symbols are the cross-domain casts
 (`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`), whose names carry *both* an integer and
