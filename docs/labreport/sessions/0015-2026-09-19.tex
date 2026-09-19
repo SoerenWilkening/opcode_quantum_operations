@@ -1,0 +1,119 @@
+% labreport entry 15 — 2026-09-19
+% labreport-to: 539a52f
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{15}{field}.
+
+\entry{15}{2026-09-19}{v2 Waves 3-7: add and slt blocks, fcmp, the f64 ABI edge, fpround, fadd/fsub, fmul, fconv, fdiv, fsqrt}
+
+\begin{generated}
+  \gitem{Range}{\texttt{a5eb52d..539a52f}}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{519} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{520} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 282 file(s) walked (filesystem, not the git index), limit 300, largest 294 (tests/test\_unc.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{539a52f} v2 Wave 7: bd 9ve.23/9ve.25/9ve.26 — M37 fconv (K19), M35 fdiv (K17), M40 fsqrt (K21)
+    \item \texttt{4630349} v2 Wave 6: bd 9ve.21/9ve.22 — M33 fadd/fsub (K15) and M34 fmul (K16), the first fp arithmetic kernels
+    \item \texttt{3330557} v2 Wave 5: bd 9ve.19 — M32 fpround (K23): the four shared softfloat helpers as exported step blocks
+    \item \texttt{277a003} PRD-v2 §5/§7.16: two decisions at the Wave 4 boundary — M32's L1 oracle is an IEEE reference model, fdiv transcribes per operator
+    \item \texttt{e7f9c2f} v2 Wave 4: bd 9ve.28/9ve.33 — the f64 ABI edge (fcmp at f64 goes live through the generator) and the harness failure-counter fix
+    \item \texttt{58ed835} v2 Wave 3: bd 9ve.30/9ve.31/9ve.20/9ve.35 — M14 add block, M16 slt block, M36 fcmp (the first fp kernel), K23/K17 drafted
+    \item \texttt{5e51ec1} labreport entry 14: v2 Waves 1 and 2 — three step exports, the host probe, the anchors, M31 fpfield, six K-docs, four boundary decisions
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{9ve.23} M37 fconv K19: fptosi / fptoui / sitofp / uitofp at f64 with x86 saturation pinned; fpext/fptrunc stay aborts, \bead{9ve.22} M34 fmul K16: soft\_fmul; the 53x53 significand product is M18's step block over a span, \bead{9ve.21} M33 fadd/fsub K15: soft\_fadd / soft\_fsub as one sandwich over flat scratch, \bead{9ve.19} M32 fpround: the shared round-and-pack (\_sf\_round\_and\_pack, softfloat\_common.jl) as an exported step block, \bead{9ve.26} M40 fsqrt K21: soft\_fsqrt, the digit-by-digit restoring root mirroring fdiv's loop -- NEW module row, \bead{9ve.25} M35 fdiv K17: soft\_fdiv transcribed per operator over M14/M16/M17 blocks (PRD-v2 §7.16; the 'compose M19' reading is retired)}
+  \gitem{Beads filed}{\bead{9ve.36} v2 ABI wiring for fadd/fsub/fmul/fdiv/fsqrt/fconv at f64 (after Waves 6-7): gen\_shim LANDED finer than (family,width), unary entry, nine fbin entry points, fifth tag space, cq\_template\_fp.c's COMPARE<->ARITH seam, D14 \_inv rows, dispatch, effect rows, test\_runtime\_v2 tables — ONE agent, as 9ve.28 did for fcmp}
+  \gitem{Diff}{\texttt{164 files changed, 38793 insertions(+), 1396 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Continue the v2 burn-down from the Wave~2 boundary: one Opus agent per bead in its own worktree, a
+PORT / MEASURED / DETECTOR review of every report, one full gate per wave, decisions only from the
+maintainer, and a stop at a wave boundary once the context window was about half spent.
+
+\field{What landed}
+\textbf{Wave 3} (\texttt{58ed835}): M14's \texttt{cq\_add\_block} (K6, out-of-place, no carry in or
+out) and M16's \texttt{cq\_slt\_block} (the inner \texttt{ult} wired at the biased copies inside the
+step, so a consumer cannot wire it at the operands), both with every golden byte-identical; M36
+\texttt{fcmp} (K18), the first fp kernel --- ten predicates and four swaps from the pinned
+extractor, one sandwich each over flat scratch composed of M31's class block, M16's \texttt{eq} /
+\texttt{ult}, M14's \texttt{sub} and M17's mux, two seams taken (ORDERED CORE $\leftrightarrow$
+PREDICATE TABLE, then ROW TABLES $\leftrightarrow$ STEP MACHINE, forced at 298 of 300); K23 and K17
+drafted pre-implementation.
+
+\textbf{Wave 4} (\texttt{e7f9c2f}): the \texttt{f64} ABI edge --- ten core symbols real by widening
+\texttt{cq\_runtime\_rail.c} / \texttt{cq\_runtime\_gate.c} with a memcpy as the library's only
+contact with a C \texttt{double}, the generator's \texttt{LANDED} set and per-domain audit, 56 real
+\texttt{fcmp} wrappers plus 28 D14 aborts, a fourth tag space after a mutant showed an \texttt{fcmp}
+\texttt{\_unc} pairing with an \texttt{icmp} forward and RELEASING; and the harness fix ---
+\texttt{cq\_h\_take\_failures} forgives only what was muted, proved by a \texttt{WILL\_FAIL} binary
+that exits 0 before the fix and 1 after.
+
+\textbf{Wave 5} (\texttt{3330557}): M32 \texttt{fpround} (K23) --- the four shared softfloat
+helpers as exported step blocks, 154 rows, three seams, an IEEE reference model in
+\texttt{tests/support/fpref} as its L1 oracle, and additive \texttt{cq\_*\_region(W)} exports on
+M14/M16/M17.
+
+\textbf{Wave 6} (\texttt{4630349}): M33 \texttt{fadd}/\texttt{fsub} (K15; \texttt{fsub} is
+\texttt{fadd}'s row program under a nine-row prologue, \texttt{cq\_fsub\_block} exported) and M34
+\texttt{fmul} (K16; four \texttt{cq\_mul\_block}s, the dead rows of \texttt{fmul.jl:94-102}
+transcribed and marked).
+
+\textbf{Wave 7} (\texttt{539a52f}): M37 \texttt{fconv} (K19; \texttt{fptoui} inlines the
+\texttt{fptosi} table twice around one \texttt{cq\_fsub\_block}; \texttt{uitofp} from \texttt{i64}
+stays \bead{9ve.34}'s abort), M35 \texttt{fdiv} (K17, transcribed per operator as a template
+$\times$~56 under a segmented prefix map) and M40 \texttt{fsqrt} (K21, unary, a 16-row digit
+template $\times$~64). Every kernel row of PRD-v2 \S5 except \texttt{fma} and \texttt{fmisc} is now
+on disk; none of the arithmetic kernels is reachable from a \texttt{cqrt\_*} symbol yet
+(\bead{9ve.36}).
+
+\field{Measured}
+\begin{figures}
+  \fig{407 / 407, 409 / 409, 421 / 421, 463 / 463, 519 / 519 passed}{\texttt{ctest -E '\^{}l6\_cqlang\_fixtures\$'}, Waves 3--7 gates}{Debug}
+  \fig{406 / 406, 408 / 408, 420 / 420, 462 / 462, 518 / 518 passed}{same}{Release}
+  \fig{OK at 225, 229, 239, 256, 282 files; up to date, 2479 symbols}{\texttt{make lint}; \texttt{gen\_shim.py -{}-check}}{filesystem walk, every wave}
+  \fig{2479 $=$ 992 $+$ 603 $+$ 56 $+$ 28 $+$ 800}{\texttt{python3 shim/gen\_shim.py} audit after \bead{9ve.28}}{generator}
+  \fig{\texttt{ule}: 7,253 slots, 10,907 gates, 3,032 scratch}{counting sink, all-quantum mask, W$=$64}{Release}
+  \fig{\texttt{fadd} 47,815 slots / 77,696 gates; \texttt{fmul} 163,300 / 294,692; \texttt{fdiv} 139,245 / 235,568; \texttt{fsqrt} 157,108 / 229,302; \texttt{fptoui} 69,253 / 110,948}{counting sink, all-quantum mask, forward $=$ \texttt{\_unc} in every row}{Release}
+  \fig{M32: 31,875 slots, 15,759 scratch over four blocks; 154 rows, 41 views}{counting sink + slot scan}{Release}
+  \fig{28 golden rows added across seven new \texttt{.counts} files, 0 existing rows moved}{\texttt{git diff --stat tests/goldens/}}{Release}
+  \fig{host \texttt{*} returns the FIRST NaN payload at \texttt{-O0} and the SECOND at \texttt{-O1/-O2}; host \texttt{/} folds \texttt{0/0} to a positive qNaN and computes INDEF}{C probes in the M34 and M35 suites}{this box, x86\_64}
+  \fig{Debug suite wall clock: fconv 73 min, fmul 30, fdiv 24, fadd 18, fsqrt 6}{\texttt{ctest} timings, one run each}{Debug; order of magnitude only (bd 97s)}
+  \fig{5 of 13 agent worktrees created behind HEAD}{\texttt{git worktree list} after spawning}{this session}
+\end{figures}
+\datasource{Every count is from a gate log or an agent report that named its instrument, with the row
+tables of \texttt{fcmp}, \texttt{fpround}, \texttt{fadd}, \texttt{fsqrt}, \texttt{fconv} and
+\texttt{fdiv} spot-checked line by line against the pinned Julia by the orchestrator before merge.}
+
+\field{Decided}
+PRD-v2 \S7.16 (both by the maintainer at the Wave~4 boundary): M32's L1 oracle, and \texttt{fdiv}'s
+construction (K17.md \S5.1 option B; the M35 row's ``compose M19'' reading retired). PRD-v2 \S5's
+M32, M33, M34, M35, M36, M37, M40 rows carry their landing notes and the seams actually taken;
+CLAUDE.md and PRD-v1 carry dated amendments for the partition figures the f64 landing moved.
+
+\field{Not taken}
+Wiring the arithmetic families through the generator inside their kernel beads --- three agents
+would have edited \texttt{gen\_shim.py} and \texttt{cq\_template\_fp.c} at once; filed as
+\bead{9ve.36} for one agent. Composing \texttt{cq\_divrem\_block} at W$=$112 for \texttt{fdiv}
+(K17 option A: a re-derivation at an unshipped width, about 2.5$\times$ the cost). A second C
+transcription of the Julia as M32's oracle (the Step~18 trap). Every PRD-v2 \S5 file seam that a
+row table made unnecessary (M34's \texttt{:136}, M35's and M40's loop seams, M37's INT$\to$FP cut)
+--- each kept as a named, pinned row boundary instead. Starting \bead{9ve.36} or \bead{9ve.24} in this
+session: the Debug gate is now about two hours and the context budget was spent.
+
+\field{Verified}
+Per wave, once, after merging every worktree: \texttt{make lint}, \texttt{make shim-check}, then
+\texttt{ctest} in Debug (sanitizers, \texttt{CQOPS\_DEBUG\_INVARIANTS}) and Release with
+\texttt{-E '\^{}l6\_cqlang\_fixtures\$'} --- the counts in the figures above, all green. L6 and L7
+\S12(1) were NOT run in this session. Each agent ran only its own \texttt{-R} selection in both
+configurations and a Release mutation battery (9 to 15 mutants each, every survivor a recorded
+equivalent); those are the agents' claims, re-checked by the gate but not re-run by the orchestrator.
+
+\field{Left open}
+\bead{9ve.36} (ABI wiring for the six landed families, one agent), \bead{9ve.24} (\texttt{fma} with
+the \S6.1 vendoring, alone), \bead{9ve.27} (\texttt{fmisc}), \bead{9ve.29} (integer intrinsics),
+\bead{c5x} (the residual bucket). K23 §6.5's finding that M14/M16/M17 published no region-size
+function is closed by the additive exports; the maintainer's upstream report on Bennett's
+\texttt{uitofp i64} defect (\bead{9ve.34}) is still owed.
