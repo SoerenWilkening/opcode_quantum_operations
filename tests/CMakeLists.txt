@@ -3036,3 +3036,344 @@ set_tests_properties(test_kernel_fmul_death.dst_aliases_its_first_source
                      test_kernel_fmul_death.sources_alias_each_other
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fmul: step index outside;fmul: the block's region;fmul: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+
+
+## M40 `fsqrt` — K21, `soft_fsqrt` at f64: the first UNARY fp kernel and the
+## first with a LOOP in it (bd 9ve.26). PRD-v2 §5's M40 row, §7.1's
+## instruments-before-the-kernel, §7.2's literal grain, §7.3's
+## constants-as-sources and views, §7.4's C transcription, §7.6's EMPTY D8
+## audit, §7.11's unary signature, §7.12's anchors.
+##
+## THIS SUITE IS SLOW AND §7.13 SAYS SO IN ADVANCE: 157,108 compute-half slots
+## at ~229k gates per kernel call, times a forced anchor block of 33 singles at
+## three mask rows. The wall clock is not a reason to cut the budget.
+add_cqops_test(test_kernel_fsqrt)
+
+## M40's fail-loud paths. Which layer would answer for each guard, and why the
+## regex names it, is in the death file's header.
+add_cqops_death_test(test_kernel_fsqrt_death CASES
+    width_is_not_64
+    width_is_128
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    result_of_a_program_that_does_not_fit
+    a_block_with_no_region
+    a_block_with_no_operand_a
+    arity_of_an_unknown_op
+    row_width_outside_the_program
+    a_projection_of_a_row_that_is_not_earlier
+    a_projection_of_a_row_that_returns_no_tuple
+    loop_row_past_the_last_iteration
+    loop_row_past_the_template
+    dst_aliases_its_source
+)
+
+## (1) THE STEP-INDEX RANGE IS MASKED FROM BOTH SIDES. `cq_fs_row_at` carries
+## its own refusal over the same interval one layer down, and every inner block
+## carries one over ITS interval; with M40's guard deleted a negative `u`
+## reaches the first CLASS row and M31 or M16 speaks instead. Every layer that
+## would answer is pinned absent, together with the five INNER OPERAND
+## REFUSALS that have no case of their own (bd
+## a-table-driven-kernel-needs-both-operand-refusals) and the sanitizer
+## banners, because a Debug-only assert landing inside the CQ_EXPECT_ABORT
+## window makes a mutant survive in Debug and die in Release (bd
+## sanitizer-abort-passes-expect-abort).
+set_tests_properties(test_kernel_fsqrt_death.step_index_past_the_end
+                     test_kernel_fsqrt_death.step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fsqrt: a slot index outside;fsqrt: the step dispatch fell off;fsqrt: the block's region;fsqrt: the block has no;fsqrt: a one-bit operand;fsqrt: a 64-lane operand;fsqrt: an operand names a row;fsqrt: a row index outside;fsqrt: a view chain;fsqrt: an arithmetic-shift view;fsqrt: unknown;fsqrt: arity of;fsqrt: a projection;fsqrt: `result`;fsqrt: W must be 64;fsqrt: a loop row outside;fsqrt: the program outgrew;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;mux: region width;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;fpfield: view span;fpfield: pack;fpclass:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
+## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
+## outside the region") — a real abort inside the window, in BOTH
+## configurations, naming the REGION rather than the consumer that mis-sized
+## its offset. `cq_fsqrt_result` carries the same check, which is why the
+## result case is in this group.
+set_tests_properties(test_kernel_fsqrt_death.block_region_is_one_bit_short
+                     test_kernel_fsqrt_death.block_offset_runs_off_the_region
+                     test_kernel_fsqrt_death.result_of_a_program_that_does_not_fit
+                     test_kernel_fsqrt_death.a_block_with_no_region
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the step dispatch fell off;fsqrt: a one-bit operand;fsqrt: a 64-lane operand;fsqrt: an operand names a row;fsqrt: unknown;fsqrt: a projection;fsqrt: an arithmetic-shift view;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;fpround: step index outside;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (3) THE MISSING RAIL. Without the guard `base64` returns NULL and the
+## `is_nan` CLASS row dereferences it — a SIGSEGV in Release, which is not a
+## SIGABRT and so is not even a death the window can see. In Debug ASan speaks
+## instead, which is the inverse-configuration asymmetry bd
+## sanitizer-abort-passes-expect-abort records, so both banners are pinned
+## absent.
+set_tests_properties(test_kernel_fsqrt_death.a_block_with_no_operand_a
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the step dispatch fell off;fsqrt: the block's region;fpclass:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (4) THE VOCABULARY, AND THE LOOP-ROW ACCESSOR. Nothing below M40 knows what
+## a row op, a row index, a projection or an ITERATION is, so no lower layer
+## can answer for these — but an unknown op falling through would return a
+## plausible arity, a malformed projection would index the row table out of
+## bounds, and `cq_fsqrt_loop_row` out of range would hand every case that
+## names a loop row a plausible WRONG row rather than failing. The layers that
+## WOULD then speak are pinned absent to keep each case a claim about M40's own
+## refusal.
+set_tests_properties(test_kernel_fsqrt_death.arity_of_an_unknown_op
+                     test_kernel_fsqrt_death.row_width_outside_the_program
+                     test_kernel_fsqrt_death.a_projection_of_a_row_that_is_not_earlier
+                     test_kernel_fsqrt_death.a_projection_of_a_row_that_returns_no_tuple
+                     test_kernel_fsqrt_death.loop_row_past_the_last_iteration
+                     test_kernel_fsqrt_death.loop_row_past_the_template
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;fsqrt: the program outgrew;eq:;ult:;sub:;add:;mux:;fpround:;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (5) THE WIDTH IS A REFUSAL AND NOT AN UNIMPLEMENTED CASE (PRD-v2 §1). Delete
+## the guard and a W = 32 call reaches M31's `cq_fp_pack` or `cq_fp_view`,
+## whose messages name the FIELD geometry rather than the fiction that a 32-bit
+## `soft_fsqrt` exists; both are pinned absent, as M34 and M36 pin them.
+set_tests_properties(test_kernel_fsqrt_death.width_is_not_64
+                     test_kernel_fsqrt_death.width_is_128
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "Assertion failed;fpfield: pack;fpfield: view span;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+
+## (6) D7a AT THE KERNEL BOUNDARY, AND THE D7b LEG IS VACUOUS AT ARITY 1 — one
+## source cannot alias another, so there is no `sources_alias_each_other` case
+## and `cq_kernel_fsqrt` calls `cq_kernel_check_n(..., 1)` rather than the
+## arity-2 wrapper, which would compare `a` with itself. M05's Debug-gated
+## distinctness assert would answer one layer down, which is exactly why it is
+## pinned absent.
+set_tests_properties(test_kernel_fsqrt_death.dst_aliases_its_source
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+
+## M37 `fconv` — K19, the f64 <-> integer conversions (bd 9ve.23). The whole
+## module's registration lives in this one contiguous block, appended at the
+## END of the file, because two other agents are adding their own blocks at the
+## same moment and an edit anywhere else in this file would collide.
+##
+## THE SUITE DRIVES FIVE WIDTH PAIRS: f64->i64 three times over (fptosi,
+## fptoui, sitofp) and i{1,8,16,32}->f64 for uitofp, whose row program is
+## sitofp's byte for byte with the zext at the operand. i64->f64 uitofp is bead
+## 9ve.34's loud abort and is a DEATH case rather than a golden row.
+add_cqops_test(test_kernel_fconv)
+
+## M37's fail-loud paths. Which layer would answer for each guard, and why the
+## regex names it, is in the death file's header.
+add_cqops_death_test(test_kernel_fconv_death CASES
+    uitofp_from_i64_is_refused
+    uitofp_from_i64_is_refused_classically_too
+    fptosi_target_is_not_64
+    fptoui_source_is_not_64
+    sitofp_source_is_not_64
+    uitofp_source_is_not_shipped
+    uitofp_target_is_not_64
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    result_of_a_program_that_does_not_fit
+    a_block_with_no_region
+    a_block_with_no_operand_a
+    a_source_width_outside_the_range
+    arity_of_an_unknown_op
+    a_64_lane_operand_names_a_one_bit_row
+    a_one_bit_operand_names_a_64_lane_row
+    an_operand_names_no_constant
+    an_operand_names_a_row_outside_the_program
+    dst_aliases_its_source
+)
+
+## (1) BEAD 9ve.34, AND IT IS THE ONE GROUP WHOSE HAZARD IS NOT A WRONG LAYER.
+## The danger is not that `uitofp` at i64 aborts somewhere else — it is that it
+## does NOT abort and falls through to `sitofp`, returning a plausible NEGATIVE
+## double that no count, palindrome or pool check can see. That cannot be
+## expressed as a forbidden message, so the DEATH is the claim and
+## `the_i64_row_upstream_would_have_emitted_is_wrong_and_the_others_are_not`
+## next door measures the divergence the refusal exists for.
+set_tests_properties(test_kernel_fconv_death.uitofp_from_i64_is_refused
+                     test_kernel_fconv_death.uitofp_from_i64_is_refused_classically_too
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;fconv: pack of a lane;fconv: the shipped source widths;fpfield: pack;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (2) THE WIDTH PAIRS ARE A REFUSAL AND NOT AN UNIMPLEMENTED CASE (PRD-v2 §1).
+## Delete a guard and the call reaches M31's `cq_fp_pack` or `cq_fp_view`,
+## whose messages name the FIELD geometry rather than the fiction that a 32-bit
+## `soft_fptosi` exists; both are pinned absent, as M34 and M36 pin them.
+## `uitofp_source_is_not_shipped` additionally must NOT take 9ve.34's message —
+## 24 is not 64, and a guard written as `F != 64` would abort with the wrong
+## reason and still read as green.
+set_tests_properties(test_kernel_fconv_death.fptosi_target_is_not_64
+                     test_kernel_fconv_death.fptoui_source_is_not_64
+                     test_kernel_fconv_death.sitofp_source_is_not_64
+                     test_kernel_fconv_death.uitofp_source_is_not_shipped
+                     test_kernel_fconv_death.uitofp_target_is_not_64
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "9ve.34;fpfield: pack;fpfield: view span;fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;eq:;ult:;sub:;add:;mux:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (3) THE STEP INDEX. Masked from BELOW on the low side by every inner block's
+## own range check (M16's `eq` is the first emitting row of `soft_fptosi`) and
+## on the high side by M37's own fall-off die, a different message from the
+## same module. Both pinned absent so each case is a claim about the range
+## check itself.
+set_tests_properties(test_kernel_fconv_death.step_index_past_the_end
+                     test_kernel_fconv_death.step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;fconv: a view chain;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;mux: region width;fpround: step index outside;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (4) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
+## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
+## outside the region") — a real abort inside the window, in BOTH
+## configurations, naming the REGION rather than the consumer that mis-sized
+## its offset. `cq_fptosi_result` carries the same check, which is why the
+## result case is in this group.
+set_tests_properties(test_kernel_fconv_death.block_region_is_one_bit_short
+                     test_kernel_fconv_death.block_offset_runs_off_the_region
+                     test_kernel_fconv_death.result_of_a_program_that_does_not_fit
+                     test_kernel_fconv_death.a_block_with_no_region
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fconv: step index outside;fconv: the step dispatch fell off;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (5) THE MISSING RAIL AND THE IMPOSSIBLE SOURCE WIDTH. Without the first
+## guard `base64` returns NULL and the `eq` row dereferences it — a SIGSEGV in
+## Release, which is not a SIGABRT and so is not even a death the window can
+## see. In Debug ASan speaks instead, which is the inverse-configuration
+## asymmetry bd sanitizer-abort-passes-expect-abort records, so both banners
+## are pinned absent.
+set_tests_properties(test_kernel_fconv_death.a_block_with_no_operand_a
+                     test_kernel_fconv_death.a_source_width_outside_the_range
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (6) THE VOCABULARY. Nothing below M37 knows what a row op, a row index or an
+## operand code is, so no lower layer can answer for these — but an unknown op
+## falling through would return a plausible arity, a 64-lane operand pointed at
+## a Bool would read wires belonging to the next block, and an unknown negative
+## code would fall off `const_of`'s switch. The layers that WOULD then speak
+## are pinned absent to keep each case a claim about M37's own refusal.
+set_tests_properties(test_kernel_fconv_death.arity_of_an_unknown_op
+                     test_kernel_fconv_death.a_64_lane_operand_names_a_one_bit_row
+                     test_kernel_fconv_death.a_one_bit_operand_names_a_64_lane_row
+                     test_kernel_fconv_death.an_operand_names_no_constant
+                     test_kernel_fconv_death.an_operand_names_a_row_outside_the_program
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fconv: step index outside;fconv: the block's region;fconv: the block has no;fconv: the source width;eq:;ult:;sub:;add:;mux:;fpround:;fpfield:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (7) D7a AT THE KERNEL BOUNDARY. `dst` may not be the source: `dst ^= f(a)`
+## is not a function of `a` if they are the same wires. M07's handle-level
+## check cannot run here and M05's Debug-gated distinctness assert would answer
+## one layer down in the WRONG configuration, which is exactly why it is pinned
+## absent.
+set_tests_properties(test_kernel_fconv_death.dst_aliases_its_source
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fconv: step index outside;fconv: the block's region;fconv: the source width;fpfield:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+
+
+## M35 `fdiv` — K17, `soft_fdiv` at f64 and the first fp kernel with a LOOP in
+## it (bd 9ve.25). PRD-v2 §5's M35 row as amended, §7.1's
+## instruments-before-the-kernel, §7.2's literal grain, §7.3's
+## constants-as-sources and views, §7.4's C transcription, §7.6's EMPTY D8
+## audit, §7.12's anchors and §7.16's decision that the restoring-division loop
+## is TRANSCRIBED per operator rather than composed from `cq_divrem_block`.
+##
+## THIS SUITE IS SLOW AND §7.13 SAYS SO IN ADVANCE: 139,245 compute-half slots
+## per call, times a forced anchor block of 54 ordered pairs at three mask
+## rows, plus a span scan and a stride scan that each run the whole program
+## again. The wall clock is not a reason to cut the budget.
+add_cqops_test(test_kernel_fdiv)
+
+## M35's fail-loud paths. Which layer would answer for each guard, and why the
+## regex names it, is in the death file's header.
+add_cqops_death_test(test_kernel_fdiv_death CASES
+    width_is_not_64
+    width_is_128
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    result_of_a_program_that_does_not_fit
+    a_block_with_no_region
+    a_block_with_no_operand_a
+    arity_of_an_unknown_op
+    row_at_outside_the_program
+    width_at_outside_the_program
+    a_projection_of_a_row_that_is_not_earlier
+    a_projection_of_a_row_that_returns_no_tuple
+    dst_aliases_its_first_source
+    sources_alias_each_other
+)
+
+## (1) THE STEP-INDEX GUARD IS MASKED BY A LATER COPY OF ITSELF, WHICH IS WHY
+## THE TWO MESSAGES WERE MADE DISJOINT. `cq_fd_row_of_slot` checks the same
+## range one layer down; with M35's public guard deleted it would answer, in
+## both configurations, and the case would still "pass". Its message — "a slot
+## index outside the segmented map" — is therefore pinned ABSENT, as is M35's
+## own fall-off `cq_kernel_die`, which is what the HIGH side would otherwise
+## reach. Every other layer a wild index can reach is named as well, enumerated
+## with `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c` plus the
+## composed blocks' own messages, plus both sanitizer banners and
+## `Assertion failed` — bd 9ve.18's M31 finding, carried here because a
+## Debug-only assert landing inside the CQ_EXPECT_ABORT window makes a mutant
+## survive in Debug and die in Release.
+set_tests_properties(test_kernel_fdiv_death.step_index_past_the_end
+                     test_kernel_fdiv_death.step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fdiv: a slot index outside the segmented map;fdiv: the step dispatch fell off;fdiv: the block's region;fdiv: the block has no;fdiv: a one-bit operand;fdiv: a 64-lane operand;fdiv: an operand names a row;fdiv: a row index outside;fdiv: a view chain;fdiv: unknown;fdiv: arity of;fdiv: a projection;fdiv: `result`;fdiv: a program segment;fdiv: W must be 64;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;addacc: step index;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;mux: region width;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
+## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
+## outside the region") — a real abort inside the window, in BOTH
+## configurations, naming the REGION rather than the consumer that mis-sized
+## its offset. `cq_fdiv_result` carries the same check through `cq_fd_arm`,
+## which is why the result case is in this group.
+set_tests_properties(test_kernel_fdiv_death.block_region_is_one_bit_short
+                     test_kernel_fdiv_death.block_offset_runs_off_the_region
+                     test_kernel_fdiv_death.result_of_a_program_that_does_not_fit
+                     test_kernel_fdiv_death.a_block_with_no_region
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the step dispatch fell off;fdiv: a one-bit operand;fdiv: a 64-lane operand;fdiv: an operand names a row;fdiv: unknown;fdiv: a projection;fdiv: a program segment;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;addacc: step index;fpround: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (3) THE MISSING RAIL. Without the guard `base64` returns NULL and the `xor`
+## of fdiv.jl:54 dereferences it — a SIGSEGV in Release, which is not a SIGABRT
+## and so is not even a death the window can see. In Debug ASan speaks instead,
+## which is the inverse-configuration asymmetry bd
+## sanitizer-abort-passes-expect-abort records, so both banners are pinned
+## absent.
+set_tests_properties(test_kernel_fdiv_death.a_block_with_no_operand_a
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the step dispatch fell off;fdiv: the block's region;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (4) THE VOCABULARY. Nothing below M35 knows what a row op, a row index or a
+## projection is, so no lower layer can answer for these — but an unknown op
+## falling through would return a plausible arity and a malformed projection
+## would index the row table out of bounds. `row_at_outside_the_program` is the
+## one that is load-bearing in a way M34's is not: there is no shared row
+## array, so EVERY read of the table goes through `cq_fdiv_row_at` and 392 of
+## the 478 rows are materialised from a template, where an unrebased relative
+## code arrives as an index of 4096 or 8192.
+set_tests_properties(test_kernel_fdiv_death.arity_of_an_unknown_op
+                     test_kernel_fdiv_death.row_at_outside_the_program
+                     test_kernel_fdiv_death.width_at_outside_the_program
+                     test_kernel_fdiv_death.a_projection_of_a_row_that_is_not_earlier
+                     test_kernel_fdiv_death.a_projection_of_a_row_that_returns_no_tuple
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;eq:;ult:;sub:;add:;mux:;fpround:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (5) THE WIDTH IS A REFUSAL AND NOT AN UNIMPLEMENTED CASE (PRD-v2 §1). Delete
+## the guard and a W = 32 call reaches M31's `cq_fp_pack` or `cq_fp_view`,
+## whose messages name the FIELD geometry rather than the fiction that a
+## 32-bit `soft_fdiv` exists; both are pinned absent, as M34 and M36 pin them.
+set_tests_properties(test_kernel_fdiv_death.width_is_not_64
+                     test_kernel_fdiv_death.width_is_128
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "Assertion failed;fpfield: pack;fpfield: view span;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+
+## (6) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations
+## and D7b is LEGAL at the handle boundary — its remedy is M26's defensive
+## cqrt_copy — so a kernel that sees it is looking at a missing copy. M05's
+## Debug-gated distinctness assert would answer for the second one a layer
+## down, which is exactly why it is pinned absent.
+set_tests_properties(test_kernel_fdiv_death.dst_aliases_its_first_source
+                     test_kernel_fdiv_death.sources_alias_each_other
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")

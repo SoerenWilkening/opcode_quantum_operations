@@ -291,6 +291,58 @@ add_library(cqops STATIC
                                # is_subnormal as K9-shape one-bit kernels over
                                # an exported step block. The first module where
                                # SLOTS and GATES come apart (D-K18-6)
+    src/kernels/fconv.c        # M37, K19 (v2) — the THREE ROW TABLES: soft_fptosi
+                               # (fptosi.jl:22-69, 31 rows), soft_sitofp
+                               # (sitofp.jl:15-85, 75 rows) and soft_fptoui's own
+                               # twelve (fptoui.jl:29-48), one row per operator
+                               # occurrence in source order, plus the assembly
+                               # that INLINES the fptosi table twice into fptoui
+                               # (:40 and :46 are two separate calls under §7.2's
+                               # no-CSE grain). PRD-v2 §5's INT->FP <-> FP->INT
+                               # seam is the marked boundary between the tables
+    src/kernels/fconv_step.c   # M37, K19 (v2) — the ROW TABLES <-> STEP MACHINE
+                               # seam (D-K18-7): row costs asked of M12/M14/M16/
+                               # M17/M33, the one-pass prefix-offset walk, and
+                               # operand resolution — including the ZEXT VIEW at
+                               # CQ_FV_A that is the whole of uitofp
+    src/kernels/fconv_emit.c   # M37, K19 (v2) — the LAYOUT-AND-OPERANDS <->
+                               # DISPATCH-AND-SURFACE seam (D-K23-10): the
+                               # one-gate-per-slot dispatch, the exported
+                               # cq_fptosi_block, and the four Rule 7 kernels in
+                               # M13's two-width shape. uitofp at i64 is a loud
+                               # abort naming bead 9ve.34, never a silent sitofp.
+                               # src/kernels/fconv_int.h is the seam
+    src/kernels/fconv_eval.c   # M37, K19 (v2) — the _eval <-> CIRCUIT seam: the
+                               # four bodies over uint64_t for the R9 row
+                               # (PRD-v2 §7.4/§7.5), composing M33's fsub eval.
+                               # NEVER a host cast: for every NaN, infinity and
+                               # out-of-range operand that cast is UB in C
+    src/kernels/fdiv.c         # M35, K17 (v2) — the THREE ROW TABLES: soft_fdiv
+                               # (fdiv.jl:44-139) one row per operator
+                               # occurrence in source order, as a PRE table, an
+                               # ITERATION TEMPLATE instantiated 56 times for
+                               # the restoring-division loop at :91-98, and a
+                               # POST table. PRD-v2 §7.16: the loop is
+                               # TRANSCRIBED per operator, never composed from
+                               # cq_divrem_block
+    src/kernels/fdiv_step.c    # M35, K17 (v2) — the ROW TABLES <-> STEP
+                               # MACHINE seam (M36's D-K18-7): the COSTS, asked
+                               # of M14/M16/M17/M31/M32, and the SEGMENTED
+                               # prefix map — a prefix sum, a modulus and a
+                               # prefix sum (K17.md §2.7)
+    src/kernels/fdiv_operand.c # M35, K17 (v2) — M33's COSTS-AND-LAYOUT <->
+                               # OPERAND RESOLUTION seam: the collapsing view
+                               # chain, the constant vocabulary, the four
+                               # hand-off projections and the one-bit flags
+    src/kernels/fdiv_emit.c    # M35, K17 (v2) — the LAYOUT-AND-OPERANDS <->
+                               # DISPATCH-AND-SURFACE seam (M32's D-K23-10):
+                               # the one-gate-per-slot dispatch, the public
+                               # block and the Rule 7 kernel.
+                               # src/kernels/fdiv_int.h is the seam
+    src/kernels/fdiv_eval.c    # M35, K17 (v2) — the _eval <-> CIRCUIT seam:
+                               # soft_fdiv over uint64_t for the R9 row,
+                               # composing M31's and M32's *_eval bodies
+                               # (PRD-v2 §7.4). NEVER the host double operator
     src/kernels/fcmp.c         # M36, K18 (v2) — the ORDERED CORE half: the row
                                # tables for soft_fcmp_olt / _oeq / _either_nan
                                # (fcmp.jl:8-47, :57-82, :117-125), one row per
@@ -340,6 +392,34 @@ add_library(cqops STATIC
                                # soft_fmul over uint64_t for the R9 row,
                                # composing M32's four *_eval bodies (PRD-v2
                                # §7.4). NEVER the host double operator
+    src/kernels/fsqrt.c        # M40, K21 (v2) — the ROW TABLE: soft_fsqrt
+                               # (fsqrt.jl:31-118) one row per operator
+                               # occurrence in source order, with the digit
+                               # recurrence written as a 16-row TEMPLATE the
+                               # preprocessor expands 64 times into 1,024
+                               # DISTINCT rows. PRD-v2 §5's PRE-NORMALISE <->
+                               # THE DIGIT LOOP seam is a named ROW boundary
+    src/kernels/fsqrt_step.c   # M40, K21 (v2) — the ROW TABLES <-> STEP
+                               # MACHINE seam (M36's D-K18-7): slot and region
+                               # arithmetic ASKED of M14/M16/M17/M31/M32, and
+                               # the MEMOISED prefix map that turns a
+                               # 1,070-row decode into a binary search
+    src/kernels/fsqrt_operand.c # M40, K21 (v2) — the COSTS-AND-LAYOUT <->
+                               # OPERAND RESOLUTION seam (M33's fourth cut,
+                               # recorded in advance here): the collapsing
+                               # view chain, the ARITHMETIC-shift view of
+                               # fsqrt.jl:60, the constant vocabulary, the
+                               # one-bit flags and the two hand-offs' outputs
+    src/kernels/fsqrt_emit.c   # M40, K21 (v2) — the LAYOUT-AND-OPERANDS <->
+                               # DISPATCH-AND-SURFACE seam (M32's D-K23-10):
+                               # the one-gate-per-slot dispatch, the public
+                               # block and the UNARY Rule 7 kernel.
+                               # src/kernels/fsqrt_int.h is the seam
+    src/kernels/fsqrt_eval.c   # M40, K21 (v2) — the _eval <-> CIRCUIT seam:
+                               # soft_fsqrt over uint64_t for the R9 row,
+                               # composing M31's class eval and M32's two.
+                               # NEVER the host sqrt(), not even for the
+                               # normal path (PRD-v2 §7.4)
     src/kernels/fadd.c         # M33, K15 (v2) — the two ROW TABLES: soft_fadd
                                # (fadd.jl:16-136, 124 rows) and soft_fsub's
                                # prologue (fsub.jl:21-24 + fneg.jl:6, 9 rows),
