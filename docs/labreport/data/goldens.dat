@@ -1,5 +1,5 @@
 # kernel pass W not cnot toffoli
-# tests/goldens/*.counts verbatim, at 539a52f (dirty).
+# tests/goldens/*.counts verbatim, at 65be925 (dirty).
 # ALL-QUANTUM operand mask — a count is a function of
 # (W, mask) and a golden that does not say which pins nothing.
 add forward 1 0 7 0
@@ -550,6 +550,8 @@ uitofp forward 32 460 13654 5424
 uitofp unc 32 460 13654 5424
 fdiv forward 64 19214 142420 73934
 fdiv unc 64 19214 142420 73934
+fma forward 64 10506 284576 131914
+fma unc 64 10506 284576 131914
 fmul forward 64 4782 190650 99260
 fmul unc 64 4782 190650 99260
 fp_is_nan forward 64 24 633 254

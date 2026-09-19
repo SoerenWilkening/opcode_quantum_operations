@@ -1,0 +1,110 @@
+% labreport entry 16 — 2026-09-19
+% labreport-to: 65be925
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{16}{field}.
+
+\entry{16}{2026-09-19}{v2 Waves 8 and 9: the fp ABI wiring, fma, and the 2880-symbol grid}
+
+\begin{generated}
+  \gitem{Range}{\texttt{539a52f..65be925}}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{580} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{581} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 301 file(s) walked (filesystem, not the git index), limit 300, largest 297 (tests/test\_shim\_trace.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{65be925} v2 Wave 9: bd 9ve.24 — M39 fma (K20) with PRD-v2 §6.1's vendoring: the cq\_template\_* grid is 2880, fma and sqrt at f64 go live
+    \item \texttt{706147d} v2 Wave 8: bd 9ve.36 — the fp ABI wiring: fadd/fsub/fmul/fdiv at f64 and seventeen conversion pairs go live through the generator
+    \item \texttt{7906540} labreport entry 15: v2 Waves 3-7 — add and slt blocks, fcmp, the f64 ABI edge, fpround, fadd/fsub, fmul, fconv, fdiv, fsqrt
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{9ve.36} v2 ABI wiring for fadd/fsub/fmul/fdiv/fsqrt/fconv at f64 (after Waves 6-7): gen\_shim LANDED finer than (family,width), unary entry, nine fbin entry points, fifth tag space, cq\_template\_fp.c's COMPARE<->ARITH seam, D14 \_inv rows, dispatch, effect rows, test\_runtime\_v2 tables — ONE agent, as 9ve.28 did for fcmp, \bead{9ve.24} M39 fma K20 + PRD-v2 §6.1 VENDORING in ONE commit: intrinsic\_table.yaml + libm\_table.yaml pinned, gen\_shim learns the ternary qql shape, CqopsSymbolSets 2479->2880, L6 link line drops the two stub objects, \bead{9ve.23} M37 fconv K19: fptosi / fptoui / sitofp / uitofp at f64 with x86 saturation pinned; fpext/fptrunc stay aborts, \bead{9ve.22} M34 fmul K16: soft\_fmul; the 53x53 significand product is M18's step block over a span, \bead{9ve.21} M33 fadd/fsub K15: soft\_fadd / soft\_fsub as one sandwich over flat scratch, \bead{9ve.19} M32 fpround: the shared round-and-pack (\_sf\_round\_and\_pack, softfloat\_common.jl) as an exported step block, \bead{9ve.26} M40 fsqrt K21: soft\_fsqrt, the digit-by-digit restoring root mirroring fdiv's loop -- NEW module row, \bead{9ve.25} M35 fdiv K17: soft\_fdiv transcribed per operator over M14/M16/M17 blocks (PRD-v2 §7.16; the 'compose M19' reading is retired)}
+  \gitem{Beads filed}{\bead{9ve.36} v2 ABI wiring for fadd/fsub/fmul/fdiv/fsqrt/fconv at f64 (after Waves 6-7): gen\_shim LANDED finer than (family,width), unary entry, nine fbin entry points, fifth tag space, cq\_template\_fp.c's COMPARE<->ARITH seam, D14 \_inv rows, dispatch, effect rows, test\_runtime\_v2 tables — ONE agent, as 9ve.28 did for fcmp, \bead{9ve.40} kerneldrv: the L1 sweep gives the THIRD source a's bit-kind mask (tests/support/kerneldrv.c:216, q[i < 2 ? i : 0]) so a 3-source kernel never sees c classical with a/b quantum except by hand-driven cases; add an independent third mask member (found reviewing fma, 9ve.24), \bead{9ve.38} K20 owes the four-valued DELEGATING slot scan M34 carries: predict an op KIND per slot with a separate stream cursor, delegating each composite block by running it standalone over operands with the SAME LANE PROFILE, \bead{9ve.37} D7b's rec\_copy in cq\_tpl\_binary: a dropped record gives the certificate an EMPTY history that reduces vacuously and RELEASES; its case asserts a strand delta of zero, which a vacuous release also satisfies — measure the mutant and add a record-walk case (found by 9ve.36's workspace mutant, NOT yet measured), \bead{9ve.41} M39 fma nits from the 9ve.24 review: eq/slt/ult span layouts are hand-laid in BOTH fma\_operand.c (eq\_at/slt\_at, ult at :248) and fma\_emit.c (:76-101) and must agree — route them through published accessors; the\_program\_is\_the\_source\_line\_for\_line aborts (cq\_fma\_row\_width on a negative index) instead of failing on a mux with a constant condition, \bead{9ve.39} D15 twin identity folds every literal lane into one imm (lo\textasciicircum{}hi, and for fma b\_lo\textasciicircum{}b\_hi\textasciicircum{}c\_lo\textasciicircum{}c\_hi): a qll \_unc with its two literals swapped would pair with the forward; the binary \_hl has the same compression. Decide: per-lane imm in cq\_call\_rec, or record that CQ\_lang never emits the shape}
+  \gitem{Diff}{\texttt{83 files changed, 15083 insertions(+), 964 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Continue the v2 burn-down from the Wave~7 boundary under the same regime --- one Opus agent per bead in
+its own worktree, a PORT / MEASURED / DETECTOR review before every merge, one full gate per wave,
+decisions only from the maintainer --- and stop at a wave boundary on the context check.
+
+\field{What landed}
+\textbf{Wave 8} (\texttt{706147d}, \bead{9ve.36}): every fp kernel Waves 5--7 put on disk is reachable
+from its \texttt{cq\_template\_*} symbol. The generator's \texttt{LANDED} key became a ROW ---
+\texttt{(opcode, width)} / \texttt{(opcode, from, to)} --- because \texttt{frem} and \texttt{fneg} share
+\texttt{fp\_arith} with the four opcodes that ship, and a \texttt{DECLINED} table gives \texttt{uitofp i64
+$\to$ f64} bead \bead{9ve.34}'s own reason in the same bucket. \texttt{shim/cq\_template\_fparith.c} took
+\texttt{cq\_template\_fp.c}'s recorded COMPARE $\leftrightarrow$ ARITHMETIC seam (nine \texttt{fbin}, two
+\texttt{fcast}, two \texttt{fun} entry points, three tag spaces); \texttt{shim/cq\_template\_unary.c} took a
+third seam off \texttt{cq\_template\_impl.c} and owns the WORKSPACE stage by which a narrow conversion
+composes the kernel at 64 with \texttt{trunc} or \texttt{sext} on upstream's own shape, the workspace recorded
+as a FWD/UNC twin pair and freed through the one proof door. The unary door exists for \texttt{fsqrt} and is
+reached by no generated symbol until the vendoring. \textbf{Wave 9} (\texttt{65be925}, \bead{9ve.24}): M39
+\texttt{fma} (K20) as a 395-row literal transcription over the shipped step blocks --- the 32/32 widemul as
+four \texttt{cq\_mul\_block}s, both \texttt{\_shiftRightJam128} expansions, twelve carry-free
+\texttt{cq\_add\_block}s with every 128-bit carry a value, fifteen signed clamps, M32's three helpers ---
+with PRD-v2 \S6.1's vendoring in the same commit: \texttt{intrinsic\_table.yaml} and \texttt{libm\_table.yaml}
+mirrored under \texttt{third\_party/cq\_lang/} beside a second provenance file, a configure-time pin, a
+second expansion path behind the same \texttt{Row} model, three \texttt{tests/abi/} manifests, the link
+witness and symbol sets at 2880 both ways, and CQ\_lang's two stub objects off the L6/L7 link line.
+\texttt{fma} at f64 (eight symbols, through a fourth seam \texttt{cq\_template\_ternary.c} and the eighth tag
+space) and \texttt{sqrt} at f64 (two, through the unary door) are the landed rows; everything else of the
+401 aborts with a reason true of its body, including a fourth \texttt{defer} bucket for the integer
+intrinsics and \texttt{lrint}/\texttt{llrint}.
+
+\field{Measured}
+\begin{figures}
+  \fig{539 / 539, 580 / 580 passed}{\texttt{ctest -E '\^{}l6\_cqlang\_fixtures\$'}, Waves 8 and 9 gates}{Debug}
+  \fig{538 / 538, 579 / 579 passed}{same; \texttt{l7\_grover\_cqlang} ran on the new link line in Wave 9's}{Release}
+  \fig{51 min, 40 min}{Debug gate wall clock, Waves 8 and 9, one run each}{Debug; order of magnitude only (bd 97s)}
+  \fig{OK at 288 and 301 files; up to date at 2479 then 2880 symbols}{\texttt{make lint}; \texttt{gen\_shim.py -{}-check}}{filesystem walk, each wave}
+  \fig{2479 $=$ 992 $+$ 603 $+$ 120 $+$ 65 $+$ 699}{\texttt{python3 shim/gen\_shim.py} audit after \bead{9ve.36}}{generator}
+  \fig{2880 $=$ 1122 $+$ 668 $+$ 841 $+$ 249 (int 992 / 603 / 237; fp 130 / 65 / 841 / 12)}{the same audit after \bead{9ve.24}; 2479 $+$ 389 $+$ 12 set-identical both ways}{generator; \texttt{cmake/CqopsSymbolSets.cmake}}
+  \fig{\texttt{fma}: 395 rows (307 emitting, 73 views, 15 projections), 241,083 slots, 84,606 scratch, 426,996 gates forward and \texttt{\_unc} alike}{counting sink, all-quantum mask, W$=$64; slots and region re-derived by the reviewer from the siblings' published costs}{Release}
+  \fig{\texttt{cq\_template\_impl.c} 288 $\to$ 242 counted lines}{\texttt{tools/check\_loc.sh}}{after the third seam}
+  \fig{\texttt{git diff --stat -{}- third\_party/} empty; three paths ADDED}{\texttt{git status}}{Wave 9}
+  \fig{a dropped workspace record leaves every value, pool and strand assertion green and RELEASES}{Release mutant, Wave 8, killed only by a record-walk case}{Release}
+  \fig{a first-match binary search with the dead forward walk in place: 17 / 17 green; walk deleted: red at slot 0}{Release mutant, Wave 9 review}{Release}
+  \fig{2 of 2 agent worktrees created behind HEAD (at \texttt{b15200b})}{\texttt{git worktree list} after spawning}{this session}
+\end{figures}
+\datasource{Every count is from a gate log, the generator's own audit line or an agent report that
+named its instrument; the shim entry points, the generator, the pin, the manifests and the L6 line were
+read by the orchestrator before merge, and the \texttt{fma} row table by an independent Opus reviewer
+over about 150 rows against the pinned Julia.}
+
+\field{Decided}
+No new D-number. PRD-v2 \S6.1's decision is now DONE (its dated note); PRD-v1 \S1 carries two more
+dated amendments (the row-grained \texttt{LANDED} key and the 2880 grid); \S5's M39 row and a new
+\texttt{cq\_template\_fparith.c} / \texttt{cq\_template\_unary.c} row are amended; plan \S3 records the third
+and fourth seams off \texttt{cq\_template\_impl.c}.
+
+\field{Not taken}
+A \texttt{(family, width)} landing for \texttt{fp\_arith} (would have shipped \texttt{frem} and \texttt{fneg}
+with no kernel). Folding the narrowing \texttt{trunc} into a conversion's copy-out (upstream emits it as a
+second IR instruction, and the shipped composition WRAPS where a fold would clamp). A sign-extended VIEW
+repeating a source qubit across lanes (M05's distinctness assert). A table-injection seam in
+\texttt{fma} so four guards that read their own table could be death cases (mutable module state; they are
+executed reachability proofs instead). The delegating four-valued slot scan for \texttt{fma}, deferred to
+\bead{9ve.38} with its concrete survivor --- intra-row gate ORDER --- written down. An agent-written
+lab-report entry captured on a dirty tree at the wrong range, removed before merge. L6 was not run, on the
+standing instruction.
+
+\field{Verified}
+Per wave, once, after merging the worktree: \texttt{make lint}, \texttt{make shim-check}, then \texttt{ctest}
+in Debug (sanitizers, \texttt{CQOPS\_DEBUG\_INVARIANTS}) and Release with
+\texttt{-E '\^{}l6\_cqlang\_fixtures\$'} --- the counts in the figures above, all green. Both build
+directories carry \texttt{CQOPS\_CQLANG\_DIR} and \texttt{CQOPS\_QEC\_DIR}, so \texttt{test\_shim\_trace}'s new
+D21 cases and \texttt{l7\_grover\_cqlang} ran in the gates although neither agent could run them. L6 was NOT
+run. Each agent ran only its own \texttt{-R} selection in both configurations and hand-applied mutants in
+Release; those are the agents' and the reviewer's claims, re-checked by the gate but not re-run by the
+orchestrator.
+
+\field{Left open}
+\bead{9ve.27} (\texttt{fmisc}) and \bead{9ve.29} (integer intrinsics) in parallel, kernels only, then their
+ABI wiring; \bead{c5x}. Filed this session: \bead{9ve.38} (delegating slot scan), \bead{9ve.39} (the twin
+identity folds two literal lanes into one \texttt{imm}), \bead{9ve.40} (the L1 driver gives a third source
+the first source's mask), \bead{9ve.41} (\texttt{fma} nits), and a P2 bead for D7b's \texttt{rec\_copy}
+sharing the vacuous-release hole an unrecorded workspace write has. The maintainer's upstream report on
+Bennett's \texttt{uitofp} i64 defect (\bead{9ve.34}) is still owed.
+
