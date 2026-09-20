@@ -725,13 +725,15 @@ endif()
 ##   check_loc.sh    the 300-line guard (Rule 12)
 ##   check_cites.sh  the citation guard (bd 0a7): a line number into a living
 ##                   document is legal only when pinned to a commit SHA
+##   function_map.py the source-navigation map freshness check
 ## ---------------------------------------------------------------------------
 
 add_custom_target(lint
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_loc.sh"
     COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_cites.sh"
+    COMMAND python3 "${CMAKE_CURRENT_SOURCE_DIR}/tools/function_map.py" --check
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    COMMENT "check_loc.sh + check_cites.sh: the 300-line and citation guards"
+    COMMENT "check_loc.sh + check_cites.sh + function_map.py: repository lint guards"
     VERBATIM
 )
 

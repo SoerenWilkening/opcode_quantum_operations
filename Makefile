@@ -40,7 +40,7 @@ endif
 # timings comparable across a generator switch.
 BUILD_JOBS ?= 6
 
-.PHONY: all lint shim-check configure build test test-debug test-release clean \
+.PHONY: all lint function-map shim-check configure build test test-debug test-release clean \
         labreport labreport-data labreport-entry
 
 all: test
@@ -48,6 +48,10 @@ all: test
 lint:
 	@tools/check_loc.sh
 	@tools/check_cites.sh
+	@python3 tools/function_map.py --check
+
+function-map:
+	@python3 tools/function_map.py
 
 # THE SHIM DRIFT GATE (bd kju). The shim is GENERATED from CQ_lang's own
 # opcode_table.yaml — never hand-written, never forked — so the symbol grid

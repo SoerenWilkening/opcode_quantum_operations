@@ -16,6 +16,11 @@
 > 3. **Bennett.jl is the sole source of circuit constructions** — port, never
 >    re-derive, and never quote it from memory.
 >
+> Before searching the source tree for a function, consult [`FUNCTION_MAP.md`](FUNCTION_MAP.md).
+> It is the generated index of owned function definitions. After adding, removing, or moving a
+> function, run `python3 tools/function_map.py`; `make lint` verifies that the checked-in map is
+> current.
+>
 > This file covers only shell hygiene and the beads integration.
 
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.

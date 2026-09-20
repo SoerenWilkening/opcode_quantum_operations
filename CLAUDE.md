@@ -396,6 +396,14 @@ surprise refactor. Two gaps to close before they are written: **M26**
 which has no seam column at all. Large static test tables move to `.inc` files rather
 than inflating a test module.
 
+**Function navigation — consult the map first.** [`FUNCTION_MAP.md`](FUNCTION_MAP.md) is the
+generated index of every owned C, Python, shell, and CMake function definition, including the
+checked-in generated shim surface. **Read it before using `rg`, `find`, or similar tools to
+locate a function.** When a function is added, removed, or moved, regenerate the map with
+`python3 tools/function_map.py`; `make lint` checks that it matches the source tree. The map is
+navigation metadata, not a second source of truth: inspect the linked source definition before
+editing it. Vendored `third_party/` and build products remain outside the map.
+
 **Rule 13 — Emission is a stream, not a structure.** **The library** holds no circuit
 object, no gate list and no statevector (NORTH_STAR §4, PRD §1 constraint 3), and
 there is **no simulator anywhere** — not now, not as a test convenience. A gate is
