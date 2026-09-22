@@ -16,10 +16,11 @@
  * cq_round_steps and the matching _region functions — or is upstream's own
  * three-gate bitwise vocabulary, and nothing would move if a row table changed.
  *
- * THE PREFIX-OFFSET WALK IS DONE ONCE PER STEP AND NOT ONCE PER LOOKUP. A row
- * reference resolves to a span, and a span needs the sum of every earlier
- * row's region; doing that per operand would make the step O(n^2) in a 133-row
- * program driven ~48,000 times per call.
+ * THE IMMUTABLE PREFIX MAP IS BUILT ONCE, THEN REBASED ONCE PER KERNEL CALL.
+ * A public standalone step still rebases defensively because its block may
+ * start anywhere in a caller's region. Whole-kernel dispatch uses the same
+ * relative map and a binary search, avoiding a row walk at every one of the
+ * program's ~48,000 slots.
  *
  * I6(a) IS SATISFIED WITH NOTHING LEFT TO CHECK. `cq_fa_sp` is the only thing
  * here that hands back a WRITABLE pointer, and every one of them is a bit of
@@ -162,6 +163,50 @@ int cq_fa_steps_of(const cq_fa_ctx *x)
     return slots;
 }
 
+const cq_fa_map *cq_fa_map_get(cq_fadd_prog p)
+{
+    static cq_fa_map maps[2];
+    static int ready[2];
+    cq_fa_map *m;
+    uint32_t bits = 0u;
+    int slots = 0, pi = (int)p;
+
+    if (pi < (int)CQ_FADD_PROG_ADD || pi > (int)CQ_FADD_PROG_SUB)
+        cq_kernel_die("fadd: program outside the prefix-map table");
+    m = &maps[pi];
+    if (ready[pi]) return m;
+    m->n = cq_fadd_program(p, m->rows);
+    if (m->n > CQ_FA_MAXR)
+        cq_kernel_die("fadd: the program outgrew the prefix map");
+    cq_fa_check_program(m->rows, m->n);
+    for (int i = 0; i < m->n; i++) {
+        m->rel[i]  = bits;
+        m->slot[i] = slots;
+        bits  += row_region(&m->rows[i]);
+        slots += cq_fa_row_steps(&m->rows[i]);
+    }
+    m->slot[m->n] = slots;
+    m->region = bits;
+    m->steps  = slots;
+    ready[pi] = 1;
+    return m;
+}
+
+int cq_fa_row_at(const cq_fa_map *m, int u, int *within)
+{
+    int lo = 0, hi = m->n;
+
+    if (u < 0 || u >= m->steps)
+        cq_kernel_die("fadd: a slot index outside the prefix map");
+    while (hi - lo > 1) {
+        int mid = lo + (hi - lo) / 2;
+
+        if (m->slot[mid] <= u) lo = mid; else hi = mid;
+    }
+    *within = u - m->slot[lo];
+    return lo;
+}
+
 /* The prefix-offset walk, which also returns the region total — so the fit
  * check and the offsets come out of ONE pass. */
 static uint32_t walk(const cq_fa_ctx *x, uint32_t *off)
@@ -184,6 +229,15 @@ void cq_fa_arm(const cq_fa_ctx *x, uint32_t *off)
     cq_fa_check_program(x->rows, x->n);
     if (x->scr == NULL) cq_kernel_die("fadd: the block has no region");
     if ((uint64_t)x->off + walk(x, off) > (uint64_t)cq_scratch_size(x->scr))
+        cq_kernel_die("fadd: the block's region does not fit at its offset");
+}
+
+void cq_fa_arm_map(const cq_fa_ctx *x, const cq_fa_map *m, uint32_t *off)
+{
+    if (x->scr == NULL) cq_kernel_die("fadd: the block has no region");
+    for (int i = 0; i < m->n; i++) off[i] = x->off + m->rel[i];
+    if ((uint64_t)x->off + (uint64_t)m->region
+        > (uint64_t)cq_scratch_size(x->scr))
         cq_kernel_die("fadd: the block's region does not fit at its offset");
 }
 

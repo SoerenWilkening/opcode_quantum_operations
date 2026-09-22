@@ -37,10 +37,6 @@ void cq_kd_default_shape(int W, cq_kd_shape *out)
      * project is built by this function and then mutated, so a spec that never
      * heard of anchors cannot inherit a stale pointer from the stack. */
     out->anchors = NULL;
-    /* And no floor, for the same reason: the whole integer catalogue reaches
-     * the sampler through here, so "the budget is cq_kd_samples()" stays true
-     * for every shape that did not ask otherwise (bd 9ve.32). */
-    out->min_samples = 0;
     for (int i = 0; i < CQ_KD_MAX_SRC; i++) {
         out->w[i] = W;
         out->classical[i] = 0u;

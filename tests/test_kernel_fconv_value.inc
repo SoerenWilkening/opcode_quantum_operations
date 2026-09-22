@@ -47,7 +47,13 @@ CQ_TEST(the_classical_row_agrees_with_the_oracle_on_every_anchor)
         else                ws = &one;
 
         for (int w = 0; w < nw; w++) {
+            cq_kd_shape sh;
             int n = ROWS[i].anchors(ws[w], -1, NULL);
+
+            fconv_arm(&ROWS[i], ws[w]);
+            fconv_shape(ws[w], &sh);
+            CHECK_EQ(sh.anchors(ws[w], -1, NULL),
+                     cq_fp_representative_count(n));
 
             for (int a = 0; a < n; a++) {
                 cq_ref_w v[CQ_KD_MAX_SRC];

@@ -1,0 +1,89 @@
+% labreport entry 17 — 2026-09-21
+% labreport-to: f2a8d64
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{17}{field}.
+
+\entry{17}{2026-09-21}{Installable CQ backend packaging and provider contract}
+
+\begin{generated}
+  \gitem{Range}{\texttt{65be925..f2a8d64}}
+  \gitem{Tree}{\emph{dirty at capture} --- 13 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{582} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{583} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 304 file(s) walked (filesystem, not the git index), limit 300, largest 297 (tests/test\_shim\_trace.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{f2a8d64} Add generated function map and navigation guard
+    \item \texttt{b3eee5e} labreport entry 16: v2 Waves 8 and 9 — the fp ABI wiring, fma, and the 2880-symbol grid
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{1wc} Package libcqops as installable CQ backend, \bead{gwu} Document the CQ static backend provider contract}
+  \gitem{Beads filed}{\bead{b6a} Reconcile CQ L6 i64 QRAM index with frozen i32 contract, \bead{gwu} Document the CQ static backend provider contract}
+  \gitem{Diff}{\texttt{11 files changed, 8735 insertions(+), 18 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Make \texttt{libcqops.a} an install-once CQ production backend at CQ\_lang
+\texttt{0707dfd6}: export the canonical CMake target, install CQ's generated
+provider manifest, supply a batch-safe installer, prove an installed consumer
+does not pull CQ's trace archives into the link, and document the contracts for
+another CQ backend or QEC engine.
+
+\field{What landed}
+The existing \texttt{cqops} static target now installs its archive and public
+header with a relocatable \texttt{CQBackend} CMake package whose imported spelling
+is \texttt{CQBackend::backend}; the build-tree \texttt{cqops::cqops} alias remains.
+The export carries \texttt{libm}, and a QEC-enabled export carries the QEC include
+directory and \texttt{libqec.a}, \texttt{libtommath.a}, and \texttt{libcjson.a} in
+that order.  The generated manifest and the three CMake package files install
+beside it.  \texttt{tools/install\_cqops.py} pins the CQ contract commit, checks a
+requested QEC tree before configuration, regenerates and compares the manifest,
+builds, tests, installs, and validates the installed archive.  A separate installed
+consumer finds both packages, calls a real \texttt{cqrt\_*} symbol, runs, and checks
+its link map for backend provenance.
+
+\texttt{docs/BACKEND\_CONTRACT.md} now separates and specifies the complete CQ
+static ABI, libcqops' six-callback logical-gate sink, and the concrete
+\texttt{qec.h} adapter.  It includes provider CMake and manifest recipes,
+semantic and clean-ancilla obligations, installed-consumer tests, and the current
+QEC deployment constraint: link metadata is complete, while its external build
+tree and runtime configuration remain required.
+
+\field{Measured}
+\begin{figures}
+  \fig{180 core + 2880 template = 3060 required symbols}{CQ\_lang \texttt{backend\_contract.py describe/check}}{CQ \texttt{0707dfd6}; installed Release QEC archive}
+  \fig{581 / 581 passed}{\texttt{tools/install\_cqops.py}; L6 excluded by its documented opt-in status}{Release, QEC enabled}
+  \fig{578 / 578 passed}{repository CTest gate with CQ integration disabled}{Release, QEC enabled}
+  \fig{580 / 583 initially passed; the two sandbox-only failures passed on rerun; L6 retained one ABI abort}{CTest plus the three targeted integration reruns}{Debug, ASan/UBSan, QEC enabled}
+  \fig{233 OK, 179 deferred, 1 abort}{\texttt{tools/l6/l6\_run.py} through \texttt{l6\_cqlang\_fixtures}}{Debug against CQ \texttt{0707dfd6}}
+  \fig{0 CQ trace archives in the executable map}{installed consumer map assertion; \texttt{libcqops.a} and QEC objects present}{Release and Debug package tests}
+\end{figures}
+\datasource{CTest output, the installer's final CQ contract check, CQ's
+\texttt{describe} command, the QEC artifact probe, and the installed consumer's
+linker map.}
+
+\field{Not taken}
+The backend was not weakened to accept CQ's one emitted i64 QRAM index.  CQ's
+frozen runtime contract says that rail is always i32, and libcqops' refusal protects
+the reversible QROM operand model; the cross-repository mismatch is isolated in
+\bead{b6a}.  The exhaustive L6 audit remains outside the installation gate, matching
+the repository manual, while L7 and the package/contract checks run in the installer.
+The QEC archives were not copied into the libcqops prefix: the installed target
+records their build-tree paths, and the provider manual names the resulting
+deployment constraint instead of calling that prefix a self-contained QEC bundle.
+
+\field{Verified}
+\texttt{make lint}, \texttt{make shim-check}, the full local CTest suite in Debug
+with ASan/UBSan and Release, the installed-package consumer in both configurations,
+the Release QEC installer end to end, CQ's L7 Grover integration, direct CQ backend
+contract validation, and the opt-in L6 audit all ran.  Every packaging and local
+gate passed.  L6's sole abort is the i64-index mismatch above; all other 412 L6
+fixtures either ran or were classified deferred by the existing audit.  The manual's
+contract counts were re-read from CQ's descriptor, and all four documented QEC
+artifacts were checked at their configured paths.
+
+\field{Left open}
+\bead{b6a}: reconcile CQ's i64 QRAM-index emission with its frozen i32-index
+contract before treating the entire L6 corpus as a production-backend gate.

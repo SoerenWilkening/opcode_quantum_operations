@@ -15,8 +15,9 @@
  * overflow and underflow — and every one of those is a distinct BRANCH of the
  * ported `ifelse` tree (PRD-v2 §7.2's literal transcription). All of it is
  * reached through the CLASSICAL lanes, which is exactly where values DO matter.
- * So the anchors are FORCED INTO EVERY DRAW and the budget is NOT raised:
- * widen the anchors, do not raise the budget.
+ * The complete tables therefore stay broad on the cheap classical/oracle
+ * path. The circuit sampler takes a fixed representative subset from them:
+ * widen semantic coverage, but do not raise the circuit budget.
  *
  * NO `double` ARITHMETIC IN THIS FILE, AND NONE ANYWHERE UNDER tests/support/
  * FOR fp. PRD-v2 §7.4: the library's classical short-circuit is a C
@@ -163,5 +164,23 @@ int cq_fp_anchors_unary(int W, int i, cq_ref_w *v);
 
 /* How many rows cq_fp_anchors_unary has at f64. */
 int cq_fp_anchors_unary_count(void);
+
+/* The circuit sweep uses eight representative values, irrespective of how
+ * large a kernel's full anchor table becomes.  The full table remains the
+ * input to the cheap classical/oracle cases; these selectors are only for the
+ * gate-emitting L1 path.
+ *
+ * Binary selection keeps zero, infinity, quiet/signalling NaN, the
+ * subnormal boundary, a rounding tie and overflow, then one kernel-specific
+ * tail row.  Unary selection keeps the corresponding classes plus a normal
+ * value and one kernel-specific tail row.  `spread` serves integer-source
+ * conversions, whose table is a width-dependent power-of-two ladder.
+ *
+ * Return the selected full-table index, or -1 when representative index `i`
+ * is outside [0, cq_fp_representative_count(available)). */
+int cq_fp_representative_count(int available);
+int cq_fp_representative_binary_index(int available, int i);
+int cq_fp_representative_unary_index(int available, int i);
+int cq_fp_representative_spread_index(int available, int i);
 
 #endif /* CQOPS_TEST_FPANCHORS_H */

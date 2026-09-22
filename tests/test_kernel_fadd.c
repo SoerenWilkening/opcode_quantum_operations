@@ -44,13 +44,14 @@
  * a second width would be a fiction; the kernels hard-error on one in both
  * configurations and tests/test_kernel_fadd_death.c drives that for both.
  *
- * THE SUITE IS SLOW AND §7.13 SAID SO IN ADVANCE: "Upstream's `fadd` is 63,058
- * gates; Rule 2 makes ours ~126k per case ... Not a reason to cut the budget."
- * One sandwiched call is ~47,800 compute slots twice over; the L1 floor is
- * `3 x anchors + 8` so that no mask row of the anchor block is dropped.
+ * ONE CIRCUIT CASE IS STILL LARGE: a sandwiched call is ~47,800 compute slots
+ * twice over. The L1 sweep therefore keeps the shared 32-case budget and uses
+ * eight representative anchors; the complete table stays in the cheap
+ * classical oracle case.
  */
 
 #include "kernels/fadd.h"
+#include "kernels/fadd_int.h"
 
 #include "bit.h"
 #include "ctx.h"
@@ -80,6 +81,32 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+
+static void check_cached_prefix_map(cq_fadd_prog p)
+{
+    const cq_fa_map *m = cq_fa_map_get(p);
+    int row = 0, start = 0;
+
+    for (int u = 0; u < m->steps; u++) {
+        int got, local, n;
+
+        for (;;) {
+            n = cq_fa_row_steps(&m->rows[row]);
+            if (n > 0 && u < start + n) break;
+            start += n;
+            row++;
+        }
+        got = cq_fa_row_at(m, u, &local);
+        CHECK_EQ(got, row);
+        CHECK_EQ(local, u - start);
+    }
+}
+
+CQ_TEST(the_cached_prefix_maps_match_a_linear_dispatch_at_every_slot)
+{
+    check_cached_prefix_map(CQ_FADD_PROG_ADD);
+    check_cached_prefix_map(CQ_FADD_PROG_SUB);
+}
 
 /* ---- L1's oracle: the host operator, three cells pinned by table. -------- */
 
@@ -127,6 +154,15 @@ static uint64_t host_fsub(uint64_t a, uint64_t b)
 
 /* ---- The two kernels, as one table. ------------------------------------- */
 
+static int fadd_circuit_anchors(int W, int i, cq_ref_w *v)
+{
+    const int available = fadd_anchors(W, -1, NULL);
+    const int picked = cq_fp_representative_binary_index(available, i);
+
+    if (i < 0) return cq_fp_representative_count(available);
+    return picked >= 0 ? fadd_anchors(W, picked, v) : 0;
+}
+
 static void fadd_shape(int W, cq_kd_shape *out)
 {
     cq_kd_default_shape(W, out);
@@ -134,15 +170,7 @@ static void fadd_shape(int W, cq_kd_shape *out)
     out->w[0]    = CQ_FP64_W;
     out->w[1]    = CQ_FP64_W;
     out->w_dst   = CQ_FP64_W;
-    out->anchors = fadd_anchors;
-
-    /* THE FLOOR IS READ OFF THE PROVIDER JUST INSTALLED, NOT WRITTEN DOWN
-     * (bd 9ve.32). The sampler forces anchors row-major over three mask rows
-     * after reserving slots 0 and 1, so `3 x anchors + 8` is the smallest
-     * budget at which NO row is dropped, and it tracks the table in the .inc
-     * with no edit here. At any width but 64 the provider declines and this is
-     * 8, below the 32 default, so the floor never fires. */
-    out->min_samples = 3 * out->anchors(W, -1, NULL) + 8;
+    out->anchors = fadd_circuit_anchors;
 }
 
 static void call_fadd(cq_ctx *ctx, cq_bit *dst, const cq_bit *const *src,
@@ -316,6 +344,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_d8_band_is_discarded_and_the_select_that_discards_it_is_live),
     CQ_CASE(the_blocks_cost_what_their_modules_say_they_cost),
     CQ_CASE(each_program_is_the_sum_of_its_rows),
+    CQ_CASE(the_cached_prefix_maps_match_a_linear_dispatch_at_every_slot),
     CQ_CASE(the_slot_boundaries_match_an_independent_four_valued_scan),
     CQ_CASE(the_programs_spans_are_pairwise_disjoint),
     CQ_CASE(the_compute_half_is_a_palindrome_at_an_asymmetric_mask),

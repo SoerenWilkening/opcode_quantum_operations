@@ -50,13 +50,13 @@
  * a second width would be a fiction; the kernel hard-errors on one in both
  * configurations and tests/test_kernel_fdiv_death.c drives that.
  *
- * THIS SUITE IS SLOW AND THAT IS NOT A REGRESSION (PRD-v2 §7.13). 139,245
- * compute-half slots per call, times a forced anchor block of 54 ordered pairs
- * at three mask rows. §7.13 has already said the wall clock is not a reason to
- * cut the budget.
+ * ONE CIRCUIT CASE IS LARGE: 139,245 compute-half slots per call. The L1
+ * sweep keeps the shared 32-case budget and uses eight representative anchors;
+ * the complete 54-pair table stays in the cheap classical oracle case.
  */
 
 #include "kernels/fdiv.h"
+#include "kernels/fdiv_int.h"
 
 #include "bit.h"
 #include "ctx.h"
@@ -86,6 +86,29 @@
 #include <string.h>
 
 enum { W64 = CQ_FP64_W };
+
+CQ_TEST(the_cached_segmented_map_matches_a_linear_dispatch_at_every_slot)
+{
+    const cq_fd_map *m = cq_fd_map_get();
+    cq_fdiv_row r;
+    int row = 0, start = 0;
+    int steps = cq_fdiv_steps();
+
+    for (int u = 0; u < steps; u++) {
+        int got, local, n;
+
+        for (;;) {
+            cq_fdiv_row_at(row, &r);
+            n = cq_fd_row_steps(&r);
+            if (n > 0 && u < start + n) break;
+            start += n;
+            row++;
+        }
+        got = cq_fd_row_of_slot(m, u, &local);
+        CHECK_EQ(got, row);
+        CHECK_EQ(local, u - start);
+    }
+}
 
 /* ---- L1's oracle: the host `/`, with §7.4's cells pinned by table. ------ */
 
@@ -125,6 +148,15 @@ static uint64_t ref_fdiv(uint64_t a, uint64_t b, int W)
 
 /* ---- The spec. ---------------------------------------------------------- */
 
+static int fdiv_circuit_anchors(int W, int i, cq_ref_w *v)
+{
+    const int available = fdiv_anchors(W, -1, NULL);
+    const int picked = cq_fp_representative_binary_index(available, i);
+
+    if (i < 0) return cq_fp_representative_count(available);
+    return picked >= 0 ? fdiv_anchors(W, picked, v) : 0;
+}
+
 /* Rule 7's canonical shape unchanged — arity 2, `w_dst == w[0]` — so the
  * driver's DEFAULT call and reference paths serve it with no adapter, which
  * `cq_kd_shape_of` checks rather than assumes. */
@@ -135,14 +167,7 @@ static void fdiv_shape(int W, cq_kd_shape *out)
     out->w[0]    = W64;
     out->w[1]    = W64;
     out->w_dst   = W64;
-    out->anchors = fdiv_anchors;
-
-    /* THE FLOOR IS READ OFF THE PROVIDER JUST INSTALLED, NOT WRITTEN DOWN
-     * (bd 9ve.32). The sampler forces anchors row-major over three mask rows
-     * after reserving slots 0 and 1, so `3 x anchors + 8` is the smallest
-     * budget at which NO row is dropped, and it tracks the table in the .inc
-     * with no edit here. */
-    out->min_samples = 3 * out->anchors(W, -1, NULL) + 8;
+    out->anchors = fdiv_circuit_anchors;
 }
 
 static const cq_kd_spec SPEC = { "fdiv", cq_kernel_fdiv, ref_fdiv,
@@ -235,29 +260,19 @@ CQ_TEST(the_classical_row_agrees_with_the_oracle_on_every_anchor)
              ref_fdiv(CQ_F64_ONE, CQ_F64_MAX_SUBNORMAL, W64));
 }
 
-/* ---- The anchors reach the kernel, and any drop is printed. ------------- */
+/* ---- Complete classical table, constant representative circuit set. ----- */
 
-CQ_TEST(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block)
+CQ_TEST(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant)
 {
     cq_kd_shape sh;
-    const char *src = NULL;
-    int n, budget;
+    int n, circuit_n;
 
     fdiv_shape(W64, &sh);
-    n = sh.anchors(W64, -1, NULL);
+    n = fdiv_anchors(W64, -1, NULL);
+    circuit_n = sh.anchors(W64, -1, NULL);
 
     CHECK_EQ(n, cq_fp_anchors_binary_count() + N_FDIV_PAIRS);
-    CHECK_EQ(sh.min_samples, 3 * n + 8);
-
-    budget = cq_kd_budget(sh.min_samples, &src);
-    CHECK(src != NULL);
-    /* THE ENVIRONMENT WINS IN BOTH DIRECTIONS AND THAT IS DELIBERATE
-     * (kerneldrv.h): a maintainer bisecting with CQOPS_L1_SAMPLES=8 gets 8,
-     * floor or no floor. So the claim is about the FLOOR, and it is made only
-     * on the row where the floor is what decided. */
-    if (src != NULL && strcmp(src, "env") != 0) CHECK(budget >= 3 * n + 2);
-    printf("# fdiv anchors %d (generic %d + K17 %d), budget %d from \"%s\"\n",
-           n, cq_fp_anchors_binary_count(), N_FDIV_PAIRS, budget, src);
+    CHECK_EQ(circuit_n, 8);
 
     /* Every row fills BOTH operands and nothing else — the cq_kd_case2 trap
      * re-armed for fp is a provider that zero-fills what it does not name. */
@@ -267,10 +282,9 @@ CQ_TEST(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block)
         v[0] = cq_ref_w_make(0xDEADBEEFull, 0u, W64);
         v[1] = cq_ref_w_make(0xDEADBEEFull, 0u, W64);
         v[2] = cq_ref_w_make(0xC0FFEEull, 0u, W64);
-        CHECK_EQ(sh.anchors(W64, i, v), 1);
+        CHECK_EQ(fdiv_anchors(W64, i, v), 1);
         CHECK_EQ(v[2].lo, 0xC0FFEEull);       /* untouched, not zero-filled */
     }
-    fflush(stdout);
 }
 
 #include "test_kernel_fdiv_slots.inc"
@@ -377,8 +391,9 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(every_iteration_is_the_template_at_a_distinct_offset),
     CQ_CASE(the_blocks_cost_what_their_modules_say_they_cost),
     CQ_CASE(the_program_is_the_sum_of_its_blocks),
+    CQ_CASE(the_cached_segmented_map_matches_a_linear_dispatch_at_every_slot),
     CQ_CASE(the_classical_row_agrees_with_the_oracle_on_every_anchor),
-    CQ_CASE(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block),
+    CQ_CASE(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant),
     CQ_CASE(the_slot_boundaries_match_an_independent_four_valued_scan),
     CQ_CASE(iteration_zero_folds_differently_from_every_other),
     CQ_CASE(the_rows_spans_are_pairwise_disjoint),

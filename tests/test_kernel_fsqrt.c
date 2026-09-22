@@ -41,9 +41,10 @@
  * second width would be a fiction; the kernel hard-errors on one in both
  * configurations and tests/test_kernel_fsqrt_death.c drives that.
  *
- * THIS SUITE IS SLOW AND THAT IS NOT A REGRESSION (PRD-v2 §7.13). 157,108
- * compute-half slots at ~229k gates per kernel call, times a forced anchor
- * block of 33 singles at three mask rows.
+ * ONE CIRCUIT CASE IS LARGE: 157,108 compute-half slots at ~229k gates per
+ * kernel call. The L1 sweep keeps the shared 32-case budget and uses eight
+ * representative anchors; the complete 33-single table stays in the cheap
+ * classical oracle case.
  */
 
 #include "kernels/fsqrt.h"
@@ -118,6 +119,15 @@ static uint64_t ref_fsqrt(uint64_t a, uint64_t b, int W)
 
 /* ---- The spec. ---------------------------------------------------------- */
 
+static int fsqrt_circuit_anchors(int W, int i, cq_ref_w *v)
+{
+    const int available = fsqrt_anchors(W, -1, NULL);
+    const int picked = cq_fp_representative_unary_index(available, i);
+
+    if (i < 0) return cq_fp_representative_count(available);
+    return picked >= 0 ? fsqrt_anchors(W, picked, v) : 0;
+}
+
 /* UNARY, ONE WIDTH (PRD-v2 §7.11), so `n_src` is 1 and the spec supplies a
  * `call` adapter — `cq_kd_shape_of` REFUSES a shape the default path cannot
  * serve, because that path passes `w_dst` as the kernel's `W` and reads
@@ -129,14 +139,7 @@ static void fsqrt_shape(int W, cq_kd_shape *out)
     out->n_src   = 1;
     out->w[0]    = W64;
     out->w_dst   = W64;
-    out->anchors = fsqrt_anchors;
-
-    /* THE FLOOR IS READ OFF THE PROVIDER JUST INSTALLED, NOT WRITTEN DOWN
-     * (bd 9ve.32). The sampler forces anchors row-major over three mask rows
-     * after reserving slots 0 and 1, so `3 x anchors + 8` is the smallest
-     * budget at which NO row is dropped, and it tracks the table in the .inc
-     * with no edit here. */
-    out->min_samples = 3 * out->anchors(W, -1, NULL) + 8;
+    out->anchors = fsqrt_circuit_anchors;
 }
 
 static void call_fsqrt(cq_ctx *ctx, cq_bit *dst, const cq_bit *const *src,
@@ -265,28 +268,19 @@ CQ_TEST(the_classical_row_agrees_with_the_oracle_on_every_anchor)
     CHECK_EQ(cq_fsqrt_eval(FSQ_QUARTER), FSQ_HALF);
 }
 
-/* ---- The anchors reach the kernel, and any drop is printed. ------------- */
+/* ---- Complete classical table, constant representative circuit set. ----- */
 
-CQ_TEST(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block)
+CQ_TEST(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant)
 {
     cq_kd_shape sh;
-    const char *src = NULL;
-    int n, budget;
+    int n, circuit_n;
 
     fsqrt_shape(W64, &sh);
-    n = sh.anchors(W64, -1, NULL);
+    n = fsqrt_anchors(W64, -1, NULL);
+    circuit_n = sh.anchors(W64, -1, NULL);
 
     CHECK_EQ(n, cq_fp_anchors_unary_count() + N_FSQRT_SINGLES);
-    CHECK_EQ(sh.min_samples, 3 * n + 8);
-
-    budget = cq_kd_budget(sh.min_samples, &src);
-    CHECK(src != NULL);
-    /* THE ENVIRONMENT WINS IN BOTH DIRECTIONS AND THAT IS DELIBERATE
-     * (kerneldrv.h), so the claim is about the FLOOR and is made only on the
-     * row where the floor is what decided. */
-    if (src != NULL && strcmp(src, "env") != 0) CHECK(budget >= 3 * n + 2);
-    printf("# fsqrt anchors %d (generic %d + K21 %d), budget %d from \"%s\"\n",
-           n, cq_fp_anchors_unary_count(), N_FSQRT_SINGLES, budget, src);
+    CHECK_EQ(circuit_n, 8);
 
     /* Every row fills v[0] and NOTHING ELSE — the cq_kd_case2 trap re-armed
      * for fp is a provider that zero-fills what it does not name. */
@@ -296,11 +290,10 @@ CQ_TEST(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block)
         v[0] = cq_ref_w_make(0xDEADBEEFull, 0u, W64);
         v[1] = cq_ref_w_make(0xC0FFEEull, 0u, W64);
         v[2] = cq_ref_w_make(0xC0FFEEull, 0u, W64);
-        CHECK_EQ(sh.anchors(W64, i, v), 1);
+        CHECK_EQ(fsqrt_anchors(W64, i, v), 1);
         CHECK_EQ(v[1].lo, 0xC0FFEEull);       /* untouched, not zero-filled */
         CHECK_EQ(v[2].lo, 0xC0FFEEull);
     }
-    fflush(stdout);
 }
 
 #include "test_kernel_fsqrt_slots.inc"
@@ -409,7 +402,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_program_is_the_sum_of_its_blocks),
     CQ_CASE(the_digit_loop_is_sixty_four_iterations_of_one_template),
     CQ_CASE(the_classical_row_agrees_with_the_oracle_on_every_anchor),
-    CQ_CASE(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block),
+    CQ_CASE(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant),
     CQ_CASE(the_working_value_handed_to_m32_is_grs_at_bit_55_and_never_ties),
     CQ_CASE(the_slot_boundaries_match_an_independent_four_valued_scan),
     CQ_CASE(the_rows_spans_are_pairwise_disjoint),

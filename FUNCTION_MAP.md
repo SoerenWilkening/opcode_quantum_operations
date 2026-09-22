@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 6446
+**Indexed definitions:** 6479
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -3626,17 +3626,21 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `emit_row` | [48](src/kernels/fadd_emit.c:48) |
 | `cq_fa_step` | [209](src/kernels/fadd_emit.c:209) |
-| `cq_fa_result` | [226](src/kernels/fadd_emit.c:226) |
-| `fsub_ctx` | [241](src/kernels/fadd_emit.c:241) |
-| `cq_fsub_region` | [251](src/kernels/fadd_emit.c:251) |
-| `cq_fsub_steps` | [260](src/kernels/fadd_emit.c:260) |
-| `cq_fsub_step` | [269](src/kernels/fadd_emit.c:269) |
-| `cq_fsub_result` | [277](src/kernels/fadd_emit.c:277) |
-| `fadd_compute` | [293](src/kernels/fadd_emit.c:293) |
-| `fadd_copyout` | [298](src/kernels/fadd_emit.c:298) |
-| `fadd` | [305](src/kernels/fadd_emit.c:305) |
-| `cq_kernel_fadd` | [355](src/kernels/fadd_emit.c:355) |
-| `cq_kernel_fsub` | [359](src/kernels/fadd_emit.c:359) |
+| `fa_step_armed` | [226](src/kernels/fadd_emit.c:226) |
+| `fa_step_mapped` | [239](src/kernels/fadd_emit.c:239) |
+| `fa_result_armed` | [248](src/kernels/fadd_emit.c:248) |
+| `fa_result_mapped` | [254](src/kernels/fadd_emit.c:254) |
+| `cq_fa_result` | [263](src/kernels/fadd_emit.c:263) |
+| `fsub_ctx` | [276](src/kernels/fadd_emit.c:276) |
+| `cq_fsub_region` | [286](src/kernels/fadd_emit.c:286) |
+| `cq_fsub_steps` | [291](src/kernels/fadd_emit.c:291) |
+| `cq_fsub_step` | [296](src/kernels/fadd_emit.c:296) |
+| `cq_fsub_result` | [304](src/kernels/fadd_emit.c:304) |
+| `fadd_compute` | [322](src/kernels/fadd_emit.c:322) |
+| `fadd_copyout` | [329](src/kernels/fadd_emit.c:329) |
+| `fadd` | [336](src/kernels/fadd_emit.c:336) |
+| `cq_kernel_fadd` | [387](src/kernels/fadd_emit.c:387) |
+| `cq_kernel_fsub` | [391](src/kernels/fadd_emit.c:391) |
 
 ## `src/kernels/fadd_eval.c`
 
@@ -3669,17 +3673,20 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_fa_class_of` | [53](src/kernels/fadd_step.c:53) |
-| `cq_fa_row_steps` | [60](src/kernels/fadd_step.c:60) |
-| `row_region` | [87](src/kernels/fadd_step.c:87) |
-| `cq_fa_pick_is_flag` | [111](src/kernels/fadd_step.c:111) |
-| `cq_fa_op_width` | [120](src/kernels/fadd_step.c:120) |
-| `cq_fa_check_program` | [140](src/kernels/fadd_step.c:140) |
-| `cq_fa_region_of` | [147](src/kernels/fadd_step.c:147) |
-| `cq_fa_steps_of` | [156](src/kernels/fadd_step.c:156) |
-| `walk` | [167](src/kernels/fadd_step.c:167) |
-| `cq_fa_arm` | [182](src/kernels/fadd_step.c:182) |
-| `cq_fa_sp` | [192](src/kernels/fadd_step.c:192) |
+| `cq_fa_class_of` | [54](src/kernels/fadd_step.c:54) |
+| `cq_fa_row_steps` | [61](src/kernels/fadd_step.c:61) |
+| `row_region` | [88](src/kernels/fadd_step.c:88) |
+| `cq_fa_pick_is_flag` | [112](src/kernels/fadd_step.c:112) |
+| `cq_fa_op_width` | [121](src/kernels/fadd_step.c:121) |
+| `cq_fa_check_program` | [141](src/kernels/fadd_step.c:141) |
+| `cq_fa_region_of` | [148](src/kernels/fadd_step.c:148) |
+| `cq_fa_steps_of` | [157](src/kernels/fadd_step.c:157) |
+| `cq_fa_map_get` | [166](src/kernels/fadd_step.c:166) |
+| `cq_fa_row_at` | [195](src/kernels/fadd_step.c:195) |
+| `walk` | [212](src/kernels/fadd_step.c:212) |
+| `cq_fa_arm` | [227](src/kernels/fadd_step.c:227) |
+| `cq_fa_arm_map` | [235](src/kernels/fadd_step.c:235) |
+| `cq_fa_sp` | [246](src/kernels/fadd_step.c:246) |
 
 ## `src/kernels/fcmp.c`
 
@@ -3756,26 +3763,30 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `emit_row` | [47](src/kernels/fconv_emit.c:47) |
 | `cq_fv_step` | [200](src/kernels/fconv_emit.c:200) |
-| `cq_fv_result` | [218](src/kernels/fconv_emit.c:218) |
-| `fptosi_ctx` | [233](src/kernels/fconv_emit.c:233) |
-| `cq_fptosi_region` | [243](src/kernels/fconv_emit.c:243) |
-| `cq_fptosi_steps` | [252](src/kernels/fconv_emit.c:252) |
-| `cq_fptosi_step` | [261](src/kernels/fconv_emit.c:261) |
-| `cq_fptosi_result` | [269](src/kernels/fconv_emit.c:269) |
-| `fconv_compute` | [286](src/kernels/fconv_emit.c:286) |
-| `fconv_copyout` | [291](src/kernels/fconv_emit.c:291) |
-| `pack_w` | [303](src/kernels/fconv_emit.c:303) |
-| `uint64_t` | [317](src/kernels/fconv_emit.c:317) |
-| `fconv` | [316](src/kernels/fconv_emit.c:316) |
-| `ev_fptosi` | [360](src/kernels/fconv_emit.c:360) |
-| `ev_fptoui` | [361](src/kernels/fconv_emit.c:361) |
-| `ev_sitofp` | [362](src/kernels/fconv_emit.c:362) |
-| `ev_uitofp` | [363](src/kernels/fconv_emit.c:363) |
-| `need_64_64` | [369](src/kernels/fconv_emit.c:369) |
-| `cq_kernel_fptosi` | [375](src/kernels/fconv_emit.c:375) |
-| `cq_kernel_fptoui` | [383](src/kernels/fconv_emit.c:383) |
-| `cq_kernel_sitofp` | [391](src/kernels/fconv_emit.c:391) |
-| `cq_kernel_uitofp` | [404](src/kernels/fconv_emit.c:404) |
+| `fv_step_armed` | [218](src/kernels/fconv_emit.c:218) |
+| `fv_step_mapped` | [231](src/kernels/fconv_emit.c:231) |
+| `fv_result_armed` | [240](src/kernels/fconv_emit.c:240) |
+| `fv_result_mapped` | [244](src/kernels/fconv_emit.c:244) |
+| `cq_fv_result` | [253](src/kernels/fconv_emit.c:253) |
+| `fptosi_ctx` | [266](src/kernels/fconv_emit.c:266) |
+| `cq_fptosi_region` | [276](src/kernels/fconv_emit.c:276) |
+| `cq_fptosi_steps` | [281](src/kernels/fconv_emit.c:281) |
+| `cq_fptosi_step` | [286](src/kernels/fconv_emit.c:286) |
+| `cq_fptosi_result` | [294](src/kernels/fconv_emit.c:294) |
+| `fconv_compute` | [313](src/kernels/fconv_emit.c:313) |
+| `fconv_copyout` | [319](src/kernels/fconv_emit.c:319) |
+| `pack_w` | [330](src/kernels/fconv_emit.c:330) |
+| `uint64_t` | [343](src/kernels/fconv_emit.c:343) |
+| `fconv` | [342](src/kernels/fconv_emit.c:342) |
+| `ev_fptosi` | [387](src/kernels/fconv_emit.c:387) |
+| `ev_fptoui` | [388](src/kernels/fconv_emit.c:388) |
+| `ev_sitofp` | [389](src/kernels/fconv_emit.c:389) |
+| `ev_uitofp` | [390](src/kernels/fconv_emit.c:390) |
+| `need_64_64` | [396](src/kernels/fconv_emit.c:396) |
+| `cq_kernel_fptosi` | [402](src/kernels/fconv_emit.c:402) |
+| `cq_kernel_fptoui` | [410](src/kernels/fconv_emit.c:410) |
+| `cq_kernel_sitofp` | [418](src/kernels/fconv_emit.c:418) |
+| `cq_kernel_uitofp` | [431](src/kernels/fconv_emit.c:431) |
 
 ## `src/kernels/fconv_eval.c`
 
@@ -3796,16 +3807,19 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_fv_check_program` | [125](src/kernels/fconv_step.c:125) |
 | `cq_fv_region_of` | [132](src/kernels/fconv_step.c:132) |
 | `cq_fv_steps_of` | [141](src/kernels/fconv_step.c:141) |
-| `cq_fv_arm` | [154](src/kernels/fconv_step.c:154) |
-| `cq_fv_sp` | [175](src/kernels/fconv_step.c:175) |
-| `const_of` | [182](src/kernels/fconv_step.c:182) |
-| `cq_fv_row_out` | [216](src/kernels/fconv_step.c:216) |
-| `cq_fv_flag_of` | [254](src/kernels/fconv_step.c:254) |
-| `shr64` | [282](src/kernels/fconv_step.c:282) |
-| `view_collapse` | [291](src/kernels/fconv_step.c:291) |
-| `view_fill` | [307](src/kernels/fconv_step.c:307) |
-| `base64` | [326](src/kernels/fconv_step.c:326) |
-| `cq_fv_op64` | [349](src/kernels/fconv_step.c:349) |
+| `cq_fv_map_get` | [150](src/kernels/fconv_step.c:150) |
+| `cq_fv_row_at` | [179](src/kernels/fconv_step.c:179) |
+| `cq_fv_arm` | [198](src/kernels/fconv_step.c:198) |
+| `cq_fv_arm_map` | [217](src/kernels/fconv_step.c:217) |
+| `cq_fv_sp` | [228](src/kernels/fconv_step.c:228) |
+| `const_of` | [235](src/kernels/fconv_step.c:235) |
+| `cq_fv_row_out` | [269](src/kernels/fconv_step.c:269) |
+| `cq_fv_flag_of` | [307](src/kernels/fconv_step.c:307) |
+| `shr64` | [335](src/kernels/fconv_step.c:335) |
+| `view_collapse` | [344](src/kernels/fconv_step.c:344) |
+| `view_fill` | [360](src/kernels/fconv_step.c:360) |
+| `base64` | [379](src/kernels/fconv_step.c:379) |
+| `cq_fv_op64` | [402](src/kernels/fconv_step.c:402) |
 
 ## `src/kernels/fdiv.c`
 
@@ -3829,11 +3843,13 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `emit_row` | [49](src/kernels/fdiv_emit.c:49) |
-| `cq_fdiv_step` | [205](src/kernels/fdiv_emit.c:205) |
-| `cq_fdiv_result` | [225](src/kernels/fdiv_emit.c:225) |
-| `fdiv_compute` | [249](src/kernels/fdiv_emit.c:249) |
-| `fdiv_copyout` | [257](src/kernels/fdiv_emit.c:257) |
-| `cq_kernel_fdiv` | [264](src/kernels/fdiv_emit.c:264) |
+| `fdiv_step_mapped` | [205](src/kernels/fdiv_emit.c:205) |
+| `cq_fdiv_step` | [218](src/kernels/fdiv_emit.c:218) |
+| `fdiv_result_mapped` | [232](src/kernels/fdiv_emit.c:232) |
+| `cq_fdiv_result` | [248](src/kernels/fdiv_emit.c:248) |
+| `fdiv_compute` | [264](src/kernels/fdiv_emit.c:264) |
+| `fdiv_copyout` | [274](src/kernels/fdiv_emit.c:274) |
+| `cq_kernel_fdiv` | [281](src/kernels/fdiv_emit.c:281) |
 
 ## `src/kernels/fdiv_eval.c`
 
@@ -3859,18 +3875,20 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_fd_row_steps` | [52](src/kernels/fdiv_step.c:52) |
-| `cq_fd_row_region` | [78](src/kernels/fdiv_step.c:78) |
-| `seg` | [108](src/kernels/fdiv_step.c:108) |
-| `cq_fd_map_build` | [129](src/kernels/fdiv_step.c:129) |
-| `cq_fd_arm` | [157](src/kernels/fdiv_step.c:157) |
-| `cq_fd_off` | [166](src/kernels/fdiv_step.c:166) |
-| `cq_fd_row_of_slot` | [185](src/kernels/fdiv_step.c:185) |
-| `cq_fd_sp` | [225](src/kernels/fdiv_step.c:225) |
-| `cq_fdiv_region` | [232](src/kernels/fdiv_step.c:232) |
-| `cq_fdiv_steps` | [240](src/kernels/fdiv_step.c:240) |
-| `cq_fdiv_iter_steps` | [251](src/kernels/fdiv_step.c:251) |
-| `cq_fdiv_iter_region` | [259](src/kernels/fdiv_step.c:259) |
+| `cq_fd_row_steps` | [50](src/kernels/fdiv_step.c:50) |
+| `cq_fd_row_region` | [76](src/kernels/fdiv_step.c:76) |
+| `seg` | [106](src/kernels/fdiv_step.c:106) |
+| `cq_fd_map_build` | [127](src/kernels/fdiv_step.c:127) |
+| `cq_fd_map_get` | [155](src/kernels/fdiv_step.c:155) |
+| `cq_fd_arm` | [167](src/kernels/fdiv_step.c:167) |
+| `cq_fd_off` | [183](src/kernels/fdiv_step.c:183) |
+| `last_boundary` | [201](src/kernels/fdiv_step.c:201) |
+| `cq_fd_row_of_slot` | [213](src/kernels/fdiv_step.c:213) |
+| `cq_fd_sp` | [246](src/kernels/fdiv_step.c:246) |
+| `cq_fdiv_region` | [253](src/kernels/fdiv_step.c:253) |
+| `cq_fdiv_steps` | [260](src/kernels/fdiv_step.c:260) |
+| `cq_fdiv_iter_steps` | [270](src/kernels/fdiv_step.c:270) |
+| `cq_fdiv_iter_region` | [275](src/kernels/fdiv_step.c:275) |
 
 ## `src/kernels/fma.c`
 
@@ -3953,11 +3971,13 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `emit_row` | [50](src/kernels/fmul_emit.c:50) |
-| `cq_fmul_step` | [220](src/kernels/fmul_emit.c:220) |
-| `cq_fmul_result` | [246](src/kernels/fmul_emit.c:246) |
-| `fmul_compute` | [270](src/kernels/fmul_emit.c:270) |
-| `fmul_copyout` | [278](src/kernels/fmul_emit.c:278) |
-| `cq_kernel_fmul` | [285](src/kernels/fmul_emit.c:285) |
+| `fmul_step_armed` | [220](src/kernels/fmul_emit.c:220) |
+| `cq_fmul_step` | [236](src/kernels/fmul_emit.c:236) |
+| `fmul_result_armed` | [250](src/kernels/fmul_emit.c:250) |
+| `cq_fmul_result` | [266](src/kernels/fmul_emit.c:266) |
+| `fmul_compute` | [282](src/kernels/fmul_emit.c:282) |
+| `fmul_copyout` | [292](src/kernels/fmul_emit.c:292) |
+| `cq_kernel_fmul` | [299](src/kernels/fmul_emit.c:299) |
 
 ## `src/kernels/fmul_eval.c`
 
@@ -3969,21 +3989,23 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_fm_row_steps` | [71](src/kernels/fmul_step.c:71) |
-| `cq_fm_row_region` | [98](src/kernels/fmul_step.c:98) |
-| `cq_fmul_region` | [123](src/kernels/fmul_step.c:123) |
-| `cq_fmul_steps` | [134](src/kernels/fmul_step.c:134) |
-| `cq_fm_arm` | [150](src/kernels/fmul_step.c:150) |
-| `cq_fm_sp` | [170](src/kernels/fmul_step.c:170) |
-| `const_of` | [177](src/kernels/fmul_step.c:177) |
-| `out64` | [208](src/kernels/fmul_step.c:208) |
-| `cq_fm_val64` | [252](src/kernels/fmul_step.c:252) |
-| `cq_fm_flag_of` | [288](src/kernels/fmul_step.c:288) |
-| `shr64` | [339](src/kernels/fmul_step.c:339) |
-| `cq_fm_view_collapse` | [346](src/kernels/fmul_step.c:346) |
-| `cq_fm_view_fill` | [365](src/kernels/fmul_step.c:365) |
-| `base64` | [376](src/kernels/fmul_step.c:376) |
-| `cq_fm_op64` | [392](src/kernels/fmul_step.c:392) |
+| `cq_fm_row_steps` | [72](src/kernels/fmul_step.c:72) |
+| `cq_fm_row_region` | [99](src/kernels/fmul_step.c:99) |
+| `cq_fmul_region` | [124](src/kernels/fmul_step.c:124) |
+| `cq_fmul_steps` | [129](src/kernels/fmul_step.c:129) |
+| `cq_fm_map_get` | [134](src/kernels/fmul_step.c:134) |
+| `cq_fm_row_at` | [159](src/kernels/fmul_step.c:159) |
+| `cq_fm_arm` | [180](src/kernels/fmul_step.c:180) |
+| `cq_fm_sp` | [194](src/kernels/fmul_step.c:194) |
+| `const_of` | [201](src/kernels/fmul_step.c:201) |
+| `out64` | [232](src/kernels/fmul_step.c:232) |
+| `cq_fm_val64` | [276](src/kernels/fmul_step.c:276) |
+| `cq_fm_flag_of` | [312](src/kernels/fmul_step.c:312) |
+| `shr64` | [363](src/kernels/fmul_step.c:363) |
+| `cq_fm_view_collapse` | [370](src/kernels/fmul_step.c:370) |
+| `cq_fm_view_fill` | [389](src/kernels/fmul_step.c:389) |
+| `base64` | [400](src/kernels/fmul_step.c:400) |
+| `cq_fm_op64` | [416](src/kernels/fmul_step.c:416) |
 
 ## `src/kernels/fpclass.c`
 
@@ -4531,6 +4553,12 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `cqops_version_string` | [10](src/version.c:10) |
 
+## `tests/package-consumer/main.c`
+
+| Function | Line |
+|---|---:|
+| `main` | [9](tests/package-consumer/main.c:9) |
+
 ## `tests/support/bitkinds.c`
 
 | Function | Line |
@@ -4595,6 +4623,11 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_fp_anchors_binary` | [101](tests/support/fpanchors.c:101) |
 | `cq_fp_anchors_unary_count` | [148](tests/support/fpanchors.c:148) |
 | `cq_fp_anchors_unary` | [150](tests/support/fpanchors.c:150) |
+| `cq_fp_representative_count` | [165](tests/support/fpanchors.c:165) |
+| `representative_index` | [171](tests/support/fpanchors.c:171) |
+| `cq_fp_representative_binary_index` | [182](tests/support/fpanchors.c:182) |
+| `cq_fp_representative_unary_index` | [192](tests/support/fpanchors.c:192) |
+| `cq_fp_representative_spread_index` | [202](tests/support/fpanchors.c:202) |
 
 ## `tests/support/fphost.c`
 
@@ -4671,25 +4704,25 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `cq_kd_default_shape` | [31](tests/support/kerneldrv.c:31) |
-| `cq_kd_shape_of` | [78](tests/support/kerneldrv.c:78) |
-| `cq_kd_fx_open` | [102](tests/support/kerneldrv.c:102) |
-| `cq_kd_fx_close` | [109](tests/support/kerneldrv.c:109) |
-| `check_source` | [140](tests/support/kerneldrv.c:140) |
-| `cq_kd_call_kernel` | [176](tests/support/kerneldrv.c:176) |
-| `call_ref` | [189](tests/support/kerneldrv.c:189) |
-| `cq_kd_case` | [196](tests/support/kerneldrv.c:196) |
-| `cq_kd_case2` | [432](tests/support/kerneldrv.c:432) |
+| `cq_kd_shape_of` | [74](tests/support/kerneldrv.c:74) |
+| `cq_kd_fx_open` | [98](tests/support/kerneldrv.c:98) |
+| `cq_kd_fx_close` | [105](tests/support/kerneldrv.c:105) |
+| `check_source` | [136](tests/support/kerneldrv.c:136) |
+| `cq_kd_call_kernel` | [172](tests/support/kerneldrv.c:172) |
+| `call_ref` | [185](tests/support/kerneldrv.c:185) |
+| `cq_kd_case` | [192](tests/support/kerneldrv.c:192) |
+| `cq_kd_case2` | [428](tests/support/kerneldrv.c:428) |
 
 ## `tests/support/kerneldrv.h`
 
 | Function | Line |
 |---|---:|
 | `int` | [151](tests/support/kerneldrv.h:151) |
+| `void` | [170](tests/support/kerneldrv.h:170) |
 | `void` | [171](tests/support/kerneldrv.h:171) |
-| `void` | [172](tests/support/kerneldrv.h:172) |
-| `cq_ref_w` | [178](tests/support/kerneldrv.h:178) |
-| `uint64_t` | [181](tests/support/kerneldrv.h:181) |
-| `void` | [341](tests/support/kerneldrv.h:341) |
+| `cq_ref_w` | [177](tests/support/kerneldrv.h:177) |
+| `uint64_t` | [180](tests/support/kerneldrv.h:180) |
+| `void` | [297](tests/support/kerneldrv.h:297) |
 
 ## `tests/support/kernelmeasure.c`
 
@@ -4703,17 +4736,14 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `budget_cache` | [105](tests/support/kernelsweep.c:105) |
-| `cq_kd_samples` | [116](tests/support/kernelsweep.c:116) |
-| `cq_kd_samples_reset` | [124](tests/support/kernelsweep.c:124) |
-| `cq_kd_budget` | [137](tests/support/kernelsweep.c:137) |
-| `budget_note` | [155](tests/support/kernelsweep.c:155) |
-| `seed_for` | [165](tests/support/kernelsweep.c:165) |
-| `pairs_for` | [176](tests/support/kernelsweep.c:176) |
-| `row_by_name` | [209](tests/support/kernelsweep.c:209) |
-| `cq_kd_sample_at` | [230](tests/support/kernelsweep.c:230) |
-| `cq_kd_sweep_at` | [365](tests/support/kernelsweep.c:365) |
-| `cq_kd_sweep` | [370](tests/support/kernelsweep.c:370) |
+| `budget_cache` | [95](tests/support/kernelsweep.c:95) |
+| `cq_kd_samples` | [106](tests/support/kernelsweep.c:106) |
+| `seed_for` | [116](tests/support/kernelsweep.c:116) |
+| `pairs_for` | [127](tests/support/kernelsweep.c:127) |
+| `row_by_name` | [160](tests/support/kernelsweep.c:160) |
+| `cq_kd_sample_at` | [181](tests/support/kernelsweep.c:181) |
+| `cq_kd_sweep_at` | [309](tests/support/kernelsweep.c:309) |
+| `cq_kd_sweep` | [314](tests/support/kernelsweep.c:314) |
 
 ## `tests/support/mock_sink.c`
 
@@ -5602,24 +5632,27 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `fa_is_nan` | [102](tests/test_kernel_fadd.c:102) |
-| `fa_is_inf` | [103](tests/test_kernel_fadd.c:103) |
-| `fa_sign` | [104](tests/test_kernel_fadd.c:104) |
-| `host_fadd` | [106](tests/test_kernel_fadd.c:106) |
-| `host_fsub` | [115](tests/test_kernel_fadd.c:115) |
-| `fadd_shape` | [130](tests/test_kernel_fadd.c:130) |
-| `call_fadd` | [148](tests/test_kernel_fadd.c:148) |
-| `call_fsub` | [152](tests/test_kernel_fadd.c:152) |
-| `ref_fadd` | [156](tests/test_kernel_fadd.c:156) |
-| `ref_fsub` | [159](tests/test_kernel_fadd.c:159) |
-| `uint64_t` | [165](tests/test_kernel_fadd.c:165) |
-| `uint64_t` | [166](tests/test_kernel_fadd.c:166) |
-| `fadd_run` | [183](tests/test_kernel_fadd.c:183) |
-| `l1_sweep (via CQ_TEST)` | [214](tests/test_kernel_fadd.c:214) |
-| `fadd_narrow` | [230](tests/test_kernel_fadd.c:230) |
-| `controlled (via CQ_TEST)` | [255](tests/test_kernel_fadd.c:255) |
-| `check_counts` | [272](tests/test_kernel_fadd.c:272) |
-| `l4_goldens (via CQ_TEST)` | [285](tests/test_kernel_fadd.c:285) |
+| `check_cached_prefix_map` | [85](tests/test_kernel_fadd.c:85) |
+| `the_cached_prefix_maps_match_a_linear_dispatch_at_every_slot (via CQ_TEST)` | [105](tests/test_kernel_fadd.c:105) |
+| `fa_is_nan` | [129](tests/test_kernel_fadd.c:129) |
+| `fa_is_inf` | [130](tests/test_kernel_fadd.c:130) |
+| `fa_sign` | [131](tests/test_kernel_fadd.c:131) |
+| `host_fadd` | [133](tests/test_kernel_fadd.c:133) |
+| `host_fsub` | [142](tests/test_kernel_fadd.c:142) |
+| `fadd_circuit_anchors` | [157](tests/test_kernel_fadd.c:157) |
+| `fadd_shape` | [166](tests/test_kernel_fadd.c:166) |
+| `call_fadd` | [176](tests/test_kernel_fadd.c:176) |
+| `call_fsub` | [180](tests/test_kernel_fadd.c:180) |
+| `ref_fadd` | [184](tests/test_kernel_fadd.c:184) |
+| `ref_fsub` | [187](tests/test_kernel_fadd.c:187) |
+| `uint64_t` | [193](tests/test_kernel_fadd.c:193) |
+| `uint64_t` | [194](tests/test_kernel_fadd.c:194) |
+| `fadd_run` | [211](tests/test_kernel_fadd.c:211) |
+| `l1_sweep (via CQ_TEST)` | [242](tests/test_kernel_fadd.c:242) |
+| `fadd_narrow` | [258](tests/test_kernel_fadd.c:258) |
+| `controlled (via CQ_TEST)` | [283](tests/test_kernel_fadd.c:283) |
+| `check_counts` | [300](tests/test_kernel_fadd.c:300) |
+| `l4_goldens (via CQ_TEST)` | [313](tests/test_kernel_fadd.c:313) |
 
 ## `tests/test_kernel_fadd_anchors.inc`
 
@@ -5672,9 +5705,9 @@ the definition (or the build-language declaration) in the listed file.
 | `fsub_is_fadds_body_under_a_prologue_and_b_is_rebased (via CQ_TEST)` | [123](tests/test_kernel_fadd_prog.inc:123) |
 | `fsub_differs_from_fadd_of_fneg_on_exactly_the_nan_rhs_sign (via CQ_TEST)` | [182](tests/test_kernel_fadd_prog.inc:182) |
 | `the_classical_row_agrees_with_the_host_on_every_anchor (via CQ_TEST)` | [250](tests/test_kernel_fadd_prog.inc:250) |
-| `the_three_unspecified_cells_are_the_pinned_literals (via CQ_TEST)` | [308](tests/test_kernel_fadd_prog.inc:308) |
-| `the_working_format_handed_to_m32_is_grs_in_bits_2_1_0 (via CQ_TEST)` | [359](tests/test_kernel_fadd_prog.inc:359) |
-| `the_d8_band_is_discarded_and_the_select_that_discards_it_is_live (via CQ_TEST)` | [406](tests/test_kernel_fadd_prog.inc:406) |
+| `the_three_unspecified_cells_are_the_pinned_literals (via CQ_TEST)` | [312](tests/test_kernel_fadd_prog.inc:312) |
+| `the_working_format_handed_to_m32_is_grs_in_bits_2_1_0 (via CQ_TEST)` | [363](tests/test_kernel_fadd_prog.inc:363) |
+| `the_d8_band_is_discarded_and_the_select_that_discards_it_is_live (via CQ_TEST)` | [410](tests/test_kernel_fadd_prog.inc:410) |
 
 ## `tests/test_kernel_fadd_scan.inc`
 
@@ -5723,13 +5756,14 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `host_fcmp` | [86](tests/test_kernel_fcmp.c:86) |
-| `fcmp_shape` | [119](tests/test_kernel_fcmp.c:119) |
-| `l1_sweep (via CQ_TEST)` | [172](tests/test_kernel_fcmp.c:172) |
-| `fcmp_narrow` | [190](tests/test_kernel_fcmp.c:190) |
-| `controlled (via CQ_TEST)` | [196](tests/test_kernel_fcmp.c:196) |
-| `check_counts` | [213](tests/test_kernel_fcmp.c:213) |
-| `l4_goldens (via CQ_TEST)` | [226](tests/test_kernel_fcmp.c:226) |
-| `dst_owns_one_qubit_and_the_scratch_comes_back (via CQ_TEST)` | [247](tests/test_kernel_fcmp.c:247) |
+| `fcmp_circuit_anchors` | [115](tests/test_kernel_fcmp.c:115) |
+| `fcmp_shape` | [128](tests/test_kernel_fcmp.c:128) |
+| `l1_sweep (via CQ_TEST)` | [173](tests/test_kernel_fcmp.c:173) |
+| `fcmp_narrow` | [191](tests/test_kernel_fcmp.c:191) |
+| `controlled (via CQ_TEST)` | [197](tests/test_kernel_fcmp.c:197) |
+| `check_counts` | [214](tests/test_kernel_fcmp.c:214) |
+| `l4_goldens (via CQ_TEST)` | [227](tests/test_kernel_fcmp.c:227) |
+| `dst_owns_one_qubit_and_the_scratch_comes_back (via CQ_TEST)` | [248](tests/test_kernel_fcmp.c:248) |
 
 ## `tests/test_kernel_fcmp_anchors.inc`
 
@@ -5773,11 +5807,11 @@ the definition (or the build-language declaration) in the listed file.
 | `the_dispatch_is_four_swaps_and_zero_inversions (via CQ_TEST)` | [71](tests/test_kernel_fcmp_pred.inc:71) |
 | `the_unordered_row_is_the_literal_o_and_u_family_split (via CQ_TEST)` | [129](tests/test_kernel_fcmp_pred.inc:129) |
 | `the_classical_row_agrees_with_the_host_on_every_anchor (via CQ_TEST)` | [194](tests/test_kernel_fcmp_pred.inc:194) |
-| `every_anchor_reaches_the_kernel_and_the_drop_is_printed (via CQ_TEST)` | [248](tests/test_kernel_fcmp_pred.inc:248) |
-| `scan_arity` | [308](tests/test_kernel_fcmp_pred.inc:308) |
-| `op_is_wide` | [318](tests/test_kernel_fcmp_pred.inc:318) |
-| `the_programs_are_well_formed_and_reach_no_variable_shift (via CQ_TEST)` | [324](tests/test_kernel_fcmp_pred.inc:324) |
-| `the_four_swapped_predicates_are_their_twin_on_exchanged_operands (via CQ_TEST)` | [381](tests/test_kernel_fcmp_pred.inc:381) |
+| `the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant (via CQ_TEST)` | [248](tests/test_kernel_fcmp_pred.inc:248) |
+| `scan_arity` | [274](tests/test_kernel_fcmp_pred.inc:274) |
+| `op_is_wide` | [284](tests/test_kernel_fcmp_pred.inc:284) |
+| `the_programs_are_well_formed_and_reach_no_variable_shift (via CQ_TEST)` | [290](tests/test_kernel_fcmp_pred.inc:290) |
+| `the_four_swapped_predicates_are_their_twin_on_exchanged_operands (via CQ_TEST)` | [347](tests/test_kernel_fcmp_pred.inc:347) |
 
 ## `tests/test_kernel_fcmp_slots.inc`
 
@@ -5812,34 +5846,37 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `host_fptosi` | [107](tests/test_kernel_fconv.c:107) |
-| `return` | [113](tests/test_kernel_fconv.c:113) |
-| `host_fptoui` | [116](tests/test_kernel_fconv.c:116) |
-| `return` | [125](tests/test_kernel_fconv.c:125) |
-| `host_sitofp` | [133](tests/test_kernel_fconv.c:133) |
-| `host_uitofp` | [139](tests/test_kernel_fconv.c:139) |
-| `fconv_shape` | [161](tests/test_kernel_fconv.c:161) |
-| `call_fptosi` | [180](tests/test_kernel_fconv.c:180) |
-| `call_fptoui` | [184](tests/test_kernel_fconv.c:184) |
-| `call_sitofp` | [188](tests/test_kernel_fconv.c:188) |
-| `call_uitofp` | [192](tests/test_kernel_fconv.c:192) |
-| `uint64_t` | [199](tests/test_kernel_fconv.c:199) |
-| `uint64_t` | [200](tests/test_kernel_fconv.c:200) |
-| `ev_fptosi` | [205](tests/test_kernel_fconv.c:205) |
-| `ev_fptoui` | [206](tests/test_kernel_fconv.c:206) |
-| `ev_sitofp` | [207](tests/test_kernel_fconv.c:207) |
-| `ev_uitofp` | [208](tests/test_kernel_fconv.c:208) |
-| `ref_fptosi` | [210](tests/test_kernel_fconv.c:210) |
-| `ref_fptoui` | [212](tests/test_kernel_fconv.c:212) |
-| `ref_sitofp` | [214](tests/test_kernel_fconv.c:214) |
-| `ref_uitofp` | [216](tests/test_kernel_fconv.c:216) |
-| `fconv_arm` | [240](tests/test_kernel_fconv.c:240) |
-| `fconv_run` | [249](tests/test_kernel_fconv.c:249) |
-| `l1_sweep (via CQ_TEST)` | [277](tests/test_kernel_fconv.c:277) |
-| `fconv_narrow` | [310](tests/test_kernel_fconv.c:310) |
-| `controlled (via CQ_TEST)` | [338](tests/test_kernel_fconv.c:338) |
-| `check_counts` | [365](tests/test_kernel_fconv.c:365) |
-| `l4_goldens (via CQ_TEST)` | [381](tests/test_kernel_fconv.c:381) |
+| `check_cached_prefix_map` | [89](tests/test_kernel_fconv.c:89) |
+| `the_cached_prefix_maps_match_a_linear_dispatch_at_every_slot (via CQ_TEST)` | [109](tests/test_kernel_fconv.c:109) |
+| `host_fptosi` | [135](tests/test_kernel_fconv.c:135) |
+| `return` | [141](tests/test_kernel_fconv.c:141) |
+| `host_fptoui` | [144](tests/test_kernel_fconv.c:144) |
+| `return` | [153](tests/test_kernel_fconv.c:153) |
+| `host_sitofp` | [161](tests/test_kernel_fconv.c:161) |
+| `host_uitofp` | [167](tests/test_kernel_fconv.c:167) |
+| `fconv_circuit_anchors` | [190](tests/test_kernel_fconv.c:190) |
+| `fconv_shape` | [201](tests/test_kernel_fconv.c:201) |
+| `call_fptosi` | [211](tests/test_kernel_fconv.c:211) |
+| `call_fptoui` | [215](tests/test_kernel_fconv.c:215) |
+| `call_sitofp` | [219](tests/test_kernel_fconv.c:219) |
+| `call_uitofp` | [223](tests/test_kernel_fconv.c:223) |
+| `uint64_t` | [230](tests/test_kernel_fconv.c:230) |
+| `uint64_t` | [231](tests/test_kernel_fconv.c:231) |
+| `ev_fptosi` | [236](tests/test_kernel_fconv.c:236) |
+| `ev_fptoui` | [237](tests/test_kernel_fconv.c:237) |
+| `ev_sitofp` | [238](tests/test_kernel_fconv.c:238) |
+| `ev_uitofp` | [239](tests/test_kernel_fconv.c:239) |
+| `ref_fptosi` | [241](tests/test_kernel_fconv.c:241) |
+| `ref_fptoui` | [243](tests/test_kernel_fconv.c:243) |
+| `ref_sitofp` | [245](tests/test_kernel_fconv.c:245) |
+| `ref_uitofp` | [247](tests/test_kernel_fconv.c:247) |
+| `fconv_arm` | [271](tests/test_kernel_fconv.c:271) |
+| `fconv_run` | [281](tests/test_kernel_fconv.c:281) |
+| `l1_sweep (via CQ_TEST)` | [309](tests/test_kernel_fconv.c:309) |
+| `fconv_narrow` | [342](tests/test_kernel_fconv.c:342) |
+| `controlled (via CQ_TEST)` | [370](tests/test_kernel_fconv.c:370) |
+| `check_counts` | [397](tests/test_kernel_fconv.c:397) |
+| `l4_goldens (via CQ_TEST)` | [413](tests/test_kernel_fconv.c:413) |
 
 ## `tests/test_kernel_fconv_anchors.inc`
 
@@ -5934,26 +5971,28 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [33](tests/test_kernel_fconv_value.inc:33) |
-| `every_undefined_cell_saturates_to_x86s_indefinite_value (via CQ_TEST)` | [84](tests/test_kernel_fconv_value.inc:84) |
-| `the_i64_row_upstream_would_have_emitted_is_wrong_and_the_others_are_not (via CQ_TEST)` | [151](tests/test_kernel_fconv_value.inc:151) |
+| `every_undefined_cell_saturates_to_x86s_indefinite_value (via CQ_TEST)` | [90](tests/test_kernel_fconv_value.inc:90) |
+| `the_i64_row_upstream_would_have_emitted_is_wrong_and_the_others_are_not (via CQ_TEST)` | [157](tests/test_kernel_fconv_value.inc:157) |
 
 ## `tests/test_kernel_fdiv.c`
 
 | Function | Line |
 |---|---:|
-| `fd_is_nan` | [92](tests/test_kernel_fdiv.c:92) |
-| `fd_is_inf` | [98](tests/test_kernel_fdiv.c:98) |
-| `fd_is_zero` | [104](tests/test_kernel_fdiv.c:104) |
-| `ref_fdiv` | [112](tests/test_kernel_fdiv.c:112) |
-| `fdiv_shape` | [131](tests/test_kernel_fdiv.c:131) |
-| `fdiv_run` | [154](tests/test_kernel_fdiv.c:154) |
-| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [184](tests/test_kernel_fdiv.c:184) |
-| `every_anchor_reaches_the_kernel_and_the_budget_covers_the_block (via CQ_TEST)` | [240](tests/test_kernel_fdiv.c:240) |
-| `l1_sweep (via CQ_TEST)` | [282](tests/test_kernel_fdiv.c:282) |
-| `fdiv_two_rows` | [299](tests/test_kernel_fdiv.c:299) |
-| `controlled (via CQ_TEST)` | [316](tests/test_kernel_fdiv.c:316) |
-| `l4_goldens (via CQ_TEST)` | [332](tests/test_kernel_fdiv.c:332) |
-| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [361](tests/test_kernel_fdiv.c:361) |
+| `the_cached_segmented_map_matches_a_linear_dispatch_at_every_slot (via CQ_TEST)` | [90](tests/test_kernel_fdiv.c:90) |
+| `fd_is_nan` | [115](tests/test_kernel_fdiv.c:115) |
+| `fd_is_inf` | [121](tests/test_kernel_fdiv.c:121) |
+| `fd_is_zero` | [127](tests/test_kernel_fdiv.c:127) |
+| `ref_fdiv` | [135](tests/test_kernel_fdiv.c:135) |
+| `fdiv_circuit_anchors` | [151](tests/test_kernel_fdiv.c:151) |
+| `fdiv_shape` | [163](tests/test_kernel_fdiv.c:163) |
+| `fdiv_run` | [179](tests/test_kernel_fdiv.c:179) |
+| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [209](tests/test_kernel_fdiv.c:209) |
+| `the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant (via CQ_TEST)` | [265](tests/test_kernel_fdiv.c:265) |
+| `l1_sweep (via CQ_TEST)` | [296](tests/test_kernel_fdiv.c:296) |
+| `fdiv_two_rows` | [313](tests/test_kernel_fdiv.c:313) |
+| `controlled (via CQ_TEST)` | [330](tests/test_kernel_fdiv.c:330) |
+| `l4_goldens (via CQ_TEST)` | [346](tests/test_kernel_fdiv.c:346) |
+| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [375](tests/test_kernel_fdiv.c:375) |
 
 ## `tests/test_kernel_fdiv_anchors.inc`
 
@@ -6040,16 +6079,17 @@ the definition (or the build-language declaration) in the listed file.
 | `ref_fma` | [114](tests/test_kernel_fma.c:114) |
 | `call_fma` | [144](tests/test_kernel_fma.c:144) |
 | `refn_fma` | [150](tests/test_kernel_fma.c:150) |
-| `fma_shape` | [156](tests/test_kernel_fma.c:156) |
-| `fma_run` | [179](tests/test_kernel_fma.c:179) |
-| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [213](tests/test_kernel_fma.c:213) |
-| `the_single_rounding_path_is_not_a_multiply_then_an_add (via CQ_TEST)` | [269](tests/test_kernel_fma.c:269) |
-| `every_anchor_reaches_the_kernel_and_the_budget_covers_the_block (via CQ_TEST)` | [302](tests/test_kernel_fma.c:302) |
-| `l1_sweep (via CQ_TEST)` | [344](tests/test_kernel_fma.c:344) |
-| `fma_two_rows` | [359](tests/test_kernel_fma.c:359) |
-| `controlled (via CQ_TEST)` | [381](tests/test_kernel_fma.c:381) |
-| `l4_goldens (via CQ_TEST)` | [398](tests/test_kernel_fma.c:398) |
-| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [427](tests/test_kernel_fma.c:427) |
+| `fma_circuit_anchors` | [156](tests/test_kernel_fma.c:156) |
+| `fma_shape` | [165](tests/test_kernel_fma.c:165) |
+| `fma_run` | [181](tests/test_kernel_fma.c:181) |
+| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [215](tests/test_kernel_fma.c:215) |
+| `the_single_rounding_path_is_not_a_multiply_then_an_add (via CQ_TEST)` | [271](tests/test_kernel_fma.c:271) |
+| `the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant (via CQ_TEST)` | [304](tests/test_kernel_fma.c:304) |
+| `l1_sweep (via CQ_TEST)` | [336](tests/test_kernel_fma.c:336) |
+| `fma_two_rows` | [351](tests/test_kernel_fma.c:351) |
+| `controlled (via CQ_TEST)` | [373](tests/test_kernel_fma.c:373) |
+| `l4_goldens (via CQ_TEST)` | [390](tests/test_kernel_fma.c:390) |
+| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [419](tests/test_kernel_fma.c:419) |
 
 ## `tests/test_kernel_fma_anchors.inc`
 
@@ -6127,19 +6167,21 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `fm_is_nan` | [84](tests/test_kernel_fmul.c:84) |
-| `fm_is_inf` | [90](tests/test_kernel_fmul.c:90) |
-| `fm_is_zero` | [96](tests/test_kernel_fmul.c:96) |
-| `ref_fmul` | [104](tests/test_kernel_fmul.c:104) |
-| `fmul_shape` | [123](tests/test_kernel_fmul.c:123) |
-| `fmul_run` | [146](tests/test_kernel_fmul.c:146) |
-| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [176](tests/test_kernel_fmul.c:176) |
-| `every_anchor_reaches_the_kernel_and_the_budget_covers_the_block (via CQ_TEST)` | [223](tests/test_kernel_fmul.c:223) |
-| `l1_sweep (via CQ_TEST)` | [270](tests/test_kernel_fmul.c:270) |
-| `fmul_two_rows` | [287](tests/test_kernel_fmul.c:287) |
-| `controlled (via CQ_TEST)` | [304](tests/test_kernel_fmul.c:304) |
-| `l4_goldens (via CQ_TEST)` | [320](tests/test_kernel_fmul.c:320) |
-| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [348](tests/test_kernel_fmul.c:348) |
+| `the_cached_prefix_map_matches_a_linear_dispatch_at_every_slot (via CQ_TEST)` | [83](tests/test_kernel_fmul.c:83) |
+| `fm_is_nan` | [108](tests/test_kernel_fmul.c:108) |
+| `fm_is_inf` | [114](tests/test_kernel_fmul.c:114) |
+| `fm_is_zero` | [120](tests/test_kernel_fmul.c:120) |
+| `ref_fmul` | [128](tests/test_kernel_fmul.c:128) |
+| `fmul_circuit_anchors` | [144](tests/test_kernel_fmul.c:144) |
+| `fmul_shape` | [156](tests/test_kernel_fmul.c:156) |
+| `fmul_run` | [172](tests/test_kernel_fmul.c:172) |
+| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [202](tests/test_kernel_fmul.c:202) |
+| `the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant (via CQ_TEST)` | [249](tests/test_kernel_fmul.c:249) |
+| `l1_sweep (via CQ_TEST)` | [280](tests/test_kernel_fmul.c:280) |
+| `fmul_two_rows` | [297](tests/test_kernel_fmul.c:297) |
+| `controlled (via CQ_TEST)` | [314](tests/test_kernel_fmul.c:314) |
+| `l4_goldens (via CQ_TEST)` | [330](tests/test_kernel_fmul.c:330) |
+| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [358](tests/test_kernel_fmul.c:358) |
 
 ## `tests/test_kernel_fmul_anchors.inc`
 
@@ -6217,7 +6259,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `fp_shape` | [66](tests/test_kernel_fpfield.c:66) |
+| `fp_circuit_anchors` | [58](tests/test_kernel_fpfield.c:58) |
+| `fp_shape` | [75](tests/test_kernel_fpfield.c:75) |
 | `host_class` | [92](tests/test_kernel_fpfield.c:92) |
 | `l1_sweep (via CQ_TEST)` | [135](tests/test_kernel_fpfield.c:135) |
 | `fp_narrow` | [142](tests/test_kernel_fpfield.c:142) |
@@ -6242,9 +6285,9 @@ the definition (or the build-language declaration) in the listed file.
 | `fpb_mask_name` | [179](tests/test_kernel_fpfield_block.inc:179) |
 | `the_class_block_is_a_palindrome_and_gives_the_pool_back (via CQ_TEST)` | [197](tests/test_kernel_fpfield_block.inc:197) |
 | `two_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [296](tests/test_kernel_fpfield_block.inc:296) |
-| `the_blocks_flag_is_the_predicate_not_its_negation (via CQ_TEST)` | [366](tests/test_kernel_fpfield_block.inc:366) |
-| `fpb_block_cost` | [420](tests/test_kernel_fpfield_block.inc:420) |
-| `the_kernels_are_the_block_twice_plus_their_copyout (via CQ_TEST)` | [445](tests/test_kernel_fpfield_block.inc:445) |
+| `the_blocks_flag_is_the_predicate_not_its_negation (via CQ_TEST)` | [367](tests/test_kernel_fpfield_block.inc:367) |
+| `fpb_block_cost` | [423](tests/test_kernel_fpfield_block.inc:423) |
+| `the_kernels_are_the_block_twice_plus_their_copyout (via CQ_TEST)` | [448](tests/test_kernel_fpfield_block.inc:448) |
 
 ## `tests/test_kernel_fpfield_death.c`
 
@@ -6294,7 +6337,7 @@ the definition (or the build-language declaration) in the listed file.
 | `a_view_addresses_the_lanes_the_source_names (via CQ_TEST)` | [82](tests/test_kernel_fpfield_views.inc:82) |
 | `a_view_over_a_classical_rail_is_all_constant (via CQ_TEST)` | [116](tests/test_kernel_fpfield_views.inc:116) |
 | `the_constant_spans_are_the_softfloat_patterns (via CQ_TEST)` | [146](tests/test_kernel_fpfield_views.inc:146) |
-| `every_anchor_reaches_the_kernel_and_the_drop_is_printed (via CQ_TEST)` | [188](tests/test_kernel_fpfield_views.inc:188) |
+| `the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant (via CQ_TEST)` | [173](tests/test_kernel_fpfield_views.inc:173) |
 
 ## `tests/test_kernel_fpround.c`
 
@@ -6426,21 +6469,22 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `fs_is_nan` | [83](tests/test_kernel_fsqrt.c:83) |
-| `fs_is_neg_nonzero` | [90](tests/test_kernel_fsqrt.c:90) |
-| `ref_fsqrt` | [107](tests/test_kernel_fsqrt.c:107) |
-| `fsqrt_shape` | [126](tests/test_kernel_fsqrt.c:126) |
-| `call_fsqrt` | [142](tests/test_kernel_fsqrt.c:142) |
-| `refn_fsqrt` | [149](tests/test_kernel_fsqrt.c:149) |
-| `fq_read` | [164](tests/test_kernel_fsqrt.c:164) |
-| `fsqrt_run` | [188](tests/test_kernel_fsqrt.c:188) |
-| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [222](tests/test_kernel_fsqrt.c:222) |
-| `every_anchor_reaches_the_kernel_and_the_budget_covers_the_block (via CQ_TEST)` | [270](tests/test_kernel_fsqrt.c:270) |
-| `l1_sweep (via CQ_TEST)` | [314](tests/test_kernel_fsqrt.c:314) |
-| `fsqrt_two_rows` | [331](tests/test_kernel_fsqrt.c:331) |
-| `controlled (via CQ_TEST)` | [348](tests/test_kernel_fsqrt.c:348) |
-| `l4_goldens (via CQ_TEST)` | [364](tests/test_kernel_fsqrt.c:364) |
-| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [393](tests/test_kernel_fsqrt.c:393) |
+| `fs_is_nan` | [84](tests/test_kernel_fsqrt.c:84) |
+| `fs_is_neg_nonzero` | [91](tests/test_kernel_fsqrt.c:91) |
+| `ref_fsqrt` | [108](tests/test_kernel_fsqrt.c:108) |
+| `fsqrt_circuit_anchors` | [122](tests/test_kernel_fsqrt.c:122) |
+| `fsqrt_shape` | [136](tests/test_kernel_fsqrt.c:136) |
+| `call_fsqrt` | [145](tests/test_kernel_fsqrt.c:145) |
+| `refn_fsqrt` | [152](tests/test_kernel_fsqrt.c:152) |
+| `fq_read` | [167](tests/test_kernel_fsqrt.c:167) |
+| `fsqrt_run` | [191](tests/test_kernel_fsqrt.c:191) |
+| `the_classical_row_agrees_with_the_oracle_on_every_anchor (via CQ_TEST)` | [225](tests/test_kernel_fsqrt.c:225) |
+| `the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant (via CQ_TEST)` | [273](tests/test_kernel_fsqrt.c:273) |
+| `l1_sweep (via CQ_TEST)` | [307](tests/test_kernel_fsqrt.c:307) |
+| `fsqrt_two_rows` | [324](tests/test_kernel_fsqrt.c:324) |
+| `controlled (via CQ_TEST)` | [341](tests/test_kernel_fsqrt.c:341) |
+| `l4_goldens (via CQ_TEST)` | [357](tests/test_kernel_fsqrt.c:357) |
+| `dst_owns_64_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [386](tests/test_kernel_fsqrt.c:386) |
 
 ## `tests/test_kernel_fsqrt_anchors.inc`
 
@@ -6944,25 +6988,6 @@ the definition (or the build-language declaration) in the listed file.
 | `shape_fp_anchors` | [284](tests/test_kerneldrv_anchors.inc:284) |
 | `anchors_sit_inside_the_budget_and_never_on_top_of_it (via CQ_TEST)` | [290](tests/test_kerneldrv_anchors.inc:290) |
 | `the_f64_anchor_constants_are_what_they_claim (via CQ_TEST)` | [321](tests/test_kerneldrv_anchors.inc:321) |
-
-## `tests/test_kerneldrv_budget.inc`
-
-| Function | Line |
-|---|---:|
-| `bud_env_save` | [62](tests/test_kerneldrv_budget.inc:62) |
-| `bud_env_set` | [73](tests/test_kerneldrv_budget.inc:73) |
-| `bud_env_restore` | [80](tests/test_kerneldrv_budget.inc:80) |
-| `bud_row_of` | [97](tests/test_kerneldrv_budget.inc:97) |
-| `k_bud_counts` | [114](tests/test_kerneldrv_budget.inc:114) |
-| `shape_fp_floor` | [130](tests/test_kerneldrv_budget.inc:130) |
-| `shape_anchors_no_floor` | [140](tests/test_kerneldrv_budget.inc:140) |
-| `shape_floor_83` | [148](tests/test_kerneldrv_budget.inc:148) |
-| `shape_floor_8` | [155](tests/test_kerneldrv_budget.inc:155) |
-| `a_shape_floor_runs_the_whole_anchor_block_and_drops_none (via CQ_TEST)` | [163](tests/test_kerneldrv_budget.inc:163) |
-| `a_shape_with_no_floor_runs_exactly_the_constant_budget (via CQ_TEST)` | [210](tests/test_kerneldrv_budget.inc:210) |
-| `bud_line_says` | [259](tests/test_kerneldrv_budget.inc:259) |
-| `the_environment_wins_over_the_floor_in_both_directions (via CQ_TEST)` | [290](tests/test_kerneldrv_budget.inc:290) |
-| `a_floor_below_the_constant_budget_is_ignored (via CQ_TEST)` | [345](tests/test_kerneldrv_budget.inc:345) |
 
 ## `tests/test_lsan_negative.c`
 
@@ -8227,6 +8252,19 @@ the definition (or the build-language declaration) in the listed file.
 | `relative` | [197](tools/function_map.py:197) |
 | `render` | [201](tools/function_map.py:201) |
 | `main` | [254](tools/function_map.py:254) |
+
+## `tools/install_cqops.py`
+
+| Function | Line |
+|---|---:|
+| `source_root` | [18](tools/install_cqops.py:18) |
+| `run` | [22](tools/install_cqops.py:22) |
+| `output` | [27](tools/install_cqops.py:27) |
+| `cq_checkout` | [33](tools/install_cqops.py:33) |
+| `check_manifest` | [58](tools/install_cqops.py:58) |
+| `check_qec` | [82](tools/install_cqops.py:82) |
+| `parse_args` | [100](tools/install_cqops.py:100) |
+| `main` | [123](tools/install_cqops.py:123) |
 
 ## `tools/l6/l6_report.py`
 

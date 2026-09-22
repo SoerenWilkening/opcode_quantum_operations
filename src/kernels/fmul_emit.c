@@ -217,24 +217,28 @@ static void emit_row(cq_ctx *ctx, const cq_fmul_block *k, const uint32_t *off,
     cq_kernel_die("fmul: unknown op in the program");
 }
 
-void cq_fmul_step(cq_ctx *ctx, const cq_fmul_block *k, int u)
+static void fmul_step_armed(cq_ctx *ctx, const cq_fmul_block *k,
+                            const uint32_t *off, int u)
 {
-    uint32_t off[CQ_FM_MAXR];
+    const cq_fm_map *m = cq_fm_map_get();
     const cq_fmul_row *rows;
-    int n;
+    int i, n, within;
 
     if (u < 0 || u >= cq_fmul_steps())
         cq_kernel_die("fmul: step index outside [0, cq_fmul_steps())");
-    cq_fm_arm(k, off);
     rows = cq_fmul_rows(&n);
+    i = cq_fm_row_at(m, u, &within);
+    if (i < 0 || i >= n || cq_fm_row_steps(&rows[i]) <= 0)
+        cq_kernel_die("fmul: the step dispatch landed on a zero-slot row");
+    emit_row(ctx, k, off, rows, i, within);
+}
 
-    for (int i = 0; i < n; i++) {
-        int s = cq_fm_row_steps(&rows[i]);
+void cq_fmul_step(cq_ctx *ctx, const cq_fmul_block *k, int u)
+{
+    uint32_t off[CQ_FM_MAXR];
 
-        if (u < s) { emit_row(ctx, k, off, rows, i, u); return; }
-        u -= s;
-    }
-    cq_kernel_die("fmul: the step dispatch fell off the end of the program");
+    cq_fm_arm(k, off);
+    fmul_step_armed(ctx, k, off, u);
 }
 
 /* The last row — fmul.jl:214's `return result`, the outermost `ifelse` of the
@@ -243,16 +247,15 @@ void cq_fmul_step(cq_ctx *ctx, const cq_fmul_block *k, int u)
  * last row ever became a view or a projection: NOTHING in the library holds a
  * circuit or a buffer (Rule 13), so an assembled operand lives only as long as
  * the call that built it. */
-const cq_bit *cq_fmul_result(const cq_fmul_block *k)
+static const cq_bit *fmul_result_armed(const cq_fmul_block *k,
+                                       const uint32_t *off)
 {
-    uint32_t off[CQ_FM_MAXR];
     cq_bit buf[CQ_FM_W];
     const cq_fmul_row *rows;
     const cq_bit *p;
     int n;
 
     rows = cq_fmul_rows(&n);
-    cq_fm_arm(k, off);
     if (rows[n - 1].op == CQ_FMOP_VIEW || rows[n - 1].op == CQ_FMOP_OUT)
         cq_kernel_die("fmul: `result` is a view or a projection, not a span");
     p = cq_fm_val64(k, off, n - 1, buf);
@@ -260,16 +263,27 @@ const cq_bit *cq_fmul_result(const cq_fmul_block *k)
     return p;
 }
 
+const cq_bit *cq_fmul_result(const cq_fmul_block *k)
+{
+    uint32_t off[CQ_FM_MAXR];
+
+    cq_fm_arm(k, off);
+    return fmul_result_armed(k, off);
+}
+
 /* --- The Rule 7 kernel: Bennett-in-the-small over one flat region. -------- */
 
 typedef struct {
     cq_fmul_block k;
+    uint32_t      off[CQ_FM_MAXR];
     cq_bit       *dst;
 } fmul_env;
 
 static void fmul_compute(cq_ctx *ctx, void *env, int s)
 {
-    cq_fmul_step(ctx, &((const fmul_env *)env)->k, s);
+    const fmul_env *e = (const fmul_env *)env;
+
+    fmul_step_armed(ctx, &e->k, e->off, s);
 }
 
 /* The "^=" of Rule 7's contract, and the only place `dst` is written on the
@@ -279,7 +293,7 @@ static void fmul_copyout(cq_ctx *ctx, void *env, int s)
 {
     const fmul_env *e = (const fmul_env *)env;
 
-    cq_emit_cx(ctx, &cq_fmul_result(&e->k)[s], &e->dst[s]);
+    cq_emit_cx(ctx, &fmul_result_armed(&e->k, e->off)[s], &e->dst[s]);
 }
 
 void cq_kernel_fmul(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
@@ -317,6 +331,7 @@ void cq_kernel_fmul(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
     cq_scratch_alloc(&scr, cq_fmul_region());
     e.k.a = a; e.k.b = b; e.k.scr = &scr; e.k.off = 0u;
     e.dst = dst;
+    cq_fm_arm(&e.k, e.off);
 
     cq_sandwich(ctx, &scr, fmul_compute, cq_fmul_steps(),
                 fmul_copyout, W, &e);

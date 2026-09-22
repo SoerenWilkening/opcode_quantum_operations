@@ -1,0 +1,5 @@
+{
+  "backend": "libcqops",
+  "cq_backend_abi": "sha256:f9debf7770db72aa35b65e5a9649f8d3be4475a0dcb99a680ae0fc96527a5ebd",
+  "schema": 1
+}

@@ -29,11 +29,22 @@ enum { CQ_FM_W = CQ_FP64_W, CQ_FM_MAXR = CQ_FMUL_MAX_ROWS };
 int      cq_fm_row_steps (const cq_fmul_row *r);
 uint32_t cq_fm_row_region(const cq_fmul_row *r);
 
-/* The prefix-offset walk plus the fit check, in ONE pass. `off` is CQ_FM_MAXR
- * entries and every one is ABSOLUTE inside the region — this is the one place
- * `k->off` is applied, which is why a block cannot see its own offset and why
- * a two-programs-in-one-region case is the only detector for dropping it (bd
- * a-step-block-cannot-see-its-own-offset-and-inherits-the-kernels-w1-hole). */
+/* Immutable metadata derived from the fixed row table and published block
+ * costs. It contains no operands or circuit state and is prepared once.
+ * `slot` has one terminal entry. */
+typedef struct {
+    uint32_t rel[CQ_FM_MAXR];
+    int      slot[CQ_FM_MAXR + 1];
+    uint32_t region;
+    int      steps, n;
+} cq_fm_map;
+
+const cq_fm_map *cq_fm_map_get(void);
+int              cq_fm_row_at(const cq_fm_map *m, int u, int *within);
+
+/* Rebase the immutable relative map plus the block fit check. `off` is
+ * CQ_FM_MAXR entries and every populated entry is ABSOLUTE inside the region —
+ * this is the one place `k->off` is applied. */
 void    cq_fm_arm(const cq_fmul_block *k, uint32_t *off);
 cq_bit *cq_fm_sp (const cq_fmul_block *k, uint32_t at, uint32_t len);
 

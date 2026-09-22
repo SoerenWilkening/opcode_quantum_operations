@@ -359,15 +359,17 @@ CQ_TEST(two_blocks_in_one_region_do_not_collide)
  * scratch, and a plausible answer. The oracle is the HOST, which shares
  * nothing with either transcription.
  *
- * DRIVEN OVER §7.12's SINGLES, at two masks. A uniform draw at 64 bits never
- * produces a NaN, an infinity or a subnormal, so without the anchor list three
- * of the four predicates would be exercised on their FALSE branch only — and a
- * block that returned a constant 0 would pass. */
+ * DRIVEN OVER §7.12's EIGHT CIRCUIT REPRESENTATIVES, at two masks. A uniform
+ * draw at 64 bits never produces a NaN, an infinity or a subnormal, so without
+ * the representative list three of the four predicates would be exercised on
+ * their FALSE branch only — and a block that returned a constant 0 would pass.
+ * The complete fifteen-value table is checked classically in the views file. */
 CQ_TEST(the_blocks_flag_is_the_predicate_not_its_negation)
 {
     cq_counter cnt;
     cq_sink s;
-    int n_anch = cq_fp_anchors_unary(CQ_FP64_W, -1, NULL);
+    int available = cq_fp_anchors_unary(CQ_FP64_W, -1, NULL);
+    int n_anch = cq_fp_representative_count(available);
     int seen_true = 0;
 
     cq_count_reset(&cnt);
@@ -381,10 +383,11 @@ CQ_TEST(the_blocks_flag_is_the_predicate_not_its_negation)
                 fpb_fx f;
                 cq_shadow sv;
                 uint64_t bits;
+                int picked = cq_fp_representative_unary_index(available, j);
                 int want;
 
                 v[0] = cq_ref_w_zero();
-                CHECK(cq_fp_anchors_unary(CQ_FP64_W, j, v) == 1);
+                CHECK(cq_fp_anchors_unary(CQ_FP64_W, picked, v) == 1);
                 bits = v[0].lo;
                 want = host_class(bits, cls);
                 seen_true += want;

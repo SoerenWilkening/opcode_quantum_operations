@@ -34,8 +34,8 @@
 static const int SLTB_WS[] = { 1, 8, 16, 32, 64, 80 };
 enum { SLTB_W_MAX = 80, SLTB_NAMED_MAX = 8 * SLTB_W_MAX };
 
-/* The six anchors of case (c), forced INSIDE the budget through the per-shape
- * floor (kerneldrv.h's cq_kd_budget) rather than stacked on top of it. */
+/* The six anchors of case (c), forced INSIDE the shared constant budget rather
+ * than stacked on top of it. */
 enum { SLTB_ANCHORS = 6 };
 
 /* ONE FIXTURE, TWO REGIONS, and the split is the block's own contract: `ops`
@@ -440,7 +440,7 @@ CQ_TEST(the_slt_blocks_flag_is_a_greater_equal_s_b)
     for (size_t j = 0; j < sizeof SLTB_WS / sizeof SLTB_WS[0]; j++) {
         int W = SLTB_WS[j];
         cq_bk_rng rng;
-        int n = cq_kd_budget(SLTB_ANCHORS, NULL);
+        int n = cq_kd_samples();
 
         cq_bk_rng_init(&rng, 0xC2B2AE3D27D4EB4Fu ^ (uint64_t)W);
 

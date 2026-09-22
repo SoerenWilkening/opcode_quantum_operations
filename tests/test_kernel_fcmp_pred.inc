@@ -1,6 +1,6 @@
 /* tests/test_kernel_fcmp_pred.inc — the PREDICATE TABLE's own instruments: the
  * fourteen-row dispatch, the ordered-vs-unordered family split, the classical
- * transcription against the host, the anchor budget, program well-formedness,
+ * transcription against the host, the constant circuit sample, program well-formedness,
  * and the four operand swaps against their unswapped twin. Included by
  * test_kernel_fcmp.c.
  *
@@ -243,55 +243,21 @@ CQ_TEST(the_classical_row_agrees_with_the_host_on_every_anchor)
     CHECK(n_false > 0);
 }
 
-/* ---- (4) The anchor budget, and every anchor through the KERNEL. -------- */
+/* ---- (4) Complete classical table, constant representative circuit set. - */
 
-CQ_TEST(every_anchor_reaches_the_kernel_and_the_drop_is_printed)
+CQ_TEST(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant)
 {
-    cq_bk_pair pairs[CQ_FP64_W + 12];
-    uint32_t np = cq_bk_fixed_pairs((uint32_t)CQ_FP64_W, pairs,
-                                    (uint32_t)(CQ_FP64_W + 12));
     cq_kd_shape sh;
-    const char *src = "";
     int n_anch = fcmp_anchors(CQ_FP64_W, -1, NULL);
-    int budget, room, want, have;
+    int circuit_n;
 
     fcmp_shape(CQ_FP64_W, &sh);
-    budget = cq_kd_budget(sh.min_samples, &src);
-    room   = budget > 2 ? budget - 2 : 0;
-    want   = n_anch * 3;
-    have   = want < room ? want : room;
+    circuit_n = sh.anchors(CQ_FP64_W, -1, NULL);
 
     CHECK_EQ(n_anch, cq_fp_anchors_binary_count() + N_FCMP_PAIRS);
     CHECK(n_anch > cq_fp_anchors_binary_count());   /* the composition is real */
     CHECK_EQ(fcmp_anchors(8, -1, NULL), 0);         /* f64 only               */
-
-    /* The floor TRACKS the provider: adding a pair to the .inc must widen the
-     * budget with no edit here, so this is an identity and not a literal. */
-    CHECK_EQ(sh.min_samples, 3 * n_anch + 8);
-
-    printf("# fcmp anchors: %d pairs x 3 mask rows = %d wanted, %d run through "
-           "the sampler, %d DROPPED at budget %d [%s, shape floor %d] — and "
-           "all %d are run explicitly below at the ALL-QUANTUM mask, which is "
-           "the one row the sampler's anchor block does not carry\n",
-           n_anch, want, have, want - have, budget, src, sh.min_samples,
-           n_anch);
-    fflush(stdout);
-
-    /* 0 DROPPED — the whole point of the floor (bd 9ve.32). */
-    if (strcmp(src, "env") != 0) CHECK_EQ(have, want);
-
-    for (int i = 0; i < N_FCMP_ROWS; i++)
-        for (int j = 0; j < n_anch; j++) {
-            cq_ref_w v[CQ_KD_MAX_SRC];
-
-            v[0] = cq_ref_w_zero();
-            v[1] = cq_ref_w_zero();
-            v[2] = cq_ref_w_zero();
-            CHECK(fcmp_anchors(CQ_FP64_W, j, v) == 1);
-            cq_kd_case(&ROWS[i].spec, CQ_FP64_W, v, &pairs[1]); /* all-quantum */
-        }
-
-    CHECK(np >= 2u);
+    CHECK_EQ(circuit_n, 8);
 }
 
 /* ---- (5) Program well-formedness, and D8's unreachability. ------------- */

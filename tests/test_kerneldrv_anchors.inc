@@ -321,6 +321,22 @@ CQ_TEST(anchors_sit_inside_the_budget_and_never_on_top_of_it)
 CQ_TEST(the_f64_anchor_constants_are_what_they_claim)
 {
     cq_ref_w v[CQ_KD_MAX_SRC];
+    static const int binary_rep[] = { 0, 4, 10, 14, 16, 20, 22, 36 };
+    static const int unary_rep[]  = { 0, 2, 4, 7, 8, 10, 12, 14 };
+
+    /* The circuit subset is fixed and names semantic classes, not the first
+     * eight rows by accident. Its last slot always reaches the provider's
+     * kernel-specific tail. Integer-source conversions use an even spread. */
+    CHECK_EQ(cq_fp_representative_count(37), 8);
+    CHECK_EQ(cq_fp_representative_count(5), 5);
+    for (int i = 0; i < 8; i++) {
+        CHECK_EQ(cq_fp_representative_binary_index(37, i), binary_rep[i]);
+        CHECK_EQ(cq_fp_representative_unary_index(15, i), unary_rep[i]);
+        CHECK_EQ(cq_fp_representative_spread_index(65, i), (i * 64) / 7);
+    }
+    CHECK_EQ(cq_fp_representative_binary_index(37, 8), -1);
+    CHECK_EQ(cq_fp_representative_unary_index(15, 8), -1);
+    CHECK_EQ(cq_fp_representative_spread_index(65, 8), -1);
 
     /* Inf: exponent all ones, significand ZERO. NaN: exponent all ones,
      * significand NON-zero — and the quiet bit separates the two NaN kinds. */

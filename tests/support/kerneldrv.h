@@ -155,17 +155,16 @@ typedef int (*cq_kd_anchor_fn)(int W, int i, cq_ref_w *v);
  * generates, so a constrained operand is never handed a qubit. `~0` means the
  * whole operand (K4's shift amount); 0 means unconstrained (the usual case).
  *
- * `anchors` and `min_samples` are the two trailing members and ZERO means
- * "neither", which is today's sampler byte for byte — cq_kd_default_shape
- * writes both, so a spec that declares no shape function, or one whose shape
- * starts from the defaults, cannot acquire either by accident. */
+ * `anchors` is the trailing member and ZERO means "none", which is today's
+ * sampler byte for byte — cq_kd_default_shape writes it, so a spec that
+ * declares no shape function, or one whose shape starts from the defaults,
+ * cannot acquire anchors by accident. */
 typedef struct {
     int             n_src;
     int             w[CQ_KD_MAX_SRC];
     int             w_dst;
     uint64_t        classical[CQ_KD_MAX_SRC];
     cq_kd_anchor_fn anchors;
-    int             min_samples;   /* the per-shape L1 floor; see cq_kd_budget */
 } cq_kd_shape;
 
 typedef void     (*cq_kd_shape_fn)(int W, cq_kd_shape *out);
@@ -216,43 +215,8 @@ void cq_kd_case2(const cq_kd_spec *k, int W,
  * constant replaced and what it gave up. */
 int cq_kd_samples(void);
 
-/* --- THE PER-SHAPE FLOOR (bd 9ve.32; PRD-v2 §7.12 + §7.13). --------------
- *
- * THE BUDGET IS STILL A SMALL CONSTANT AND STILL NOT A PRODUCT. A floor moves
- * the constant, for the shapes that ask and for no others. The reason is
- * §7.12's anchor block: it is 3 x A cases, so a provider naming 25 ordered
- * pairs WANTS 75 of the 32 slots it has and gives up two of its three mask
- * rows by default. bd hkg made that truncation loud rather than silent; this
- * makes it unnecessary for the kernels that need the rows, and §7.13 has
- * already said the wall clock is not a reason to cut the budget.
- *
- * THE PRECEDENCE IS THREE-WAY AND THE ENVIRONMENT WINS IN BOTH DIRECTIONS:
- *
- *   "env"      CQOPS_L1_SAMPLES resolved a positive value -> n is that value,
- *              whether it is ABOVE the floor or BELOW it. A maintainer asking
- *              for 8 gets 8 and asking for 256 gets 256; a knob that silently
- *              refused to go down is a knob nobody can bisect with.
- *   "floor"    no environment value and min_samples > cq_kd_samples() -> the
- *              floor. MAX, never REPLACE: a floor that replaced the budget
- *              would be a coverage CUT wearing the word "floor".
- *   "default"  neither -> cq_kd_samples(), i.e. today.
- *
- * min_samples <= 0 is NO FLOOR and is what cq_kd_default_shape writes, so the
- * whole integer catalogue sits on the "default" row and cannot leave it by
- * accident. `source` (may be NULL) receives one of the three strings above,
- * and it is the SAME pointer the sampler's printed `#` line publishes — see
- * kernelsweep.c for why that line stays byte-identical on the default row. */
-int cq_kd_budget(int min_samples, const char **source);
-
-/* Drops cq_kd_samples()' cached value so a test can change CQOPS_L1_SAMPLES
- * and be seen to. TEST-ONLY: the cache is read once per process, so without
- * this the "env" row above could only be checked by spawning a child. No
- * kernel suite calls it, and nothing in src/ can. */
-void cq_kd_samples_reset(void);
-
-/* One kernel at one width: cq_kd_budget(shape.min_samples, ...) cases — which
- * is cq_kd_samples() unless the shape raises the floor — each drawing a mask
- * pair AND a value pair from one seeded RNG. The all-classical pair (which IS L5), the
+/* One kernel at one width: exactly cq_kd_samples() cases, each drawing a mask
+ * pair AND a value tuple from one seeded RNG. The all-classical pair (which IS L5), the
  * all-quantum pair (which is what L4 pins) and the four value corners are taken
  * first, INSIDE the budget rather than on top of it.
  *
@@ -271,21 +235,13 @@ void cq_kd_samples_reset(void);
  *                       b-quantum. The four value corners are REPLACED.
  *   slots 2+T .. n-1    the joint random draw, as before.
  *
- * THE ROW ORDER IS THE TRUNCATION ORDER, AND THAT IS THE WHOLE REASON FOR IT.
- * T = min(3A, n-2): the BUDGET WINS, and what the budget drops is whole mask
- * ROWS rather than whole anchors, so a tight budget still runs EVERY anchor at
- * the all-classical row — the row where an fp value reaches the kernel's
- * special-case tree at all. The mixed rows exist because a NaN payload in a
- * QUANTUM operand exercises the circuit's own path rather than the classical
- * short-circuit, and they are the first thing a small budget gives up.
- *
- * NOTHING IS DROPPED SILENTLY: the printed `#` line names A, T, the number of
- * anchor cases dropped and how many random draws are left, and CQOPS_L1_SAMPLES
- * raises the budget. bd hkg's instruction was to widen the ANCHORS and leave
- * the budget at 32, so a default fp run dropped the mixed rows and said so;
- * bd 9ve.32's `min_samples` lets an fp shape ask for the whole block instead,
- * and the same line then reports 0 DROPPED. Which of the three sources set the
- * budget is named on that line too. */
+ * The provider must keep A small enough that 3A fits after the two mandatory
+ * mask rows. Floating-point suites therefore expose a representative circuit
+ * provider while checking their complete semantic table with cheap classical
+ * oracles. NOTHING IS DROPPED SILENTLY: the printed `#` line names A, T, the
+ * number of anchor cases dropped and how many random draws are left, and
+ * CQOPS_L1_SAMPLES can raise or lower the fixed budget for an explicit deep or
+ * bisect run. */
 void cq_kd_sample_at(const cq_kd_spec *k, int W);
 
 /* The whole L1-L3 sweep for one kernel: cq_kd_sample_at over the standard

@@ -11,13 +11,11 @@
  * four-gate bitwise vocabulary, and nothing would move if the row table
  * changed.
  *
- * THE MAP IS BUILT ONCE PER STEP AND NEVER CACHED, for fpround_step.c's and
- * fmul_step.c's stated reason: a table carried in mutable state is state whose
- * initialisation a consumer can forget, and the sandwich replays indices in
- * reverse, so a desynchronised table is a reverse half that does not cancel.
- * What makes that affordable at 478 rows is the SEGMENTATION — 93 row costs
- * per build rather than 478, because every iteration of fdiv.jl:91 is the same
- * seven rows and its offsets are therefore arithmetic.
+ * THE BASE-ZERO MAP IS BUILT ONCE AND CONTAINS IMMUTABLE INTEGER METADATA.
+ * A block invocation copies and rebases it once, never caching operands or
+ * circuit state. Segmentation keeps both that preparation and lookup compact:
+ * every iteration of fdiv.jl:91 is the same seven rows, so its offsets are
+ * arithmetic instead of a 478-entry flat table.
  *
  * I6(a) IS SATISFIED WITH NOTHING LEFT TO CHECK. `cq_fd_sp` is the only thing
  * here that hands back a WRITABLE pointer and every one of them is a bit of
@@ -154,11 +152,30 @@ void cq_fd_map_build(cq_fd_map *m, uint32_t base)
         m->post, m->post_s, &bits, &slots);
 }
 
+const cq_fd_map *cq_fd_map_get(void)
+{
+    static cq_fd_map m;
+    static int ready;
+
+    if (!ready) {
+        cq_fd_map_build(&m, 0u);
+        ready = 1;
+    }
+    return &m;
+}
+
 void cq_fd_arm(const cq_fdiv_block *k, cq_fd_map *m)
 {
+    const cq_fd_map *base;
+
     if (k == NULL || k->scr == NULL)
         cq_kernel_die("fdiv: the block has no region");
-    cq_fd_map_build(m, k->off);
+    base = cq_fd_map_get();
+    *m = *base;
+    for (int i = 0; i <= m->n_pre; i++)  m->pre[i]  += k->off;
+    for (int i = 0; i <= m->n_post; i++) m->post[i] += k->off;
+    m->loop_off += k->off;
+    m->post_off += k->off;
     if ((uint64_t)m->post[m->n_post] > (uint64_t)cq_scratch_size(k->scr))
         cq_kernel_die("fdiv: the block's region does not fit at its offset");
 }
@@ -179,9 +196,20 @@ uint32_t cq_fd_off(const cq_fd_map *m, int i)
     }
 }
 
-/* A PREFIX SUM, THEN A MODULUS, THEN A PREFIX SUM (K17.md §2.7). The two
- * linear scans are over 36 and 50 entries and the loop's is over 7, which is
- * why this is O(1) in CQ_FDIV_N_ITERS rather than O(478) per slot. */
+/* A PREFIX SUM, THEN A MODULUS, THEN A PREFIX SUM (K17.md §2.7). Each segment
+ * uses a last-boundary binary search; the loop body has only seven rows. */
+static int last_boundary(const int *slot, int n, int u)
+{
+    int lo = 0, hi = n;
+
+    while (hi - lo > 1) {
+        int mid = lo + (hi - lo) / 2;
+
+        if (slot[mid] <= u) lo = mid; else hi = mid;
+    }
+    return lo;
+}
+
 int cq_fd_row_of_slot(const cq_fd_map *m, int u, int *local)
 {
     /* THE MESSAGE IS DISJOINT FROM `cq_fdiv_step`'s ON PURPOSE, and it is the
@@ -194,32 +222,25 @@ int cq_fd_row_of_slot(const cq_fd_map *m, int u, int *local)
         cq_kernel_die("fdiv: a slot index outside the segmented map");
 
     if (u < m->loop_slot) {
-        for (int i = m->n_pre - 1; i >= 0; i--)
-            if (u >= m->pre_s[i]) { *local = u - m->pre_s[i]; return i; }
-        cq_kernel_die("fdiv: the step dispatch fell off the end of the program");
+        int i = last_boundary(m->pre_s, m->n_pre, u);
+
+        *local = u - m->pre_s[i];
+        return i;
     }
     if (u >= m->post_slot) {
-        int v = u;
+        int i = last_boundary(m->post_s, m->n_post, u);
 
-        for (int i = m->n_post - 1; i >= 0; i--)
-            if (v >= m->post_s[i]) {
-                *local = v - m->post_s[i];
-                return cq_fdiv_post_base_row() + i;
-            }
-        cq_kernel_die("fdiv: the step dispatch fell off the end of the program");
+        *local = u - m->post_s[i];
+        return cq_fdiv_post_base_row() + i;
     }
     {
         int v = u - m->loop_slot;
         int t = v / m->iter_steps, j = v % m->iter_steps;
+        int i = last_boundary(m->iter_s, CQ_FDIV_ITER_ROWS, j);
 
-        for (int i = CQ_FDIV_ITER_ROWS - 1; i >= 0; i--)
-            if (j >= m->iter_s[i]) {
-                *local = j - m->iter_s[i];
-                return cq_fdiv_loop_base_row() + t * CQ_FDIV_ITER_ROWS + i;
-            }
-        cq_kernel_die("fdiv: the step dispatch fell off the end of the program");
+        *local = j - m->iter_s[i];
+        return cq_fdiv_loop_base_row() + t * CQ_FDIV_ITER_ROWS + i;
     }
-    return 0;
 }
 
 cq_bit *cq_fd_sp(const cq_fdiv_block *k, uint32_t at, uint32_t len)
@@ -231,18 +252,16 @@ cq_bit *cq_fd_sp(const cq_fdiv_block *k, uint32_t at, uint32_t len)
 
 uint32_t cq_fdiv_region(void)
 {
-    cq_fd_map m;
+    const cq_fd_map *m = cq_fd_map_get();
 
-    cq_fd_map_build(&m, 0u);
-    return m.post[m.n_post];
+    return m->post[m->n_post];
 }
 
 int cq_fdiv_steps(void)
 {
-    cq_fd_map m;
+    const cq_fd_map *m = cq_fd_map_get();
 
-    cq_fd_map_build(&m, 0u);
-    return m.post_s[m.n_post];
+    return m->post_s[m->n_post];
 }
 
 /* `loop_K` — the slots one iteration of fdiv.jl:91-98 costs. A wrong one is a
@@ -250,16 +269,10 @@ int cq_fdiv_steps(void)
  * asserted against `C_ult + C_sub + 2*C_mux + C_or` on its own. */
 int cq_fdiv_iter_steps(void)
 {
-    cq_fd_map m;
-
-    cq_fd_map_build(&m, 0u);
-    return m.iter_steps;
+    return cq_fd_map_get()->iter_steps;
 }
 
 uint32_t cq_fdiv_iter_region(void)
 {
-    cq_fd_map m;
-
-    cq_fd_map_build(&m, 0u);
-    return m.iter_bits;
+    return cq_fd_map_get()->iter_bits;
 }

@@ -1,0 +1,62 @@
+% labreport entry 18 — 2026-09-21
+% labreport-to: f2a8d64
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{18}{field}.
+
+\entry{18}{2026-09-21}{Bound the floating-point circuit-test budget}
+
+\begin{generated}
+  \gitem{Range}{\texttt{f2a8d64..f2a8d64}}
+  \gitem{Tree}{\emph{dirty at capture} --- 40 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{582} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{583} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 304 file(s) walked (filesystem, not the git index), limit 300, largest 297 (tests/test\_shim\_trace.c)}
+  \gitem{Commits}{none in range at capture}
+  \gitem{Beads closed}{\bead{1wc} Package libcqops as installable CQ backend, \bead{gwu} Document the CQ static backend provider contract}
+  \gitem{Beads filed}{\bead{efs} Restore constant FP circuit-test budget, \bead{b6a} Reconcile CQ L6 i64 QRAM index with frozen i32 contract, \bead{gwu} Document the CQ static backend provider contract}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Restore the floating-point tests to a small representative constant number of
+circuit executions, retain broad semantic coverage on classical paths, and
+estimate the time saved without running the tests.
+
+\field{What landed}
+Every floating-point L1 shape now selects at most eight representative anchors
+from its complete semantic table.  The driver again uses one shared 32-case
+budget with no per-shape floor: eight anchors at three mask rows, the two
+mandatory mask cases, and six deterministic random cases.  Full NaN, infinity,
+zero, subnormal, rounding, overflow, saturation, and kernel-specific tables
+remain checked by classical/reference cases.  The redundant full-table circuit
+loops in 	exttt{fcmp} and 	exttt{fpfield} were removed; the class-block loop
+also uses the same representative subset.  PRD-v2~\S7.12 and K17--K19 record
+the split between complete classical tables and bounded circuit samples.
+
+\field{Measured}
+\begin{figures}
+  \fig{6489 $\rightarrow$ 2368 circuit cases; 4121 fewer (63.5\%)}{static count of L1 sampler calls, controlled sampler passes, and the removed full-anchor kernel loops}{default 32-case policy; no test binary executed}
+  \fig{119,641,667 $\rightarrow$ 25,482,752 compute-half slots; 78.7\% fewer}{case counts weighted by the checked-in per-call slot figures}{fadd/fsub, fmul, fdiv, fma, and fsqrt L1 sweeps; common forward/uncompute factor cancels}
+  \fig{120 $\rightarrow$ 64 class-block circuit cases; 56 fewer (46.7\%)}{static loop bounds in \texttt{test\_kernel\_fpfield\_block.inc}}{four predicates, two masks, fifteen full values versus eight representatives}
+  \fig{167 $\rightarrow$ 32 FMA L1 cases; 80.8\% fewer}{former shape floor and current constant in the test driver}{one f64 FMA sweep; this is not a wall-clock benchmark}
+\end{figures}
+\datasource{The checked-in anchor-provider counts, suite loop bounds, and
+\texttt{cq\_kd\_samples()} default; arithmetic performed statically without
+executing a test binary.}
+
+\field{Decided}
+PRD-v2~\S7.12.
+
+\field{Not taken}
+No test binary or timing benchmark was run, matching the request to diagnose and
+size the change without executing the tests.  Structural, golden, palindrome,
+scratch, death, and controlled-promotion cases were not weakened; the change is
+limited to value multiplicity in gate-emitting sweeps.
+
+\field{Verified}
+The nine affected Release test executables compiled and linked.  \texttt{make
+lint} passed its LOC, citation, and generated-function-map checks.  No test
+layer ran, so this entry makes no runtime correctness or timing claim.

@@ -1,0 +1,61 @@
+% labreport entry 19 — 2026-09-21
+% labreport-to: f2a8d64
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{19}{field}.
+
+\entry{19}{2026-09-21}{Memoize floating-point row dispatch maps}
+
+\begin{generated}
+  \gitem{Range}{\texttt{f2a8d64..f2a8d64}}
+  \gitem{Tree}{\emph{dirty at capture} --- 54 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{582} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{583} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 304 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{none in range at capture}
+  \gitem{Beads closed}{\bead{6jk} Memoize FP row dispatch maps, \bead{efs} Restore constant FP circuit-test budget, \bead{1wc} Package libcqops as installable CQ backend, \bead{gwu} Document the CQ static backend provider contract}
+  \gitem{Beads filed}{\bead{6jk} Memoize FP row dispatch maps, \bead{efs} Restore constant FP circuit-test budget, \bead{b6a} Reconcile CQ L6 i64 QRAM index with frozen i32 contract, \bead{gwu} Document the CQ static backend provider contract}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Explain why the bounded floating-point tests were still slow, then make
+\texttt{fadd}, \texttt{fmul}, \texttt{fconv}, and \texttt{fdiv} fast without
+weakening their representative-value coverage.
+
+\field{What landed}
+The four table-driven families now prepare immutable row, bit-offset, and slot
+prefix metadata once.  Per-slot dispatch uses a last-boundary binary search,
+which preserves the ownership rule at duplicate boundaries created by
+zero-slot view rows.  Whole-kernel calls rebase offsets once before the
+compute/uncompute sandwich; public standalone step blocks retain their
+defensive per-call fit check and rebase.  Operands and circuit state are never
+cached.  Each suite has a linear-oracle check of the cached map at every slot,
+while the existing two-block cases continue to cover nonzero region offsets.
+
+\field{Measured}
+\begin{figures}
+  \fig{255.98 s $\rightarrow$ 54.21 s; 78.8\% less, 4.72$\times$ faster}{sequential \texttt{/usr/bin/time -p} sum over the nine floating-point test executables}{Release, same workstation, complete suites}
+  \fig{221.864 s $\rightarrow$ 30.54 s; 86.2\% less}{sequential \texttt{/usr/bin/time -p} sum}{Release \texttt{fadd}/\texttt{fmul}/\texttt{fconv}/\texttt{fdiv}}
+  \fig{41.780/65.103/71.187/43.794 s $\rightarrow$ 8.68/10.97/4.85/6.04 s}{\texttt{/usr/bin/time -p} per executable}{Release \texttt{fadd}/\texttt{fmul}/\texttt{fconv}/\texttt{fdiv}, in that order}
+\end{figures}
+\datasource{Wall-clock timings printed by \texttt{/usr/bin/time -p}; TAP
+streams were captured separately and checked for failures.}
+
+\field{Not taken}
+No operand, scratch pointer, mutable cursor, or emitted circuit is stored in a
+global cache.  The constant representative-value budget was not reduced again:
+the remaining cost was dispatch bookkeeping, not excess semantic cases.  Full
+Debug suite execution was not repeated; those suites remain intentionally much
+more expensive under ASan/UBSan, while all four affected Debug targets did
+compile and link.
+
+\field{Verified}
+Release: all nine floating-point executables ran sequentially and passed,
+including the four new every-slot map checks, existing independent slot scans,
+palindrome/uncompute cases, nonzero-offset two-block cases, L1 sweeps,
+controlled promotion, and L4 goldens.  Debug with ASan/UBSan: all four affected
+targets compiled and linked.  Repository checks: \texttt{make lint} passed LOC,
+citation, and generated function-map checks; \texttt{git diff --check} passed.

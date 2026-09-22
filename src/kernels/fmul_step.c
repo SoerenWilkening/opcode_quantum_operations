@@ -30,10 +30,11 @@
  * reverse and a table rebuilt from mutable state would desynchronise the two
  * halves (K16.md §2.5).
  *
- * THE PREFIX-OFFSET WALK IS DONE ONCE PER STEP AND NOT ONCE PER LOOKUP. A row
- * reference resolves to a span, and a span needs the sum of every earlier
- * row's region; doing that per operand would make the step O(n^2) in a 150-row
- * program driven 163,300 times per compute half.
+ * THE PREFIX MAP IS IMMUTABLE METADATA, BUILT ONCE. Re-asking all sibling
+ * modules for 150 row costs and then linearly locating the owner on every one
+ * of 163,300 slots dominated the Release suite. The map caches only table
+ * layout, never operands or circuit state; each block still rebases it and
+ * performs its own fit check.
  *
  * I6(a) IS SATISFIED WITH NOTHING LEFT TO CHECK. `cq_fm_sp` is the only thing
  * here that hands back a WRITABLE pointer and every one of them is a bit of
@@ -122,23 +123,52 @@ uint32_t cq_fm_row_region(const cq_fmul_row *r)
 
 uint32_t cq_fmul_region(void)
 {
-    const cq_fmul_row *rows;
-    uint32_t bits = 0u;
-    int n;
-
-    rows = cq_fmul_rows(&n);
-    for (int i = 0; i < n; i++) bits += cq_fm_row_region(&rows[i]);
-    return bits;
+    return cq_fm_map_get()->region;
 }
 
 int cq_fmul_steps(void)
 {
-    const cq_fmul_row *rows;
-    int slots = 0, n;
+    return cq_fm_map_get()->steps;
+}
 
-    rows = cq_fmul_rows(&n);
-    for (int i = 0; i < n; i++) slots += cq_fm_row_steps(&rows[i]);
-    return slots;
+const cq_fm_map *cq_fm_map_get(void)
+{
+    static cq_fm_map m;
+    static int ready;
+    const cq_fmul_row *rows;
+    uint32_t bits = 0u;
+    int slots = 0;
+
+    if (ready) return &m;
+    rows = cq_fmul_rows(&m.n);
+    if (m.n > CQ_FM_MAXR)
+        cq_kernel_die("fmul: the program outgrew the prefix map");
+    for (int i = 0; i < m.n; i++) {
+        m.rel[i]  = bits;
+        m.slot[i] = slots;
+        bits  += cq_fm_row_region(&rows[i]);
+        slots += cq_fm_row_steps(&rows[i]);
+    }
+    m.slot[m.n] = slots;
+    m.region = bits;
+    m.steps  = slots;
+    ready = 1;
+    return &m;
+}
+
+int cq_fm_row_at(const cq_fm_map *m, int u, int *within)
+{
+    int lo = 0, hi = m->n;
+
+    if (u < 0 || u >= m->steps)
+        cq_kernel_die("fmul: a slot index outside the prefix map");
+    while (hi - lo > 1) {
+        int mid = lo + (hi - lo) / 2;
+
+        if (m->slot[mid] <= u) lo = mid; else hi = mid;
+    }
+    *within = u - m->slot[lo];
+    return lo;
 }
 
 /* The prefix-offset walk plus the fit check, in ONE pass.
@@ -149,19 +179,13 @@ int cq_fmul_steps(void)
  * no diagnostic of its own. Hard error in both configurations. */
 void cq_fm_arm(const cq_fmul_block *k, uint32_t *off)
 {
-    const cq_fmul_row *rows;
-    uint32_t o;
-    int n;
+    const cq_fm_map *m = cq_fm_map_get();
 
     if (k == NULL || k->scr == NULL)
         cq_kernel_die("fmul: the block has no region");
-    rows = cq_fmul_rows(&n);
-    o = k->off;
-    for (int i = 0; i < n; i++) {
-        off[i] = o;
-        o += cq_fm_row_region(&rows[i]);
-    }
-    if ((uint64_t)o > (uint64_t)cq_scratch_size(k->scr))
+    for (int i = 0; i < m->n; i++) off[i] = k->off + m->rel[i];
+    if ((uint64_t)k->off + (uint64_t)m->region
+        > (uint64_t)cq_scratch_size(k->scr))
         cq_kernel_die("fmul: the block's region does not fit at its offset");
 }
 

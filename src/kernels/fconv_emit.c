@@ -215,6 +215,41 @@ void cq_fv_step(cq_ctx *ctx, const cq_fv_ctx *x, int u)
     cq_kernel_die("fconv: the step dispatch fell off the end of the program");
 }
 
+static void fv_step_armed(cq_ctx *ctx, const cq_fv_ctx *x,
+                          const cq_fv_map *m, const uint32_t *off, int u)
+{
+    int i, within;
+
+    if (u < 0 || u >= m->steps)
+        cq_kernel_die("fconv: step index outside [0, steps())");
+    i = cq_fv_row_at(m, u, &within);
+    if (cq_fv_row_steps(&m->rows[i]) <= 0)
+        cq_kernel_die("fconv: the step dispatch landed on a zero-slot row");
+    emit_row(ctx, x, off, i, within);
+}
+
+static void fv_step_mapped(cq_ctx *ctx, const cq_fv_ctx *x,
+                           const cq_fv_map *m, int u)
+{
+    uint32_t off[CQ_FV_MAXR];
+
+    cq_fv_arm_map(x, m, off);
+    fv_step_armed(ctx, x, m, off, u);
+}
+
+static const cq_bit *fv_result_armed(const cq_fv_ctx *x, cq_fconv_prog p,
+                                     const uint32_t *off)
+{ return cq_fv_row_out(x, off, cq_fconv_result_row(p)); }
+
+static const cq_bit *fv_result_mapped(const cq_fv_ctx *x, cq_fconv_prog p,
+                                      const cq_fv_map *m)
+{
+    uint32_t off[CQ_FV_MAXR];
+
+    cq_fv_arm_map(x, m, off);
+    return fv_result_armed(x, p, off);
+}
+
 const cq_bit *cq_fv_result(const cq_fv_ctx *x, cq_fconv_prog p)
 {
     uint32_t off[CQ_FV_MAXR];
@@ -225,74 +260,66 @@ const cq_bit *cq_fv_result(const cq_fv_ctx *x, cq_fconv_prog p)
 
 /* --- The exported `fptosi` compute half. --------------------------------- */
 
-/* The rows are rebuilt per call rather than carried on the block, for
- * fpclass.c's reason: a block holding a row pointer would hold state whose
- * initialisation a consumer can forget, and a forgotten bind is a silent wrong
- * circuit rather than a failure. `cq_fconv_program` is a pure function of its
- * argument, so the reverse pass rebuilds the identical table. */
-static cq_fv_ctx fptosi_ctx(const cq_fptosi_block *k, cq_fconv_row *rows)
+/* The public block carries no row pointer: a consumer cannot forget to bind
+ * internal state. The immutable program map is selected here, and a transient
+ * context combines it with this invocation's operands and region. */
+static cq_fv_ctx fptosi_ctx(const cq_fptosi_block *k, const cq_fv_map *m)
 {
     cq_fv_ctx x;
 
     x.a = k->a; x.a_w = CQ_FV_W; x.scr = k->scr; x.off = k->off;
-    x.n = cq_fconv_program(CQ_FCONV_PROG_FPTOSI, rows);
-    x.rows = rows;
+    x.n = m->n;
+    x.rows = m->rows;
     return x;
 }
 
 uint32_t cq_fptosi_region(void)
 {
-    cq_fconv_row rows[CQ_FCONV_MAX_ROWS];
-    cq_fptosi_block k = { NULL, NULL, 0u };
-    cq_fv_ctx x = fptosi_ctx(&k, rows);
-
-    return cq_fv_region_of(&x);
+    return cq_fv_map_get(CQ_FCONV_PROG_FPTOSI)->region;
 }
 
 int cq_fptosi_steps(void)
 {
-    cq_fconv_row rows[CQ_FCONV_MAX_ROWS];
-    cq_fptosi_block k = { NULL, NULL, 0u };
-    cq_fv_ctx x = fptosi_ctx(&k, rows);
-
-    return cq_fv_steps_of(&x);
+    return cq_fv_map_get(CQ_FCONV_PROG_FPTOSI)->steps;
 }
 
 void cq_fptosi_step(cq_ctx *ctx, const cq_fptosi_block *k, int u)
 {
-    cq_fconv_row rows[CQ_FCONV_MAX_ROWS];
-    cq_fv_ctx x = fptosi_ctx(k, rows);
+    const cq_fv_map *m = cq_fv_map_get(CQ_FCONV_PROG_FPTOSI);
+    cq_fv_ctx x = fptosi_ctx(k, m);
 
-    cq_fv_step(ctx, &x, u);
+    fv_step_mapped(ctx, &x, m, u);
 }
 
 const cq_bit *cq_fptosi_result(const cq_fptosi_block *k)
 {
-    cq_fconv_row rows[CQ_FCONV_MAX_ROWS];
-    cq_fv_ctx x = fptosi_ctx(k, rows);
+    const cq_fv_map *m = cq_fv_map_get(CQ_FCONV_PROG_FPTOSI);
+    cq_fv_ctx x = fptosi_ctx(k, m);
 
-    return cq_fv_result(&x, CQ_FCONV_PROG_FPTOSI);
+    return fv_result_mapped(&x, CQ_FCONV_PROG_FPTOSI, m);
 }
 
 /* --- The four Rule 7 kernels: Bennett-in-the-small over one flat region. -- */
 
 typedef struct {
     cq_fv_ctx     x;
+    const cq_fv_map *map;
+    uint32_t      off[CQ_FV_MAXR];
     cq_fconv_prog p;
     cq_bit       *dst;
     int           T;
 } fconv_env;
 
-static void fconv_compute(cq_ctx *ctx, void *env, int s)
-{
-    cq_fv_step(ctx, &((const fconv_env *)env)->x, s);
-}
-
-static void fconv_copyout(cq_ctx *ctx, void *env, int s)
-{
+static void fconv_compute(cq_ctx *ctx, void *env, int s) {
     const fconv_env *e = (const fconv_env *)env;
 
-    cq_emit_cx(ctx, &cq_fv_result(&e->x, e->p)[s], &e->dst[s]);
+    fv_step_armed(ctx, &e->x, e->map, e->off, s);
+}
+
+static void fconv_copyout(cq_ctx *ctx, void *env, int s) {
+    const fconv_env *e = (const fconv_env *)env;
+
+    cq_emit_cx(ctx, &fv_result_armed(&e->x, e->p, e->off)[s], &e->dst[s]);
 }
 
 /* The F lanes of an ALL-CLASSICAL source as a `uint64_t`, for risk R9. M31's
@@ -300,8 +327,7 @@ static void fconv_copyout(cq_ctx *ctx, void *env, int s)
  * the narrow form with the same refusal. It is local rather than an addition
  * to M31 because the fp FIELD geometry is M31's subject and an integer source
  * rail has none. */
-static uint64_t pack_w(const cq_bit *a, int F)
-{
+static uint64_t pack_w(const cq_bit *a, int F) {
     uint64_t v = UINT64_C(0);
 
     for (int i = 0; i < F; i++) {
@@ -316,7 +342,6 @@ static uint64_t pack_w(const cq_bit *a, int F)
 static void fconv(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, int F, int T,
                   cq_fconv_prog p, uint64_t (*ev)(uint64_t, int))
 {
-    cq_fconv_row rows[CQ_FCONV_MAX_ROWS];
     cq_scratch scr;
     fconv_env e;
     const cq_bit *src[1];
@@ -339,9 +364,10 @@ static void fconv(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, int F, int T,
         return;
     }
 
+    e.map = cq_fv_map_get(p);
     e.x.a = a; e.x.a_w = F; e.x.off = 0u; e.x.scr = NULL;
-    e.x.n = cq_fconv_program(p, rows);
-    e.x.rows = rows;
+    e.x.n = e.map->n;
+    e.x.rows = e.map->rows;
     e.p = p;
     e.dst = dst;
     e.T = T;
@@ -349,10 +375,11 @@ static void fconv(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, int F, int T,
     /* ONE CONTIGUOUS REGION, carved into named sub-arrays, because emit.c's
      * I6(a) check is a pointer RANGE test over cq_bit addresses — a kernel
      * that allocated two regions would put half its targets outside it. */
-    cq_scratch_alloc(&scr, cq_fv_region_of(&e.x));
+    cq_scratch_alloc(&scr, e.map->region);
     e.x.scr = &scr;
+    cq_fv_arm_map(&e.x, e.map, e.off);
 
-    cq_sandwich(ctx, &scr, fconv_compute, cq_fv_steps_of(&e.x),
+    cq_sandwich(ctx, &scr, fconv_compute, e.map->steps,
                 fconv_copyout, T, &e);
     cq_scratch_dispose(&scr);
 }

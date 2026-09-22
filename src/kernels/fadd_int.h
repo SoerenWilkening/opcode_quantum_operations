@@ -28,11 +28,10 @@
 
 enum { CQ_FA_W = CQ_FP64_W, CQ_FA_MAXR = CQ_FADD_MAX_ROWS };
 
-/* One program, resolved: the two rails, the caller's region, and the rows.
- * Built per entry point; nothing is cached across calls, for fpclass.c's
- * reason — a block carrying cached operands would carry state whose
- * initialisation a consumer can forget, and a forgotten bind is a silent wrong
- * circuit rather than a failure. */
+/* One invocation, resolved: the two rails, the caller's region, and the rows.
+ * Operands and circuit state are never cached. The separate cq_fa_map below
+ * caches only immutable rows and integer prefixes derived from the fixed
+ * programs and published block costs. */
 typedef struct {
     const cq_bit      *a, *b;
     cq_scratch        *scr;
@@ -56,6 +55,22 @@ int      cq_fa_row_steps(const cq_fadd_row *r);
 uint32_t cq_fa_region_of(const cq_fa_ctx *x);
 int      cq_fa_steps_of (const cq_fa_ctx *x);
 void     cq_fa_check_program(const cq_fadd_row *rows, int n);
+
+/* One immutable program plus its relative bit and slot prefixes. The two
+ * instances are pure functions of cq_fadd_program() and sibling block costs;
+ * neither contains operands, scratch pointers, or circuit state. */
+typedef struct {
+    cq_fadd_row rows[CQ_FA_MAXR];
+    uint32_t    rel [CQ_FA_MAXR];
+    int         slot[CQ_FA_MAXR + 1];
+    uint32_t    region;
+    int         steps, n;
+} cq_fa_map;
+
+const cq_fa_map *cq_fa_map_get(cq_fadd_prog p);
+int              cq_fa_row_at(const cq_fa_map *m, int u, int *within);
+void             cq_fa_arm_map(const cq_fa_ctx *x, const cq_fa_map *m,
+                               uint32_t *off);
 
 /* The prefix-offset walk plus the fit check, in ONE pass. `off` is CQ_FA_MAXR
  * entries and every one is ABSOLUTE inside the region — this is the one place

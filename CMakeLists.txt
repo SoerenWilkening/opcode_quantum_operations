@@ -31,6 +31,9 @@ cqops_select_debug_toolchain()
 
 project(cqops VERSION 0.1.0 LANGUAGES C)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -59,6 +62,14 @@ set_property(CACHE CQOPS_LEAK_CHECK PROPERTY STRINGS AUTO ON OFF)
 set(CQOPS_PYTHON "AUTO" CACHE STRING
     "Shim generator suites: AUTO (register if an interpreter qualifies), ON (require one), OFF")
 set_property(CACHE CQOPS_PYTHON PROPERTY STRINGS AUTO ON OFF)
+
+## CQ_lang is an opt-in integration dependency, not a build dependency. Its
+## contract tool validates the archive and its installed tree supplies the CQ
+## package used by the installed-consumer test.
+set(CQOPS_CQLANG_DIR "" CACHE PATH
+    "Path to a built CQ_lang checkout; enables backend-contract, L6 and L7 tests")
+set(CQOPS_CQLANG_BUILD "build" CACHE STRING
+    "CQ_lang build directory, relative to CQOPS_CQLANG_DIR")
 
 ## M25 (Step 26). THE PROJECT NAME `C_quantum_error_correction` IS A REPOSITORY,
 ## NOT AN ARTEFACT: the library is that repo's `qec/` subdirectory, built as
@@ -650,6 +661,7 @@ add_library(cqops STATIC
 
 target_include_directories(cqops
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     ## shim/ joins src/ here at Step 23: M26 is inside this repository, so it
     ## reaches the internals by include path rather than through a public
     ## header — which is the answer src/ctx.h reserved for this step, and the
@@ -658,7 +670,14 @@ target_include_directories(cqops
             ${CMAKE_CURRENT_SOURCE_DIR}/shim
 )
 
-target_link_libraries(cqops PRIVATE cqops_build_flags)
+target_link_libraries(cqops PRIVATE $<BUILD_INTERFACE:cqops_build_flags>)
+
+## cqops_build_flags is a build-tree implementation detail and carries
+## warnings/defines no consumer should inherit. A Debug archive still needs its
+## sanitizer runtime at final link, so only those link flags cross the installed
+## target boundary. Release leaves this interface empty.
+target_link_options(cqops INTERFACE
+    $<INSTALL_INTERFACE:${CQOPS_SANITIZER_FLAGS}>)
 
 ## libm, for M21's round and fabs (and fmod/fma in test_angle_oracles.inc).
 ## M22 needs none of it: rotate.c does no float arithmetic — it passes theta
@@ -688,7 +707,35 @@ if(CQOPS_HAVE_QEC)
     target_link_libraries(cqops PUBLIC ${CQOPS_QEC_LIBS})
 endif()
 
+## Preserve the build-tree spelling while exporting CQ's canonical backend
+## target. PUBLIC dependencies are recorded on it in static-link order.
+set_target_properties(cqops PROPERTIES EXPORT_NAME backend)
 add_library(cqops::cqops ALIAS cqops)
+
+set(CQOPS_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/CQBackend")
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CQBackendConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/CQBackendConfig.cmake"
+    INSTALL_DESTINATION "${CQOPS_INSTALL_CMAKEDIR}")
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/CQBackendConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion)
+
+install(TARGETS cqops
+        EXPORT CQBackendTargets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/cqops/cqops.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/cqops")
+install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/CQBackendConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/CQBackendConfigVersion.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/backend-manifest.json"
+        DESTINATION "${CQOPS_INSTALL_CMAKEDIR}")
+install(EXPORT CQBackendTargets
+        FILE CQBackendTargets.cmake
+        NAMESPACE CQBackend::
+        DESTINATION "${CQOPS_INSTALL_CMAKEDIR}")
 
 add_subdirectory(tests)
 

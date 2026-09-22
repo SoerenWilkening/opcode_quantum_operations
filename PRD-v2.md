@@ -431,7 +431,7 @@ Numbered to continue plan §6's register rather than restart it.
 |---|---|---|
 | **R10** | **The f32 round trip gets taken to widen the fixture count from 100 to 138.** It is one flag away, it looks like a port, and it is a 38-fixture prize | §3.4's box. Upstream rejects the compile; L1 would be red and **correctly** red. If it is ever taken it must be as a **declared approximation with its own test tier**, never inside condition 2 |
 | **R11** | **An fp kernel's scratch region trips D2's ceiling and the refusal is read as a libcqops bug.** `fadd` needs ~30k qubits where K12 i8 needs 543 | D25 already resolved the behaviour (abort from the pool during pre-materialisation, unswallowed at the opcode surface) and **D25's prohibition is the live one here: the shim must never grow its own "that will not fit" check** |
-| **R12** | **The L1 sample budget is carried over without widening the anchors**, so NaN/±Inf/±0/subnormal/rounding-boundary rows are drawn at random and no run guarantees any of them | §3.4. The 32-sample budget is fine; the **anchors** are what must change. This is the same shape as the note already standing on `cq_kd_samples()` — the named mask rows became pool rows and no single run guarantees one |
+| **R12** | **The L1 sample budget is carried over without widening the anchors**, so NaN/±Inf/±0/subnormal/rounding-boundary rows are drawn at random and no run guarantees any of them | §3.4 and §7.12. The 32-sample circuit budget is fixed. Eight representatives guarantee the major semantic classes at three mask rows; the complete per-kernel tables remain exhaustive on the cheap classical/oracle path |
 | **R13** | ~~**`fma` is scoped out because it is not in the grid, and it is 4,295 calls**~~ — **RETIRED 2026-09-17 as a risk and RESOLVED as a decision.** It was filed as a *sizing* risk and was measured to be an *acceptance* one: without §6.1, an `f64`-only v2 completes **23** fixtures rather than 100, and **6 fixtures with no floating point anywhere** are already blocked by it today | §6.1, now a resolution. **What remains a risk is the inverse and it has its own row: R16.** Do not re-open R13 to re-argue the sizing — the number is measured and the decision is written |
 | **R16** | **The vendoring lands AHEAD of the port, and 401 symbols become libcqops aborts for no fixture gain** while the LINK GATE widens from 2,479 to 2,880 and `tools/l6/run_slice_cqops.sh` must stop passing CQ_lang's two stub objects. Both are load-bearing and both have recorded silent-failure modes | §6.1's order clause: **vendor WITH the port of the families it exposes, never ahead of it.** The L6 link-line change is not optional once we define those symbols — the two objects are passed *loose*, so a duplicate definition is a hard link error rather than the silent shadowing `CqopsSymbolSets.cmake` records for the archive form |
 | **R14** | **`BENCHMARKS.md`'s magnitudes are reused as if they were L4 goldens.** This repo has a recorded instance of exactly that (`x+1 i8` at `100/4/68/28`) | §3.2's rider (ii). The alphabet conclusion is fold-invariant; **the magnitudes are not and must be re-measured against our own port**, at the all-quantum mask, before any golden is pinned |
@@ -890,25 +890,28 @@ declares three sources exactly as the mux does, reached through `cq_kd_spec`'s `
 with `.kernel` NULL. Conversions are M13's two-width shape. `fneg`/`fabs`/`sqrt`/rounding are
 unary, one width. Nothing widens `cq_kernel_fn`.
 
-### 7.12 L1's fp anchors — WRITTEN (answers §6.5; bead `hkg` keeps the sampler change)
+### 7.12 L1's fp anchors — FIXED CIRCUIT SAMPLE, COMPLETE CLASSICAL TABLE
 
-The budget stays `cq_kd_samples()` = 32 (§3.4's argument survives). The anchors, **forced into
-every draw** rather than pooled, per kernel: **±0** (both signs, and `+0 + −0 = +0`); **±Inf**;
-**the default NaN** and **a payload NaN in each operand position, both orders** (§7.4's
-first-operand rule); **an sNaN against a qNaN**; **the largest and the smallest subnormal** and
-**the smallest normal** (the subnormal→normal carry in round-and-pack); **a tie-to-even case in
-each direction** (round bit set, sticky clear); **overflow to Inf**; **underflow to a subnormal**;
-and for `fcmp`, **one unordered pair per predicate**. Per kernel the list is refined against the
-source's own special-case predicates (`a_nan`, `a_inf`, `a_zero`, `swap`, `d ≥ 56`, …): each named
-predicate gets an anchor that makes it true, because each is a branch of the `ifelse` tree that a
-random draw of 32 reaches with no guarantee.
+The circuit budget stays `cq_kd_samples()` = 32 (§3.4's argument survives) and **no shape may
+raise it**. Each fp shape exposes eight representative circuit anchors: zero, infinity, default
+NaN, signalling NaN, a subnormal boundary, a normal/rounding boundary, overflow or another
+kernel-relevant edge, and one kernel-specific tail row. The sampler replays those eight at three
+mask rows (24 cases), alongside its mandatory all-classical and all-quantum rows, leaving six
+deterministic random cases.
+
+The full per-kernel tables are not discarded. They retain **±0**, **±Inf**, payload NaNs in both
+operand positions and orders, sNaN/qNaN, subnormal and normal boundaries, tie-to-even in each
+direction, overflow, underflow, and each kernel's named predicates. Every row is checked by the
+cheap classical/reference cases. What is bounded is only the gate-emitting circuit replay; adding
+a semantic row must never increase the number of constructed circuits.
 
 ### 7.13 Suite cost, stated so nobody reads it as a regression
 
 Upstream's `fadd` is 63,058 gates; Rule 2 makes ours ~126k per case; `fmul` ~300k; `fma` ~500k.
 At 32 samples through a recording mock sink, one fp kernel adds roughly one `divrem` pair's worth
 of wall clock to each configuration (`bd 97s`'s shape, which already says timings spread 4–5×
-between runs). Not a reason to cut the budget.
+between runs). This estimate assumes the fixed 32-case circuit budget from §7.12; exhaustive
+semantic tables belong on classical/reference paths, not as additional circuit executions.
 
 ### 7.14 The integer intrinsics ARE portable, and they are a v1-shaped bead, not fp
 

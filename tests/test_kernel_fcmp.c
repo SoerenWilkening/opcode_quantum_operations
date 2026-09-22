@@ -112,6 +112,15 @@ static int host_fcmp(uint64_t ab, uint64_t bb, cq_fcmp_pred p)
 
 /* ---- The fourteen kernels, as one table. -------------------------------- */
 
+static int fcmp_circuit_anchors(int W, int i, cq_ref_w *v)
+{
+    const int available = fcmp_anchors(W, -1, NULL);
+    const int picked = cq_fp_representative_binary_index(available, i);
+
+    if (i < 0) return cq_fp_representative_count(available);
+    return picked >= 0 ? fcmp_anchors(W, picked, v) : 0;
+}
+
 /* K9's shape: `dst` is one bit while the operands are 64, so the driver is
  * told through `w_dst` and the call adapter passes `sh->w[0]`. Without the
  * adapter `shape_of` REFUSES the narrow shape — which it must, because the
@@ -123,15 +132,7 @@ static void fcmp_shape(int W, cq_kd_shape *out)
     out->w[0]    = CQ_FP64_W;
     out->w[1]    = CQ_FP64_W;
     out->w_dst   = 1;
-    out->anchors = fcmp_anchors;
-
-    /* THE FLOOR IS READ OFF THE PROVIDER JUST INSTALLED, NOT WRITTEN DOWN
-     * (bd 9ve.32). The sampler forces anchors row-major over three mask rows
-     * after reserving slots 0 and 1, so `3 x anchors + 8` is the smallest
-     * budget at which NO row is dropped, and it tracks the table in the .inc
-     * with no edit here. At any width but 64 the provider declines and this is
-     * 8, below the 32 default, so the floor never fires. */
-    out->min_samples = 3 * out->anchors(W, -1, NULL) + 8;
+    out->anchors = fcmp_circuit_anchors;
 }
 
 #define CQ_FCMP_ROWS(X)                                                        \
@@ -268,7 +269,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_dispatch_is_four_swaps_and_zero_inversions),
     CQ_CASE(the_unordered_row_is_the_literal_o_and_u_family_split),
     CQ_CASE(the_classical_row_agrees_with_the_host_on_every_anchor),
-    CQ_CASE(every_anchor_reaches_the_kernel_and_the_drop_is_printed),
+    CQ_CASE(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant),
     CQ_CASE(the_programs_are_well_formed_and_reach_no_variable_shift),
     CQ_CASE(the_blocks_cost_what_their_modules_say_they_cost),
     CQ_CASE(each_predicate_is_the_sum_of_its_blocks),

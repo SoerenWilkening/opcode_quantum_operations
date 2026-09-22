@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/CQBackendTargets.cmake")
+
+set(CQBackend_PROVIDER_MANIFEST
+    "${CMAKE_CURRENT_LIST_DIR}/backend-manifest.json")
+
+check_required_components(CQBackend)

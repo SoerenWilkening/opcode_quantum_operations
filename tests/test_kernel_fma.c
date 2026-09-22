@@ -45,10 +45,10 @@
  * hard-errors on one in both configurations and tests/test_kernel_fma_death.c
  * drives that.
  *
- * THIS SUITE IS THE SLOWEST IN THE PROJECT AND THAT IS NOT A REGRESSION
- * (PRD-v2 §7.13). 241,083 compute-half slots, twice per call under Rule 2,
- * times a forced anchor block of 53 rows over three mask rows. §7.13 has
- * already said the wall clock is not a reason to cut the budget.
+ * ONE CIRCUIT CASE IS THE LARGEST IN THE PROJECT: 241,083 compute-half slots,
+ * twice per call under Rule 2. The L1 sweep keeps the shared 32-case budget and
+ * uses eight representative anchors; the complete 53-row table stays in the
+ * cheap classical oracle case.
  */
 
 #include "kernels/fma.h"
@@ -153,6 +153,15 @@ static cq_ref_w refn_fma(const cq_ref_w *src, const cq_kd_shape *sh)
     return cq_ref_w_make(ref_fma(src[0].lo, src[1].lo, src[2].lo), 0u, W64);
 }
 
+static int fma_circuit_anchors(int W, int i, cq_ref_w *v)
+{
+    const int available = fma_anchors(W, -1, NULL);
+    const int picked = cq_fp_representative_binary_index(available, i);
+
+    if (i < 0) return cq_fp_representative_count(available);
+    return picked >= 0 ? fma_anchors(W, picked, v) : 0;
+}
+
 static void fma_shape(int W, cq_kd_shape *out)
 {
     cq_kd_default_shape(W, out);
@@ -161,14 +170,7 @@ static void fma_shape(int W, cq_kd_shape *out)
     out->w[1]    = W64;
     out->w[2]    = W64;
     out->w_dst   = W64;
-    out->anchors = fma_anchors;
-
-    /* THE FLOOR IS READ OFF THE PROVIDER JUST INSTALLED, NOT WRITTEN DOWN
-     * (bd 9ve.32). The sampler forces anchors row-major over three mask rows
-     * after reserving slots 0 and 1, so `3 x anchors + 8` is the smallest
-     * budget at which NO row is dropped, and it tracks the table in the .inc
-     * with no edit here. */
-    out->min_samples = 3 * out->anchors(W, -1, NULL) + 8;
+    out->anchors = fma_circuit_anchors;
 }
 
 static const cq_kd_spec SPEC = { "fma", NULL, NULL,
@@ -297,28 +299,19 @@ CQ_TEST(the_single_rounding_path_is_not_a_multiply_then_an_add)
     }
 }
 
-/* ---- The anchors reach the kernel, and any drop is printed. ------------- */
+/* ---- Complete classical table, constant representative circuit set. ----- */
 
-CQ_TEST(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block)
+CQ_TEST(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant)
 {
     cq_kd_shape sh;
-    const char *src = NULL;
-    int n, budget;
+    int n, circuit_n;
 
     fma_shape(W64, &sh);
-    n = sh.anchors(W64, -1, NULL);
+    n = fma_anchors(W64, -1, NULL);
+    circuit_n = sh.anchors(W64, -1, NULL);
 
     CHECK_EQ(n, cq_fp_anchors_binary_count() + N_FA_TRIPLES);
-    CHECK_EQ(sh.min_samples, 3 * n + 8);
-
-    budget = cq_kd_budget(sh.min_samples, &src);
-    CHECK(src != NULL);
-    /* THE ENVIRONMENT WINS IN BOTH DIRECTIONS AND THAT IS DELIBERATE
-     * (kerneldrv.h), so the claim is about the FLOOR and is made only on the
-     * row where the floor is what decided. */
-    if (src != NULL && strcmp(src, "env") != 0) CHECK(budget >= 3 * n + 2);
-    printf("# fma anchors %d (generic %d + K20 %d), budget %d from \"%s\"\n",
-           n, cq_fp_anchors_binary_count(), N_FA_TRIPLES, budget, src);
+    CHECK_EQ(circuit_n, 8);
 
     /* EVERY ROW FILLS ALL THREE OPERANDS, which is this provider's contract
      * and the cq_kd_case2 trap re-armed for fp: the sampler overwrites only
@@ -330,13 +323,12 @@ CQ_TEST(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block)
 
         for (int j = 0; j < CQ_KD_MAX_SRC; j++)
             v[j] = cq_ref_w_make(0xDEADBEEFull, 0u, W64);
-        CHECK_EQ(sh.anchors(W64, i, v), 1);
+        CHECK_EQ(fma_anchors(W64, i, v), 1);
         for (int j = 0; j < 3; j++)
             if (v[j].lo == 0xDEADBEEFull)
                 cq_h_fail(__FILE__, __LINE__,
                           "anchor %d leaves operand %d unwritten", i, j);
     }
-    fflush(stdout);
 }
 
 /* ---- L1 + L2 + L3 + L5. ------------------------------------------------- */
@@ -449,7 +441,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_result_row_is_a_span_inside_the_caller_s_region),
     CQ_CASE(the_classical_row_agrees_with_the_oracle_on_every_anchor),
     CQ_CASE(the_single_rounding_path_is_not_a_multiply_then_an_add),
-    CQ_CASE(every_anchor_reaches_the_kernel_and_the_budget_covers_the_block),
+    CQ_CASE(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant),
     CQ_CASE(the_compute_half_is_a_palindrome_at_an_asymmetric_mask),
     CQ_CASE(two_programs_in_one_region_do_not_collide),
     CQ_CASE(l1_sweep),

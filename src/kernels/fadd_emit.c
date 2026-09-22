@@ -223,6 +223,43 @@ void cq_fa_step(cq_ctx *ctx, const cq_fa_ctx *x, int u)
     cq_kernel_die("fadd: the step dispatch fell off the end of the program");
 }
 
+static void fa_step_armed(cq_ctx *ctx, const cq_fa_ctx *x,
+                          const cq_fa_map *m, const uint32_t *off, int u)
+{
+    int i, within;
+
+    if (u < 0 || u >= m->steps)
+        cq_kernel_die("fadd: step index outside [0, cq_fsub_steps())");
+    i = cq_fa_row_at(m, u, &within);
+    if (cq_fa_row_steps(&m->rows[i]) <= 0)
+        cq_kernel_die("fadd: the step dispatch landed on a zero-slot row");
+    emit_row(ctx, x, off, i, within);
+}
+
+static void fa_step_mapped(cq_ctx *ctx, const cq_fa_ctx *x,
+                           const cq_fa_map *m, int u)
+{
+    uint32_t off[CQ_FA_MAXR];
+
+    cq_fa_arm_map(x, m, off);
+    fa_step_armed(ctx, x, m, off, u);
+}
+
+static const cq_bit *fa_result_armed(const cq_fa_ctx *x, cq_fadd_prog p,
+                                     const uint32_t *off)
+{
+    return cq_fa_row_out(x, off, cq_fadd_result_row(p));
+}
+
+static const cq_bit *fa_result_mapped(const cq_fa_ctx *x, cq_fadd_prog p,
+                                      const cq_fa_map *m)
+{
+    uint32_t off[CQ_FA_MAXR];
+
+    cq_fa_arm_map(x, m, off);
+    return fa_result_armed(x, p, off);
+}
+
 const cq_bit *cq_fa_result(const cq_fa_ctx *x, cq_fadd_prog p)
 {
     uint32_t off[CQ_FA_MAXR];
@@ -233,79 +270,72 @@ const cq_bit *cq_fa_result(const cq_fa_ctx *x, cq_fadd_prog p)
 
 /* --- The exported `fsub` compute half (bd 9ve.23 / K19). ----------------- */
 
-/* The rows are rebuilt per call rather than carried on the block, for
- * fpclass.c's reason: a block holding a row pointer would hold state whose
- * initialisation a consumer can forget, and a forgotten bind is a silent wrong
- * circuit rather than a failure. `cq_fadd_program` is a pure function of its
- * argument, so the reverse pass rebuilds the identical table. */
-static cq_fa_ctx fsub_ctx(const cq_fsub_block *k, cq_fadd_row *rows)
+/* The public block carries no row pointer: a consumer cannot forget to bind
+ * internal state. The immutable program map is selected here, and a transient
+ * context combines it with this invocation's operands and region. */
+static cq_fa_ctx fsub_ctx(const cq_fsub_block *k, const cq_fa_map *m)
 {
     cq_fa_ctx x;
 
     x.a = k->a; x.b = k->b; x.scr = k->scr; x.off = k->off;
-    x.n = cq_fadd_program(CQ_FADD_PROG_SUB, rows);
-    x.rows = rows;
+    x.n = m->n;
+    x.rows = m->rows;
     return x;
 }
 
 uint32_t cq_fsub_region(void)
 {
-    cq_fadd_row rows[CQ_FADD_MAX_ROWS];
-    cq_fsub_block k = { NULL, NULL, NULL, 0u };
-    cq_fa_ctx x = fsub_ctx(&k, rows);
-
-    return cq_fa_region_of(&x);
+    return cq_fa_map_get(CQ_FADD_PROG_SUB)->region;
 }
 
 int cq_fsub_steps(void)
 {
-    cq_fadd_row rows[CQ_FADD_MAX_ROWS];
-    cq_fsub_block k = { NULL, NULL, NULL, 0u };
-    cq_fa_ctx x = fsub_ctx(&k, rows);
-
-    return cq_fa_steps_of(&x);
+    return cq_fa_map_get(CQ_FADD_PROG_SUB)->steps;
 }
 
 void cq_fsub_step(cq_ctx *ctx, const cq_fsub_block *k, int u)
 {
-    cq_fadd_row rows[CQ_FADD_MAX_ROWS];
-    cq_fa_ctx x = fsub_ctx(k, rows);
+    const cq_fa_map *m = cq_fa_map_get(CQ_FADD_PROG_SUB);
+    cq_fa_ctx x = fsub_ctx(k, m);
 
-    cq_fa_step(ctx, &x, u);
+    fa_step_mapped(ctx, &x, m, u);
 }
 
 const cq_bit *cq_fsub_result(const cq_fsub_block *k)
 {
-    cq_fadd_row rows[CQ_FADD_MAX_ROWS];
-    cq_fa_ctx x = fsub_ctx(k, rows);
+    const cq_fa_map *m = cq_fa_map_get(CQ_FADD_PROG_SUB);
+    cq_fa_ctx x = fsub_ctx(k, m);
 
-    return cq_fa_result(&x, CQ_FADD_PROG_SUB);
+    return fa_result_mapped(&x, CQ_FADD_PROG_SUB, m);
 }
 
 /* --- The two Rule 7 kernels: Bennett-in-the-small over one flat region. --- */
 
 typedef struct {
     cq_fa_ctx    x;
+    const cq_fa_map *map;
+    uint32_t     off[CQ_FA_MAXR];
     cq_fadd_prog p;
     cq_bit      *dst;
 } fadd_env;
 
 static void fadd_compute(cq_ctx *ctx, void *env, int s)
 {
-    cq_fa_step(ctx, &((const fadd_env *)env)->x, s);
+    const fadd_env *e = (const fadd_env *)env;
+
+    fa_step_armed(ctx, &e->x, e->map, e->off, s);
 }
 
 static void fadd_copyout(cq_ctx *ctx, void *env, int s)
 {
     const fadd_env *e = (const fadd_env *)env;
 
-    cq_emit_cx(ctx, &cq_fa_result(&e->x, e->p)[s], &e->dst[s]);
+    cq_emit_cx(ctx, &fa_result_armed(&e->x, e->p, e->off)[s], &e->dst[s]);
 }
 
 static void fadd(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
                  int W, cq_fadd_prog p)
 {
-    cq_fadd_row rows[CQ_FADD_MAX_ROWS];
     cq_scratch scr;
     fadd_env e;
 
@@ -335,19 +365,21 @@ static void fadd(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
         return;
     }
 
+    e.map = cq_fa_map_get(p);
     e.x.a = a; e.x.b = b; e.x.off = 0u; e.x.scr = NULL;
-    e.x.n = cq_fadd_program(p, rows);
-    e.x.rows = rows;
+    e.x.n = e.map->n;
+    e.x.rows = e.map->rows;
     e.p = p;
     e.dst = dst;
 
     /* ONE CONTIGUOUS REGION, carved into named sub-arrays, because emit.c's
      * I6(a) check is a pointer RANGE test over cq_bit addresses — a kernel
      * that allocated two regions would put half its targets outside it. */
-    cq_scratch_alloc(&scr, cq_fa_region_of(&e.x));
+    cq_scratch_alloc(&scr, e.map->region);
     e.x.scr = &scr;
+    cq_fa_arm_map(&e.x, e.map, e.off);
 
-    cq_sandwich(ctx, &scr, fadd_compute, cq_fa_steps_of(&e.x),
+    cq_sandwich(ctx, &scr, fadd_compute, e.map->steps,
                 fadd_copyout, W, &e);
     cq_scratch_dispose(&scr);
 }

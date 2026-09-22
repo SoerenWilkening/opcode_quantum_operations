@@ -2005,8 +2005,8 @@ set_tests_properties(test_kernel_fpfield_death.pack_of_a_quantum_lane
 ## ONE WIDTH AND FOURTEEN PREDICATES, WHICH IS WHY THIS SUITE IS THE PROJECT'S
 ## SLOWEST PER CASE AND NOT PER WIDTH. PRD-v2 §1 scopes v2 to f64, so there is
 ## no ladder; what there is instead is ten ported bodies over up to 42 blocks
-## each, and §7.13 has already said the wall clock is not a reason to cut the
-## anchor budget.
+## each. The circuit path uses §7.12's fixed 32-case representative sample;
+## the complete semantic table is checked classically.
 add_cqops_test(test_kernel_fcmp)
 
 ## M36's fail-loud paths. Which layer would answer for each guard, and why the
@@ -2706,10 +2706,6 @@ endif()
 ## upstream commit; a floor still catches an in-scope fixture regressing into
 ## the casualty list, which is the regression that matters. RE-MEASURE IT when
 ## the number moves rather than lowering it to make a run green.
-set(CQOPS_CQLANG_DIR "" CACHE PATH
-    "Path to a built CQ_lang checkout; enables the L6 (Step 24) fixture run")
-set(CQOPS_CQLANG_BUILD "build" CACHE STRING
-    "CQ_lang build directory, relative to CQOPS_CQLANG_DIR")
 set(CQOPS_L6_MIN_OK "43" CACHE STRING
     "Floor on the number of L6 fixtures that run to completion")
 
@@ -2825,16 +2821,44 @@ else()
                    "Grover through cqc and link it against this archive")
 endif()
 
+## CQ_lang 0707dfd6's installed-backend contract. This is deliberately an
+## installed-tree test: the build-tree alias can be healthy while an export is
+## missing a dependency, include directory or canonical target name.
+if(CQOPS_CQLANG_DIR AND CQOPS_PY3
+   AND EXISTS "${CQOPS_CQLANG_DIR}/tools/backend_contract.py"
+   AND EXISTS "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/cmake_install.cmake")
+    add_test(NAME backend_contract_cq
+             COMMAND "${CQOPS_PY3}"
+                     "${CQOPS_CQLANG_DIR}/tools/backend_contract.py"
+                     --root "${CQOPS_CQLANG_DIR}" check
+                     --archive "$<TARGET_FILE:cqops>"
+                     --manifest "${CMAKE_SOURCE_DIR}/backend-manifest.json")
+    add_test(NAME package_install_cqbackend
+             COMMAND "${CMAKE_COMMAND}"
+                     -Dcqops_source_dir=${CMAKE_SOURCE_DIR}
+                     -Dcqops_build_dir=${CMAKE_BINARY_DIR}
+                     -Dcqops_install_libdir=${CMAKE_INSTALL_LIBDIR}
+                     -Dcqops_cqlang_dir=${CQOPS_CQLANG_DIR}
+                     -Dcqops_cqlang_build=${CQOPS_CQLANG_BUILD}
+                     -Dcqops_python=${CQOPS_PY3}
+                     -Dcqops_c_compiler=${CMAKE_C_COMPILER}
+                     -Dcqops_config=$<CONFIG>
+                     -P "${CMAKE_SOURCE_DIR}/tests/package-consumer/run_test.cmake")
+    set_tests_properties(package_install_cqbackend PROPERTIES TIMEOUT 300)
+else()
+    message(STATUS "cqops: installed CQBackend package test not registered — "
+                   "configure with -DCQOPS_CQLANG_DIR=<CQ_lang 0707dfd6 checkout> "
+                   "whose build tree has been configured")
+endif()
+
 ## M33 `fadd`/`fsub` — K15, the second fp KERNEL and the first fp ARITHMETIC one
 ## (bd 9ve.21). PRD-v2 §5's M33 row, §7.1's instruments-before-the-kernel, §7.2's
 ## literal grain, §7.3's constants-as-sources, §7.4's C transcription and
 ## pinned-by-table oracle cells, §7.6's one CLAMPED and one DISCARDED D8 row,
 ## §7.12's anchors and §7.13's stated cost.
 ##
-## SLOW BY CONSTRUCTION AND §7.13 SAID SO IN ADVANCE: one sandwiched call is
-## ~47,800 compute slots twice over, and the L1 floor is `3 x anchors + 8` so
-## that no mask row of the anchor block is dropped. "Not a reason to cut the
-## budget."
+## One sandwiched call is ~47,800 compute slots twice over. The L1 path keeps
+## §7.12's fixed 32-case representative sample; the full table is classical.
 add_cqops_test(test_kernel_fadd)
 
 ## M33's fail-loud paths. Which layer would answer for each guard, and why the
@@ -2950,9 +2974,8 @@ set_tests_properties(test_kernel_fadd_death.fadd_dst_aliases_its_first_source
 ## constants-as-sources and views, §7.4's C transcription, §7.6's EMPTY D8
 ## audit and its discarded-arm rule, §7.12's anchors.
 ##
-## THIS SUITE IS SLOW AND §7.13 SAYS SO IN ADVANCE: 163,300 compute-half slots
-## at ~300k gates per kernel call, times a forced anchor block of 49 ordered
-## pairs at three mask rows. The wall clock is not a reason to cut the budget.
+## One circuit case is 163,300 compute-half slots at ~300k gates. The L1 path
+## keeps §7.12's fixed 32-case representative sample; the full table is classical.
 add_cqops_test(test_kernel_fmul)
 
 ## M39 `fma` — K20, `soft_fma` at f64: the LARGEST single transcription in the
@@ -3209,9 +3232,8 @@ set_tests_properties(test_kernel_fmul_death.dst_aliases_its_first_source
 ## constants-as-sources and views, §7.4's C transcription, §7.6's EMPTY D8
 ## audit, §7.11's unary signature, §7.12's anchors.
 ##
-## THIS SUITE IS SLOW AND §7.13 SAYS SO IN ADVANCE: 157,108 compute-half slots
-## at ~229k gates per kernel call, times a forced anchor block of 33 singles at
-## three mask rows. The wall clock is not a reason to cut the budget.
+## One circuit case is 157,108 compute-half slots at ~229k gates. The L1 path
+## keeps §7.12's fixed 32-case representative sample; the full table is classical.
 add_cqops_test(test_kernel_fsqrt)
 
 ## M40's fail-loud paths. Which layer would answer for each guard, and why the
@@ -3440,10 +3462,9 @@ set_tests_properties(test_kernel_fconv_death.dst_aliases_its_source
 ## audit, §7.12's anchors and §7.16's decision that the restoring-division loop
 ## is TRANSCRIBED per operator rather than composed from `cq_divrem_block`.
 ##
-## THIS SUITE IS SLOW AND §7.13 SAYS SO IN ADVANCE: 139,245 compute-half slots
-## per call, times a forced anchor block of 54 ordered pairs at three mask
-## rows, plus a span scan and a stride scan that each run the whole program
-## again. The wall clock is not a reason to cut the budget.
+## One circuit case is 139,245 compute-half slots. The L1 path keeps §7.12's
+## fixed 32-case representative sample; span/stride scans remain separate and
+## the complete semantic table is checked classically.
 add_cqops_test(test_kernel_fdiv)
 
 ## M35's fail-loud paths. Which layer would answer for each guard, and why the

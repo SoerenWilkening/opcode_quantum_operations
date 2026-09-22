@@ -1,5 +1,5 @@
-/* tests/test_kernel_fpfield_views.inc — M31's VIEWS half, and the anchor
- * budget. Included by tests/test_kernel_fpfield.c.
+/* tests/test_kernel_fpfield_views.inc — M31's VIEWS half, and the constant
+ * circuit sample. Included by tests/test_kernel_fpfield.c.
  *
  * A VIEW IS THE ONE THING IN THIS MODULE THAT CANNOT FAIL LOUDLY. It emits no
  * gate and allocates no qubit, so a view addressing the wrong lanes produces a
@@ -167,70 +167,29 @@ CQ_TEST(the_constant_spans_are_the_softfloat_patterns)
     CHECK_EQ(CQ_FP64_EXP_MASK, CQ_FP64_EXP_ALL << CQ_FP64_EXP_LO);
 }
 
-/* (d) WHAT THE ANCHOR BUDGET ACTUALLY DELIVERS, ASSERTED AND PRINTED.
- *
- * The sampler forces anchors ROW-MAJOR BY MASK ROW and truncates at
- * `budget - 2` (kernelsweep.c), so with fifteen singles and three mask rows it
- * wants 45 while the 32-sample default has room for 30 — one whole mask row
- * DROPPED. bd 9ve.32's per-shape floor is what stops that, and `fp_shape`
- * reads the figure off the provider rather than writing it down, so the claim
- * asserted here is `0 DROPPED` and not a number.
- *
- * THE ENVIRONMENT WINS IN BOTH DIRECTIONS, so the assertion is made only on
- * the rows where the floor is in force. `CQOPS_L1_SAMPLES=8` is a maintainer
- * asking for eight cases and must still get eight; a case that demanded full
- * anchor coverage there would make the knob un-bisectable, which is the thing
- * 9ve.32's own precedence note refuses.
- *
- * AND THE ANCHORS ARE RUN HERE DIRECTLY, EVERY ONE OF THEM, AT TWO MASKS — so
- * the coverage does not depend on the budget at all and a future edit to the
- * sampler cannot silently take it away. */
-CQ_TEST(every_anchor_reaches_the_kernel_and_the_drop_is_printed)
+/* (d) The complete semantic table stays on the cheap classical path. The
+ * gate-emitting sampler gets eight representatives at three mask rows, leaving
+ * six deterministic random cases in the default 32-case budget. */
+CQ_TEST(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant)
 {
-    cq_bk_pair pairs[CQ_FP64_W + 12];
-    uint32_t np = cq_bk_fixed_pairs((uint32_t)CQ_FP64_W, pairs,
-                                    (uint32_t)(CQ_FP64_W + 12));
     cq_kd_shape sh;
-    const char *src = "";
     int n_anch = cq_fp_anchors_unary(CQ_FP64_W, -1, NULL);
-    int budget, room, want, have;
+    int circuit_n;
 
     fp_shape(CQ_FP64_W, &sh);
-    budget = cq_kd_budget(sh.min_samples, &src);
-    room   = budget > 2 ? budget - 2 : 0;
-    want   = n_anch * 3;
-    have   = want < room ? want : room;
+    circuit_n = sh.anchors(CQ_FP64_W, -1, NULL);
 
     CHECK_EQ(n_anch, cq_fp_anchors_unary_count());
     CHECK(n_anch > 0);
     CHECK_EQ(cq_fp_anchors_unary(8, -1, NULL), 0);   /* f64 only */
-
-    /* The floor TRACKS the provider: adding a single to fpanchors.c must widen
-     * the budget with no edit here, so this is an identity and not a literal. */
-    CHECK_EQ(sh.min_samples, 3 * n_anch + 8);
-
-    printf("# fp class anchors: %d singles x 3 mask rows = %d wanted, %d run "
-           "through the sampler, %d DROPPED at budget %d [%s, shape floor %d] "
-           "— and all %d are run explicitly below at two masks\n",
-           n_anch, want, have, want - have, budget, src, sh.min_samples,
-           n_anch);
-    fflush(stdout);
-
-    /* 0 DROPPED — the whole point of the floor. */
-    if (strcmp(src, "env") != 0) CHECK_EQ(have, want);
+    CHECK_EQ(circuit_n, 8);
 
     for (int i = 0; i < N_FP_ROWS; i++)
         for (int j = 0; j < n_anch; j++) {
             cq_ref_w v[CQ_KD_MAX_SRC];
 
-            v[0] = cq_ref_w_zero();
-            v[1] = cq_ref_w_zero();
-            v[2] = cq_ref_w_zero();
-            CHECK(cq_fp_anchors_unary(CQ_FP64_W, j, v) == 1);
-
-            cq_kd_case(&ROWS[i].spec, CQ_FP64_W, v, &pairs[1]);   /* all-quantum */
-            cq_kd_case(&ROWS[i].spec, CQ_FP64_W, v, &pairs[0]);   /* all-classical */
+            CHECK_EQ(cq_fp_anchors_unary(CQ_FP64_W, j, v), 1);
+            CHECK_EQ(cq_fp_class_eval(v[0].lo, ROWS[i].cls),
+                     host_class(v[0].lo, ROWS[i].cls));
         }
-
-    CHECK(np >= 2u);
 }

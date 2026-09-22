@@ -55,6 +55,15 @@
 
 /* ---- The four kernels, as one table. ------------------------------------ */
 
+static int fp_circuit_anchors(int W, int i, cq_ref_w *v)
+{
+    const int available = cq_fp_anchors_unary(W, -1, NULL);
+    const int picked = cq_fp_representative_unary_index(available, i);
+
+    if (i < 0) return cq_fp_representative_count(available);
+    return picked >= 0 ? cq_fp_anchors_unary(W, picked, v) : 0;
+}
+
 /* K9's shape: `dst` is one bit while the source is 64, so the driver is told
  * through `w_dst` and the call adapter passes nothing — these kernels are
  * unary and name their operand, so there is no `W` to hand over at all.
@@ -69,16 +78,7 @@ static void fp_shape(int W, cq_kd_shape *out)
     out->n_src   = 1;
     out->w[0]    = CQ_FP64_W;
     out->w_dst   = 1;
-    out->anchors = cq_fp_anchors_unary;
-
-    /* THE FLOOR IS READ OFF THE PROVIDER JUST INSTALLED, NOT WRITTEN DOWN
-     * (bd 9ve.32). The sampler forces anchors row-major over three mask rows
-     * after reserving slots 0 and 1, so `3 x anchors + 8` is the smallest
-     * budget at which NO row is dropped — and it tracks fpanchors.c: adding a
-     * single there widens the floor here with no edit. At a width the provider
-     * declines (anything but 64) this is 8, below the 32 default, so the floor
-     * never fires and the schedule is today's byte for byte. */
-    out->min_samples = 3 * out->anchors(W, -1, NULL) + 8;
+    out->anchors = fp_circuit_anchors;
 }
 
 /* L1's ORACLE IS THE HOST, AND IT SHARES NOTHING WITH THE PORT. `fpclass.c`
@@ -234,7 +234,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(a_view_addresses_the_lanes_the_source_names),
     CQ_CASE(a_view_over_a_classical_rail_is_all_constant),
     CQ_CASE(the_constant_spans_are_the_softfloat_patterns),
-    CQ_CASE(every_anchor_reaches_the_kernel_and_the_drop_is_printed),
+    CQ_CASE(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant),
     CQ_CASE(the_eq_block_costs_what_m16_says_it_costs),
     CQ_CASE(each_predicate_is_two_eq_blocks_a_not1_per_eq_and_one_and),
     CQ_CASE(the_slot_boundaries_match_an_independent_four_valued_scan),

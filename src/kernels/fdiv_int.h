@@ -22,21 +22,17 @@
  * straight-line and K12 is a pure modulus because it is one repeated
  * iteration; K17 is both, and the two ends are NOT the loop's shape.
  *
- * AND THAT IS WHY THE MAP EXISTS AT ALL RATHER THAN M34's FLAT `off[]`.
- * `cq_fmul_step` walks its whole 128-row table once per step to build the
- * prefix offsets, which is fine at 128 rows; at 478 it is 3.7x the work on a
- * kernel that is already ~139k slots per compute half and is driven four times
- * per L1 case. The segmented map walks 36 + 7 + 50 = 93 row costs instead of
- * 478 and answers `cq_fd_off` in constant time, because the loop's offsets are
- * `loop_off + t * iter_bits + iter[j]` — an ARITHMETIC consequence of every
- * iteration being the same seven rows. It is rebuilt PER STEP and never
- * cached: a table carried in mutable state would desynchronise the sandwich's
- * two halves, which is fpround_step.c's and fmul_step.c's stated reason and
- * Rule 13's.
+ * AND THAT IS WHY THE MAP EXISTS AT ALL RATHER THAN A 478-ROW FLAT `off[]`.
+ * The segmented map prepares 36 + 7 + 50 row costs instead of 478 and answers
+ * `cq_fd_off` in constant time, because the loop's offsets are `loop_off + t *
+ * iter_bits + iter[j]` — an ARITHMETIC consequence of every iteration being
+ * the same seven rows. Its base-zero form is immutable and cached once; an
+ * invocation copies and rebases it without storing operands or circuit state.
  *
  * `loop_off`, `iter_bits`, `loop_slot` and `iter_steps` ARE PURE FUNCTIONS OF
- * THE BLOCK COSTS AND OF NOTHING ELSE (plan §0.1, ckd.14(a)): the driver
- * replays indices in reverse and a step must be an involution.
+ * THE BLOCK COSTS AND OF NOTHING ELSE (plan §0.1, ckd.14(a)). The base-zero
+ * map is therefore built once; a block invocation copies and rebases that
+ * immutable metadata, never operands or circuit state.
  */
 #ifndef CQOPS_KERNELS_FDIV_INT_H
 #define CQOPS_KERNELS_FDIV_INT_H
@@ -75,6 +71,7 @@ typedef struct {
 /* The layout, as a pure function of `base`. No block, so `cq_fdiv_steps` and
  * `cq_fdiv_region` reach it too. */
 void cq_fd_map_build(cq_fd_map *m, uint32_t base);
+const cq_fd_map *cq_fd_map_get(void);
 
 /* The same plus the fit check, which is the BLOCK's and has to be: without it
  * the first out-of-region span aborts in M08 naming the REGION rather than the

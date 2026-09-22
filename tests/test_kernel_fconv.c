@@ -48,6 +48,7 @@
  */
 
 #include "kernels/fconv.h"
+#include "kernels/fconv_int.h"
 
 #include "bit.h"
 #include "ctx.h"
@@ -84,6 +85,33 @@
  * boundaries, not approximations. */
 #define FV_TWO63  9223372036854775808.0
 #define FV_TWO64  18446744073709551616.0
+
+static void check_cached_prefix_map(cq_fconv_prog p)
+{
+    const cq_fv_map *m = cq_fv_map_get(p);
+    int row = 0, start = 0;
+
+    for (int u = 0; u < m->steps; u++) {
+        int got, local, n;
+
+        for (;;) {
+            n = cq_fv_row_steps(&m->rows[row]);
+            if (n > 0 && u < start + n) break;
+            start += n;
+            row++;
+        }
+        got = cq_fv_row_at(m, u, &local);
+        CHECK_EQ(got, row);
+        CHECK_EQ(local, u - start);
+    }
+}
+
+CQ_TEST(the_cached_prefix_maps_match_a_linear_dispatch_at_every_slot)
+{
+    check_cached_prefix_map(CQ_FCONV_PROG_FPTOSI);
+    check_cached_prefix_map(CQ_FCONV_PROG_FPTOUI);
+    check_cached_prefix_map(CQ_FCONV_PROG_SITOFP);
+}
 
 /* ---- L1's oracle: the host cast where C defines it, §7.5's value where not. */
 
@@ -157,6 +185,18 @@ static uint64_t host_uitofp(uint64_t u, int F)
  * pointer. */
 static int g_F = CQ_FP64_W, g_T = CQ_FP64_W;
 static cq_kd_anchor_fn g_anchors;
+static int g_fp_source;
+
+static int fconv_circuit_anchors(int W, int i, cq_ref_w *v)
+{
+    const int available = g_anchors(W, -1, NULL);
+    const int picked = g_fp_source
+        ? cq_fp_representative_unary_index(available, i)
+        : cq_fp_representative_spread_index(available, i);
+
+    if (i < 0) return cq_fp_representative_count(available);
+    return picked >= 0 ? g_anchors(W, picked, v) : 0;
+}
 
 static void fconv_shape(int W, cq_kd_shape *out)
 {
@@ -165,16 +205,7 @@ static void fconv_shape(int W, cq_kd_shape *out)
     out->n_src   = 1;
     out->w[0]    = g_F;
     out->w_dst   = g_T;
-    out->anchors = g_anchors;
-
-    /* THE FLOOR IS READ OFF THE PROVIDER JUST INSTALLED, NOT WRITTEN DOWN
-     * (bd 9ve.32). The sampler forces anchors row-major over three mask rows
-     * after reserving slots 0 and 1, so `3 x anchors + 8` is the smallest
-     * budget at which NO row is dropped, and it tracks the tables in the .inc
-     * with no edit here. It also SHRINKS with the source width for the
-     * int-source provider, which is the whole reason the count is asked for
-     * rather than written. */
-    out->min_samples = 3 * out->anchors(g_F, -1, NULL) + 8;
+    out->anchors = fconv_circuit_anchors;
 }
 
 static void call_fptosi(cq_ctx *ctx, cq_bit *dst, const cq_bit *const *src,
@@ -242,6 +273,7 @@ static void fconv_arm(const fconv_krow *r, int F)
     g_F = F;
     g_T = CQ_FP64_W;
     g_anchors = r->anchors;
+    g_fp_source = r->fp_source;
 }
 
 /* ---- One forward call, at an explicit value and mask. ------------------- */
@@ -420,6 +452,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_i64_row_upstream_would_have_emitted_is_wrong_and_the_others_are_not),
     CQ_CASE(the_blocks_cost_what_their_modules_say_they_cost),
     CQ_CASE(each_program_is_the_sum_of_its_rows),
+    CQ_CASE(the_cached_prefix_maps_match_a_linear_dispatch_at_every_slot),
     CQ_CASE(the_slot_boundaries_match_an_independent_four_valued_scan),
     CQ_CASE(the_programs_spans_are_pairwise_disjoint),
     CQ_CASE(the_compute_half_is_a_palindrome_at_an_asymmetric_mask),

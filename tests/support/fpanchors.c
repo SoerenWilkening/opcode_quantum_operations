@@ -157,3 +157,53 @@ int cq_fp_anchors_unary(int W, int i, cq_ref_w *v)
     v[0] = cq_ref_w_make(FP64_SINGLES[i], 0u, 64);
     return 1;
 }
+
+/* Eight values x three mask rows leaves six random cases inside the shared
+ * 32-case budget after its mandatory all-classical and all-quantum slots. */
+enum { N_FP_REPRESENTATIVES = 8 };
+
+int cq_fp_representative_count(int available)
+{
+    if (available <= 0) return 0;
+    return available < N_FP_REPRESENTATIVES ? available : N_FP_REPRESENTATIVES;
+}
+
+static int representative_index(const int *base, int nbase,
+                                int available, int i)
+{
+    const int n = cq_fp_representative_count(available);
+
+    if (i < 0 || i >= n) return -1;
+    if (available <= N_FP_REPRESENTATIVES) return i;
+    if (i < nbase && base[i] < available) return base[i];
+    return available - 1;                /* one kernel-specific tail row */
+}
+
+int cq_fp_representative_binary_index(int available, int i)
+{
+    /* FP64_PAIRS indices: +0, +Inf, default NaN, sNaN, subnormal boundary,
+     * tie-to-even, overflow.  The eighth row is the provider's own last row. */
+    static const int BASE[] = { 0, 4, 10, 14, 16, 20, 22 };
+
+    return representative_index(BASE, (int)(sizeof BASE / sizeof BASE[0]),
+                                available, i);
+}
+
+int cq_fp_representative_unary_index(int available, int i)
+{
+    /* FP64_SINGLES indices: +0, +Inf, default NaN, sNaN, max subnormal,
+     * min normal, 1.0.  The eighth row is the provider's own last row. */
+    static const int BASE[] = { 0, 2, 4, 7, 8, 10, 12 };
+
+    return representative_index(BASE, (int)(sizeof BASE / sizeof BASE[0]),
+                                available, i);
+}
+
+int cq_fp_representative_spread_index(int available, int i)
+{
+    const int n = cq_fp_representative_count(available);
+
+    if (i < 0 || i >= n) return -1;
+    if (n == 1) return 0;
+    return (i * (available - 1)) / (n - 1);
+}

@@ -59,12 +59,10 @@
  * property, which would win over the shell (the same trap CQOPS_UPDATE_GOLDENS
  * has, recorded in CLAUDE.md's Build & Test section).
  *
- * AND SINCE bd 9ve.32 A SHAPE MAY RAISE THAT CONSTANT FOR ITSELF, which is
- * still not a product and still does not scale with W — cq_kd_budget below is
- * the whole of it, and kerneldrv.h states the three-way precedence. Nothing on
- * the integer catalogue is affected: cq_kd_default_shape writes a floor of 0,
- * and at 0 with no environment value every line this file prints is what it
- * printed before, byte for byte.
+ * NO SHAPE MAY RAISE THAT CONSTANT FOR ITSELF. Floating-point providers select
+ * a fixed representative subset for circuit execution and keep the complete
+ * semantic table in cheap classical/oracle cases. This is what prevents a
+ * growing anchor table from turning the sampler back into an enumeration.
  */
 
 #include "support/kerneldrv.h"
@@ -92,15 +90,7 @@ enum {
     N_ANCHOR_ROWS         = 3      /* PRD-v2 §7.12: all-classical + two mixed */
 };
 
-/* The cache is a PAIR, and the second half is why (bd 9ve.32). The precedence
- * below has to distinguish "the environment asked for 32" from "nobody asked
- * and the default is 32", because those two answer a shape's floor in opposite
- * ways — and the VALUE alone cannot tell them apart. `from_env` is set only
- * when a value actually RESOLVED, so CQOPS_L1_SAMPLES=abc keeps today's silent
- * fall back to the default AND leaves a floor in force, rather than disabling
- * the floor by way of a typo. */
 static int budget_n = -1;
-static int budget_from_env;
 
 static void budget_cache(void)
 {
@@ -108,8 +98,8 @@ static void budget_cache(void)
         const char *e = getenv("CQOPS_L1_SAMPLES");
         long v = (e && *e) ? strtol(e, NULL, 10) : 0;
 
-        budget_from_env = (v > 0 && v <= 1000000);
-        budget_n = budget_from_env ? (int)v : CQ_KD_SAMPLES_DEFAULT;
+        budget_n = (v > 0 && v <= 1000000)
+            ? (int)v : CQ_KD_SAMPLES_DEFAULT;
     }
 }
 
@@ -117,45 +107,6 @@ int cq_kd_samples(void)
 {
     budget_cache();
     return budget_n;
-}
-
-/* TEST-ONLY (kerneldrv.h). The cache is read once per process, so a case that
- * changes CQOPS_L1_SAMPLES must drop it or measure the previous answer. */
-void cq_kd_samples_reset(void)
-{
-    budget_n = -1;
-    budget_from_env = 0;
-}
-
-/* THE THREE-WAY PRECEDENCE, IN ONE PLACE. kerneldrv.h states it; this is the
- * only implementation, and the string it hands back is the one the sampler
- * prints, so a reader of a red log and a reader of this function cannot
- * disagree.
- *
- * MAX, NOT REPLACE, and the direction matters: a floor below the constant
- * budget must leave the budget alone, or "floor" would name a coverage CUT. */
-int cq_kd_budget(int min_samples, const char **source)
-{
-    int n = cq_kd_samples();
-    const char *why = "default";
-
-    if (budget_from_env)          why = "env";
-    else if (min_samples > n)   { n = min_samples; why = "floor"; }
-
-    if (source) *source = why;
-    return n;
-}
-
-/* The `#` line's budget clause, and it is EMPTY for a shape with no floor
- * running without an environment value — which is every integer spec on an
- * ordinary run. That keeps those lines byte-identical to what they printed
- * before this bead, so the diff that guards this change has something to say;
- * and it costs nothing, because on that one row "default" is the only thing
- * the clause could have said. Every other row NAMES itself. */
-static void budget_note(int min_samples, const char *src, char *out, size_t cap)
-{
-    if (min_samples <= 0 && !budget_from_env) { out[0] = '\0'; return; }
-    (void)snprintf(out, cap, " [budget=%s, shape floor %d]", src, min_samples);
 }
 
 /* FNV-1a over the kernel's name, mixed with the width. A pure function of
@@ -235,18 +186,11 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
     uint32_t np = pairs_for(k, W, pairs, MAX_PAIRS);
     uint64_t seed = seed_for(k->name, W);
     cq_bk_rng rng;
-    const char *bsrc = "default";
-    char bnote[64];
 
     cq_kd_default_shape(W, &sh);
     if (k->shape) k->shape(W, &sh);
 
-    /* THE BUDGET IS READ AFTER THE SHAPE, because the shape is what may raise
-     * it. Nothing about the draw moves: the generator is seeded further down
-     * and its seed is a pure function of the kernel's name and W. */
-    const int n = cq_kd_budget(sh.min_samples, &bsrc);
-
-    budget_note(sh.min_samples, bsrc, bnote, sizeof bnote);
+    const int n = cq_kd_samples();
 
     /* The all-quantum row is index 1 by construction. Asserted rather than
      * assumed, and BEFORE it is used: it is the mask L4 pins and the one where
@@ -332,18 +276,18 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
         printf("# %s W=%3d SAMPLED: %d cases (all-classical + all-quantum + 4 "
                "value corners forced, %d drawn jointly) from %u mask pairs, "
                "seed 0x%llx — a CONSTANT budget, not a product; see "
-               "kernelsweep.c for what the draw replaced%s\n",
+               "kernelsweep.c for what the draw replaced\n",
                k->name, W, n, n > N_ANCHORS ? n - N_ANCHORS : 0, np,
-               (unsigned long long)seed, bnote);
+               (unsigned long long)seed);
     else
         printf("# %s W=%3d SAMPLED: %d cases (all-classical + all-quantum + %d "
                "of %d ANCHOR cases forced = %d anchors x %d mask rows, %d "
                "DROPPED by the budget (raise CQOPS_L1_SAMPLES), the 4 value "
                "corners REPLACED, %d drawn jointly) from %u mask pairs, seed "
                "0x%llx — anchors are FORCED, a pool row is not; see PRD-v2 "
-               "§7.12%s\n",
+               "§7.12\n",
                k->name, W, n, have, want, n_anch, N_ANCHOR_ROWS, want - have,
-               room - have, np, (unsigned long long)seed, bnote);
+               room - have, np, (unsigned long long)seed);
     fflush(stdout);
 }
 

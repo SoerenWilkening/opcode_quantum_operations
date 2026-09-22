@@ -147,6 +147,50 @@ int cq_fv_steps_of(const cq_fv_ctx *x)
     return slots;
 }
 
+const cq_fv_map *cq_fv_map_get(cq_fconv_prog p)
+{
+    static cq_fv_map maps[3];
+    static int ready[3];
+    cq_fv_map *m;
+    uint32_t bits = 0u;
+    int slots = 0, pi = (int)p;
+
+    if (pi < (int)CQ_FCONV_PROG_FPTOSI || pi > (int)CQ_FCONV_PROG_SITOFP)
+        cq_kernel_die("fconv: program outside the prefix-map table");
+    m = &maps[pi];
+    if (ready[pi]) return m;
+    m->n = cq_fconv_program(p, m->rows);
+    if (m->n > CQ_FV_MAXR)
+        cq_kernel_die("fconv: the program outgrew the prefix map");
+    cq_fv_check_program(m->rows, m->n);
+    for (int i = 0; i < m->n; i++) {
+        m->rel[i]  = bits;
+        m->slot[i] = slots;
+        bits  += row_region(&m->rows[i]);
+        slots += cq_fv_row_steps(&m->rows[i]);
+    }
+    m->slot[m->n] = slots;
+    m->region = bits;
+    m->steps  = slots;
+    ready[pi] = 1;
+    return m;
+}
+
+int cq_fv_row_at(const cq_fv_map *m, int u, int *within)
+{
+    int lo = 0, hi = m->n;
+
+    if (u < 0 || u >= m->steps)
+        cq_kernel_die("fconv: a slot index outside the prefix map");
+    while (hi - lo > 1) {
+        int mid = lo + (hi - lo) / 2;
+
+        if (m->slot[mid] <= u) lo = mid; else hi = mid;
+    }
+    *within = u - m->slot[lo];
+    return lo;
+}
+
 /* The region check is the PROGRAM's, and it has to be: without it the first
  * out-of-region span aborts in M08 naming the REGION rather than the consumer
  * that mis-sized its offset, and the two-programs-in-one-region shape then has
@@ -168,6 +212,15 @@ void cq_fv_arm(const cq_fv_ctx *x, uint32_t *off, int *slots)
     if ((uint64_t)o > (uint64_t)cq_scratch_size(x->scr))
         cq_kernel_die("fconv: the block's region does not fit at its offset");
     if (slots != NULL) *slots = s;
+}
+
+void cq_fv_arm_map(const cq_fv_ctx *x, const cq_fv_map *m, uint32_t *off)
+{
+    if (x->scr == NULL) cq_kernel_die("fconv: the block has no region");
+    for (int i = 0; i < m->n; i++) off[i] = x->off + m->rel[i];
+    if ((uint64_t)x->off + (uint64_t)m->region
+        > (uint64_t)cq_scratch_size(x->scr))
+        cq_kernel_die("fconv: the block's region does not fit at its offset");
 }
 
 /* `at` is ABSOLUTE inside the region: the prefix walk has already added

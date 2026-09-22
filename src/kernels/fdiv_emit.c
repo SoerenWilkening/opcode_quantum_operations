@@ -202,18 +202,25 @@ static void emit_row(cq_ctx *ctx, const cq_fdiv_block *k, const cq_fd_map *m,
     cq_kernel_die("fdiv: unknown op in the program");
 }
 
-void cq_fdiv_step(cq_ctx *ctx, const cq_fdiv_block *k, int u)
+static void fdiv_step_mapped(cq_ctx *ctx, const cq_fdiv_block *k,
+                             const cq_fd_map *m, int u)
 {
-    cq_fd_map m;
     cq_fdiv_row r;
     int local = 0, i;
 
-    cq_fd_arm(k, &m);
-    if (u < 0 || u >= m.post_s[m.n_post])
+    if (u < 0 || u >= m->post_s[m->n_post])
         cq_kernel_die("fdiv: step index outside [0, cq_fdiv_steps())");
-    i = cq_fd_row_of_slot(&m, u, &local);
+    i = cq_fd_row_of_slot(m, u, &local);
     cq_fdiv_row_at(i, &r);
-    emit_row(ctx, k, &m, &r, cq_fd_off(&m, i), local);
+    emit_row(ctx, k, m, &r, cq_fd_off(m, i), local);
+}
+
+void cq_fdiv_step(cq_ctx *ctx, const cq_fdiv_block *k, int u)
+{
+    cq_fd_map m;
+
+    cq_fd_arm(k, &m);
+    fdiv_step_mapped(ctx, k, &m, u);
 }
 
 /* The last row — fdiv.jl:138's `return result`, the outermost `ifelse` of the
@@ -222,33 +229,43 @@ void cq_fdiv_step(cq_ctx *ctx, const cq_fdiv_block *k, int u)
  * row ever became a view or a projection: NOTHING in the library holds a
  * circuit or a buffer (Rule 13), so an assembled operand lives only as long as
  * the call that built it. */
-const cq_bit *cq_fdiv_result(const cq_fdiv_block *k)
+static const cq_bit *fdiv_result_mapped(const cq_fdiv_block *k,
+                                        const cq_fd_map *m)
 {
-    cq_fd_map m;
     cq_fdiv_row r;
     cq_bit buf[CQ_FD_W];
     const cq_bit *p;
     int n = cq_fdiv_n_rows();
 
-    cq_fd_arm(k, &m);
     cq_fdiv_row_at(n - 1, &r);
     if (r.op == CQ_FDOP_VIEW || r.op == CQ_FDOP_OUT)
         cq_kernel_die("fdiv: `result` is a view or a projection, not a span");
-    p = cq_fd_val64(k, &m, n - 1, buf);
+    p = cq_fd_val64(k, m, n - 1, buf);
     if (p == buf) cq_kernel_die("fdiv: `result` did not resolve to a span");
     return p;
+}
+
+const cq_bit *cq_fdiv_result(const cq_fdiv_block *k)
+{
+    cq_fd_map m;
+
+    cq_fd_arm(k, &m);
+    return fdiv_result_mapped(k, &m);
 }
 
 /* --- The Rule 7 kernel: Bennett-in-the-small over one flat region. -------- */
 
 typedef struct {
     cq_fdiv_block k;
+    cq_fd_map     map;
     cq_bit       *dst;
 } fdiv_env;
 
 static void fdiv_compute(cq_ctx *ctx, void *env, int s)
 {
-    cq_fdiv_step(ctx, &((const fdiv_env *)env)->k, s);
+    const fdiv_env *e = (const fdiv_env *)env;
+
+    fdiv_step_mapped(ctx, &e->k, &e->map, s);
 }
 
 /* The "^=" of Rule 7's contract, and the only place `dst` is written on the
@@ -258,7 +275,7 @@ static void fdiv_copyout(cq_ctx *ctx, void *env, int s)
 {
     const fdiv_env *e = (const fdiv_env *)env;
 
-    cq_emit_cx(ctx, &cq_fdiv_result(&e->k)[s], &e->dst[s]);
+    cq_emit_cx(ctx, &fdiv_result_mapped(&e->k, &e->map)[s], &e->dst[s]);
 }
 
 void cq_kernel_fdiv(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
@@ -296,6 +313,7 @@ void cq_kernel_fdiv(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
     cq_scratch_alloc(&scr, cq_fdiv_region());
     e.k.a = a; e.k.b = b; e.k.scr = &scr; e.k.off = 0u;
     e.dst = dst;
+    cq_fd_arm(&e.k, &e.map);
 
     cq_sandwich(ctx, &scr, fdiv_compute, cq_fdiv_steps(),
                 fdiv_copyout, W, &e);

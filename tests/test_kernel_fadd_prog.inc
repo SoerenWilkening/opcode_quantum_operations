@@ -249,9 +249,13 @@ CQ_TEST(fsub_differs_from_fadd_of_fneg_on_exactly_the_nan_rhs_sign)
  * transcription that is right on the specials and wrong in the middle. */
 CQ_TEST(the_classical_row_agrees_with_the_host_on_every_anchor)
 {
+    cq_kd_shape sh;
     int n_anch = fadd_anchors(CQ_FP64_W, -1, NULL);
     uint64_t seed = 0x9E3779B97F4A7C15ull;
     int n_specials = 0, n_ordinary = 0;
+
+    fadd_shape(CQ_FP64_W, &sh);
+    CHECK_EQ(sh.anchors(CQ_FP64_W, -1, NULL), 8);
 
     for (int j = 0; j < n_anch; j++) {
         cq_ref_w v[CQ_KD_MAX_SRC];

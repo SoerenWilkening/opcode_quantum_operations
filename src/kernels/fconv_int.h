@@ -27,11 +27,10 @@
 
 enum { CQ_FV_W = CQ_FP64_W, CQ_FV_MAXR = CQ_FCONV_MAX_ROWS };
 
-/* One program, resolved: the rail and ITS WIDTH, the caller's region, and the
- * rows. Built per entry point; nothing is cached across calls, for fpclass.c's
- * reason — a block carrying cached operands would carry state whose
- * initialisation a consumer can forget, and a forgotten bind is a silent wrong
- * circuit rather than a failure.
+/* One invocation, resolved: the rail and ITS WIDTH, the caller's region, and
+ * the rows. Operands and circuit state are never cached. The separate
+ * cq_fv_map below caches only immutable rows and integer prefixes derived from
+ * the fixed programs and published block costs.
  *
  * `a_w` IS THE WHOLE OF `uitofp` AND IT IS NOT A KERNEL WIDTH. PRD-v2 §1
  * scopes v2 to f64 so every row runs at 64; `a_w < 64` makes `CQ_FV_A` resolve
@@ -56,6 +55,22 @@ int      cq_fv_row_steps(const cq_fconv_row *r);
 uint32_t cq_fv_region_of(const cq_fv_ctx *x);
 int      cq_fv_steps_of (const cq_fv_ctx *x);
 void     cq_fv_check_program(const cq_fconv_row *rows, int n);
+
+/* One immutable conversion program and its relative bit/slot prefixes. The
+ * three instances depend only on cq_fconv_program() and published block costs;
+ * source width changes operand views, not this layout. */
+typedef struct {
+    cq_fconv_row rows[CQ_FV_MAXR];
+    uint32_t     rel [CQ_FV_MAXR];
+    int          slot[CQ_FV_MAXR + 1];
+    uint32_t     region;
+    int          steps, n;
+} cq_fv_map;
+
+const cq_fv_map *cq_fv_map_get(cq_fconv_prog p);
+int              cq_fv_row_at(const cq_fv_map *m, int u, int *within);
+void             cq_fv_arm_map(const cq_fv_ctx *x, const cq_fv_map *m,
+                               uint32_t *off);
 
 /* THE PREFIX-OFFSET WALK, THE FIT CHECK, THE REGION TOTAL AND THE SLOT TOTAL
  * IN ONE PASS — M36's shape, and here it is a measured cost rather than
