@@ -75,7 +75,9 @@ OPCODES = {"add", "sub", "mul", "sdiv", "udiv", "srem", "urem", "and", "or",
            "ctpop", "ctlz", "cttz", "bitreverse", "bswap", "abs",
            "smin", "smax", "umin", "umax",
            "fneg", "fabs", "floor", "ceil", "round", "rint", "nearbyint",
-           "fmin", "fmax", "copysign"}
+           "fmin", "fmax", "copysign",
+           # bead s8g: f64 <-> i64, through the INTEGER cast door.
+           "bitcast"}
 
 # THE TWO INTRINSIC SELECTORS, TRANSCRIBED INDEPENDENTLY. `fma`'s enumerator
 # happens to be the opcode upper-cased and `sqrt`'s is NOT — `CQ_SHIM_FUN_FSQRT`
@@ -218,14 +220,15 @@ def expected_args(name, decl):
 # --- The cases ---------------------------------------------------------------
 
 def no_wrapper_is_inert(defs=None):
-    # AND 1262 SINCE bead 9ve.44: 110 integer intrinsic wrappers and 30 f64.
+    # AND 1262 SINCE bead 9ve.44: 110 integer intrinsic wrappers and 30 f64;
+    # AND 1266 SINCE bead s8g: the four f64 <-> i64 bitcast fwd/unc bodies.
     # 992 until PRD-v2's first fp family landed (2026-09-18, bead 9ve.28) and
     # 1048 until bead 9ve.36 added the fp ARITHMETIC surface: 30 `fp_arith`
     # bodies at f64 and 34 cross-domain conversion bodies, wrappers on exactly
     # the same terms as an integer one, ONE CALL EACH.
     # AND 1122 SINCE bead 9ve.24's VENDORING: `fma` x8 and `sqrt` x2 at f64.
     w = wrappers(defs or SHIPPED)
-    sc.check(len(w) == 1262, "expected 1262 wrappers, got %d" % len(w))
+    sc.check(len(w) == 1266, "expected 1266 wrappers, got %d" % len(w))
     for name, body in sorted(w.items()):
         one_call(name, body)
 
@@ -252,8 +255,10 @@ def the_wrapper_calls_cover_every_dispatched_opcode(defs=None):
     sc.diff_sets(seen, OPCODES, "opcodes DISPATCHED by a wrapper body")
 
 
-def the_wrapper_shape_split_is_519_forward_519_unc_224_controlled(defs=None):
-    # 449/449/224 until bead 9ve.44, whose 140 wrappers are 70 forwards and 70
+def the_wrapper_shape_split_is_521_forward_521_unc_224_controlled(defs=None):
+    # 519/519/224 until bead s8g's two bitcast forwards and two `_unc`s (a cast
+    # has no controlled axis). 449/449/224 until bead 9ve.44, whose 140
+    # wrappers are 70 forwards and 70
     # `_unc`s: NONE of intrinsic_table.yaml's rows carries a controlled axis.
     # 389/389/214, then 417/417/214 when `fcmp` landed (its 28 new wrappers are
     # forwards and `_unc`s and the CONTROLLED figure did not move, because
@@ -268,8 +273,8 @@ def the_wrapper_shape_split_is_519_forward_519_unc_224_controlled(defs=None):
         entry = one_call(name, body)[0]
         got["unc" if entry.endswith("_unc") else
             "controlled" if entry.endswith("_ctrl") else "fwd"] += 1
-    sc.check(got == {"fwd": 519, "unc": 519, "controlled": 224},
-             "shape split: expected 519/519/224, got %r" % got)
+    sc.check(got == {"fwd": 521, "unc": 521, "controlled": 224},
+             "shape split: expected 521/521/224, got %r" % got)
     ctrl = {n for n, b in wrappers(defs or SHIPPED).items()
             if one_call(n, b)[0].endswith("_ctrl")}
     sc.check(not any("cmp_" in n for n in ctrl),
@@ -418,8 +423,9 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
     sc.check(sc.DECLINED_REASON not in (sc.FP_REASON, sc.INV_REASON),
              "the declined reason is one of the other two")
     landed_inv = {n for n in aborts(defs) if sc.is_landed(n)}
-    sc.check(len(landed_inv) == 66,
-             "expected 66 D14 aborts inside the landed fp families, got %d"
+    # 68 since bead s8g: + the two bitcast f64 <-> i64 `_inv`.
+    sc.check(len(landed_inv) == 68,
+             "expected 68 D14 aborts inside the landed fp families, got %d"
              % len(landed_inv))
     sc.check(all(n.endswith("_inv") for n in landed_inv),
              "a LANDED fp symbol aborts without being an `_inv`: %s"
@@ -549,7 +555,7 @@ def the_new_fp_shapes_are_pinned_body_by_body(defs=None):
 CASES = [
     no_wrapper_is_inert,
     the_wrapper_calls_cover_every_dispatched_opcode,
-    the_wrapper_shape_split_is_519_forward_519_unc_224_controlled,
+    the_wrapper_shape_split_is_521_forward_521_unc_224_controlled,
     every_wrapper_body_is_exactly_the_call_its_symbol_names,
     the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type,
     every_abort_body_names_its_own_symbol_and_silences_its_parameters,

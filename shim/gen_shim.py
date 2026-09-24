@@ -215,6 +215,12 @@ LANDED = frozenset((
     ("uitofp", "i16", "f64"), ("uitofp", "i32", "f64"),
     # ("uitofp", "i64", "f64") IS DELIBERATELY ABSENT — bead 9ve.34; see below.
     #
+    # bead s8g — `bitcast` f64 <-> i64, the `reinterpret` family's in-scope
+    # pair (PRD-v2 §3.5). An IDENTITY RELABEL: gen_bodies routes it through
+    # the integer cast door as CQ_SHIM_CAST_BITCAST, i.e. M13's `zext` at
+    # F == T. The f16/f32/f80 pairs keep "fp is v2".
+    ("bitcast", "f64", "i64"), ("bitcast", "i64", "f64"),
+    #
     # --- intrinsic_table.yaml, vendored 2026-09-19 (PRD-v2 §6.1, bead 9ve.24).
     ("fma", "f64"),             # M39 / K20 — 4 shapes x fwd/unc, NO `_inv`
     ("sqrt", "f64"),            # M40 / K21 — reached through cq_shim_fun
@@ -387,7 +393,7 @@ def expand(table):
 # is what a reader and a reviewer actually need, and it is what the bead reports.
 BUCKETS = ("wrapper", "inv", "fp", "defer")
 
-EXPECTED = {"total": 2880, "wrapper": 1262, "inv": 676, "fp": 810,
+EXPECTED = {"total": 2880, "wrapper": 1266, "inv": 678, "fp": 804,
             "defer": 132}
 # SEVEN POPULATIONS, AND THE THREE NEW ONES ARE WHAT MAKES THE VENDORING
 # VISIBLE. `int_defer` is the integer intrinsics that still abort (since bead
@@ -400,8 +406,10 @@ EXPECTED = {"total": 2880, "wrapper": 1262, "inv": 676, "fp": 810,
 # `int_defer` (M41/M42's wrappers, and the class-1 `bswap`/`bitreverse` `_inv`
 # as D14 aborts), 30 + 1 f64 rows out of `fp_abort` (M38's wrappers and
 # `fneg_f64_inv`). `int_inv` is therefore no longer the opcode grid's 603.
+# BEAD s8g MOVED 6: the f64 <-> i64 bitcast pair's four fwd/unc rows to
+# `fp_wrapper` and its two `_inv` rows to `fp_inv` (D14), out of `fp_abort`.
 EXPECTED_BY_DOMAIN = {"int_wrapper": 1102, "int_inv": 610, "int_defer": 120,
-                      "fp_wrapper": 160, "fp_inv": 66, "fp_abort": 810,
+                      "fp_wrapper": 164, "fp_inv": 68, "fp_abort": 804,
                       "fp_defer": 12}
 
 

@@ -48,13 +48,17 @@ static void cq_dispu_die(const char *what, int32_t v)
 
 cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind)
 {
+    /* `bitcast` IS `zext` AT `F == T` — M13's recorded identity copy, F CX and
+     * nothing else (`trunc` at `F == T` is the same loop). cq_template_unary.c
+     * refuses a bitcast whose widths differ BEFORE this pointer is called, so
+     * `zext`'s widening is never reachable under that name. */
     static const cq_tpl_cast_fn K[] = {
-        cq_kernel_sext, cq_kernel_zext, cq_kernel_trunc
+        cq_kernel_sext, cq_kernel_zext, cq_kernel_trunc, cq_kernel_zext
     };
-    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_CAST_TRUNC + 1u,
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_CAST_BITCAST + 1u,
                    "one kernel per cq_shim_cast_kind");
 
-    if ((unsigned)kind > (unsigned)CQ_SHIM_CAST_TRUNC)
+    if ((unsigned)kind > (unsigned)CQ_SHIM_CAST_BITCAST)
         cq_dispu_die("cq_template_* cast kind outside the ABI's enum",
                      (int32_t)kind);
     return K[kind];
@@ -176,11 +180,11 @@ cq_tpl_cast_fn cq_tpl_iun_kernel(cq_shim_iun_op op)
  * what CQ_lang's IR called, not which soft_* ran. */
 const char *cq_tpl_cast_name(cq_shim_cast_kind kind)
 {
-    static const char *const N[] = { "sext", "zext", "trunc" };
-    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_CAST_TRUNC + 1u,
+    static const char *const N[] = { "sext", "zext", "trunc", "bitcast" };
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_CAST_BITCAST + 1u,
                    "one display name per cq_shim_cast_kind");
 
-    if ((unsigned)kind > (unsigned)CQ_SHIM_CAST_TRUNC)
+    if ((unsigned)kind > (unsigned)CQ_SHIM_CAST_BITCAST)
         cq_dispu_die("cq_template_* cast kind outside the ABI's enum",
                      (int32_t)kind);
     return N[kind];

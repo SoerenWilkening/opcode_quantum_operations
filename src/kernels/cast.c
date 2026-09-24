@@ -16,8 +16,12 @@
  * handles it with no special case (sext's broadcast loop is zero-trip, zext
  * and trunc degenerate to a plain F-CX copy), and both readings are defensible
  * — so this line is the decision, recorded because K05.md picked it in passing
- * without flagging it as one. It is unreachable from CQ_lang's shipped grid:
- * sext and zext are strictly widening there and trunc strictly narrowing. */
+ * without flagging it as one. M13's OWN three opcodes never reach it — sext
+ * and zext are strictly widening in CQ_lang's shipped grid and trunc strictly
+ * narrowing — but the grid DOES reach it since bead s8g: `bitcast f64 <-> i64`
+ * is dispatched as `cq_kernel_zext` at F == T == 64 (shim/cq_template_
+ * dispatch_unary.c), a physical 64-CX copy, and the shim refuses a bitcast
+ * whose widths differ before this guard is ever consulted. */
 static void check_widths(const cq_bit *dst, const cq_bit *a, int F, int T,
                          int widening)
 {

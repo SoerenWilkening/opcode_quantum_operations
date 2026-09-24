@@ -189,7 +189,17 @@ int32_t cq_tpl_unary(tpl_ureq r)
  * sequence collapses to one stage.
  *
  * A CAST'S TAG FOLDS BOTH WIDTHS IN: `zext i8->i32` is not the adjoint of
- * `zext i8->i64` on the same handles, and `trunc` is not `zext`'s. */
+ * `zext i8->i64` on the same handles, and `trunc` is not `zext`'s.
+ *
+ * `bitcast` (bead s8g) IS THE FOURTH KIND AND THE SAME ONE-STAGE SHAPE: M13's
+ * `zext` at `F == T`, a physical F-CX copy. Its one rule is hoisted here,
+ * AFTER the range and the enum (so a wild width or kind gets its own sentence)
+ * and BEFORE the bracket and the mint: a bitcast whose widths differ is
+ * refused, because `zext` would silently WIDEN at `(32, 64)` and refuse
+ * `(64, 32)` only one layer down, after a rail is minted and a D21 bracket
+ * opened. Both directions share one kind and therefore one tag — they are the
+ * same function on the bits, so a forward in one direction is truthfully
+ * undone by the other's `_unc` (tests/test_template_bitcast_cert.inc). */
 static tpl_ureq cast_req(cq_shim_cast_kind kind, int from_bits, int to_bits,
                          int32_t out, int32_t a_handle)
 {
@@ -198,6 +208,9 @@ static tpl_ureq cast_req(cq_shim_cast_kind kind, int from_bits, int to_bits,
 
     r.inner.fn = NULL; r.inner.f = r.inner.t = 0u; r.inner.tag = 0u;
     r.outer.fn = cq_tpl_cast_kernel(kind);
+    if (kind == CQ_SHIM_CAST_BITCAST && f != t)
+        cq_un_die("bitcast is a same-width reinterpretation and its two "
+                  "widths differ; the from-width is", (int)f);
     r.outer.f = f; r.outer.t = t;
     r.outer.tag = 0x80000000u + (uint32_t)kind * 65536u + f * 256u + t;
     r.w = f; r.wout = t;

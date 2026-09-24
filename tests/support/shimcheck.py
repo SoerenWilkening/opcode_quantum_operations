@@ -65,6 +65,9 @@ LANDED_NAME = re.compile(
     r"|fptoui_f64_to_i(?:64|32|16|8|1)"
     r"|sitofp_i(?:64|32|16|8)_to_f64"
     r"|uitofp_i(?:32|16|8|1)_to_f64"
+    # --- bead s8g: `bitcast` at f64 <-> i64 ONLY; the f16/f32/f80 pairs
+    # still abort, so the widths are spelled out rather than `\d+`.
+    r"|bitcast_(?:f64_to_i64|i64_to_f64)"
     # --- intrinsic_table.yaml, vendored 2026-09-19 (bead 9ve.24). The four
     # `fma` shapes at f64 and `sqrt` at f64; NOTHING at f16/f32/f80 and no
     # other opcode from that table.

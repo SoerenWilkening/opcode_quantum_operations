@@ -116,7 +116,7 @@ def every_emitted_signature_matches_cq_langs_own_declaration():
     sc.check(not bad, "%d signature mismatch(es):\n  %s" % (len(bad), "\n  ".join(bad[:3])))
 
 
-def the_partition_is_1262_wrappers_676_inv_810_fp_and_132_deferred():
+def the_partition_is_1266_wrappers_678_inv_804_fp_and_132_deferred():
     # 992 / 603 / 884 until PRD-v2's first fp family landed (2026-09-18), then
     # 1048 / 631 / 800, then 1112 / 668 / 699 at bead 9ve.36. Bead 9ve.24's
     # vendoring ADDS 401 symbols rather than moving any: 10 land as wrappers
@@ -127,13 +127,15 @@ def the_partition_is_1262_wrappers_676_inv_810_fp_and_132_deferred():
     # aborts (the class-1 `bswap`/`bitreverse` rows), leaving 132. Out of
     # `fp`: 30 f64 wrappers (M38's eleven opcodes) and `fneg_f64_inv`,
     # leaving 810.
+    # BEAD s8g MOVES 6: `bitcast` f64 <-> i64's four fwd/unc rows to `wrapper`
+    # and its two `_inv` rows to `inv`, leaving 804.
     got = {k: len(v) for k, v in buckets(SHIPPED).items()}
-    sc.check(got == {"wrapper": 1262, "inv": 676, "fp": 810, "defer": 132},
+    sc.check(got == {"wrapper": 1266, "inv": 678, "fp": 804, "defer": 132},
              "PRD §1 + §15 D14 + PRD-v2 §1 + §6.1 partition: expected "
-             "1262/676/810/132, got %r" % got)
+             "1266/678/804/132, got %r" % got)
 
 
-def the_domain_split_is_1102_610_120_160_66_and_12():
+def the_domain_split_is_1102_610_120_164_68_and_12():
     # A COUNT IS NOT AN IDENTIFICATION, AND THE THREE COARSE BUCKETS NOW HIDE A
     # DOMAIN MOVE. Once a family-width lands, `wrapper` holds integer AND fp
     # wrappers, so 1048/631/800 stays exact while, say, `fp_arith`/`f64` goes
@@ -149,7 +151,7 @@ def the_domain_split_is_1102_610_120_160_66_and_12():
     sc.check([len(BY_DOMAIN[k]) for k in
               ("int_wrapper", "int_inv", "int_defer",
                "fp_wrapper", "fp_inv", "fp_defer")]
-             == [1102, 610, 120, 160, 66, 12],
+             == [1102, 610, 120, 164, 68, 12],
              "the domain split moved: %r"
              % {k: len(v) for k, v in BY_DOMAIN.items()})
 
@@ -178,8 +180,9 @@ def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
     got = buckets(SHIPPED)["fp"]
     sc.diff_sets(got, EXPECT["fp"], "fp abort set")
     crossdomain = {n for n in got if any("_i%d" % b in n for b in (1, 8, 16, 32, 64, 80, 128))}
-    sc.check(len(crossdomain) == 189,
-             "expected 189 integer-ish fp symbols, got %d" % len(crossdomain))
+    # 183 SINCE bead s8g: the six f64 <-> i64 bitcast symbols carry `_i64`.
+    sc.check(len(crossdomain) == 183,
+             "expected 183 integer-ish fp symbols, got %d" % len(crossdomain))
     # AND THE STILL-DEFERRED fp WIDTHS ARE STILL THERE IN FULL. `fcmp` ships at
     # f64 ALONE (PRD-v2 §1a), so its other three widths must remain aborts —
     # 14 preds x 6 variants x 3 widths. A "LANDED = the whole family" slip is
@@ -210,12 +213,13 @@ def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
     # `opcode_table.yaml`'s integer cast, which is `trunc_i64_to_i32` and
     # carries no `_f64` token at all. `fma`, `sqrt` and those eleven are ABSENT
     # from this census, which is the assertion that they LANDED.
+    # `bitcast` LEFT THIS CENSUS AT bead s8g (its f64 <-> i64 pair landed).
     sc.check(by_op == {"frem": 15, "uitofp": 3,
-                       "fpext": 9, "fptrunc": 9, "bitcast": 6},
+                       "fpext": 9, "fptrunc": 9},
              "the f64 symbols still aborting are not the expected census: %r"
              % by_op)
     landed = ("fma", "sqrt", "fneg", "fabs", "copysign", "fmin", "fmax",
-              "floor", "ceil", "trunc", "round", "rint", "nearbyint")
+              "floor", "ceil", "trunc", "round", "rint", "nearbyint", "bitcast")
     sc.check(not [op for op in landed if op in by_op],
              "an f64 symbol of a LANDED opcode is still in the `fp is v2` "
              "bucket: %s" % [op for op in landed if op in by_op])
@@ -427,8 +431,8 @@ CASES = [
     the_manifest_is_the_expansion_of_the_pinned_yaml,
     the_emitted_symbol_set_equals_the_abi_in_both_directions,
     every_emitted_signature_matches_cq_langs_own_declaration,
-    the_partition_is_1262_wrappers_676_inv_810_fp_and_132_deferred,
-    the_domain_split_is_1102_610_120_160_66_and_12,
+    the_partition_is_1266_wrappers_678_inv_804_fp_and_132_deferred,
+    the_domain_split_is_1102_610_120_164_68_and_12,
     the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family,
     the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family,
     the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed,

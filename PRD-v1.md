@@ -3068,6 +3068,8 @@ and diffs — `make shim-check` / `cmake --build <dir> --target shim-check`, i.e
 > WERE otherwise integer-clean and ran to `tape is v2` and stopped — which is what collapsed
 > that deferral.
 >
+> **Amended 2026-09-24 (bead `s8g`, v2 Wave 13):** the `f64↔i64` pair of this example is now LIVE — PRD-v2 §3.5 put it in `f64` scope and it lands through the integer cast door as an identity copy (its `_inv` pair is a D14 abort); the `f16`/`f32`/`f80` pairs keep their abort. The 2026-09-14 measurement above stands as recorded.
+>
 > **AND THE TEMPTING GROUND IS MEASURABLY FALSE, WHICH IS WHY IT IS RECORDED RATHER THAN LEFT
 > IMPLICIT.** *"Defer them because CQ_lang does not emit them"* is the D14-shaped argument and
 > it does **not** transfer: the bitcasts are among the most heavily emitted symbols in the grid.

@@ -268,7 +268,10 @@ static void a_predicate_outside_the_abis_enum_is_refused(void)
 static void a_cast_kind_outside_the_abis_enum_is_refused(void)
 {
     (void)open_shim();
-    CQ_EXPECT_ABORT((void)cq_shim_cast((cq_shim_cast_kind)(CQ_SHIM_CAST_TRUNC + 1),
+    /* Re-aimed at the NEW last enumerator (bead s8g): `TRUNC + 1` is now
+     * `BITCAST`, a LEGAL kind, and at (8, 32) it would abort on bitcast's own
+     * width rule — satisfying this case for the wrong reason. */
+    CQ_EXPECT_ABORT((void)cq_shim_cast((cq_shim_cast_kind)(CQ_SHIM_CAST_BITCAST + 1),
                                        8, 32, cqrt_alloc_i8(0)));
 }
 

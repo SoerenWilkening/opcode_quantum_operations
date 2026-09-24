@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7059
+**Indexed definitions:** 7107
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -310,13 +310,13 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `cq_dispu_die` | [41](shim/cq_template_dispatch_unary.c:41) |
 | `cq_tpl_cast_kernel` | [49](shim/cq_template_dispatch_unary.c:49) |
-| `cq_tpl_fcast_kernel` | [70](shim/cq_template_dispatch_unary.c:70) |
-| `cq_tpl_fun_kernel` | [132](shim/cq_template_dispatch_unary.c:132) |
-| `cq_tpl_iun_kernel` | [156](shim/cq_template_dispatch_unary.c:156) |
-| `cq_tpl_cast_name` | [177](shim/cq_template_dispatch_unary.c:177) |
-| `cq_tpl_fcast_name` | [189](shim/cq_template_dispatch_unary.c:189) |
-| `cq_tpl_fun_name` | [201](shim/cq_template_dispatch_unary.c:201) |
-| `cq_tpl_iun_name` | [216](shim/cq_template_dispatch_unary.c:216) |
+| `cq_tpl_fcast_kernel` | [74](shim/cq_template_dispatch_unary.c:74) |
+| `cq_tpl_fun_kernel` | [136](shim/cq_template_dispatch_unary.c:136) |
+| `cq_tpl_iun_kernel` | [160](shim/cq_template_dispatch_unary.c:160) |
+| `cq_tpl_cast_name` | [181](shim/cq_template_dispatch_unary.c:181) |
+| `cq_tpl_fcast_name` | [193](shim/cq_template_dispatch_unary.c:193) |
+| `cq_tpl_fun_name` | [205](shim/cq_template_dispatch_unary.c:205) |
+| `cq_tpl_iun_name` | [220](shim/cq_template_dispatch_unary.c:220) |
 
 ## `shim/cq_template_fp.c`
 
@@ -409,24 +409,24 @@ the definition (or the build-language declaration) in the listed file.
 | `urec` | [87](shim/cq_template_unary.c:87) |
 | `ustage` | [105](shim/cq_template_unary.c:105) |
 | `cq_tpl_unary` | [112](shim/cq_template_unary.c:112) |
-| `cast_req` | [193](shim/cq_template_unary.c:193) |
-| `cq_shim_cast` | [209](shim/cq_template_unary.c:209) |
-| `cq_shim_cast_unc` | [215](shim/cq_template_unary.c:215) |
-| `iun_req` | [249](shim/cq_template_unary.c:249) |
-| `cq_shim_iun` | [272](shim/cq_template_unary.c:272) |
-| `cq_shim_iun_unc` | [277](shim/cq_template_unary.c:277) |
+| `cast_req` | [203](shim/cq_template_unary.c:203) |
+| `cq_shim_cast` | [222](shim/cq_template_unary.c:222) |
+| `cq_shim_cast_unc` | [228](shim/cq_template_unary.c:228) |
+| `iun_req` | [262](shim/cq_template_unary.c:262) |
+| `cq_shim_iun` | [285](shim/cq_template_unary.c:285) |
+| `cq_shim_iun_unc` | [290](shim/cq_template_unary.c:290) |
 
 ## `shim/gen_bodies.py`
 
 | Function | Line |
 |---|---:|
 | `entry_family` | [79](shim/gen_bodies.py:79) |
-| `entry_key` | [93](shim/gen_bodies.py:93) |
-| `literal` | [226](shim/gen_bodies.py:226) |
-| `call_args` | [240](shim/gen_bodies.py:240) |
-| `wrapper` | [272](shim/gen_bodies.py:272) |
-| `abort` | [284](shim/gen_bodies.py:284) |
-| `body` | [295](shim/gen_bodies.py:295) |
+| `entry_key` | [94](shim/gen_bodies.py:94) |
+| `literal` | [231](shim/gen_bodies.py:231) |
+| `call_args` | [245](shim/gen_bodies.py:245) |
+| `wrapper` | [277](shim/gen_bodies.py:277) |
+| `abort` | [289](shim/gen_bodies.py:289) |
+| `body` | [300](shim/gen_bodies.py:300) |
 
 ## `shim/gen_intrinsics.py`
 
@@ -451,17 +451,17 @@ the definition (or the build-language declaration) in the listed file.
 | `variant_axes` | [123](shim/gen_shim.py:123) |
 | `suffix` | [134](shim/gen_shim.py:134) |
 | `signature` | [157](shim/gen_shim.py:157) |
-| `landed_key` | [301](shim/gen_shim.py:301) |
-| `bucket_of` | [313](shim/gen_shim.py:313) |
-| `_emitter` | [339](shim/gen_shim.py:339) |
-| `emit` | [340](shim/gen_shim.py:340) |
-| `expand` | [367](shim/gen_shim.py:367) |
-| `_is_fp` | [408](shim/gen_shim.py:408) |
-| `audit` | [412](shim/gen_shim.py:412) |
-| `render` | [459](shim/gen_shim.py:459) |
-| `files` | [479](shim/gen_shim.py:479) |
-| `load` | [485](shim/gen_shim.py:485) |
-| `main` | [490](shim/gen_shim.py:490) |
+| `landed_key` | [307](shim/gen_shim.py:307) |
+| `bucket_of` | [319](shim/gen_shim.py:319) |
+| `_emitter` | [345](shim/gen_shim.py:345) |
+| `emit` | [346](shim/gen_shim.py:346) |
+| `expand` | [373](shim/gen_shim.py:373) |
+| `_is_fp` | [416](shim/gen_shim.py:416) |
+| `audit` | [420](shim/gen_shim.py:420) |
+| `render` | [467](shim/gen_shim.py:467) |
+| `files` | [487](shim/gen_shim.py:487) |
+| `load` | [493](shim/gen_shim.py:493) |
+| `main` | [498](shim/gen_shim.py:498) |
 
 ## `shim/generated/cq_template_fp_arith.gen.c`
 
@@ -3390,23 +3390,23 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_template_bitcast_f32_to_i32_inv` | [58](shim/generated/cq_template_reinterpret.gen.c:58) |
 | `cq_template_bitcast_f32_to_i32_unc` | [63](shim/generated/cq_template_reinterpret.gen.c:63) |
 | `cq_template_bitcast_f64_to_i64` | [69](shim/generated/cq_template_reinterpret.gen.c:69) |
-| `cq_template_bitcast_f64_to_i64_inv` | [74](shim/generated/cq_template_reinterpret.gen.c:74) |
-| `cq_template_bitcast_f64_to_i64_unc` | [79](shim/generated/cq_template_reinterpret.gen.c:79) |
-| `cq_template_bitcast_f80_to_i80` | [85](shim/generated/cq_template_reinterpret.gen.c:85) |
-| `cq_template_bitcast_f80_to_i80_inv` | [90](shim/generated/cq_template_reinterpret.gen.c:90) |
-| `cq_template_bitcast_f80_to_i80_unc` | [95](shim/generated/cq_template_reinterpret.gen.c:95) |
-| `cq_template_bitcast_i16_to_f16` | [101](shim/generated/cq_template_reinterpret.gen.c:101) |
-| `cq_template_bitcast_i16_to_f16_inv` | [106](shim/generated/cq_template_reinterpret.gen.c:106) |
-| `cq_template_bitcast_i16_to_f16_unc` | [111](shim/generated/cq_template_reinterpret.gen.c:111) |
-| `cq_template_bitcast_i32_to_f32` | [117](shim/generated/cq_template_reinterpret.gen.c:117) |
-| `cq_template_bitcast_i32_to_f32_inv` | [122](shim/generated/cq_template_reinterpret.gen.c:122) |
-| `cq_template_bitcast_i32_to_f32_unc` | [127](shim/generated/cq_template_reinterpret.gen.c:127) |
-| `cq_template_bitcast_i64_to_f64` | [133](shim/generated/cq_template_reinterpret.gen.c:133) |
-| `cq_template_bitcast_i64_to_f64_inv` | [138](shim/generated/cq_template_reinterpret.gen.c:138) |
-| `cq_template_bitcast_i64_to_f64_unc` | [143](shim/generated/cq_template_reinterpret.gen.c:143) |
-| `cq_template_bitcast_i80_to_f80` | [149](shim/generated/cq_template_reinterpret.gen.c:149) |
-| `cq_template_bitcast_i80_to_f80_inv` | [154](shim/generated/cq_template_reinterpret.gen.c:154) |
-| `cq_template_bitcast_i80_to_f80_unc` | [159](shim/generated/cq_template_reinterpret.gen.c:159) |
+| `cq_template_bitcast_f64_to_i64_inv` | [73](shim/generated/cq_template_reinterpret.gen.c:73) |
+| `cq_template_bitcast_f64_to_i64_unc` | [78](shim/generated/cq_template_reinterpret.gen.c:78) |
+| `cq_template_bitcast_f80_to_i80` | [82](shim/generated/cq_template_reinterpret.gen.c:82) |
+| `cq_template_bitcast_f80_to_i80_inv` | [87](shim/generated/cq_template_reinterpret.gen.c:87) |
+| `cq_template_bitcast_f80_to_i80_unc` | [92](shim/generated/cq_template_reinterpret.gen.c:92) |
+| `cq_template_bitcast_i16_to_f16` | [98](shim/generated/cq_template_reinterpret.gen.c:98) |
+| `cq_template_bitcast_i16_to_f16_inv` | [103](shim/generated/cq_template_reinterpret.gen.c:103) |
+| `cq_template_bitcast_i16_to_f16_unc` | [108](shim/generated/cq_template_reinterpret.gen.c:108) |
+| `cq_template_bitcast_i32_to_f32` | [114](shim/generated/cq_template_reinterpret.gen.c:114) |
+| `cq_template_bitcast_i32_to_f32_inv` | [119](shim/generated/cq_template_reinterpret.gen.c:119) |
+| `cq_template_bitcast_i32_to_f32_unc` | [124](shim/generated/cq_template_reinterpret.gen.c:124) |
+| `cq_template_bitcast_i64_to_f64` | [130](shim/generated/cq_template_reinterpret.gen.c:130) |
+| `cq_template_bitcast_i64_to_f64_inv` | [134](shim/generated/cq_template_reinterpret.gen.c:134) |
+| `cq_template_bitcast_i64_to_f64_unc` | [139](shim/generated/cq_template_reinterpret.gen.c:139) |
+| `cq_template_bitcast_i80_to_f80` | [143](shim/generated/cq_template_reinterpret.gen.c:143) |
+| `cq_template_bitcast_i80_to_f80_inv` | [148](shim/generated/cq_template_reinterpret.gen.c:148) |
+| `cq_template_bitcast_i80_to_f80_unc` | [153](shim/generated/cq_template_reinterpret.gen.c:153) |
 
 ## `src/angle.c`
 
@@ -3540,10 +3540,10 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `check_widths` | [21](src/kernels/cast.c:21) |
-| `cq_kernel_zext` | [35](src/kernels/cast.c:35) |
-| `cq_kernel_sext` | [47](src/kernels/cast.c:47) |
-| `cq_kernel_trunc` | [58](src/kernels/cast.c:58) |
+| `check_widths` | [25](src/kernels/cast.c:25) |
+| `cq_kernel_zext` | [39](src/kernels/cast.c:39) |
+| `cq_kernel_sext` | [51](src/kernels/cast.c:51) |
+| `cq_kernel_trunc` | [62](src/kernels/cast.c:62) |
 
 ## `src/kernels/cmp.c`
 
@@ -4800,8 +4800,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _ibits_pin` | [3914](tests/CMakeLists.txt:3914) |
-| `function _cqops_fround_death_ban` | [4135](tests/CMakeLists.txt:4135) |
+| `function _ibits_pin` | [3918](tests/CMakeLists.txt:3918) |
+| `function _cqops_fround_death_ban` | [4139](tests/CMakeLists.txt:4139) |
 
 ## `tests/package-consumer/main.c`
 
@@ -5107,23 +5107,23 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `check` | [95](tests/support/shimcheck.py:95) |
-| `diff_sets` | [100](tests/support/shimcheck.py:100) |
-| `manifest_yaml_sha` | [109](tests/support/shimcheck.py:109) |
-| `manifest_decls` | [117](tests/support/shimcheck.py:117) |
-| `is_fp` | [159](tests/support/shimcheck.py:159) |
-| `is_landed` | [163](tests/support/shimcheck.py:163) |
-| `is_declined` | [170](tests/support/shimcheck.py:170) |
-| `is_deferred_fp` | [177](tests/support/shimcheck.py:177) |
-| `generate` | [181](tests/support/shimcheck.py:181) |
-| `parse_definitions` | [191](tests/support/shimcheck.py:191) |
-| `read_dir` | [212](tests/support/shimcheck.py:212) |
-| `defer_reason_of` | [259](tests/support/shimcheck.py:259) |
-| `bucket_of_body` | [269](tests/support/shimcheck.py:269) |
-| `is_defer` | [294](tests/support/shimcheck.py:294) |
-| `run` | [298](tests/support/shimcheck.py:298) |
-| `abi_header` | [328](tests/support/shimcheck.py:328) |
-| `compile_gen` | [339](tests/support/shimcheck.py:339) |
+| `check` | [98](tests/support/shimcheck.py:98) |
+| `diff_sets` | [103](tests/support/shimcheck.py:103) |
+| `manifest_yaml_sha` | [112](tests/support/shimcheck.py:112) |
+| `manifest_decls` | [120](tests/support/shimcheck.py:120) |
+| `is_fp` | [162](tests/support/shimcheck.py:162) |
+| `is_landed` | [166](tests/support/shimcheck.py:166) |
+| `is_declined` | [173](tests/support/shimcheck.py:173) |
+| `is_deferred_fp` | [180](tests/support/shimcheck.py:180) |
+| `generate` | [184](tests/support/shimcheck.py:184) |
+| `parse_definitions` | [194](tests/support/shimcheck.py:194) |
+| `read_dir` | [215](tests/support/shimcheck.py:215) |
+| `defer_reason_of` | [262](tests/support/shimcheck.py:262) |
+| `bucket_of_body` | [272](tests/support/shimcheck.py:272) |
+| `is_defer` | [297](tests/support/shimcheck.py:297) |
+| `run` | [301](tests/support/shimcheck.py:301) |
+| `abi_header` | [331](tests/support/shimcheck.py:331) |
+| `compile_gen` | [342](tests/support/shimcheck.py:342) |
 
 ## `tests/test_angle.c`
 
@@ -5362,19 +5362,19 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `selector_opcode` | [108](tests/test_gen_bodies.py:108) |
-| `wrappers` | [121](tests/test_gen_bodies.py:121) |
-| `aborts` | [125](tests/test_gen_bodies.py:125) |
-| `one_call` | [129](tests/test_gen_bodies.py:129) |
-| `expected_args` | [140](tests/test_gen_bodies.py:140) |
-| `no_wrapper_is_inert` | [220](tests/test_gen_bodies.py:220) |
-| `the_wrapper_calls_cover_every_dispatched_opcode` | [233](tests/test_gen_bodies.py:233) |
-| `the_wrapper_shape_split_is_519_forward_519_unc_224_controlled` | [255](tests/test_gen_bodies.py:255) |
-| `every_wrapper_body_is_exactly_the_call_its_symbol_names` | [280](tests/test_gen_bodies.py:280) |
-| `the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type` | [293](tests/test_gen_bodies.py:293) |
-| `every_abort_body_names_its_own_symbol_and_silences_its_parameters` | [350](tests/test_gen_bodies.py:350) |
-| `the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket` | [362](tests/test_gen_bodies.py:362) |
-| `the_new_fp_shapes_are_pinned_body_by_body` | [448](tests/test_gen_bodies.py:448) |
+| `selector_opcode` | [110](tests/test_gen_bodies.py:110) |
+| `wrappers` | [123](tests/test_gen_bodies.py:123) |
+| `aborts` | [127](tests/test_gen_bodies.py:127) |
+| `one_call` | [131](tests/test_gen_bodies.py:131) |
+| `expected_args` | [142](tests/test_gen_bodies.py:142) |
+| `no_wrapper_is_inert` | [222](tests/test_gen_bodies.py:222) |
+| `the_wrapper_calls_cover_every_dispatched_opcode` | [236](tests/test_gen_bodies.py:236) |
+| `the_wrapper_shape_split_is_521_forward_521_unc_224_controlled` | [258](tests/test_gen_bodies.py:258) |
+| `every_wrapper_body_is_exactly_the_call_its_symbol_names` | [285](tests/test_gen_bodies.py:285) |
+| `the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type` | [298](tests/test_gen_bodies.py:298) |
+| `every_abort_body_names_its_own_symbol_and_silences_its_parameters` | [355](tests/test_gen_bodies.py:355) |
+| `the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket` | [367](tests/test_gen_bodies.py:367) |
+| `the_new_fp_shapes_are_pinned_body_by_body` | [454](tests/test_gen_bodies.py:454) |
 
 ## `tests/test_gen_bodies_provoked.py`
 
@@ -5404,17 +5404,17 @@ the definition (or the build-language declaration) in the listed file.
 | `the_manifest_is_the_expansion_of_the_pinned_yaml` | [81](tests/test_gen_shim.py:81) |
 | `the_emitted_symbol_set_equals_the_abi_in_both_directions` | [106](tests/test_gen_shim.py:106) |
 | `every_emitted_signature_matches_cq_langs_own_declaration` | [110](tests/test_gen_shim.py:110) |
-| `the_partition_is_1262_wrappers_676_inv_810_fp_and_132_deferred` | [119](tests/test_gen_shim.py:119) |
-| `the_domain_split_is_1102_610_120_160_66_and_12` | [136](tests/test_gen_shim.py:136) |
-| `the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family` | [157](tests/test_gen_shim.py:157) |
-| `the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family` | [166](tests/test_gen_shim.py:166) |
-| `the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed` | [171](tests/test_gen_shim.py:171) |
-| `the_three_declined_symbols_are_in_the_fp_bucket_with_their_own_reason` | [224](tests/test_gen_shim.py:224) |
-| `no_cqrt_rotation_symbol_appears_anywhere_in_the_emitted_shim` | [253](tests/test_gen_shim.py:253) |
-| `scan` | [269](tests/test_gen_shim.py:269) |
-| `the_shim_enums_match_the_opcodes_the_grid_reaches` | [283](tests/test_gen_shim.py:283) |
-| `every_family_gets_its_own_file_and_only_its_own_symbols` | [359](tests/test_gen_shim.py:359) |
-| `the_generated_files_on_disk_are_up_to_date` | [400](tests/test_gen_shim.py:400) |
+| `the_partition_is_1266_wrappers_678_inv_804_fp_and_132_deferred` | [119](tests/test_gen_shim.py:119) |
+| `the_domain_split_is_1102_610_120_164_68_and_12` | [138](tests/test_gen_shim.py:138) |
+| `the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family` | [159](tests/test_gen_shim.py:159) |
+| `the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family` | [168](tests/test_gen_shim.py:168) |
+| `the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed` | [173](tests/test_gen_shim.py:173) |
+| `the_three_declined_symbols_are_in_the_fp_bucket_with_their_own_reason` | [228](tests/test_gen_shim.py:228) |
+| `no_cqrt_rotation_symbol_appears_anywhere_in_the_emitted_shim` | [257](tests/test_gen_shim.py:257) |
+| `scan` | [273](tests/test_gen_shim.py:273) |
+| `the_shim_enums_match_the_opcodes_the_grid_reaches` | [287](tests/test_gen_shim.py:287) |
+| `every_family_gets_its_own_file_and_only_its_own_symbols` | [363](tests/test_gen_shim.py:363) |
+| `the_generated_files_on_disk_are_up_to_date` | [404](tests/test_gen_shim.py:404) |
 
 ## `tests/test_gen_shim_provoked.py`
 
@@ -6662,12 +6662,15 @@ the definition (or the build-language declaration) in the listed file.
 | `fm_ref_row_steps` | [62](tests/test_kernel_fmul_slots.inc:62) |
 | `fm_ref_row_region` | [85](tests/test_kernel_fmul_slots.inc:85) |
 | `fm_count` | [123](tests/test_kernel_fmul_slots.inc:123) |
-| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [149](tests/test_kernel_fmul_slots.inc:149) |
-| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [262](tests/test_kernel_fmul_slots.inc:262) |
-| `fm_slots` | [319](tests/test_kernel_fmul_slots.inc:319) |
-| `fm_region` | [339](tests/test_kernel_fmul_slots.inc:339) |
-| `return` | [341](tests/test_kernel_fmul_slots.inc:341) |
-| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [358](tests/test_kernel_fmul_slots.inc:358) |
+| `fm_width_or_refuse` | [160](tests/test_kernel_fmul_slots.inc:160) |
+| `fm_bool_operand_faults` | [174](tests/test_kernel_fmul_slots.inc:174) |
+| `the_bool_operand_scan_reports_rather_than_aborts (via CQ_TEST)` | [213](tests/test_kernel_fmul_slots.inc:213) |
+| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [230](tests/test_kernel_fmul_slots.inc:230) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [341](tests/test_kernel_fmul_slots.inc:341) |
+| `fm_slots` | [398](tests/test_kernel_fmul_slots.inc:398) |
+| `fm_region` | [418](tests/test_kernel_fmul_slots.inc:418) |
+| `return` | [420](tests/test_kernel_fmul_slots.inc:420) |
+| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [437](tests/test_kernel_fmul_slots.inc:437) |
 
 ## `tests/test_kernel_fmul_spans.inc`
 
@@ -7099,11 +7102,14 @@ the definition (or the build-language declaration) in the listed file.
 | `fq_loop_slots` | [94](tests/test_kernel_fsqrt_slots.inc:94) |
 | `fq_loop_region` | [106](tests/test_kernel_fsqrt_slots.inc:106) |
 | `fq_count` | [130](tests/test_kernel_fsqrt_slots.inc:130) |
-| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [152](tests/test_kernel_fsqrt_slots.inc:152) |
-| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [262](tests/test_kernel_fsqrt_slots.inc:262) |
-| `fq_slots` | [299](tests/test_kernel_fsqrt_slots.inc:299) |
-| `fq_region` | [314](tests/test_kernel_fsqrt_slots.inc:314) |
-| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [329](tests/test_kernel_fsqrt_slots.inc:329) |
+| `fq_width_or_refuse` | [163](tests/test_kernel_fsqrt_slots.inc:163) |
+| `fq_bool_operand_faults` | [176](tests/test_kernel_fsqrt_slots.inc:176) |
+| `the_bool_operand_scan_reports_rather_than_aborts (via CQ_TEST)` | [216](tests/test_kernel_fsqrt_slots.inc:216) |
+| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [233](tests/test_kernel_fsqrt_slots.inc:233) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [343](tests/test_kernel_fsqrt_slots.inc:343) |
+| `fq_slots` | [380](tests/test_kernel_fsqrt_slots.inc:380) |
+| `fq_region` | [395](tests/test_kernel_fsqrt_slots.inc:395) |
+| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [410](tests/test_kernel_fsqrt_slots.inc:410) |
 
 ## `tests/test_kernel_fsqrt_spans.inc`
 
@@ -8667,6 +8673,68 @@ the definition (or the build-language declaration) in the listed file.
 | `the_controlled_literal_doors_reach_the_region_with_the_right_lane (via CQ_TEST)` | [396](tests/test_template.c:396) |
 | `a_measured_rail_is_a_legal_template_source (via CQ_TEST)` | [466](tests/test_template.c:466) |
 
+## `tests/test_template_bitcast.c`
+
+| Function | Line |
+|---|---:|
+| `fresh` | [63](tests/test_template_bitcast.c:63) |
+| `open_with` | [70](tests/test_template_bitcast.c:70) |
+| `close_with` | [79](tests/test_template_bitcast.c:79) |
+| `f64_of` | [88](tests/test_template_bitcast.c:88) |
+| `i64_of` | [89](tests/test_template_bitcast.c:89) |
+| `ref_f2i` | [90](tests/test_template_bitcast.c:90) |
+| `ref_i2f` | [92](tests/test_template_bitcast.c:92) |
+| `int32_t` | [100](tests/test_template_bitcast.c:100) |
+| `void` | [101](tests/test_template_bitcast.c:101) |
+| `int32_t` | [102](tests/test_template_bitcast.c:102) |
+| `uint64_t` | [103](tests/test_template_bitcast.c:103) |
+| `src_f64` | [106](tests/test_template_bitcast.c:106) |
+| `src_i64` | [107](tests/test_template_bitcast.c:107) |
+| `row_f2i` | [108](tests/test_template_bitcast.c:108) |
+| `row_i2f` | [109](tests/test_template_bitcast.c:109) |
+| `the_memcpy_reference_is_bit_exact_on_nans_and_signed_zero (via CQ_TEST)` | [136](tests/test_template_bitcast.c:136) |
+| `every_bitcast_wrapper_is_a_bit_exact_copy_on_classical_rails (via CQ_TEST)` | [147](tests/test_template_bitcast.c:147) |
+| `bc_stream_is_the_lane_copy` | [180](tests/test_template_bitcast.c:180) |
+
+## `tests/test_template_bitcast_cert.inc`
+
+| Function | Line |
+|---|---:|
+| `bc_one_write` | [19](tests/test_template_bitcast_cert.inc:19) |
+| `a_bitcast_records_one_write_naming_a_under_its_cast_tag (via CQ_TEST)` | [46](tests/test_template_bitcast_cert.inc:46) |
+| `int32_t` | [78](tests/test_template_bitcast_cert.inc:78) |
+| `void` | [79](tests/test_template_bitcast_cert.inc:79) |
+| `bc_poisoned` | [78](tests/test_template_bitcast_cert.inc:78) |
+| `bc_poison_f64` | [102](tests/test_template_bitcast_cert.inc:102) |
+| `bc_poison_i64` | [110](tests/test_template_bitcast_cert.inc:110) |
+| `a_bitcast_unc_on_a_poisoned_source_is_discharged_by_the_certificate (via CQ_TEST)` | [118](tests/test_template_bitcast_cert.inc:118) |
+| `the_two_directions_pair_because_they_are_one_function (via CQ_TEST)` | [141](tests/test_template_bitcast_cert.inc:141) |
+| `a_bitcast_forward_does_not_pair_with_an_fneg_unc (via CQ_TEST)` | [159](tests/test_template_bitcast_cert.inc:159) |
+| `int32_t` | [174](tests/test_template_bitcast_cert.inc:174) |
+| `call_inv` | [176](tests/test_template_bitcast_cert.inc:176) |
+| `both_bitcast_inv_symbols_abort_naming_themselves_and_d14s_reason (via CQ_TEST)` | [181](tests/test_template_bitcast_cert.inc:181) |
+
+## `tests/test_template_bitcast_death.c`
+
+| Function | Line |
+|---|---:|
+| `open_shim` | [33](tests/test_template_bitcast_death.c:33) |
+| `a_bitcast_that_widens_is_refused_at_the_door` | [42](tests/test_template_bitcast_death.c:42) |
+| `a_bitcast_that_narrows_is_refused_at_the_door` | [53](tests/test_template_bitcast_death.c:53) |
+| `a_bitcast_unc_whose_widths_differ_is_refused_at_the_door` | [64](tests/test_template_bitcast_death.c:64) |
+
+## `tests/test_template_bitcast_wires.inc`
+
+| Function | Line |
+|---|---:|
+| `bc_seed` | [11](tests/test_template_bitcast_wires.inc:11) |
+| `bc_next` | [19](tests/test_template_bitcast_wires.inc:19) |
+| `bc_popcount` | [28](tests/test_template_bitcast_wires.inc:28) |
+| `bc_wire_case` | [40](tests/test_template_bitcast_wires.inc:40) |
+| `every_bitcast_wrapper_is_a_lane_copy_at_every_mask_drawn (via CQ_TEST)` | [75](tests/test_template_bitcast_wires.inc:75) |
+| `the_all_quantum_tuple_is_0_64_0_forward_and_unc_in_both_directions (via CQ_TEST)` | [105](tests/test_template_bitcast_wires.inc:105) |
+| `a_bitcast_round_trip_on_wires_is_the_value_l2_and_the_pool (via CQ_TEST)` | [130](tests/test_template_bitcast_wires.inc:130) |
+
 ## `tests/test_template_d7.inc`
 
 | Function | Line |
@@ -8704,9 +8772,9 @@ the definition (or the build-language declaration) in the listed file.
 | `an_opcode_outside_the_abis_enum_is_refused` | [251](tests/test_template_death.c:251) |
 | `a_predicate_outside_the_abis_enum_is_refused` | [261](tests/test_template_death.c:261) |
 | `a_cast_kind_outside_the_abis_enum_is_refused` | [268](tests/test_template_death.c:268) |
-| `a_width_outside_the_abis_range_is_refused` | [279](tests/test_template_death.c:279) |
-| `a_cast_to_a_width_above_the_abis_range_is_refused` | [286](tests/test_template_death.c:286) |
-| `a_pool_ceiling_refusal_is_not_swallowed_at_the_opcode_surface` | [314](tests/test_template_death.c:314) |
+| `a_width_outside_the_abis_range_is_refused` | [282](tests/test_template_death.c:282) |
+| `a_cast_to_a_width_above_the_abis_range_is_refused` | [289](tests/test_template_death.c:289) |
+| `a_pool_ceiling_refusal_is_not_swallowed_at_the_opcode_surface` | [317](tests/test_template_death.c:317) |
 
 ## `tests/test_template_fbin.inc`
 

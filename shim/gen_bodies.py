@@ -80,6 +80,7 @@ def entry_family(row):
     if row.kind == "compare":
         return row.opcode                       # icmp | fcmp
     if row.kind == "cast":
+        # `reinterpret` (bitcast, bead s8g) takes the INTEGER door on purpose.
         return "fcast" if row.family in ("int_to_fp", "fp_to_int") else "cast"
     if row.kind == "cross_unary":
         return "libm"                           # never LANDED; no entry point
@@ -179,7 +180,11 @@ SELECTOR = {
     # `copysign` is NOT commutative and is the one that reaches its `_lh`.
     "fbinary": {op: "CQ_SHIM_FOP_%s" % op.upper() for op in (
         "fadd", "fsub", "fmul", "fdiv", "fmin", "fmax", "copysign")},
-    "cast": {k: "CQ_SHIM_CAST_%s" % k.upper() for k in ("sext", "zext", "trunc")},
+    # `bitcast` (bead s8g) is the `reinterpret` family, which `entry_family`
+    # sends here rather than to `fcast`: a same-width identity relabel, not a
+    # value conversion. Only its LANDED f64 <-> i64 rows ever reach this row.
+    "cast": {k: "CQ_SHIM_CAST_%s" % k.upper()
+             for k in ("sext", "zext", "trunc", "bitcast")},
     "fcast": {k: "CQ_SHIM_FCAST_%s" % k.upper() for k in (
         "fptosi", "fptoui", "sitofp", "uitofp")},
     # --- intrinsic_table.yaml (PRD-v2 §6.1, bead 9ve.24). `fternary` is ONE

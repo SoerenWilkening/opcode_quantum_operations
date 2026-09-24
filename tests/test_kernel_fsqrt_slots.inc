@@ -149,6 +149,87 @@ static void fq_count(const cq_fsqrt_row *rows, int n, fq_census *c)
         }
 }
 
+/* ---- The Bool-operand scan, which must REPORT and never abort. ----------
+ *
+ * `cq_fsqrt_row_width` is a LIBRARY guard: it dies on an index outside the
+ * program, on a projection of a row that is not earlier, and on a projection
+ * of a row that returns no tuple. So a test that hands it a mux whose
+ * condition is a constant code (`CQ_FS_K_ZERO`, negative) reports nothing and
+ * ABORTS the binary before the first TAP result — every later case unrun
+ * (bd 9ve.46; fma's identical finding is 9ve.41). `fq_width_or_refuse`
+ * pre-screens exactly the inputs that function dies on and answers -1 for
+ * them; `fq_bool_operand_faults` counts and, when asked, names each fault as
+ * a test FAILURE. */
+static int fq_width_or_refuse(const cq_fsqrt_row *rows, int n, int i, int s)
+{
+    if (s < 0 || s >= i || s >= n) return -1;
+    if (rows[s].op == CQ_FSOP_OUT) {
+        int p = rows[s].s0;
+
+        if (p < 0 || p >= s) return -1;
+        if (rows[p].op != CQ_FSOP_NORM52 && rows[p].op != CQ_FSOP_ROUND)
+            return -1;
+    }
+    return cq_fsqrt_row_width(rows, n, s);
+}
+
+static int fq_bool_operand_faults(const cq_fsqrt_row *rows, int n, int report)
+{
+    int faults = 0;
+
+    for (int i = 0; i < n; i++) {
+        int op = rows[i].op, slots;
+        short s[2];
+
+        if (op == CQ_FSOP_MUX || op == CQ_FSOP_NOT1) slots = 1;
+        else if (op == CQ_FSOP_AND1) slots = 2;
+        else continue;
+        s[0] = rows[i].s0; s[1] = rows[i].s1;
+        for (int j = 0; j < slots; j++) {
+            int w = fq_width_or_refuse(rows, n, i, s[j]);
+
+            if (w == 1) continue;
+            faults++;
+            if (!report) continue;
+            if (s[j] < 0)
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d is operand code %d, a "
+                          "constant or a rail, not a Bool row", i, op, j,
+                          (int)s[j]);
+            else if (w < 0)
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d names row %d, which is not "
+                          "a well-formed earlier row", i, op, j, (int)s[j]);
+            else
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d names row %d of width %d, "
+                          "not a Bool row", i, op, j, (int)s[j], w);
+        }
+    }
+    return faults;
+}
+
+/* THE SCAN'S OWN PROVOCATION: a hand-built table with one fault of each kind
+ * it names, plus one well-formed mux as the negative control. fsqrt has one
+ * rail, so both 64-lane mux arms are `a`. Reaching the CHECK at all is the
+ * claim that nothing aborted. */
+CQ_TEST(the_bool_operand_scan_reports_rather_than_aborts)
+{
+    static const cq_fsqrt_row bad[] = {
+        { CQ_FSOP_EQ,   CQ_FS_A,      CQ_FS_K_ONE, 0,       0, 0 }, /* Bool */
+        { CQ_FSOP_MUX,  CQ_FS_K_ZERO, CQ_FS_A,     CQ_FS_A, 0, 0 }, /* K    */
+        { CQ_FSOP_MUX,  0,            CQ_FS_A,     CQ_FS_A, 0, 0 }, /* fine */
+        { CQ_FSOP_NOT1, 9,            0,           0,       0, 0 }, /* fwd  */
+        { CQ_FSOP_MUX,  1,            CQ_FS_A,     CQ_FS_A, 0, 0 }, /* 64   */
+        { CQ_FSOP_OUT,  CQ_FS_A,      0,           0,       0, 0 }, /* bad  */
+        { CQ_FSOP_AND1, 0,            5,           0,       0, 0 }, /* 5    */
+    };
+    int n = (int)(sizeof bad / sizeof bad[0]);
+
+    CHECK_EQ(fq_bool_operand_faults(bad, n, 0), 4);
+    CHECK_EQ(fq_bool_operand_faults(bad, 3, 0), 1); /* rows 0-2: only row 1 */
+}
+
 CQ_TEST(the_program_is_the_source_line_for_line)
 {
     const cq_fsqrt_row *rows;
@@ -245,12 +326,12 @@ CQ_TEST(the_program_is_the_source_line_for_line)
             CHECK(rows[b].op != CQ_FSOP_VIEW);
             CHECK(rows[b].op != CQ_FSOP_SVIEW);
         }
-        if (rows[i].op == CQ_FSOP_NOT1 || rows[i].op == CQ_FSOP_AND1)
-            for (int j = 0; j < ar; j++)
-                CHECK_EQ(cq_fsqrt_row_width(rows, n, s[j]), 1);
-        if (rows[i].op == CQ_FSOP_MUX)
-            CHECK_EQ(cq_fsqrt_row_width(rows, n, rows[i].s0), 1);
     }
+    /* A MUX's condition and the two 1-bit ops' operands must be Bool rows.
+     * `cq_fsqrt_row_width` is the one place that mapping lives, reached
+     * through a pre-screen so a constant condition FAILS here instead of
+     * aborting in the library guard (bd 9ve.46, fma's 9ve.41 shape). */
+    CHECK_EQ(fq_bool_operand_faults(rows, n, 1), 0);
 }
 
 /* ---- (a1) The block costs, ASKED of their modules. Runs no kernel. ------ */

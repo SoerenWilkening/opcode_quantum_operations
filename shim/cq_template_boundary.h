@@ -122,7 +122,11 @@ typedef struct {
  * (Bead 9ve.44 widened three enums INSIDE their spaces — `cq_shim_op` to 17,
  * `cq_shim_fop` to 7, `cq_shim_fun_op` to 9 — so those spaces now reach
  * `16 * 1024 + 128 + 1 = 16513`, `6 * 1024 + 65 = 6209` and
- * `8 * 1024 + 65 = 8257`: the same five orders of magnitude of headroom.)
+ * `8 * 1024 + 65 = 8257`: the same five orders of magnitude of headroom.
+ * Bead s8g widened `cq_shim_cast_kind` to 4 with `bitcast`, so the cast space
+ * now reaches `3 * 65536 + 128 * 256 + 128 = 229504` — still three orders of
+ * magnitude below `0x10000000`. It claims NO new space: bitcast is a kind of
+ * the integer cast door, not a new family.)
  *
  * RE-CHECKED FOR THE EIGHTH (bead 9ve.24, 2026-09-19), as the sentence this
  * paragraph used to end with required. `0x50000000` is the first free

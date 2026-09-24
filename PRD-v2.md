@@ -414,7 +414,7 @@ symbols are live (`f32↔i32`, `f64↔i64`, `f80↔i80`, each forward and `_unc`
 (`f16_to_i16`, `f16_to_i16_unc`, `i16_to_f16`, `i16_to_f16_unc`); this sentence read *"both `f16`
 symbols"*, which does not make the 24 close. Under an `f64`-only scope only the
 `f64↔i64` pair is in scope; the `f80` pair — at **817** occurrences the most-used bitcast — waits on
-`f80`.
+`f80`. **LANDED 2026-09-24 (bead `s8g`): the `f64↔i64` pair's four forward/`_unc` symbols are live through the INTEGER cast door (`CQ_SHIM_CAST_BITCAST` = `cq_kernel_zext` at `F == T == 64`, a physical 64-CX copy, zero gates on a constant), one kind and one tag for both directions; its two `_inv` symbols are D14 aborts.**
 
 **The fp abort bucket shrinks and does not vanish.** Even at full four-width fp, **688 of the 884**
 have no caller in the corpus. At `f64`-only scope the bucket stays large, and that is correct: v1's
@@ -664,7 +664,7 @@ why that edit had to land in the same commit.
    *What the measurement found beyond the question — filed, not decided here.* (i) **`bitcast`
    `f64↔i64` is a GAP, not a residual:** §3.5 puts the pair in `f64` scope, it is not in `LANDED`,
    and the corpus calls its 4 non-`_inv` symbols **448** times across **59** goldens (bead
-   `s8g`). (ii) **The `"fp is v2"` reason string is false at `f64`** — by the
+   `s8g`). **Landed the same day by `s8g`** (partition 2880 = 1266 / 678 / 804 / 132). (ii) **The `"fp is v2"` reason string is false at `f64`** — by the
    generator's own `DECLINED` doctrine — on `frem_f64` (15), the `f64`-touching `fpext`/`fptrunc`
    (18) and `bitcast` `f64` (6); none of them is waiting on a v2 that has not shipped (bead
    `ar9`). Both are text/whitelist changes in `shim/gen_shim.py`, and neither moves a file.

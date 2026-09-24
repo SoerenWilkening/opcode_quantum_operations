@@ -2380,7 +2380,11 @@ set_tests_properties(test_template_death.an_opcode_outside_the_abis_enum_is_refu
                      test_template_death.a_width_outside_the_abis_range_is_refused
                      test_template_death.a_cast_to_a_width_above_the_abis_range_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cq_template;FATAL: reg:;kernel:;distinctness")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;not the width its cq_template;FATAL: reg:;kernel:;distinctness;same-width reinterpretation")
+## `same-width reinterpretation` (bead 6c2, after s8g): `cq_shim_cast_kind` grew
+## CQ_SHIM_CAST_BITCAST, whose door refuses unequal widths — so a cast case
+## whose kind drifted onto BITCAST (as `TRUNC + 1` now would) must not be
+## satisfied by that sentence.
 
 add_cqops_death_test(test_runtime_gate_death CASES
     x_on_a_rail_wider_than_one_bit
@@ -4324,3 +4328,29 @@ set_tests_properties(test_template_intr_death.an_iun_source_rail_is_not_the_widt
                      test_template_intr_death.an_iun_unc_destination_is_not_the_width_its_symbol_names
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;integer intrinsic opcode is not one of the ABI;multiple of 16 bits;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+
+## s8g — `bitcast f64 <-> i64` LANDED through the INTEGER cast door: one more
+## `cq_shim_cast_kind` (CQ_SHIM_CAST_BITCAST) reaching M13's `zext` at F == T,
+## the identity copy src/kernels/cast.c records. Tag space unchanged (0x80000000).
+##   test_template_bitcast        both directions through the generated symbols:
+##                                memcpy L1 incl. sNaN/payload/-0, L5, the
+##                                closed-form tuple at every mask drawn, the lane
+##                                stream, L2/L3, the record walk, the certificate
+##   test_template_bitcast_death  the one hard error it adds: unequal widths
+add_cqops_test(test_template_bitcast)
+
+add_cqops_death_test(test_template_bitcast_death CASES
+    a_bitcast_that_widens_is_refused_at_the_door
+    a_bitcast_that_narrows_is_refused_at_the_door
+    a_bitcast_unc_whose_widths_differ_is_refused_at_the_door
+)
+
+## Every sentence that is NOT the door's own is banned: `kernel:` (zext's own
+## inverted-pair refusal would satisfy the narrowing case one layer down, after
+## a mint and an unclosed D21 bracket), `width pair is inverted` for the same
+## reason spelled out, and the range / enum / operand-door sentences.
+set_tests_properties(test_template_bitcast_death.a_bitcast_that_widens_is_refused_at_the_door
+                     test_template_bitcast_death.a_bitcast_that_narrows_is_refused_at_the_door
+                     test_template_bitcast_death.a_bitcast_unc_whose_widths_differ_is_refused_at_the_door
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;width pair is inverted;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;cast kind outside the ABI's enum;not the width its cq_template;opcode outside the ABI's enum;fp conversion kind")

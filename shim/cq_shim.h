@@ -154,8 +154,21 @@ typedef enum {
     CQ_SHIM_FOP_FMIN, CQ_SHIM_FOP_FMAX, CQ_SHIM_FOP_COPYSIGN
 } cq_shim_fop;
 
-/* The three integer width casts. */
-typedef enum { CQ_SHIM_CAST_SEXT, CQ_SHIM_CAST_ZEXT, CQ_SHIM_CAST_TRUNC } cq_shim_cast_kind;
+/* The three integer width casts, and `bitcast` (bead s8g).
+ *
+ * `bitcast` IS HERE AND NOT IN `cq_shim_fcast_kind`, and the reason is what it
+ * computes, not what its name touches: `opcode_table.yaml` files it as the
+ * `reinterpret` family — "a reversible IDENTITY RELABEL (same basis states
+ * under a new type label; zero gate)" — so it is a SAME-WIDTH copy of the bit
+ * pattern with no fp arithmetic in it, which is M13's `zext` at `F == T`
+ * (src/kernels/cast.c records that identity as a decision). The conversion
+ * door carries M37's VALUE conversions and would be the wrong operation with
+ * the right shape. The door refuses a bitcast whose two widths differ. ONE
+ * enumerator for BOTH directions: `f64 -> i64` and `i64 -> f64` are the same
+ * function on 64 bits, so they share one kind and one D15 tag. */
+typedef enum {
+    CQ_SHIM_CAST_SEXT, CQ_SHIM_CAST_ZEXT, CQ_SHIM_CAST_TRUNC, CQ_SHIM_CAST_BITCAST
+} cq_shim_cast_kind;
 
 /* The four CROSS-DOMAIN casts (`opcode_table.yaml`'s `int_to_fp` and
  * `fp_to_int` kinds). A SEPARATE ENUM FROM `cq_shim_cast_kind`, not four more
