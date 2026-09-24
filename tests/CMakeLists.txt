@@ -4366,3 +4366,12 @@ set_tests_properties(test_template_bitcast_death.a_bitcast_that_widens_is_refuse
 ## class is forked and its stderr compared byte for byte against text typed in
 ## the test; the static sweep of all 804 is tests/test_gen_bodies.py's.
 add_cqops_test(test_template_reasons)
+
+## 9ve.39 — D15's twin identity over a template call's LITERAL LANES. The
+## record carries each literal lane in its own slot (masked to the width), and
+## `adjoint_matches`' twin branch compares them, as upstream compares every
+## argument in position. Every case is rotation-poisoned so the CERTIFICATE,
+## not the shadow, decides; each asserts the three layers' dispositions.
+##   test_shim_twin_lit  bin hl/lh, fbin hl/lh, fma qll/qlq: swapped literals
+##                       strand, identical literals release, a record walk
+add_cqops_test(test_shim_twin_lit)

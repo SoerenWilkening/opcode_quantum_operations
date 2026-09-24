@@ -487,9 +487,12 @@ CQ_TEST(an_fcmp_unc_does_not_pair_with_an_icmp_forward_on_the_same_handles)
 
 /* THE `_hl` `_unc` IS ITS OWN PATH AND MUST PAIR TOO. It reaches `cq_tpl_binary`
  * with `b_h == CQ_REG_NONE` and the literal in `r.lo`, and D15's twin match
- * folds `r.lo ^ r.hi` into the record's `imm` — so a forward and an `_unc` at
- * DIFFERENT literals are correctly NOT a pair, and at the same literal they
- * are. Driving only the `qq` shape would leave that lane untested. */
+ * compares the record's per-slot `lit` lane — so a forward and an `_unc` at
+ * DIFFERENT literals are NOT a pair, and at the same literal they are. (Until
+ * bead 9ve.39 this comment said the first half of that about a folded `imm`
+ * the twin branch never read; the different-literal half is pinned, poisoned,
+ * in tests/test_shim_twin_lit.c.) Driving only the `qq` shape would leave
+ * that lane untested. */
 CQ_TEST(an_fcmp_f64_hl_unc_pairs_with_its_forward_at_the_same_literal)
 {
     cq_mock m; cq_sink s;

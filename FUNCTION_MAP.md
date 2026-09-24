@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7126
+**Indexed definitions:** 7156
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -240,15 +240,16 @@ the definition (or the build-language declaration) in the listed file.
 | `grow_handles` | [142](shim/cq_shim_record.c:142) |
 | `cq_rec_reset` | [158](shim/cq_shim_record.c:158) |
 | `cq_rec_mint` | [166](shim/cq_shim_record.c:166) |
-| `cq_rec_retire` | [196](shim/cq_shim_record.c:196) |
-| `cq_rec_swap` | [202](shim/cq_shim_record.c:202) |
-| `note_write` | [210](shim/cq_shim_record.c:210) |
-| `cq_rec_push` | [225](shim/cq_shim_record.c:225) |
-| `cq_rec_hist` | [309](shim/cq_shim_record.c:309) |
-| `cq_rec_at` | [315](shim/cq_shim_record.c:315) |
-| `cq_rec_len` | [316](shim/cq_shim_record.c:316) |
-| `cq_rec_writes_in` | [318](shim/cq_shim_record.c:318) |
-| `cq_rec_table_is_complete` | [340](shim/cq_shim_record.c:340) |
+| `cq_rec_set_lit` | [199](shim/cq_shim_record.c:199) |
+| `cq_rec_retire` | [210](shim/cq_shim_record.c:210) |
+| `cq_rec_swap` | [216](shim/cq_shim_record.c:216) |
+| `note_write` | [224](shim/cq_shim_record.c:224) |
+| `cq_rec_push` | [239](shim/cq_shim_record.c:239) |
+| `cq_rec_hist` | [323](shim/cq_shim_record.c:323) |
+| `cq_rec_at` | [329](shim/cq_shim_record.c:329) |
+| `cq_rec_len` | [330](shim/cq_shim_record.c:330) |
+| `cq_rec_writes_in` | [332](shim/cq_shim_record.c:332) |
+| `cq_rec_table_is_complete` | [354](shim/cq_shim_record.c:354) |
 
 ## `shim/cq_shim_reduce.c`
 
@@ -257,10 +258,10 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_reduce_depth_declines` | [18](shim/cq_shim_reduce.c:18) |
 | `cq_reduce_reset_stats` | [19](shim/cq_shim_reduce.c:19) |
 | `adjoint_matches` | [30](shim/cq_shim_reduce.c:30) |
-| `commutes` | [60](shim/cq_shim_reduce.c:60) |
-| `pair_operands_unchanged` | [101](shim/cq_shim_reduce.c:101) |
-| `reduce` | [170](shim/cq_shim_reduce.c:170) |
-| `cq_reduce_to_identity` | [250](shim/cq_shim_reduce.c:250) |
+| `commutes` | [65](shim/cq_shim_reduce.c:65) |
+| `pair_operands_unchanged` | [106](shim/cq_shim_reduce.c:106) |
+| `reduce` | [175](shim/cq_shim_reduce.c:175) |
+| `cq_reduce_to_identity` | [255](shim/cq_shim_reduce.c:255) |
 
 ## `shim/cq_shim_trace.c`
 
@@ -373,22 +374,22 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_tpl_rec_copy` | [163](shim/cq_template_impl.c:163) |
 | `tpl_run_kernel` | [173](shim/cq_template_impl.c:173) |
 | `cq_tpl_binary` | [224](shim/cq_template_impl.c:224) |
-| `cq_tpl_req` | [367](shim/cq_template_impl.c:367) |
-| `tpl_bin_req` | [380](shim/cq_template_impl.c:380) |
-| `tpl_cmp_req` | [395](shim/cq_template_impl.c:395) |
-| `cq_shim_bin_qq` | [412](shim/cq_template_impl.c:412) |
-| `cq_shim_bin_hl` | [417](shim/cq_template_impl.c:417) |
-| `cq_shim_bin_lh` | [425](shim/cq_template_impl.c:425) |
-| `cq_shim_bin_qq_unc` | [433](shim/cq_template_impl.c:433) |
-| `cq_shim_bin_hl_unc` | [441](shim/cq_template_impl.c:441) |
-| `cq_shim_bin_lh_unc` | [449](shim/cq_template_impl.c:449) |
-| `cq_shim_bin_qq_ctrl` | [457](shim/cq_template_impl.c:457) |
-| `cq_shim_bin_hl_ctrl` | [465](shim/cq_template_impl.c:465) |
-| `cq_shim_bin_lh_ctrl` | [473](shim/cq_template_impl.c:473) |
-| `cq_shim_icmp_qq` | [481](shim/cq_template_impl.c:481) |
-| `cq_shim_icmp_hl` | [487](shim/cq_template_impl.c:487) |
-| `cq_shim_icmp_qq_unc` | [495](shim/cq_template_impl.c:495) |
-| `cq_shim_icmp_hl_unc` | [503](shim/cq_template_impl.c:503) |
+| `cq_tpl_req` | [371](shim/cq_template_impl.c:371) |
+| `tpl_bin_req` | [384](shim/cq_template_impl.c:384) |
+| `tpl_cmp_req` | [399](shim/cq_template_impl.c:399) |
+| `cq_shim_bin_qq` | [416](shim/cq_template_impl.c:416) |
+| `cq_shim_bin_hl` | [421](shim/cq_template_impl.c:421) |
+| `cq_shim_bin_lh` | [429](shim/cq_template_impl.c:429) |
+| `cq_shim_bin_qq_unc` | [437](shim/cq_template_impl.c:437) |
+| `cq_shim_bin_hl_unc` | [445](shim/cq_template_impl.c:445) |
+| `cq_shim_bin_lh_unc` | [453](shim/cq_template_impl.c:453) |
+| `cq_shim_bin_qq_ctrl` | [461](shim/cq_template_impl.c:461) |
+| `cq_shim_bin_hl_ctrl` | [469](shim/cq_template_impl.c:469) |
+| `cq_shim_bin_lh_ctrl` | [477](shim/cq_template_impl.c:477) |
+| `cq_shim_icmp_qq` | [485](shim/cq_template_impl.c:485) |
+| `cq_shim_icmp_hl` | [491](shim/cq_template_impl.c:491) |
+| `cq_shim_icmp_qq_unc` | [499](shim/cq_template_impl.c:499) |
+| `cq_shim_icmp_hl_unc` | [507](shim/cq_template_impl.c:507) |
 
 ## `shim/cq_template_ternary.c`
 
@@ -398,14 +399,14 @@ the definition (or the build-language declaration) in the listed file.
 | `fma_width` | [80](shim/cq_template_ternary.c:80) |
 | `fma_req` | [89](shim/cq_template_ternary.c:89) |
 | `cq_tpl_ternary` | [107](shim/cq_template_ternary.c:107) |
-| `cq_shim_fma_qqq` | [224](shim/cq_template_ternary.c:224) |
-| `cq_shim_fma_qql` | [230](shim/cq_template_ternary.c:230) |
-| `cq_shim_fma_qlq` | [239](shim/cq_template_ternary.c:239) |
-| `cq_shim_fma_qll` | [248](shim/cq_template_ternary.c:248) |
-| `cq_shim_fma_qqq_unc` | [258](shim/cq_template_ternary.c:258) |
-| `cq_shim_fma_qql_unc` | [267](shim/cq_template_ternary.c:267) |
-| `cq_shim_fma_qlq_unc` | [277](shim/cq_template_ternary.c:277) |
-| `cq_shim_fma_qll_unc` | [287](shim/cq_template_ternary.c:287) |
+| `cq_shim_fma_qqq` | [227](shim/cq_template_ternary.c:227) |
+| `cq_shim_fma_qql` | [233](shim/cq_template_ternary.c:233) |
+| `cq_shim_fma_qlq` | [242](shim/cq_template_ternary.c:242) |
+| `cq_shim_fma_qll` | [251](shim/cq_template_ternary.c:251) |
+| `cq_shim_fma_qqq_unc` | [261](shim/cq_template_ternary.c:261) |
+| `cq_shim_fma_qql_unc` | [270](shim/cq_template_ternary.c:270) |
+| `cq_shim_fma_qlq_unc` | [280](shim/cq_template_ternary.c:280) |
+| `cq_shim_fma_qll_unc` | [290](shim/cq_template_ternary.c:290) |
 
 ## `shim/cq_template_unary.c`
 
@@ -8566,6 +8567,40 @@ the definition (or the build-language declaration) in the listed file.
 | `a_ternary_call_names_the_handle_with_no_temporary_term (via CQ_TEST)` | [115](tests/test_shim_trace_fp.inc:115) |
 | `an_aliased_ternary_call_names_the_handle_past_its_one_temporary (via CQ_TEST)` | [146](tests/test_shim_trace_fp.inc:146) |
 
+## `tests/test_shim_twin_lit.c`
+
+| Function | Line |
+|---|---:|
+| `fresh` | [53](tests/test_shim_twin_lit.c:53) |
+| `open_with` | [60](tests/test_shim_twin_lit.c:60) |
+| `close_with` | [69](tests/test_shim_twin_lit.c:69) |
+| `f64_of` | [76](tests/test_shim_twin_lit.c:76) |
+| `iwire` | [85](tests/test_shim_twin_lit.c:85) |
+| `fwire` | [92](tests/test_shim_twin_lit.c:92) |
+| `int32_t` | [104](tests/test_shim_twin_lit.c:104) |
+| `void` | [105](tests/test_shim_twin_lit.c:105) |
+| `bin_hl` | [108](tests/test_shim_twin_lit.c:108) |
+| `bin_hl_u` | [110](tests/test_shim_twin_lit.c:110) |
+| `bin_lh` | [112](tests/test_shim_twin_lit.c:112) |
+| `bin_lh_u` | [114](tests/test_shim_twin_lit.c:114) |
+| `fbin_hl` | [116](tests/test_shim_twin_lit.c:116) |
+| `fbin_hl_u` | [118](tests/test_shim_twin_lit.c:118) |
+| `fbin_lh` | [120](tests/test_shim_twin_lit.c:120) |
+| `fbin_lh_u` | [122](tests/test_shim_twin_lit.c:122) |
+| `fma_qll` | [124](tests/test_shim_twin_lit.c:124) |
+| `fma_qll_u` | [126](tests/test_shim_twin_lit.c:126) |
+| `fma_qlq` | [133](tests/test_shim_twin_lit.c:133) |
+| `fma_qlq_u` | [135](tests/test_shim_twin_lit.c:135) |
+| `lits` | [150](tests/test_shim_twin_lit.c:150) |
+| `round_trip` | [165](tests/test_shim_twin_lit.c:165) |
+| `an_unc_with_swapped_literals_does_not_pair_with_its_forward (via CQ_TEST)` | [205](tests/test_shim_twin_lit.c:205) |
+| `an_unc_with_identical_literals_pairs_with_its_forward (via CQ_TEST)` | [215](tests/test_shim_twin_lit.c:215) |
+| `an_fp_unc_at_a_different_literal_does_not_pair (via CQ_TEST)` | [226](tests/test_shim_twin_lit.c:226) |
+| `bits_above_the_width_are_not_part_of_a_literals_identity (via CQ_TEST)` | [237](tests/test_shim_twin_lit.c:237) |
+| `last_tpl` | [249](tests/test_shim_twin_lit.c:249) |
+| `want_lits` | [258](tests/test_shim_twin_lit.c:258) |
+| `each_literal_lane_is_recorded_in_its_own_slot_masked_to_the_width (via CQ_TEST)` | [269](tests/test_shim_twin_lit.c:269) |
+
 ## `tests/test_sink.c`
 
 | Function | Line |
@@ -8846,9 +8881,9 @@ the definition (or the build-language declaration) in the listed file.
 | `an_fcmp_f64_unc_zeroes_its_out_rail_and_the_free_strands_nothing (via CQ_TEST)` | [320](tests/test_template_fcmp.inc:320) |
 | `an_fcmp_f64_unc_on_a_poisoned_source_is_discharged_by_the_certificate (via CQ_TEST)` | [379](tests/test_template_fcmp.inc:379) |
 | `an_fcmp_unc_does_not_pair_with_an_icmp_forward_on_the_same_handles (via CQ_TEST)` | [457](tests/test_template_fcmp.inc:457) |
-| `an_fcmp_f64_hl_unc_pairs_with_its_forward_at_the_same_literal (via CQ_TEST)` | [493](tests/test_template_fcmp.inc:493) |
-| `fcmp_call_inv` | [532](tests/test_template_fcmp.inc:532) |
-| `every_fcmp_f64_inv_aborts_naming_itself_and_d14s_reason (via CQ_TEST)` | [537](tests/test_template_fcmp.inc:537) |
+| `an_fcmp_f64_hl_unc_pairs_with_its_forward_at_the_same_literal (via CQ_TEST)` | [496](tests/test_template_fcmp.inc:496) |
+| `fcmp_call_inv` | [535](tests/test_template_fcmp.inc:535) |
+| `every_fcmp_f64_inv_aborts_naming_itself_and_d14s_reason (via CQ_TEST)` | [540](tests/test_template_fcmp.inc:540) |
 
 ## `tests/test_template_fconv.inc`
 

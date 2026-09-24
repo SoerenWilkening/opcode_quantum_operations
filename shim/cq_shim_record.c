@@ -193,6 +193,20 @@ void cq_rec_mint(int32_t h, uint32_t width, uint64_t lo, uint64_t hi,
     }
 }
 
+/* A slot past the record or a width past the register ceiling is a caller bug
+ * that would silently drop a lane from the identity — which WIDENS pairing —
+ * so it aborts in both configurations rather than clamping. */
+void cq_rec_set_lit(cq_call_rec *c, unsigned slot, uint32_t width,
+                    uint64_t lo, uint64_t hi)
+{
+    if (slot >= CQ_REC_SLOTS || width == 0u || width > 128u) abort();
+    if (width < 64u)       { lo &= (UINT64_C(1) << width) - 1u; hi = 0u; }
+    else if (width == 64u) { hi = 0u; }
+    else if (width < 128u) { hi &= (UINT64_C(1) << (width - 64u)) - 1u; }
+    c->lit[slot][0] = lo;
+    c->lit[slot][1] = hi;
+}
+
 void cq_rec_retire(int32_t h)
 {
     if (h < 0 || (uint32_t)h >= g_nh) return;

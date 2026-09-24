@@ -155,12 +155,23 @@ typedef enum {
 typedef struct {
     uint16_t op;
     int32_t  h[CQ_REC_SLOTS]; /* CQ_REG_NONE for an absent slot              */
-    uint64_t imm;       /* addc/xorc immediate, already masked to the width  */
+    uint64_t imm;       /* addc/xorc immediate ONLY, masked to the width     */
     uint64_t angle;     /* the double's BIT PATTERN — see the .c on why      */
     int32_t  ctrl;      /* the §9 region's flag handle, or CQ_REG_NONE       */
     uint32_t tag;       /* template opcode identity; 0 elsewhere             */
     uint32_t xpar[CQ_REC_SLOTS]; /* each operand's cqrt_x parity, FROZEN     */
-} cq_call_rec;   /* NOT `cq_rec` — tests/support/mock_sink.h already owns that
+    /* A TEMPLATE CALL'S LITERAL LANES, ONE PER OPERAND SLOT, (lo, hi) masked
+     * to the call's width — set only through cq_rec_set_lit, zero in every
+     * slot that carries a handle and in every non-template record (bead
+     * 9ve.39, PRD §15 D15). Part of the TWIN identity: upstream pairs a
+     * forward with its `_unc` on `args[1:] == fwd_args`, every argument in its
+     * own position, so `_unc(out, a, 3.0)` is not the adjoint of `fwd(a, 2.0)`.
+     * IT USED TO BE ONE FOLDED WORD IN `imm` (`lo ^ hi`, and for fma the XOR
+     * of all four), and the twin branch of `adjoint_matches` never read even
+     * that — so every literal-lane `_unc` paired whatever its literals were
+     * and RELEASED a dirty rail. Measured red on six shapes, both configs. */
+    uint64_t lit[CQ_REC_SLOTS][2];
+} cq_call_rec;  /* NOT `cq_rec` — tests/support/mock_sink.h already owns that
                   * name for a RECORDED GATE, and the two would collide in any
                   * translation unit that includes both. Only a test including
                   * both could ever see it, which is exactly what happened. */
@@ -206,6 +217,13 @@ void cq_rec_mint(int32_t h, uint32_t width, uint64_t lo, uint64_t hi,
                  int from_template);
 void cq_rec_push(const cq_call_rec *c);
 void cq_rec_retire(int32_t h);
+
+/* Put a literal lane into slot `slot` of `c`, masked to `width` bits — the
+ * bits the kernel reads (`cq_bits_from_words` reads exactly W), so two
+ * encodings equal mod 2^W are the same literal and a word above the width is
+ * not part of the identity. The ONE writer of `lit`, so the mask lives once. */
+void cq_rec_set_lit(cq_call_rec *c, unsigned slot, uint32_t width,
+                    uint64_t lo, uint64_t hi);
 
 /* EXCHANGE TWO HANDLES' HISTORIES. `cqrt_cswap`'s constant-ONE row swaps the
  * two rails' BIT ARRAYS rather than emitting gates, so after it handle `a`

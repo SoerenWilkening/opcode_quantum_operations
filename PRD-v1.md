@@ -2415,6 +2415,8 @@ and diffs — `make shim-check` / `cmake --build <dir> --target shim-check`, i.e
 > > loop rather than being a rule. U3 is the classical-immediate fast path and is the only
 > > entry condition that does not call the engine at all.
 > >
+> > **Amended 2026-09-24 (bead `9ve.39`, the maintainer's decision):** the TWIN IDENTITY is the twin opcode, the tag, all four handle slots, the per-slot LITERAL lanes (masked to the call's width), `ctrl` and the control parity — ported from upstream's `free_pairing_check.py`, which pairs a forward with its `_unc` only when `args[1:] == fwd_args`. Measured before the fix: the twin branch never read the literal at all (the writers also XOR-folded it into `imm`), so a `_unc` with ANY literals paired its forward, and under a rotation-poisoned source `cqrt_free` released a dirty rail. `imm` now carries only `addc`/`xorc`'s constant.
+> >
 > > **(iii) THE BIRTH VALUE IS WHAT MAKES §4's CARVE-OUT A MECHANISM RATHER THAN A CASE, and it
 > > is the port's one deliberate divergence from upstream's OBLIGATION.** Upstream's rules prove
 > > "a known classical basis STATE, unentangled" — its A-rules explicitly accept a rail

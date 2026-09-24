@@ -34,10 +34,15 @@ static int adjoint_matches(const cq_call_rec *a, const cq_call_rec *b)
     if (memcmp(a->xpar, b->xpar, sizeof a->xpar) != 0) return 0;
     if (a->ctrl != b->ctrl) return 0;   /* §9 context — D15 §6(i) */
 
+    /* THE LITERAL LANES ARE PART OF THE TWIN, per slot (bead 9ve.39): upstream
+     * matches `args[1:] == fwd_args` — every argument in its own position —
+     * and a literal lane is an argument. Without the `lit` compare every
+     * `_hl`/`_lh`/`qll`/`qlq`/`qql` `_unc` paired whatever its literals were. */
     if (e->twin) {
         if (b->op != e->twin_of) return 0;
         return a->tag == b->tag &&
-               memcmp(a->h, b->h, sizeof a->h) == 0;
+               memcmp(a->h, b->h, sizeof a->h) == 0 &&
+               memcmp(a->lit, b->lit, sizeof a->lit) == 0;
     }
     if (a->op != b->op) return 0;
     if (memcmp(a->h, b->h, sizeof a->h) != 0) return 0;

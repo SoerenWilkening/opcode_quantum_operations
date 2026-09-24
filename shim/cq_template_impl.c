@@ -337,7 +337,11 @@ int32_t cq_tpl_binary(tpl_req r)
         memset(&c, 0, sizeof c);
         c.op   = (uint16_t)(is_unc ? CQ_ROP_TPL_UNC : CQ_ROP_TPL_FWD);
         c.h[0] = r.out; c.h[1] = r.a_h; c.h[2] = r.b_h; c.h[3] = CQ_REG_NONE;
-        c.imm  = r.lo ^ r.hi;   /* the `_hl`/`_lh` literal, in the identity */
+        /* THE `_hl`/`_lh` LITERAL, in the slot it occupies (bead 9ve.39).
+         * `r.b_h` here is post-D7b, but D7b needs two handles, so a literal
+         * lane is never redirected and its NONE slot is the literal's. */
+        if (r.a_h == CQ_REG_NONE) cq_rec_set_lit(&c, 1u, r.w, r.lo, r.hi);
+        if (r.b_h == CQ_REG_NONE) cq_rec_set_lit(&c, 2u, r.w, r.lo, r.hi);
         c.ctrl = r.ctrl;
         c.tag  = r.tag;
         cq_rec_push(&c);

@@ -200,7 +200,10 @@ int32_t cq_tpl_ternary(tpl3_req r)
         memset(&c, 0, sizeof c);
         c.op   = (uint16_t)(is_unc ? CQ_ROP_TPL_UNC : CQ_ROP_TPL_FWD);
         c.h[0] = r.out; c.h[1] = r.a_h; c.h[2] = r.b_h; c.h[3] = r.c_h;
-        c.imm  = r.b_lo ^ r.b_hi ^ r.c_lo ^ r.c_hi;
+        /* Each literal lane in ITS OWN slot (bead 9ve.39) — never folded:
+         * a fold makes `qll(a, x, y)` and `qll(a, y, x)` one identity. */
+        if (r.b_h == CQ_REG_NONE) cq_rec_set_lit(&c, 2u, r.w, r.b_lo, r.b_hi);
+        if (r.c_h == CQ_REG_NONE) cq_rec_set_lit(&c, 3u, r.w, r.c_lo, r.c_hi);
         c.ctrl = CQ_REG_NONE;
         c.tag  = r.tag;
         cq_rec_push(&c);
