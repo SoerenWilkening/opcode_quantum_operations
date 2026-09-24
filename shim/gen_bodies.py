@@ -84,7 +84,7 @@ def entry_family(row):
     if row.kind == "cross_unary":
         return "libm"                           # never LANDED; no entry point
     if row.kind in ("rotate", "funnel"):
-        return "shift_intrinsic"                # bead 9ve.29; no entry point
+        return "shift_intrinsic"                # REFUSED, bead 9ve.29.3
     return ("f" if row.domain == "fp" else "") + row.kind   # binary | fbinary
                                                             # unary  | funary
                                                             # ternary| fternary
@@ -127,14 +127,19 @@ ENTRY = {
     ("fcast", "un", "unc"): "cq_shim_fcast_unc",
     # --- intrinsic_table.yaml, vendored 2026-09-19 (PRD-v2 §6.1, 9ve.24).
     #
-    # `funary` EXISTS NOW AND `fneg` STILL DOES NOT REACH IT. The door was
-    # built at Wave 8 for M40's `fsqrt` and was unreachable from the grid only
-    # because `sqrt` lives in a yaml M27 did not read; the vendoring is what
-    # connects them. `fneg` is `fp_arith`'s unary opcode in the OTHER yaml, its
-    # kernel is bead 9ve.27's, and `LANDED` does not carry it — so it takes the
-    # bucket rule and aborts, and these two rows are never reached for it.
+    # `funary` WAS BUILT AT Wave 8 FOR M40's `fsqrt`, CONNECTED BY THE
+    # VENDORING, AND SINCE bead 9ve.44 IT IS ALSO M38's DOOR: `fneg` (the
+    # OTHER yaml's unary opcode), `fabs` and the six rounding opcodes. Which
+    # of them share a kernel is the dispatch table's business, not this one's.
     ("funary", "un", "fwd"): "cq_shim_fun",
     ("funary", "un", "unc"): "cq_shim_fun_unc",
+    # THE INTEGER UNARY DOOR (bead 9ve.44): M41's ctpop/ctlz/cttz/bitreverse/
+    # bswap and M42's abs. `fwd` and `unc` only — the class-1 `_inv` rows of
+    # bswap/bitreverse are D14 aborts and never reach this table. The i1
+    # immarg of ctlz/cttz/abs is not in the ABI at all (the yaml drops it at
+    # lowering), so the door is one handle and a width, like `funary`.
+    ("unary", "un", "fwd"): "cq_shim_iun",
+    ("unary", "un", "unc"): "cq_shim_iun_unc",
     # `fternary` IS `fma` AND ONLY `fma` — the yaml's one ternary opcode. Four
     # shapes because two of the three operands may be literals; `qqq` is the
     # bare base symbol exactly as `qq` is.
@@ -146,14 +151,13 @@ ENTRY = {
     ("fternary", "qql", "unc"): "cq_shim_fma_qql_unc",
     ("fternary", "qlq", "unc"): "cq_shim_fma_qlq_unc",
     ("fternary", "qll", "unc"): "cq_shim_fma_qll_unc",
-    # THERE IS NO `("unary", ...)`, `("shift_intrinsic", ...)` OR `("libm", ...)`
-    # ROW, AND EACH ABSENCE IS A DOCUMENTED FAILURE. The integer intrinsics
-    # (`ctpop`, `ctlz`, `cttz`, `bswap`, `bitreverse`, `abs`, the four min/max
-    # and the four saturating adds, plus `fshl`/`fshr` in both their arities)
-    # are bead 9ve.29's and `lrint`/`llrint` are PRD-v2 §7.9's; none is in
-    # `LANDED`, so none reaches `wrapper` and none reaches this table. Landing
-    # any of them means a row HERE as well as a `LANDED` line, and until then
-    # the KeyError is what says so.
+    # THERE IS NO `("shift_intrinsic", ...)` OR `("libm", ...)` ROW, AND EACH
+    # ABSENCE IS A DOCUMENTED FAILURE. `fshl`/`fshr` in both their arities are
+    # REFUSED (bead 9ve.29.3) and `lrint`/`llrint` are PRD-v2 §7.9's; none is
+    # in `LANDED`, so none reaches `wrapper` and none reaches this table. The
+    # four `*_sat` DO have a `("binary", ...)` row to reach — they are
+    # ordinary integer binaries by shape — so what refuses them is
+    # `SELECTOR["binary"]`, which has no entry for them (K27.md, Not ported).
 }
 
 # THE SELECTOR PER OPCODE, AS A TABLE WHOSE KeyError IS THE FAILURE — the same
@@ -164,20 +168,36 @@ ENTRY = {
 # header says never to edit it — rather than as a generator refusal naming the
 # symbol.
 SELECTOR = {
+    # The four integer min/max (M42, bead 9ve.44) ride the integer binary
+    # door: same shapes (`qq`/`hl` and their `_unc`), same D7b, same literal
+    # rule. The `*_sat` four do NOT, and their absence here is the refusal.
     "binary": {op: "CQ_SHIM_OP_%s" % op.upper() for op in (
         "add", "sub", "mul", "sdiv", "udiv", "srem", "urem",
-        "and", "or", "xor", "shl", "lshr", "ashr")},
+        "and", "or", "xor", "shl", "lshr", "ashr",
+        "smin", "smax", "umin", "umax")},
+    # M38's three binary opcodes (bead 9ve.44) ride the fp binary door;
+    # `copysign` is NOT commutative and is the one that reaches its `_lh`.
     "fbinary": {op: "CQ_SHIM_FOP_%s" % op.upper() for op in (
-        "fadd", "fsub", "fmul", "fdiv")},
+        "fadd", "fsub", "fmul", "fdiv", "fmin", "fmax", "copysign")},
     "cast": {k: "CQ_SHIM_CAST_%s" % k.upper() for k in ("sext", "zext", "trunc")},
     "fcast": {k: "CQ_SHIM_FCAST_%s" % k.upper() for k in (
         "fptosi", "fptoui", "sitofp", "uitofp")},
-    # --- intrinsic_table.yaml (PRD-v2 §6.1, bead 9ve.24). ONE ENTRY EACH, and
-    # the one-entry-ness is the point: `funary` is the whole of M40's surface
-    # from that table and `fternary` is the whole of M39's, so a second opcode
-    # arriving in either family is a KeyError here rather than an enumerator
-    # that does not exist in a generated file.
-    "funary": {"sqrt": "CQ_SHIM_FUN_FSQRT"},
+    # --- intrinsic_table.yaml (PRD-v2 §6.1, bead 9ve.24). `fternary` is ONE
+    # entry and that is the point: it is the whole of M39's surface, so a
+    # second ternary opcode is a KeyError here rather than an enumerator that
+    # does not exist in a generated file. `funary` was one entry (`sqrt`, whose
+    # enumerator carries the `f` its ABI token drops) until bead 9ve.44 added
+    # M38's eight, spelled out rather than derived for the same reason: one
+    # enumerator PER ABI ROW, so `rint`/`nearbyint`/`round` are three even
+    # though two of them reach one kernel (PRD-v2 7.7).
+    "funary": {"sqrt": "CQ_SHIM_FUN_FSQRT", "fneg": "CQ_SHIM_FUN_FNEG",
+               "fabs": "CQ_SHIM_FUN_FABS", "floor": "CQ_SHIM_FUN_FLOOR",
+               "ceil": "CQ_SHIM_FUN_CEIL", "trunc": "CQ_SHIM_FUN_TRUNC",
+               "round": "CQ_SHIM_FUN_ROUND", "rint": "CQ_SHIM_FUN_RINT",
+               "nearbyint": "CQ_SHIM_FUN_NEARBYINT"},
+    # M41's five and M42's `abs` (bead 9ve.44), the integer unary door.
+    "unary": {op: "CQ_SHIM_IUN_%s" % op.upper() for op in (
+        "ctpop", "ctlz", "cttz", "bitreverse", "bswap", "abs")},
     "fternary": {"fma": "CQ_SHIM_FMA_FMA"},
 }
 

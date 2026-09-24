@@ -46,10 +46,11 @@
  * conversion; without the RECORD it would strand on every poisoned operand.
  *
  * RULE 12. Budget 300, trigger 240. The reserve seam, recorded now rather than
- * when it bites: `the SEQUENCE <-> the INTEGER cast entry points` ->
- * `shim/cq_template_cast.c`, on this file's own discriminator — the sequence
- * changes when a DECISION about composition changes, the three integer cast
- * entry points when `opcode_table.yaml` gains a cast kind.
+ * when it bites: `the SEQUENCE <-> the INTEGER entry points` ->
+ * `shim/cq_template_iun.c`, on this file's own discriminator — the sequence
+ * changes when a DECISION about composition changes, the integer entry points
+ * (the three casts and, since bead 9ve.44, the intrinsic unary door) when a
+ * yaml gains an integer arity-1 opcode.
  */
 
 #include "cq_shim.h"
@@ -66,7 +67,18 @@
 #include "reg.h"
 
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+/* The house shape, this translation unit's own copy (`src/reg_check.c`'s
+ * precedent): every string below appears nowhere else in shim/, because the
+ * death pins discriminate on the MESSAGE and not on the module. */
+static void cq_un_die(const char *what, int v)
+{
+    fprintf(stderr, "libcqops: FATAL: shim: %s (%d)\n", what, v);
+    abort();
+}
 
 /* One stage's D15 record: `h[0]` is the rail it WROTE and `h[1]` the handle the
  * ABI says it read. `CQ_ROP_TPL_FWD`/`TPL_UNC` model operand SLOTS and not
@@ -204,4 +216,66 @@ void cq_shim_cast_unc(cq_shim_cast_kind kind, int from_bits, int to_bits,
                       int32_t out_handle, int32_t a_handle)
 {
     (void)cq_tpl_unary(cast_req(kind, from_bits, to_bits, out_handle, a_handle));
+}
+
+/* --- the INTEGER UNARY intrinsics (bead 9ve.44) --------------------------- */
+
+/* M41's ctpop/ctlz/cttz/bitreverse/bswap and M42's abs. ONE stage, one width,
+ * a result as wide as the operand, no composition — so `inner.fn` stays NULL
+ * and the sequence is the cast's one-stage shape with the width given once.
+ *
+ * THE NINTH TAG SPACE, `0x60000000 | op * 1024 + w + 1`, and it is disjoint
+ * from every other by prefix (the arithmetic is re-checked in
+ * cq_template_boundary.h). It matters for a reason the record makes exact: an
+ * integer unary `_unc` records `{out, a, NONE, NONE}` with `imm` 0, which is
+ * what a binary `_hl` forward with a zero literal records too — so `ctpop i8`
+ * and `add i8, 0` would pair on every field but the tag if they shared a
+ * space, and a free after `add` then `ctpop_unc` would RELEASE a rail holding
+ * `a ^ ctpop(a)`.
+ *
+ * THE ORDER THAT MATTERS IS RANGE BEFORE THE BSWAP RULE: a wild width (129
+ * fails both) must get the range door's sentence, and the rule must never
+ * read an unvalidated `bits` (tests/test_template_intr_death.c's
+ * `an_iun_width_outside_the_abis_range_is_refused` is its detector). The ENUM
+ * lookup's place relative to the range is NOT load-bearing and is recorded as
+ * such rather than defended: it indexes by `op` alone, so swapping the two is
+ * an equivalent mutant (measured, bead 9ve.44). bswap's 16-bit rule is last.
+ * `cq_kernel_bswap` refuses the same widths one layer down, AFTER the call has
+ * minted a rail and opened a D21 bracket that is then never closed, which is
+ * a fatal parse error for the viewer; the refusal belongs where the claim is
+ * about the CALL. The ABI has no `bswap` symbol at i8 at all
+ * (intrinsic_table.yaml: `bswap.i8` is rejected by LLVM), so no generated
+ * body can reach this line — a direct caller can. */
+static tpl_ureq iun_req(cq_shim_iun_op op, int bits, int32_t out,
+                        int32_t a_handle)
+{
+    tpl_ureq r;
+    const uint32_t w = cq_tpl_width(bits);
+    const cq_tpl_cast_fn k = cq_tpl_iun_kernel(op);
+
+    if (op == CQ_SHIM_IUN_BSWAP && w % 16u != 0u)
+        cq_un_die("bswap is refused at a width that is not a multiple of "
+                  "16 bits; llvm.bswap swaps whole BYTE PAIRS and "
+                  "intrinsic_table.yaml lists it at i16, i32 and i64 only "
+                  "(K26.md)", (int)w);
+
+    r.inner.fn = NULL; r.inner.f = r.inner.t = 0u; r.inner.tag = 0u;
+    r.outer.fn = k;
+    r.outer.f  = w; r.outer.t = w;
+    r.outer.tag = 0x60000000u + (uint32_t)op * 1024u + w + 1u;
+    r.w = r.wout = w;
+    r.a_h = a_handle; r.out = out;
+    r.name = cq_tpl_iun_name(op);
+    return r;
+}
+
+int32_t cq_shim_iun(cq_shim_iun_op op, int bits, int32_t a_handle)
+{
+    return cq_tpl_unary(iun_req(op, bits, CQ_REG_NONE, a_handle));
+}
+
+void cq_shim_iun_unc(cq_shim_iun_op op, int bits, int32_t out_handle,
+                     int32_t a_handle)
+{
+    (void)cq_tpl_unary(iun_req(op, bits, out_handle, a_handle));
 }

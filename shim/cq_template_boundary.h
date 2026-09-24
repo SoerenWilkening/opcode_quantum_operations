@@ -102,14 +102,15 @@ typedef struct {
  * as this function sets them is a defect its own family's suite must catch:
  * `k` is NULL, `name` is NULL and `tag` is 0.
  *
- * THE EIGHT TAG SPACES IN USE, and a ninth family must claim a ninth:
+ * THE NINE TAG SPACES IN USE, and a tenth family must claim a tenth:
  *
  *     0x00000000 | op   * 1024 + w + 1      binary          (cq_template_impl.c)
- *     0x10000000 | fop  * 1024 + w + 1      fp_arith binary (cq_template_fparith.c)
+ *     0x10000000 | fop  * 1024 + w + 1      fp binary       (cq_template_fparith.c)
  *     0x20000000 | op   * 1024 + w + 1      fp unary        (cq_template_fparith.c)
  *     0x30000000 | kind * 65536 + f*256 + t fp conversion   (cq_template_fparith.c)
  *     0x40000000 | pred * 1024 + w + 1      icmp            (cq_template_impl.c)
  *     0x50000000 | op   * 1024 + w + 1      fp TERNARY      (cq_template_ternary.c)
+ *     0x60000000 | op   * 1024 + w + 1      INTEGER UNARY   (cq_template_unary.c)
  *     0x80000000 | kind * 65536 + f*256 + t cast            (cq_template_unary.c)
  *     0xC0000000 | pred * 1024 + w + 1      fcmp            (cq_template_fp.c)
  *
@@ -118,6 +119,10 @@ typedef struct {
  * by intent: the binary space reaches at most `12 * 1024 + 128 + 1 = 12417` and
  * the cast space at most `2 * 65536 + 128 * 256 + 128 = 163968`, both far below
  * `0x10000000`, so the gaps between the old prefixes are wide and empty.
+ * (Bead 9ve.44 widened three enums INSIDE their spaces — `cq_shim_op` to 17,
+ * `cq_shim_fop` to 7, `cq_shim_fun_op` to 9 — so those spaces now reach
+ * `16 * 1024 + 128 + 1 = 16513`, `6 * 1024 + 65 = 6209` and
+ * `8 * 1024 + 65 = 8257`: the same five orders of magnitude of headroom.)
  *
  * RE-CHECKED FOR THE EIGHTH (bead 9ve.24, 2026-09-19), as the sentence this
  * paragraph used to end with required. `0x50000000` is the first free
@@ -127,6 +132,16 @@ typedef struct {
  * prefix. `0x60000000`, `0x70000000`, `0x90000000`, `0xA0000000`, `0xB0000000`,
  * `0xD0000000`, `0xE0000000` and `0xF0000000` remain free. A ninth family must
  * re-check this arithmetic rather than assume it.
+ *
+ * RE-CHECKED FOR THE NINTH (bead 9ve.44, 2026-09-24). `0x60000000` is the
+ * first free prefix above the ternary one; the integer unary space reaches at
+ * most `5 * 1024 + 128 + 1 = 5249` (`cq_shim_iun_op` has six enumerators and
+ * the width door admits 128). `0x70000000`, `0x90000000`, `0xA0000000`,
+ * `0xB0000000`, `0xD0000000`, `0xE0000000` and `0xF0000000` remain free. Its
+ * detector is the case whose shape is EXACT for it: a binary `_hl` forward
+ * with a zero literal records `{out, a, NONE, NONE}` and `imm` 0, which is
+ * what an integer unary `_unc` records, so only the prefix separates
+ * `add i8, 0` from `ctpop i8` (tests/test_template_intr.c).
  *
  * The `+ 1` and the width term are not decoration: the width is folded in
  * because the ABI's `_unc` carries it too, and a forward at i32 is not the

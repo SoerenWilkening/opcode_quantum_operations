@@ -146,7 +146,8 @@ static void uitofp_from_i64_is_refused_at_the_entry_point(void)
 static void an_fop_outside_the_abis_enum_is_refused(void)
 {
     (void)open_shim();
-    CQ_EXPECT_ABORT((void)cq_shim_fbin_qq((cq_shim_fop)(CQ_SHIM_FOP_FDIV + 1),
+    /* LAST moved FDIV -> COPYSIGN at bead 9ve.44; `FDIV + 1` is `FMIN`. */
+    CQ_EXPECT_ABORT((void)cq_shim_fbin_qq((cq_shim_fop)(CQ_SHIM_FOP_COPYSIGN + 1),
                                           64, cqrt_alloc_f64(1.0),
                                           cqrt_alloc_f64(1.0)));
 }
@@ -162,7 +163,8 @@ static void an_fcast_kind_outside_the_abis_enum_is_refused(void)
 static void a_fun_op_outside_the_abis_enum_is_refused(void)
 {
     (void)open_shim();
-    CQ_EXPECT_ABORT((void)cq_shim_fun((cq_shim_fun_op)(CQ_SHIM_FUN_FSQRT + 1),
+    /* LAST moved FSQRT -> NEARBYINT at bead 9ve.44; `FSQRT + 1` is `FNEG`. */
+    CQ_EXPECT_ABORT((void)cq_shim_fun((cq_shim_fun_op)(CQ_SHIM_FUN_NEARBYINT + 1),
                                       64, cqrt_alloc_f64(1.0)));
 }
 

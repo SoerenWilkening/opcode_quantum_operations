@@ -1,22 +1,27 @@
 /* shim/cq_template_dispatch.c — see cq_template_dispatch.h for the seam this
  * file is one half of and for why a cast carries its own function-pointer type.
+ *
+ * SINCE bead 9ve.44 THIS IS THE ARITY-2 / ARITY-3 HALF OF THE DISPATCH: every
+ * table here stores a `cq_kernel_fn` or a `cq_tpl_fma_fn` with no adapter. The
+ * `(F, T)` tables — the casts, the conversions and both UNARY families, with
+ * their adapters — are shim/cq_template_dispatch_unary.c's, on the seam
+ * cq_template_dispatch.h records.
  */
 
 #include "cq_template_dispatch.h"
 
 #include "kernels/add.h"
 #include "kernels/bitwise.h"
-#include "kernels/cast.h"
 #include "kernels/cmp.h"
 #include "kernels/divrem_s.h"
 #include "kernels/divrem_u.h"
 #include "kernels/fadd.h"
 #include "kernels/fcmp.h"
-#include "kernels/fconv.h"
 #include "kernels/fdiv.h"
+#include "kernels/fmisc.h"
 #include "kernels/fmul.h"
 #include "kernels/fma.h"
-#include "kernels/fsqrt.h"
+#include "kernels/iminmax.h"
 #include "kernels/mul.h"
 #include "kernels/shift_var.h"
 
@@ -45,12 +50,17 @@ cq_kernel_fn cq_tpl_bin_kernel(cq_shim_op op)
         cq_kernel_add,  cq_kernel_sub,  cq_kernel_mul,      cq_kernel_sdiv,
         cq_kernel_udiv, cq_kernel_srem, cq_kernel_urem,     cq_kernel_and,
         cq_kernel_or,   cq_kernel_xor,  cq_kernel_shl_var,  cq_kernel_lshr_var,
-        cq_kernel_ashr_var
+        cq_kernel_ashr_var,
+        /* M42 (K27, bead 9ve.44) — intrinsic_table.yaml's four min/max.
+         * `smin` and `umin` are the SAME program over slt vs ult, so a
+         * transposed row is value-wrong only where the operands differ in
+         * sign bit: K9's trap once more, seen by L1 alone. */
+        cq_kernel_smin, cq_kernel_smax, cq_kernel_umin, cq_kernel_umax
     };
-    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_OP_ASHR + 1u,
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_OP_UMAX + 1u,
                    "one kernel per cq_shim_op, in the enum's own order");
 
-    if ((unsigned)op > (unsigned)CQ_SHIM_OP_ASHR)
+    if ((unsigned)op > (unsigned)CQ_SHIM_OP_UMAX)
         cq_disp_die("cq_template_* opcode outside the ABI's enum", (int32_t)op);
     return K[op];
 }
@@ -133,63 +143,19 @@ cq_kernel_fn cq_tpl_fcmp_kernel(cq_shim_fpred pred)
 cq_kernel_fn cq_tpl_fbin_kernel(cq_shim_fop op)
 {
     static const cq_kernel_fn K[] = {
-        cq_kernel_fadd, cq_kernel_fsub, cq_kernel_fmul, cq_kernel_fdiv
+        cq_kernel_fadd, cq_kernel_fsub, cq_kernel_fmul, cq_kernel_fdiv,
+        /* M38 (K24, bead 9ve.44). `fmin`/`fmax` are soft_fmin/soft_fmax —
+         * minNum/maxNum, NaN-ABSORBING (PRD-v2 7.7) — one 17-row program
+         * under a swapped mux pair, identical counts. `copysign` is NOT
+         * commutative: the kernel takes the magnitude from its FIRST source,
+         * which is the ABI's `a` lane. */
+        cq_kernel_fmin, cq_kernel_fmax, cq_kernel_copysign
     };
-    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FOP_FDIV + 1u,
-                   "one kernel per cq_shim_fop, in opcode_table.yaml's order");
+    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FOP_COPYSIGN + 1u,
+                   "one kernel per cq_shim_fop, in the enum's own order");
 
-    if ((unsigned)op > (unsigned)CQ_SHIM_FOP_FDIV)
+    if ((unsigned)op > (unsigned)CQ_SHIM_FOP_COPYSIGN)
         cq_disp_die("the fp arithmetic opcode is not one of the ABI enumerators",
-                    (int32_t)op);
-    return K[op];
-}
-
-/* M37's four conversions, in `cq_shim_fcast_kind`'s order. Each takes `(F, T)`
- * exactly as M13's casts do, which is why they share the pointer type and NOT
- * the table: `cq_kernel_sext` and `cq_kernel_sitofp` are both
- * `void (*)(ctx, dst, a, F, T)` and are interchangeable to a compiler, so one
- * table indexed by "a cast kind" would send `sitofp i8 -> f64` to `cq_kernel_zext`
- * — right shape, right widths, a 64-lane result, and a value that is the integer
- * rather than its IEEE encoding. Only L1 sees it. */
-cq_tpl_cast_fn cq_tpl_fcast_kernel(cq_shim_fcast_kind kind)
-{
-    static const cq_tpl_cast_fn K[] = {
-        cq_kernel_fptosi, cq_kernel_fptoui, cq_kernel_sitofp, cq_kernel_uitofp
-    };
-    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FCAST_UITOFP + 1u,
-                   "one kernel per cq_shim_fcast_kind");
-
-    if ((unsigned)kind > (unsigned)CQ_SHIM_FCAST_UITOFP)
-        cq_disp_die("the fp conversion kind is not one of the ABI enumerators",
-                    (int32_t)kind);
-    return K[kind];
-}
-
-/* THE UNARY ADAPTER, AND IT IS WHERE `ckd.15` IS PAID FOR. `cq_kernel_fsqrt` is
- * `(ctx, dst, a, W)` — one source, ONE width — so it does not fit either
- * pointer type the tables above use. Rule 7 fixes the SEMANTICS and not the
- * parameter list, so the kernel is right and the boundary adapts: the arity-1
- * ordered call sequence is written over `(F, T)` because the CASTS need two
- * widths, and a one-width operation passes the same number twice.
- *
- * `T` IS DISCARDED AND THAT IS SAFE HERE AND ONLY HERE. `cq_shim_fun` sets both
- * widths from its single `bits` argument after refusing anything but 64, so the
- * two cannot disagree; a future unary family with a result width of its own
- * would need its own adapter rather than a `T`-aware version of this one. */
-static void fun_fsqrt(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, int F, int T)
-{
-    (void)T;
-    cq_kernel_fsqrt(ctx, dst, a, F);
-}
-
-cq_tpl_cast_fn cq_tpl_fun_kernel(cq_shim_fun_op op)
-{
-    static const cq_tpl_cast_fn K[] = { fun_fsqrt };
-    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_FUN_FSQRT + 1u,
-                   "one kernel per cq_shim_fun_op");
-
-    if ((unsigned)op > (unsigned)CQ_SHIM_FUN_FSQRT)
-        cq_disp_die("the fp unary opcode is not one of the ABI enumerators",
                     (int32_t)op);
     return K[op];
 }
@@ -209,20 +175,6 @@ cq_tpl_fma_fn cq_tpl_fma_kernel(cq_shim_fma_op op)
     return K[op];
 }
 
-cq_tpl_cast_fn cq_tpl_cast_kernel(cq_shim_cast_kind kind)
-{
-    static const cq_tpl_cast_fn K[] = {
-        cq_kernel_sext, cq_kernel_zext, cq_kernel_trunc
-    };
-    _Static_assert(sizeof K / sizeof *K == (size_t)CQ_SHIM_CAST_TRUNC + 1u,
-                   "one kernel per cq_shim_cast_kind");
-
-    if ((unsigned)kind > (unsigned)CQ_SHIM_CAST_TRUNC)
-        cq_disp_die("cq_template_* cast kind outside the ABI's enum",
-                    (int32_t)kind);
-    return K[kind];
-}
-
 /* --- the display names (PRD §15 D21) -------------------------------------- */
 
 /* THREE TABLES IN THE ENUMS' OWN ORDER, tied to their last enumerator by a
@@ -235,12 +187,13 @@ const char *cq_tpl_bin_name(cq_shim_op op)
 {
     static const char *const N[] = {
         "add",  "sub", "mul", "sdiv", "udiv", "srem", "urem",
-        "and",  "or",  "xor", "shl",  "lshr", "ashr"
+        "and",  "or",  "xor", "shl",  "lshr", "ashr",
+        "smin", "smax", "umin", "umax"
     };
-    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_OP_ASHR + 1u,
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_OP_UMAX + 1u,
                    "one display name per cq_shim_op, in the enum's own order");
 
-    if ((unsigned)op > (unsigned)CQ_SHIM_OP_ASHR)
+    if ((unsigned)op > (unsigned)CQ_SHIM_OP_UMAX)
         cq_disp_die("cq_template_* opcode outside the ABI's enum", (int32_t)op);
     return N[op];
 }
@@ -278,44 +231,22 @@ const char *cq_tpl_fcmp_name(cq_shim_fpred pred)
     return N[pred];
 }
 
-const char *cq_tpl_cast_name(cq_shim_cast_kind kind)
-{
-    static const char *const N[] = { "sext", "zext", "trunc" };
-    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_CAST_TRUNC + 1u,
-                   "one display name per cq_shim_cast_kind");
-
-    if ((unsigned)kind > (unsigned)CQ_SHIM_CAST_TRUNC)
-        cq_disp_die("cq_template_* cast kind outside the ABI's enum",
-                    (int32_t)kind);
-    return N[kind];
-}
-
 /* The three fp families' D21 payload names, in their enums' own orders. They
  * are the ABI's own opcode spellings and stay inside handoff §5's charset; the
  * viewer has no operation vocabulary, so all a name has to be is recognisable
  * to a reader of CQ_lang's IR. */
 const char *cq_tpl_fbin_name(cq_shim_fop op)
 {
-    static const char *const N[] = { "fadd", "fsub", "fmul", "fdiv" };
-    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FOP_FDIV + 1u,
-                   "one display name per cq_shim_fop, in the yaml's order");
+    static const char *const N[] = {
+        "fadd", "fsub", "fmul", "fdiv", "fmin", "fmax", "copysign"
+    };
+    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FOP_COPYSIGN + 1u,
+                   "one display name per cq_shim_fop, in the enum's own order");
 
-    if ((unsigned)op > (unsigned)CQ_SHIM_FOP_FDIV)
+    if ((unsigned)op > (unsigned)CQ_SHIM_FOP_COPYSIGN)
         cq_disp_die("the fp arithmetic opcode is not one of the ABI enumerators",
                     (int32_t)op);
     return N[op];
-}
-
-const char *cq_tpl_fcast_name(cq_shim_fcast_kind kind)
-{
-    static const char *const N[] = { "fptosi", "fptoui", "sitofp", "uitofp" };
-    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FCAST_UITOFP + 1u,
-                   "one display name per cq_shim_fcast_kind");
-
-    if ((unsigned)kind > (unsigned)CQ_SHIM_FCAST_UITOFP)
-        cq_disp_die("the fp conversion kind is not one of the ABI enumerators",
-                    (int32_t)kind);
-    return N[kind];
 }
 
 const char *cq_tpl_fma_name(cq_shim_fma_op op)
@@ -326,18 +257,6 @@ const char *cq_tpl_fma_name(cq_shim_fma_op op)
 
     if ((unsigned)op > (unsigned)CQ_SHIM_FMA_FMA)
         cq_disp_die("the fp ternary opcode is not one of the ABI enumerators",
-                    (int32_t)op);
-    return N[op];
-}
-
-const char *cq_tpl_fun_name(cq_shim_fun_op op)
-{
-    static const char *const N[] = { "fsqrt" };
-    _Static_assert(sizeof N / sizeof *N == (size_t)CQ_SHIM_FUN_FSQRT + 1u,
-                   "one display name per cq_shim_fun_op");
-
-    if ((unsigned)op > (unsigned)CQ_SHIM_FUN_FSQRT)
-        cq_disp_die("the fp unary opcode is not one of the ABI enumerators",
                     (int32_t)op);
     return N[op];
 }

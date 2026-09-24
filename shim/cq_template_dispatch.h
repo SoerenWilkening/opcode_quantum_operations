@@ -60,15 +60,30 @@ cq_kernel_fn   cq_tpl_fcmp_kernel(cq_shim_fpred pred);
  * one enumerator short. */
 cq_kernel_fn   cq_tpl_fbin_kernel(cq_shim_fop op);
 
-/* M37's four CROSS-DOMAIN conversions and M40's `fsqrt`, both in M13's `(F, T)`
- * pointer type. `cq_tpl_fun_kernel` returns that type too, which is an ADAPTER
- * rather than a claim about `cq_kernel_fsqrt`: that kernel is one source and
- * ONE width (Rule 7 fixes the semantics, not the parameter list — `ckd.15`),
- * and the adapter passes `F`, with `F == T` guaranteed by the entry point's own
- * refusal of any width but 64. Reaching for `cq_kernel_fn` instead would be the
- * widening Rule 7 forbids in as many words. */
+/* M37's four CROSS-DOMAIN conversions and the two UNARY families, all in M13's
+ * `(F, T)` pointer type. `cq_tpl_fun_kernel` (M40's `fsqrt`, M38's sign ops
+ * and rounding family) and `cq_tpl_iun_kernel` (M41/M42, bead 9ve.44) return
+ * that type through ADAPTERS rather than as a claim about the kernels: each is
+ * one source and ONE width (Rule 7 fixes the semantics, not the parameter list
+ * — `ckd.15`), and the adapter passes `F`, with `F == T` guaranteed by the
+ * entry point, which sets both from one `bits`. Reaching for `cq_kernel_fn`
+ * instead would be the widening Rule 7 forbids in as many words.
+ *
+ * THESE FOUR TABLES AND THEIR NAMES ARE shim/cq_template_dispatch_unary.c's,
+ * ON A SEAM INSIDE THE DISPATCH HALF taken 2026-09-24 (bead 9ve.44):
+ *
+ *     the ARITY-2 / ARITY-3 tables <-> the ARITY-1 `(F, T)` tables
+ *
+ * cq_template_dispatch.c stood at 218 counted lines and Wave 10 owed it ~100
+ * more, most of them unary ADAPTERS. The discriminator is the one
+ * cq_template_boundary.h draws for the ordered call sequences: the unary half
+ * is reached only through `cq_tpl_unary`, and grows when a unary family
+ * lands. THE NEXT CUT, recorded now: the fp unary table and its adapters from
+ * the integer one (`..._dispatch_funary.c`), on the domain line
+ * cq_template_boundary.h already draws between integer and fp surfaces. */
 cq_tpl_cast_fn cq_tpl_fcast_kernel(cq_shim_fcast_kind kind);
 cq_tpl_cast_fn cq_tpl_fun_kernel  (cq_shim_fun_op op);
+cq_tpl_cast_fn cq_tpl_iun_kernel  (cq_shim_iun_op op);
 
 /* THE DISPLAY NAME OF THE OPERATION, for `bd 76r`'s `# STAGE: op begin` payload
  * (PRD §15 D21). It belongs on THIS side of the seam by the seam's own
@@ -87,6 +102,7 @@ const char *cq_tpl_fcmp_name (cq_shim_fpred pred);
 const char *cq_tpl_fbin_name (cq_shim_fop op);
 const char *cq_tpl_fcast_name(cq_shim_fcast_kind kind);
 const char *cq_tpl_fun_name  (cq_shim_fun_op op);
+const char *cq_tpl_iun_name  (cq_shim_iun_op op);
 
 /* --- the ARITY-3 kernel, which needs its own pointer type ------------------
  *

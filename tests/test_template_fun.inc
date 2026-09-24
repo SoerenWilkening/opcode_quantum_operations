@@ -1,8 +1,13 @@
 /* tests/test_template_fun.inc — the UNARY M26 door, `cq_shim_fun` /
- * `cq_shim_fun_unc`, over `cq_shim_fun_op { CQ_SHIM_FUN_FSQRT }`.
+ * `cq_shim_fun_unc`, as bead 9ve.36 built it for `CQ_SHIM_FUN_FSQRT`.
  *
- * NO `cq_template_*` SYMBOL REACHES IT YET, AND THAT IS RECORDED RATHER THAN
- * WORKED AROUND. `opcode_table.yaml`'s only unary opcode is `fneg`
+ * SUPERSEDED IN PART (bead 9ve.44): the vendoring connected `sqrt` to this
+ * door and Wave 10's wiring connected M38's eight unary rows, `fneg` among
+ * them; those are tests/test_template_fmisc.c's. The paragraph below is the
+ * door's history as built, kept because the cases here still test it BY NAME.
+ *
+ * WHEN BUILT, NO `cq_template_*` SYMBOL REACHED IT, AND THAT WAS RECORDED
+ * RATHER THAN WORKED AROUND. `opcode_table.yaml`'s only unary opcode is `fneg`
  * (`:209-210`), whose kernel is bead 9ve.27's and does not exist, so `fneg`
  * keeps its `"fp is v2"` abort and `gen_bodies.ENTRY` has no `("funary", ...)`
  * row — its KeyError is the documented failure for a premature landing.

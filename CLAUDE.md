@@ -234,7 +234,7 @@ document** first, never implicitly in code. Read the named decision before reope
 | `ckd.17a`, `ckd.14` | PRD §10 | One involution per step; `cq_shadow_retire` after release, never on a live qubit |
 | `vxk`, `r3y`, `ck6` | **D16/D23/D24** | fp / `qram` / `tape` disposition; buckets by family then width. f64 rails exist since `9ve.28`. Read counts from `nm` |
 | `dzj` | **D17** | `cqrt_addc` is K8 in place, never sandwiched |
-| `819`, `3ep` | Step 22 name rule + **D14** | Integer grid = 992 wrappers + 603 `_inv` aborts; fp-touching iff the **name** carries an fp width token. Landed fp ROWS live in `shim/gen_shim.py` (`LANDED`, `DECLINED`); **read the live split from `python3 shim/gen_shim.py`** |
+| `819`, `3ep` | Step 22 name rule + **D14** | `opcode_table.yaml`'s integer grid = 992 wrappers + 603 `_inv` aborts (the intrinsic rows add their own — read the live split from the generator); fp-touching iff the **name** carries an fp width token. Landed fp ROWS live in `shim/gen_shim.py` (`LANDED`, `DECLINED`); **read the live split from `python3 shim/gen_shim.py`** |
 | `ckd.19` | PRD §10 | **`cqrt_free` is the sole deallocator**; `_unc` zeroes values and reclaims nothing |
 | D7a / D7b | PRD §15 | D7a (`out` among sources) = hard error. D7b (sources alias) is **legal** at the handle boundary — M26 does a defensive `cqrt_copy`, **both halves outside the §9 region** — and a hard error at the kernel boundary. `bd remember d7b-copy-brackets-the-region-from-outside` |
 
@@ -409,7 +409,7 @@ Most have a `bd` memory with the full measured story — read it before touching
 - Do NOT assert forward/`_unc` count or kind equality (Rule 14).
 - Do NOT implement gate-level optimisation in v1, or shadow-driven demotion (D6).
 - Do NOT implement fp outside the v2 port, and never at f16/f32/f80; unlanded fp rows and the
-  603 integer `_inv` bodies keep their loud aborts (D14).
+  integer `_inv` bodies keep their loud aborts (D14).
 - Do NOT implement error correction — we call the QEC library; angle conversion is the QEC sink's.
 - Do NOT add dependencies beyond libc (PRD §14).
 

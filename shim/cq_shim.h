@@ -86,15 +86,22 @@ static inline uint64_t cq_shim_f64_bits(double x)
 #define CQ_SHIM_F64_LO(x) cq_shim_f64_bits(x)
 #define CQ_SHIM_F64_HI(x) ((void)sizeof(x), UINT64_C(0))
 
-/* The 13 integer binary opcodes that reach a wrapper. `icmp` is separate (it
- * carries a predicate); the fp opcodes never reach a wrapper at all. The set
- * is asserted against opcode_table.yaml by tests/test_gen_shim.py, so it
- * cannot drift from the ABI silently. */
+/* The integer binary opcodes that reach a wrapper: opcode_table.yaml's 13,
+ * then intrinsic_table.yaml's four min/max (M42, bead 9ve.44), which are
+ * ordinary integer binaries by shape — `qq`/`hl` and their `_unc`, no `_lh`
+ * (commutative), no controlled axis in that yaml. `icmp` is separate (it
+ * carries a predicate). The set is asserted against BOTH yamls by
+ * tests/test_gen_shim.py, so it cannot drift from the ABI silently.
+ *
+ * THE FOUR `*_sat` INTRINSICS ARE NOT HERE AND MUST NOT ARRIVE WITHOUT A
+ * CONSTRUCTION: the pinned Bennett snapshot has none (K27.md, "Not ported"),
+ * so they keep their abort and there is no enumerator to dispatch them. */
 typedef enum {
     CQ_SHIM_OP_ADD, CQ_SHIM_OP_SUB,  CQ_SHIM_OP_MUL,  CQ_SHIM_OP_SDIV,
     CQ_SHIM_OP_UDIV, CQ_SHIM_OP_SREM, CQ_SHIM_OP_UREM, CQ_SHIM_OP_AND,
     CQ_SHIM_OP_OR,  CQ_SHIM_OP_XOR,  CQ_SHIM_OP_SHL,  CQ_SHIM_OP_LSHR,
-    CQ_SHIM_OP_ASHR
+    CQ_SHIM_OP_ASHR,
+    CQ_SHIM_OP_SMIN, CQ_SHIM_OP_SMAX, CQ_SHIM_OP_UMIN, CQ_SHIM_OP_UMAX
 } cq_shim_op;
 
 /* opcode_table.yaml's `predicates: icmp:` list, in its order. */
@@ -126,8 +133,9 @@ typedef enum {
  * yaml's own order (`:200-204`).
  *
  * TWO OF THAT FAMILY'S SIX OPCODES ARE ABSENT AND THE ABSENCE IS THE POINT.
- * `frem` is a `fp_arith` binary row with no kernel, and `fneg` is the yaml's
- * ONE unary opcode and also in `fp_arith`; both keep their `"fp is v2"` abort.
+ * `frem` is a `fp_arith` binary row with no kernel and keeps its `"fp is v2"`
+ * abort; `fneg` is the yaml's ONE unary opcode and also in `fp_arith`, and
+ * since bead 9ve.44 it is live — through `cq_shim_fun_op`, not this enum.
  * That is why `gen_shim.LANDED`'s key is `(opcode, width)` and not
  * `(family, width)` — a family-grained key would take all six together, which
  * for `frem` means a live wrapper dispatching an opcode no table has a row for.
@@ -135,8 +143,15 @@ typedef enum {
  * A SEPARATE PREFIX FROM `CQ_SHIM_OP_`, on `cq_shim_fpred`'s ground: an fp
  * `fadd` and an integer `add` are different operations over different kernels,
  * and one enumerator space for both is a silent cross-domain dispatch. */
+/* AND M38's THREE BINARY OPCODES FROM intrinsic_table.yaml (bead 9ve.44):
+ * `fmin` and `fmax` are `llvm.minnum`/`maxnum` — soft_fmin/soft_fmax, the
+ * NaN-ABSORBING pair, never soft_fminimum/soft_fmaximum (PRD-v2 7.7) — and
+ * `copysign` is NOT commutative: the magnitude is the FIRST operand. None of
+ * the three carries a controlled row in that yaml, so `cq_shim_fbin_*_ctrl`
+ * is never reached with them; the door would serve it if it were. */
 typedef enum {
-    CQ_SHIM_FOP_FADD, CQ_SHIM_FOP_FSUB, CQ_SHIM_FOP_FMUL, CQ_SHIM_FOP_FDIV
+    CQ_SHIM_FOP_FADD, CQ_SHIM_FOP_FSUB, CQ_SHIM_FOP_FMUL, CQ_SHIM_FOP_FDIV,
+    CQ_SHIM_FOP_FMIN, CQ_SHIM_FOP_FMAX, CQ_SHIM_FOP_COPYSIGN
 } cq_shim_fop;
 
 /* The three integer width casts. */
@@ -159,14 +174,36 @@ typedef enum {
     CQ_SHIM_FCAST_SITOFP, CQ_SHIM_FCAST_UITOFP
 } cq_shim_fcast_kind;
 
-/* The UNARY fp operations. `fsqrt` is `llvm.sqrt` in CQ_lang's
- * intrinsic_table.yaml, which M27 does not generate from (PRD §1: scope is
- * `opcode_table.yaml` ONLY), so NO generated wrapper reaches this enum today —
- * the door is built, tested by name from tests/test_template_fp.c, and
- * unreached. `fneg`, the yaml's one unary opcode, is NOT here: its kernel is
- * bead 9ve.27's and does not exist, so it keeps its abort and
- * `gen_bodies.ENTRY` has no `("funary", ...)` row at all. */
-typedef enum { CQ_SHIM_FUN_FSQRT } cq_shim_fun_op;
+/* The UNARY fp operations, ONE ENUMERATOR PER ABI ROW. `fsqrt` is
+ * `llvm.sqrt` (M40), reached since PRD-v2 §6.1's vendoring; the rest are M38's
+ * (bead 9ve.44): `fneg` is opcode_table.yaml's one unary opcode and the other
+ * seven are intrinsic_table.yaml's.
+ *
+ * `ROUND`, `RINT` AND `NEARBYINT` ARE THREE ENUMERATORS AND TWO KERNELS, and
+ * the table that says which is shim/cq_template_dispatch_unary.c's (PRD-v2
+ * 7.7): `rint` and `nearbyint` are soft_round (ties-to-EVEN) and C's `round`
+ * is soft_round_away (ties-AWAY). Folding them into one enumerator here would
+ * give `rint` and `round` one twin identity, and an `_unc` of one would then
+ * discharge a forward of the other — a rail left holding `x ^ y` on every tie. */
+typedef enum {
+    CQ_SHIM_FUN_FSQRT,
+    CQ_SHIM_FUN_FNEG,  CQ_SHIM_FUN_FABS,
+    CQ_SHIM_FUN_FLOOR, CQ_SHIM_FUN_CEIL, CQ_SHIM_FUN_TRUNC,
+    CQ_SHIM_FUN_ROUND, CQ_SHIM_FUN_RINT, CQ_SHIM_FUN_NEARBYINT
+} cq_shim_fun_op;
+
+/* The INTEGER UNARY intrinsics (bead 9ve.44): M41's ctpop/ctlz/cttz/
+ * bitreverse/bswap and M42's abs, at the widths intrinsic_table.yaml lists
+ * (i8..i64; `bswap` i16..i64). A SEPARATE ENUM AND A SEPARATE DOOR from
+ * `cq_shim_fun_op` on `cq_shim_fpred`'s ground: the fp unary door refuses any
+ * width but 64, and a shared enumerator space would let an integer `abs`
+ * dispatch `fabs`. The i1 immarg of ctlz/cttz/abs is NOT an operand here — the
+ * yaml drops it at lowering and the kernels compute the total function
+ * (K26.md D-K26-4). */
+typedef enum {
+    CQ_SHIM_IUN_CTPOP, CQ_SHIM_IUN_CTLZ, CQ_SHIM_IUN_CTTZ,
+    CQ_SHIM_IUN_BITREVERSE, CQ_SHIM_IUN_BSWAP, CQ_SHIM_IUN_ABS
+} cq_shim_iun_op;
 
 /* Forward: mint a fresh rail holding f(a, b) and return its handle. */
 int32_t cq_shim_bin_qq(cq_shim_op op, int bits, int32_t a_handle, int32_t b_handle);
@@ -265,10 +302,10 @@ int32_t cq_shim_fcast(cq_shim_fcast_kind kind, int from_bits, int to_bits, int32
 void cq_shim_fcast_unc(cq_shim_fcast_kind kind, int from_bits, int to_bits, int32_t out_handle, int32_t a_handle);
 
 /* The UNARY fp door. One source, one width, a 64-lane result — the shape
- * PRD-v2 §7.11 predicts for the whole of M38 (`fneg`/`fabs`/the rounding
- * family), so what lands here is what they reuse. No classical operand and no
- * controlled axis: the yaml gives `fneg` three variants (fwd/inv/unc) and
- * nothing else. */
+ * PRD-v2 §7.11 predicted for the whole of M38 (`fneg`/`fabs`/the rounding
+ * family), and since bead 9ve.44 what they reach. No classical operand and no
+ * controlled axis: the yaml gives `fneg` three variants (fwd/inv/unc, the
+ * `_inv` a D14 abort) and the intrinsic rows two (fwd/unc). */
 /* --- the fp TERNARY family (PRD-v2 §6.1's vendoring, bead 9ve.24) ---------
  *
  * ONE ENUMERATOR, AND IT IS STILL AN ENUM RATHER THAN A BARE `bits`. The tag
@@ -309,6 +346,15 @@ void cq_shim_fma_qll_unc(cq_shim_fma_op op, int bits, int32_t out_handle,
 
 int32_t cq_shim_fun(cq_shim_fun_op op, int bits, int32_t a_handle);
 void cq_shim_fun_unc(cq_shim_fun_op op, int bits, int32_t out_handle, int32_t a_handle);
+
+/* The INTEGER UNARY door (bead 9ve.44): one handle, one width, a result of
+ * the operand's width, no literal and no controlled axis — the yaml gives
+ * these rows `fwd`/`unc` (plus a class-1 `_inv` on bswap/bitreverse, which is
+ * a D14 abort and never reaches this door). `bswap` at a width that is not a
+ * multiple of 16 is refused HERE, at the entry point, before a rail is minted
+ * or a D21 bracket opened. */
+int32_t cq_shim_iun(cq_shim_iun_op op, int bits, int32_t a_handle);
+void cq_shim_iun_unc(cq_shim_iun_op op, int bits, int32_t out_handle, int32_t a_handle);
 
 /* The v1 boundary, made visible at RUNTIME rather than at link time (PRD §1).
  * `reason` distinguishes the two abort buckets — "fp is v2" and D14's `_inv` —

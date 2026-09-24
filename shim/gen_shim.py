@@ -52,18 +52,21 @@ import yaml
 
 import gen_bodies
 import gen_intrinsics
+import gen_opcodes
 
-# RESERVE SEAM, RECORDED 2026-09-19 (bead 9ve.24) BEFORE IT BITES. This file is
-# at 292 counted lines of Rule 12's 300 after PRD-v2 6.1's vendoring, and the
-# next family to land is one LANDED line plus nothing — but the next SCHEMA
-# would be another expander. The cut is already drawn and is the one this
-# landing took for the tables: THE MODEL AND THE RULES (Row, variant_axes,
-# suffix, signature, landed_key, bucket_of, the reason tables) STAY HERE; the
-# per-schema EXPANSION moves out, as shim/gen_intrinsics.py already has. The
-# next thing to move is `expand` itself, to shim/gen_opcodes.py, which is ~35
-# counted lines and would leave this file at ~257. Do NOT instead split the
-# audit or the renderer: they are what every expander answers to, and two
-# copies of either is two readings of one frozen ABI.
+# THE RESERVE SEAM RECORDED 2026-09-19 (bead 9ve.24) WAS TAKEN 2026-09-24
+# (bead 9ve.44), exactly as recorded: this file stood at 292 counted lines of
+# Rule 12's 300 and Wave 10 owed it eleven fp LANDED keys, ten integer ones
+# and a per-opcode `defer` reason table. THE MODEL AND THE RULES (Row,
+# variant_axes, suffix, signature, landed_key, bucket_of, the reason tables,
+# the audit, the renderer) STAY HERE; `opcode_table.yaml`'s EXPANSION moved to
+# shim/gen_opcodes.py beside gen_intrinsics.py's two, and `expand` below is the
+# one-line entry point every caller already used. Do NOT split the audit or the
+# renderer next: they are what every expander answers to, and two copies of
+# either is two readings of one frozen ABI. THE NEXT CUT, recorded now: the
+# REASON TABLES (DEFER_REASON, INTRINSIC_DEFER_REASON, DECLINED) to
+# shim/gen_reasons.py — they are the one part of this file that grows with
+# every refusal rather than with a schema.
 
 # --- Row model ---------------------------------------------------------------
 # One record per emitted symbol. This is the whole interface to gen_bodies.
@@ -215,11 +218,26 @@ LANDED = frozenset((
     # --- intrinsic_table.yaml, vendored 2026-09-19 (PRD-v2 §6.1, bead 9ve.24).
     ("fma", "f64"),             # M39 / K20 — 4 shapes x fwd/unc, NO `_inv`
     ("sqrt", "f64"),            # M40 / K21 — reached through cq_shim_fun
-    # NOTHING ELSE FROM THAT TABLE LANDS HERE. `fneg`/`fabs`/`copysign`/
-    # `fmin`/`fmax` and the five rounding opcodes are M38's (bead 9ve.27) and
-    # the thirteen integer intrinsics are bead 9ve.29's; each keeps an abort
-    # whose reason is TRUE of it, which for the integer half is not "fp is v2".
-))
+    #
+    # --- bead 9ve.44, Wave 10's ABI wiring. M38 (K24 fmisc, K25 fround) at
+    # f64: `fneg` is opcode_table.yaml's one unary opcode, the other ten are
+    # intrinsic_table.yaml's. The LLVM-name -> soft_* map is NOT identity
+    # (PRD-v2 7.7: `rint`/`nearbyint` are soft_round, `round` is
+    # soft_round_away, `fmin`/`fmax` are soft_fmin/soft_fmax) and it lives in
+    # shim/cq_template_dispatch_unary.c's table, never in a key here.
+    ("fneg", "f64"), ("fabs", "f64"), ("copysign", "f64"),
+    ("fmin", "f64"), ("fmax", "f64"),
+    ("floor", "f64"), ("ceil", "f64"), ("trunc", "f64"),
+    ("round", "f64"), ("rint", "f64"), ("nearbyint", "f64"),
+)) | frozenset(
+    # M41 ibits (K26) and M42 iminmax (K27): the ten integer intrinsics that
+    # HAVE a construction, at every width the yaml lists (`bswap` has no i8
+    # row, so its key there matches nothing). `fshl`/`fshr` and the four
+    # `*_sat` are NOT here and each defers for its own reason (below).
+    (op, w) for op in ("ctpop", "ctlz", "cttz", "bitreverse", "bswap", "abs",
+                       "smin", "smax", "umin", "umax")
+    for w in ("i8", "i16", "i32", "i64")
+)
 
 # --- Rows that are REFUSED rather than unported ------------------------------
 # A KEY HERE IS NOT LANDED AND CARRIES ITS OWN ABORT TEXT. The default `"fp is
@@ -247,14 +265,26 @@ LANDED = frozenset((
 # minus the ten that landed — the "a count is not an identification" failure
 # applied to the buckets themselves.
 DEFER_REASON = {
-    "intrinsic": "the integer llvm.* intrinsics are a v1-shaped port that has "
-                 "not run yet — Bennett expands ctpop/ctlz/bswap/fshl in its "
-                 "extractor, so Rule 1 is satisfiable (bead 9ve.29, "
-                 "PRD-v2 7.14)",
     "libm": "lrint/llrint have no soft_lrint upstream and ZERO corpus calls; "
             "they are composable as soft_round then soft_fptosi the day a "
             "caller appears (PRD-v2 7.9)",
 }
+
+# THE INTRINSIC TABLE'S REASON IS PER OPCODE SINCE bead 9ve.44, AND THE OLD ONE
+# IS GONE RATHER THAN NARROWED. It said the integer intrinsics were "a
+# v1-shaped port that has not run yet (bead 9ve.29)"; M41/M42 have run, so the
+# sentence is true of NO row now, and the six opcodes that still defer do so
+# for two different reasons of their own. A KeyError here is the failure for an
+# integer intrinsic row that defers with no reason written down.
+_FUNNEL = ("fshl/fshr are REFUSED, not unported: Bennett's expansion "
+           "(instructions.jl:4947-4996) is not LLVM's funnel shift at a shift "
+           "congruent to 0 mod W, so porting it is a known miscompile and "
+           "correcting it is a re-derivation (bead 9ve.29.3, K26.md section 6)")
+_SAT = ("the saturating add/sub intrinsics have NO construction in the pinned "
+        "Bennett snapshot, so Rule 1 forbids writing one (K27.md, Not ported)")
+INTRINSIC_DEFER_REASON = {"fshl": _FUNNEL, "fshr": _FUNNEL,
+                          "uadd_sat": _SAT, "sadd_sat": _SAT,
+                          "usub_sat": _SAT, "ssub_sat": _SAT}
 
 DECLINED = {
     ("uitofp", "i64", "f64"):
@@ -276,8 +306,8 @@ def landed_key(kind, opcode, widths):
 
 # `source` DECIDES WHICH RULE APPLIES, and it has to: a row from
 # `opcode_table.yaml` that touches no fp width is a live wrapper by definition,
-# while a row from `intrinsic_table.yaml` that touches no fp width is bead
-# 9ve.29's and must NOT be. Reading that off the widths alone is impossible —
+# while a row from `intrinsic_table.yaml` that touches no fp width is live ONLY
+# if its key is LANDED (M41/M42's ten, bead 9ve.44) and defers otherwise. Reading that off the widths alone is impossible —
 # `cq_template_add_i32` and `cq_template_ctpop_i32` are indistinguishable by
 # domain — which is why the field exists rather than being derived.
 def bucket_of(key, widths, inv, domains, source):
@@ -319,7 +349,8 @@ def _emitter(rows, W):
         if bucket == "fp":
             reason = DECLINED.get(key)
         elif bucket == "defer":
-            reason = DEFER_REASON[source]
+            reason = (INTRINSIC_DEFER_REASON[opcode] if source == "intrinsic"
+                      else DEFER_REASON[source])
         else:
             reason = None
         rows.append(Row(
@@ -334,29 +365,10 @@ def _emitter(rows, W):
 
 
 def expand(table):
-    W = table["widths"]
+    # opcode_table.yaml's schema lives in shim/gen_opcodes.py (the seam at the
+    # head of this file); this is the entry point the tests have always called.
     rows = []
-    emit = _emitter(rows, W)
-    preds = table["predicates"]
-
-    for kind, key in (("binary", "binary_opcodes"), ("unary", "unary_opcodes")):
-        for e in table[key]:
-            for w in e["widths"]:
-                for v in e["variants"]:
-                    emit("%s_%s" % (e["opcode"], w), kind, e["family"],
-                         e["opcode"], "", [w], v, W[w]["bits"], 0)
-    for e in table["compare_opcodes"]:
-        for p in preds[e["predicate_set"]]:
-            for w in e["widths"]:
-                for v in e["variants"]:
-                    emit("%s_%s_%s" % (e["opcode"], p, w), "compare", e["family"],
-                         e["opcode"], p, [w], v, W[w]["bits"], 0)
-    for e in table["cast_opcodes"]:
-        for pr in e["pairs"]:
-            for v in e["variants"]:
-                emit("%s_%s_to_%s" % (e["opcode"], pr["from"], pr["to"]), "cast",
-                     e["kind"], e["opcode"], "", [pr["from"], pr["to"]], v,
-                     W[pr["from"]]["bits"], W[pr["to"]]["bits"])
+    gen_opcodes.expand_opcodes(table, _emitter(rows, table["widths"]))
     return rows
 
 
@@ -375,16 +387,21 @@ def expand(table):
 # is what a reader and a reviewer actually need, and it is what the bead reports.
 BUCKETS = ("wrapper", "inv", "fp", "defer")
 
-EXPECTED = {"total": 2880, "wrapper": 1122, "inv": 668, "fp": 841,
-            "defer": 249}
+EXPECTED = {"total": 2880, "wrapper": 1262, "inv": 676, "fp": 810,
+            "defer": 132}
 # SEVEN POPULATIONS, AND THE THREE NEW ONES ARE WHAT MAKES THE VENDORING
-# VISIBLE. `int_defer` is bead 9ve.29's integer intrinsics; `fp_defer` is
+# VISIBLE. `int_defer` is the integer intrinsics that still abort (since bead
+# 9ve.44 only `fshl`/`fshr` and the four `*_sat`); `fp_defer` is
 # libm's twelve, which are fp on their OPERAND width; `fp_abort` is unchanged
 # in meaning and grew by the unported fp intrinsics. Without this split the
 # four coarse figures stay exact while 389 symbols change domain — the
 # failure the five-way split was added for one landing ago.
-EXPECTED_BY_DOMAIN = {"int_wrapper": 992, "int_inv": 603, "int_defer": 237,
-                      "fp_wrapper": 130, "fp_inv": 65, "fp_abort": 841,
+# BEAD 9ve.44 MOVED 148 AND ADDED NONE: 110 + 7 integer intrinsic rows out of
+# `int_defer` (M41/M42's wrappers, and the class-1 `bswap`/`bitreverse` `_inv`
+# as D14 aborts), 30 + 1 f64 rows out of `fp_abort` (M38's wrappers and
+# `fneg_f64_inv`). `int_inv` is therefore no longer the opcode grid's 603.
+EXPECTED_BY_DOMAIN = {"int_wrapper": 1102, "int_inv": 610, "int_defer": 120,
+                      "fp_wrapper": 160, "fp_inv": 66, "fp_abort": 810,
                       "fp_defer": 12}
 
 

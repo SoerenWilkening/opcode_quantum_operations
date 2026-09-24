@@ -55,7 +55,11 @@ BITS = {"i1": 1, "i8": 8, "i16": 16, "i32": 32, "i64": 64, "i80": 80,
 # carry. Spelled out here rather than asked of gen_shim: that file reads the
 # yaml's `domain` and its cast `kind`, so these are a genuinely independent
 # route to the same answer and the two disagree exactly when one is wrong.
-FP_BINOPS = {"fadd", "fsub", "fmul", "fdiv"}
+FP_BINOPS = {"fadd", "fsub", "fmul", "fdiv", "fmin", "fmax", "copysign"}
+# bead 9ve.44's integer UNARY door, `cq_shim_iun`: M41's five and M42's `abs`.
+# The four integer min/max reach `CQ_SHIM_OP_` like `add` does, by the rule
+# below that is not this set.
+INT_UNOPS = {"ctpop", "ctlz", "cttz", "bitreverse", "bswap", "abs"}
 XDOM = {"fptosi", "fptoui", "sitofp", "uitofp"}
 CALL = re.compile(r"^    (?:return )?(cq_shim_[a-z_0-9]+)\((.*)\);$")
 PARAM = re.compile(r"\b([a-z_]+_(?:handle|classical|flag))\b")
@@ -65,14 +69,28 @@ OPCODES = {"add", "sub", "mul", "sdiv", "udiv", "srem", "urem", "and", "or",
            "fptosi", "fptoui", "sitofp", "uitofp",
            # PRD-v2 §6.1's vendoring (bead 9ve.24): the two opcodes from
            # intrinsic_table.yaml that LANDED.
-           "fma", "sqrt"}
+           "fma", "sqrt",
+           # bead 9ve.44: M41 + M42 (integer), M38 (f64; `trunc` is already
+           # above, as the integer cast, and the SET does not count it twice).
+           "ctpop", "ctlz", "cttz", "bitreverse", "bswap", "abs",
+           "smin", "smax", "umin", "umax",
+           "fneg", "fabs", "floor", "ceil", "round", "rint", "nearbyint",
+           "fmin", "fmax", "copysign"}
 
 # THE TWO INTRINSIC SELECTORS, TRANSCRIBED INDEPENDENTLY. `fma`'s enumerator
 # happens to be the opcode upper-cased and `sqrt`'s is NOT — `CQ_SHIM_FUN_FSQRT`
 # carries the `f` the ABI's opcode token drops — so a rule that upper-cased the
 # stem would emit `CQ_SHIM_FUN_SQRT`, an enumerator that does not exist. The
 # mapping is spelled out for exactly that reason.
-INTRINSIC_SEL = {"fma": "CQ_SHIM_FMA_FMA", "sqrt": "CQ_SHIM_FUN_FSQRT"}
+INTRINSIC_SEL = {"fma": "CQ_SHIM_FMA_FMA", "sqrt": "CQ_SHIM_FUN_FSQRT",
+                 # bead 9ve.44: the fp UNARY door. ONE ENUMERATOR PER ABI ROW —
+                 # `rint`, `nearbyint` and `round` are three, and which kernel
+                 # each reaches (PRD-v2 7.7) is the dispatch table's, not this.
+                 "fneg": "CQ_SHIM_FUN_FNEG", "fabs": "CQ_SHIM_FUN_FABS",
+                 "floor": "CQ_SHIM_FUN_FLOOR", "ceil": "CQ_SHIM_FUN_CEIL",
+                 "trunc": "CQ_SHIM_FUN_TRUNC", "round": "CQ_SHIM_FUN_ROUND",
+                 "rint": "CQ_SHIM_FUN_RINT",
+                 "nearbyint": "CQ_SHIM_FUN_NEARBYINT"}
 # The enum prefix a dispatch SELECTOR may carry, and the opcode each implies.
 # The four `F*` prefixes are pairwise disjoint from their integer siblings —
 # checked in tests/test_gen_shim.py rather than assumed here — so the order of
@@ -82,7 +100,22 @@ SELECTORS = (("CQ_SHIM_OP_", None), ("CQ_SHIM_FOP_", None),
              ("CQ_SHIM_CAST_", None), ("CQ_SHIM_FCAST_", None),
              # The two intrinsic prefixes. `fma` takes the None rule (its
              # enumerator IS its opcode); `sqrt` cannot, so it is named.
-             ("CQ_SHIM_FMA_", None), ("CQ_SHIM_FUN_", "sqrt"))
+             ("CQ_SHIM_FMA_", None), ("CQ_SHIM_FUN_", {"FSQRT": "sqrt"}),
+             # bead 9ve.44's integer unary door; its enumerators ARE opcodes.
+             ("CQ_SHIM_IUN_", None))
+
+
+def selector_opcode(sel):
+    # The opcode each matching prefix says `sel` dispatches. A dict names the
+    # enumerators that are NOT their opcode spelled upper-case; any other
+    # enumerator under that prefix is.
+    out = []
+    for p, op in SELECTORS:
+        if sel.startswith(p):
+            tail = sel[len(p):]
+            out.append(op if isinstance(op, str) else
+                       (op or {}).get(tail, tail.lower()))
+    return out
 
 
 def wrappers(defs):
@@ -146,9 +179,11 @@ def expected_args(name, decl):
         # one of them is wrong.
         m = re.match(r"([a-z_]+?)_([if]\d+)", stem)
         if m.group(1) in INTRINSIC_SEL:
-            # THE TWO LANDED INTRINSICS, whose selector is a NAMED constant
+            # THE LANDED fp INTRINSICS, whose selector is a NAMED constant
             # rather than a derived one — see INTRINSIC_SEL.
             head = [INTRINSIC_SEL[m.group(1)], str(BITS[m.group(2)])]
+        elif m.group(1) in INT_UNOPS:
+            head = ["CQ_SHIM_IUN_" + m.group(1).upper(), str(BITS[m.group(2)])]
         else:
             pre = "CQ_SHIM_FOP_" if m.group(1) in FP_BINOPS else "CQ_SHIM_OP_"
             head = [pre + m.group(1).upper(), str(BITS[m.group(2)])]
@@ -183,18 +218,19 @@ def expected_args(name, decl):
 # --- The cases ---------------------------------------------------------------
 
 def no_wrapper_is_inert(defs=None):
+    # AND 1262 SINCE bead 9ve.44: 110 integer intrinsic wrappers and 30 f64.
     # 992 until PRD-v2's first fp family landed (2026-09-18, bead 9ve.28) and
     # 1048 until bead 9ve.36 added the fp ARITHMETIC surface: 30 `fp_arith`
     # bodies at f64 and 34 cross-domain conversion bodies, wrappers on exactly
     # the same terms as an integer one, ONE CALL EACH.
     # AND 1122 SINCE bead 9ve.24's VENDORING: `fma` x8 and `sqrt` x2 at f64.
     w = wrappers(defs or SHIPPED)
-    sc.check(len(w) == 1122, "expected 1122 wrappers, got %d" % len(w))
+    sc.check(len(w) == 1262, "expected 1262 wrappers, got %d" % len(w))
     for name, body in sorted(w.items()):
         one_call(name, body)
 
 
-def the_wrapper_calls_cover_all_twenty_six_dispatched_opcodes(defs=None):
+def the_wrapper_calls_cover_every_dispatched_opcode(defs=None):
     # READS THE CALL, NOT THE NAME. Until an adversarial review said so this
     # walked the symbol NAME set — which `the_emitted_symbol_set_equals_the_abi`
     # already pins — so the case could not fail and its own name was a false
@@ -209,15 +245,16 @@ def the_wrapper_calls_cover_all_twenty_six_dispatched_opcodes(defs=None):
     seen = set()
     for name, body in wrappers(defs or SHIPPED).items():
         sel = one_call(name, body)[1][0]
-        hit = [op if op else sel[len(p):].lower()
-               for p, op in SELECTORS if sel.startswith(p)]
+        hit = selector_opcode(sel)
         sc.check(len(hit) == 1, "%s: selector %r matches %d known enum "
                  "prefixes, expected exactly 1" % (name, sel, len(hit)))
         seen.add(hit[0])
     sc.diff_sets(seen, OPCODES, "opcodes DISPATCHED by a wrapper body")
 
 
-def the_wrapper_shape_split_is_449_forward_449_unc_224_controlled(defs=None):
+def the_wrapper_shape_split_is_519_forward_519_unc_224_controlled(defs=None):
+    # 449/449/224 until bead 9ve.44, whose 140 wrappers are 70 forwards and 70
+    # `_unc`s: NONE of intrinsic_table.yaml's rows carries a controlled axis.
     # 389/389/214, then 417/417/214 when `fcmp` landed (its 28 new wrappers are
     # forwards and `_unc`s and the CONTROLLED figure did not move, because
     # compares get no controlled grid on ANY axis). Bead 9ve.36 is the first
@@ -231,8 +268,8 @@ def the_wrapper_shape_split_is_449_forward_449_unc_224_controlled(defs=None):
         entry = one_call(name, body)[0]
         got["unc" if entry.endswith("_unc") else
             "controlled" if entry.endswith("_ctrl") else "fwd"] += 1
-    sc.check(got == {"fwd": 449, "unc": 449, "controlled": 224},
-             "shape split: expected 449/449/224, got %r" % got)
+    sc.check(got == {"fwd": 519, "unc": 519, "controlled": 224},
+             "shape split: expected 519/519/224, got %r" % got)
     ctrl = {n for n, b in wrappers(defs or SHIPPED).items()
             if one_call(n, b)[0].endswith("_ctrl")}
     sc.check(not any("cmp_" in n for n in ctrl),
@@ -272,7 +309,8 @@ def the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type(defs=None)
         sc.check("CQ_SHIM_LO(b_classical)" in body[0] and "CQ_SHIM_HI(b_classical)" in body[0],
                  "%s: literal is not decomposed into two words: %s" % (name, body[0]))
     n = sum(1 for _n, b in wrappers(defs).items() if "CQ_SHIM_LO(" in b[0])
-    sc.check(n == 516, "expected 516 wrappers carrying a classical literal, got %d" % n)
+    # 548 since bead 9ve.44: the four integer min/max `_hl` x {fwd, unc} x 4.
+    sc.check(n == 548, "expected 548 wrappers carrying a classical literal, got %d" % n)
     # AND THE fp LITERALS ARE A DISJOINT SET OF 46, counted with a macro name
     # that is not a substring of the integer one — `CQ_SHIM_F64_LO(` does not
     # contain `CQ_SHIM_LO(`, which is what keeps the two counts independent. It
@@ -282,7 +320,8 @@ def the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type(defs=None)
     # carrying BOTH macro pairs, or an fp body carrying the integer pair, moves
     # one of these two numbers and not the other.
     fp = {n2 for n2, b in wrappers(defs).items() if "CQ_SHIM_F64_LO(" in b[0]}
-    sc.check(len(fp) == 52,
+    # 60 since bead 9ve.44: `fmin`/`fmax` `_hl` x 2 and `copysign` `_hl`/`_lh`.
+    sc.check(len(fp) == 60,
              "expected 52 wrappers carrying an f64 bit-pattern literal, got %d"
              % len(fp))
     # SIX MORE SHAPES SINCE bead 9ve.24, and they are the reason this list is
@@ -298,8 +337,9 @@ def the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type(defs=None)
     # AND IT IS THE TWO FAMILIES IT SHOULD BE. A cross-domain CAST has no
     # classical operand at all, so one appearing here would mean the generator
     # had invented a literal for an arity-1 symbol.
-    sc.check(sorted({n2.split("_")[2] for n2 in fp}) == ["fadd", "fcmp", "fdiv",
-                                                         "fma", "fmul", "fsub"],
+    sc.check(sorted({n2.split("_")[2] for n2 in fp})
+             == ["copysign", "fadd", "fcmp", "fdiv", "fma", "fmax", "fmin",
+                 "fmul", "fsub"],
              "the f64 literal carriers are not fcmp + the four fp_arith "
              "opcodes + fma: %s" % sorted({n2.split("_")[2] for n2 in fp}))
     sc.check(not (fp & {n2 for n2, b in wrappers(defs).items()
@@ -343,36 +383,43 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
     # v2"` is FALSE of most of them: `cq_template_ctpop_i32` is an integer
     # opcode at an integer width that no fp release reaches, and
     # `cq_template_lrint_f64_to_i64` touches a width that already SHIPS. The
-    # integer intrinsics cite bead 9ve.29 and the two libm opcodes cite §7.9.
+    # integer intrinsics cited bead 9ve.29 and the two libm opcodes cite §7.9;
+    # since bead 9ve.44 the integer rows that still defer cite their OWN
+    # reasons (9ve.29.3 for the funnel shifts, K27 for the saturating four).
     for name, body in aborts(defs).items():
         if sc.is_declined(name):
             want = sc.DECLINED_REASON
         elif sc.is_defer(name):
-            want = (sc.DEFER_LIBM_REASON
-                    if name.startswith(("cq_template_lrint",
-                                        "cq_template_llrint"))
-                    else sc.DEFER_INTRINSIC_REASON)
+            # THREE DEFER REASONS SINCE bead 9ve.44, each read off the stem:
+            # `fshl`/`fshr` REFUSED (9ve.29.3), `*_sat` unported (K27), libm.
+            want = sc.defer_reason_of(name)
         else:
             want = sc.FP_REASON if sc.is_deferred_fp(name) else sc.INV_REASON
         sc.check('"%s"' % want in "\n".join(body),
                  "%s: abort reason is not %r" % (name, want))
     # THE FOUR REASONS ARE PAIRWISE DISTINCT, which is what makes
     # `bucket_of_body` a partition rather than a first-match.
-    reasons = [sc.FP_REASON, sc.INV_REASON, sc.DECLINED_REASON,
-               sc.DEFER_INTRINSIC_REASON, sc.DEFER_LIBM_REASON]
+    reasons = [sc.FP_REASON, sc.INV_REASON, sc.DECLINED_REASON] \
+        + list(sc.DEFER_REASONS)
     sc.check(len(set(reasons)) == len(reasons),
              "two abort reasons are the same string")
     deferred = {n for n in aborts(defs) if sc.is_defer(n)}
-    sc.check(len(deferred) == 249,
-             "expected 249 deferred aborts, got %d" % len(deferred))
+    sc.check(len(deferred) == 132,
+             "expected 132 deferred aborts, got %d" % len(deferred))
+    # AND bead 9ve.29's OLD SENTENCE IS ON NO BODY: it said the integer
+    # intrinsics were "a v1-shaped port that has not run yet", which is true
+    # of no row now — the landed ones run and the rest are refused/unported.
+    stale = sorted(n for n, (_d, b) in defs.items()
+                   if "v1-shaped port that has not run yet" in "\n".join(b))
+    sc.check(not stale, "bead 9ve.29's stale reason survives on %s" % stale[:4])
     declined = {n for n in aborts(defs) if sc.is_declined(n)}
     sc.check(len(declined) == 3,
              "expected 3 declined aborts, got %d" % len(declined))
     sc.check(sc.DECLINED_REASON not in (sc.FP_REASON, sc.INV_REASON),
              "the declined reason is one of the other two")
     landed_inv = {n for n in aborts(defs) if sc.is_landed(n)}
-    sc.check(len(landed_inv) == 65,
-             "expected 65 D14 aborts inside the landed fp families, got %d"
+    sc.check(len(landed_inv) == 66,
+             "expected 66 D14 aborts inside the landed fp families, got %d"
              % len(landed_inv))
     sc.check(all(n.endswith("_inv") for n in landed_inv),
              "a LANDED fp symbol aborts without being an `_inv`: %s"
@@ -437,6 +484,28 @@ def the_new_fp_shapes_are_pinned_body_by_body(defs=None):
             '    (void)a_handle;\n'
             '    cq_shim_unsupported("cq_template_uitofp_i64_to_f64", "%s");'
             % sc.DECLINED_REASON,
+        # bead 9ve.44: one body per new door and per new abort sentence.
+        # `rint` is `FUN_RINT` (the dispatch table, not the selector, maps it
+        # to soft_round); `copysign_lh` puts the MAGNITUDE literal first.
+        "cq_template_rint_f64":
+            "    return cq_shim_fun(CQ_SHIM_FUN_RINT, 64, a_handle);",
+        "cq_template_copysign_f64_lh_unc":
+            "    cq_shim_fbin_lh_unc(CQ_SHIM_FOP_COPYSIGN, 64, out_handle, "
+            "CQ_SHIM_F64_LO(a_classical), CQ_SHIM_F64_HI(a_classical), "
+            "b_handle);",
+        "cq_template_ctlz_i32_unc":
+            "    cq_shim_iun_unc(CQ_SHIM_IUN_CTLZ, 32, out_handle, a_handle);",
+        "cq_template_smin_i8_hl":
+            "    return cq_shim_bin_hl(CQ_SHIM_OP_SMIN, 8, a_handle, "
+            "CQ_SHIM_LO(b_classical), CQ_SHIM_HI(b_classical));",
+        "cq_template_fshr_i16_qql":
+            '    (void)a_handle;\n    (void)b_handle;\n    (void)c_classical;\n'
+            '    cq_shim_unsupported("cq_template_fshr_i16_qql", "%s");'
+            % sc.DEFER_FUNNEL_REASON,
+        "cq_template_ssub_sat_i64_lh":
+            '    (void)a_classical;\n    (void)b_handle;\n'
+            '    cq_shim_unsupported("cq_template_ssub_sat_i64_lh", "%s");'
+            % sc.DEFER_SAT_REASON,
     }
     for name in sorted(want):
         got = "\n".join(defs[name][1])
@@ -446,7 +515,8 @@ def the_new_fp_shapes_are_pinned_body_by_body(defs=None):
     # handful of names says nothing about a branch that fires for one symbol
     # and is wrong for the other 33.
     live = wrappers(defs)
-    for what, n in (("CQ_SHIM_FOP_", 30), ("CQ_SHIM_FCAST_", 34)):
+    for what, n in (("CQ_SHIM_FOP_", 44), ("CQ_SHIM_FCAST_", 34),
+                    ("CQ_SHIM_FUN_", 18), ("CQ_SHIM_IUN_", 46)):
         hit = sum(1 for b in live.values() if what in b[0])
         sc.check(hit == n, "expected %d bodies carrying %s, got %d"
                  % (n, what, hit))
@@ -478,8 +548,8 @@ def the_new_fp_shapes_are_pinned_body_by_body(defs=None):
 # added here.
 CASES = [
     no_wrapper_is_inert,
-    the_wrapper_calls_cover_all_twenty_six_dispatched_opcodes,
-    the_wrapper_shape_split_is_449_forward_449_unc_224_controlled,
+    the_wrapper_calls_cover_every_dispatched_opcode,
+    the_wrapper_shape_split_is_519_forward_519_unc_224_controlled,
     every_wrapper_body_is_exactly_the_call_its_symbol_names,
     the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type,
     every_abort_body_names_its_own_symbol_and_silences_its_parameters,

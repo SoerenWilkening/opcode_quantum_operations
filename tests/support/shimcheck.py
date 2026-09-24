@@ -70,6 +70,12 @@ LANDED_NAME = re.compile(
     # other opcode from that table.
     r"|fma_f64"
     r"|sqrt_f64"
+    # --- bead 9ve.44 (Wave 10's ABI wiring): M38's eleven opcodes at f64 —
+    # `fneg` from opcode_table.yaml, the other ten from intrinsic_table.yaml.
+    # `round` is C's ties-AWAY and `rint`/`nearbyint` ties-EVEN (PRD-v2 7.7);
+    # the NAME is all this predicate reads, so the mapping is not its concern.
+    r"|fneg_f64|fabs_f64|copysign_f64|fmin_f64|fmax_f64"
+    r"|(?:floor|ceil|trunc|round|rint|nearbyint)_f64"
     r")(?:_|$)")
 
 # THE ROWS THAT ARE REFUSED RATHER THAN UNPORTED — gen_shim.DECLINED's test-side
@@ -222,20 +228,42 @@ DECLINED_REASON = (
     "would convert as a negative number (bead 9ve.34, PRD-v2 7.9)")
 
 
-# THE FOURTH BUCKET (bead 9ve.24). `"fp is v2"` printed at
-# `cq_template_ctpop_i32` would be a falsehood — an INTEGER opcode at an
-# INTEGER width that no amount of fp work reaches — and `lrint f64 -> i64`
-# touches a width that already SHIPS, so neither can honestly take the fp
-# reason. Both are transcribed here rather than imported from gen_shim, which
-# is what makes this an independent reading of what actually shipped.
-DEFER_INTRINSIC_REASON = (
-    "the integer llvm.* intrinsics are a v1-shaped port that has not run yet "
-    "— Bennett expands ctpop/ctlz/bswap/fshl in its extractor, so Rule 1 is "
-    "satisfiable (bead 9ve.29, PRD-v2 7.14)")
+# THE FOURTH BUCKET (bead 9ve.24). `"fp is v2"` printed at an INTEGER
+# intrinsic would be a falsehood — an integer opcode at an integer width that no
+# amount of fp work reaches — and `lrint f64 -> i64` touches a width that
+# already SHIPS, so neither can honestly take the fp reason. Transcribed here
+# rather than imported from gen_shim, which is what makes this an independent
+# reading of what actually shipped.
+#
+# THREE REASONS SINCE bead 9ve.44, AND THE OLD INTRINSIC ONE IS GONE. It said
+# the integer intrinsics were "a v1-shaped port that has not run yet (bead
+# 9ve.29)", which stopped being true of ANY row when M41/M42 landed: what still
+# defers does so for a reason of its own. `fshl`/`fshr` are REFUSED (Bennett's
+# expansion is not LLVM's funnel shift, bead 9ve.29.3) and the four `*_sat`
+# have NO construction in the snapshot (K27.md, "Not ported").
+DEFER_FUNNEL_REASON = (
+    "fshl/fshr are REFUSED, not unported: Bennett's expansion "
+    "(instructions.jl:4947-4996) is not LLVM's funnel shift at a shift "
+    "congruent to 0 mod W, so porting it is a known miscompile and correcting "
+    "it is a re-derivation (bead 9ve.29.3, K26.md section 6)")
+DEFER_SAT_REASON = (
+    "the saturating add/sub intrinsics have NO construction in the pinned "
+    "Bennett snapshot, so Rule 1 forbids writing one (K27.md, Not ported)")
 DEFER_LIBM_REASON = (
     "lrint/llrint have no soft_lrint upstream and ZERO corpus calls; they are "
     "composable as soft_round then soft_fptosi the day a caller appears "
     "(PRD-v2 7.9)")
+DEFER_REASONS = (DEFER_FUNNEL_REASON, DEFER_SAT_REASON, DEFER_LIBM_REASON)
+
+
+def defer_reason_of(name):
+    # The reason a DEFERRED symbol must carry, read off its STEM alone.
+    stem = name[len("cq_template_"):]
+    if stem.startswith(("fshl_", "fshr_")):
+        return DEFER_FUNNEL_REASON
+    if stem.startswith(("lrint_", "llrint_")):
+        return DEFER_LIBM_REASON
+    return DEFER_SAT_REASON
 
 
 def bucket_of_body(body):
@@ -246,19 +274,19 @@ def bucket_of_body(body):
         return "fp"
     if '"%s"' % INV_REASON in text:
         return "inv"
-    if ('"%s"' % DEFER_INTRINSIC_REASON in text
-            or '"%s"' % DEFER_LIBM_REASON in text):
+    if any('"%s"' % r in text for r in DEFER_REASONS):
         return "defer"
     return "abort-with-an-unrecognised-reason"
 
 
-# A NAME-BASED TWIN FOR THE FOURTH BUCKET, sharing nothing with the yamls. The
-# integer intrinsics and the two libm opcodes, by the only thing the test side
-# can see from outside: the symbol's own stem.
+# A NAME-BASED TWIN FOR THE FOURTH BUCKET, sharing nothing with the yamls: the
+# rows that still defer, by the only thing the test side can see from outside,
+# the symbol's own stem. SHRANK at bead 9ve.44 — `ctpop`/`ctlz`/`cttz`/
+# `bitreverse`/`bswap` (M41) and `abs`/`smin`/`smax`/`umin`/`umax` (M42) left it
+# for the live buckets; `fshl`/`fshr`, the four `*_sat` and libm's two stay.
 DEFER_NAME = re.compile(
     r"^cq_template_(?:"
-    r"bswap|bitreverse|fshl|fshr|ctpop|ctlz|cttz|abs"
-    r"|smin|smax|umin|umax|uadd_sat|sadd_sat|usub_sat|ssub_sat"
+    r"fshl|fshr|uadd_sat|sadd_sat|usub_sat|ssub_sat"
     r"|lrint|llrint"
     r")_")
 

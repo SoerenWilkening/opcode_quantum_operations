@@ -206,6 +206,9 @@ static uint64_t fma_run(uint64_t va, uint64_t vb, uint64_t vc,
 #include "test_kernel_fma_slots.inc"
 #include "test_kernel_fma_spans.inc"
 
+/* THE DELEGATING FOUR-VALUED SLOT SCAN (bd 9ve.38): intra-row gate ORDER. */
+#include "test_kernel_fma_scan.inc"
+
 /* THE PREFIX MAP AND THE FOUR UNREACHABLE GUARDS (review round 1). See the
  * `.inc`'s own header for why three of them are positive cases. */
 #include "test_kernel_fma_map.inc"
@@ -444,6 +447,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_full_anchor_table_stays_classical_and_the_circuit_set_is_constant),
     CQ_CASE(the_compute_half_is_a_palindrome_at_an_asymmetric_mask),
     CQ_CASE(two_programs_in_one_region_do_not_collide),
+    CQ_CASE(the_slot_kinds_match_a_delegating_four_valued_scan),
     CQ_CASE(l1_sweep),
     CQ_CASE(controlled),
     CQ_CASE(l4_goldens),

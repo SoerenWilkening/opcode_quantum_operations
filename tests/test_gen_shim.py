@@ -47,8 +47,8 @@ ABI = sc.manifest_decls()
 # its forward ships.
 # A FOURTH BUCKET SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24). `defer` is
 # everything that aborts for a reason that is neither D14 nor "fp is v2" — the
-# integer `llvm.*` intrinsics (bead 9ve.29) and libm's `lrint`/`llrint`
-# (§7.9). It is a BUCKET rather than a third reason inside `fp` because the
+# integer `llvm.*` intrinsics (bead 9ve.29; since bead 9ve.44 only the funnel
+# shifts and the four `*_sat`) and libm's `lrint`/`llrint` (§7.9). It is a BUCKET rather than a third reason inside `fp` because the
 # bucket is what the audit counts and what each `.gen.c` banner prints, so
 # folding 249 symbols into `fp` would make every published fp figure wrong.
 DEFER = {n for n in ABI if sc.is_defer(n) and not sc.is_landed(n)}
@@ -116,19 +116,24 @@ def every_emitted_signature_matches_cq_langs_own_declaration():
     sc.check(not bad, "%d signature mismatch(es):\n  %s" % (len(bad), "\n  ".join(bad[:3])))
 
 
-def the_partition_is_1122_wrappers_668_inv_841_fp_and_249_deferred():
+def the_partition_is_1262_wrappers_676_inv_810_fp_and_132_deferred():
     # 992 / 603 / 884 until PRD-v2's first fp family landed (2026-09-18), then
     # 1048 / 631 / 800, then 1112 / 668 / 699 at bead 9ve.36. Bead 9ve.24's
     # vendoring ADDS 401 symbols rather than moving any: 10 land as wrappers
     # (`fma` x8 and `sqrt` x2 at f64), 142 join the fp aborts, and 249 are the
-    # new fourth bucket.
+    # new fourth bucket — 1122 / 668 / 841 / 249.
+    # BEAD 9ve.44 MOVES 148 AND ADDS NONE. Out of `defer`: 110 integer
+    # intrinsic wrappers (M41's five opcodes, M42's five) and 7 D14 `_inv`
+    # aborts (the class-1 `bswap`/`bitreverse` rows), leaving 132. Out of
+    # `fp`: 30 f64 wrappers (M38's eleven opcodes) and `fneg_f64_inv`,
+    # leaving 810.
     got = {k: len(v) for k, v in buckets(SHIPPED).items()}
-    sc.check(got == {"wrapper": 1122, "inv": 668, "fp": 841, "defer": 249},
+    sc.check(got == {"wrapper": 1262, "inv": 676, "fp": 810, "defer": 132},
              "PRD §1 + §15 D14 + PRD-v2 §1 + §6.1 partition: expected "
-             "1122/668/841/249, got %r" % got)
+             "1262/676/810/132, got %r" % got)
 
 
-def the_domain_split_is_992_603_237_130_65_and_12():
+def the_domain_split_is_1102_610_120_160_66_and_12():
     # A COUNT IS NOT AN IDENTIFICATION, AND THE THREE COARSE BUCKETS NOW HIDE A
     # DOMAIN MOVE. Once a family-width lands, `wrapper` holds integer AND fp
     # wrappers, so 1048/631/800 stays exact while, say, `fp_arith`/`f64` goes
@@ -144,7 +149,7 @@ def the_domain_split_is_992_603_237_130_65_and_12():
     sc.check([len(BY_DOMAIN[k]) for k in
               ("int_wrapper", "int_inv", "int_defer",
                "fp_wrapper", "fp_inv", "fp_defer")]
-             == [992, 603, 237, 130, 65, 12],
+             == [1102, 610, 120, 160, 66, 12],
              "the domain split moved: %r"
              % {k: len(v) for k, v in BY_DOMAIN.items()})
 
@@ -199,22 +204,21 @@ def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
     for n in f64_left:
         by_op.setdefault(n.split("cq_template_")[1].split("_")[0], 0)
         by_op[n.split("cq_template_")[1].split("_")[0]] += 1
-    # M38's TEN OPCODES JOINED THAT CENSUS AT THE VENDORING (bead 9ve.24) and
-    # they are the half a reader is likeliest to misread: `trunc` here is the
-    # intrinsic table's fp round-toward-zero at f64, NOT `opcode_table.yaml`'s
-    # integer cast, which is `trunc_i64_to_i32` and carries no `_f64` token at
-    # all. They are bead 9ve.27's and abort until it runs. `fma` and `sqrt` are
-    # ABSENT from this census, which is the assertion that they LANDED.
-    sc.check(by_op == {"frem": 15, "fneg": 3, "uitofp": 3,
-                       "fpext": 9, "fptrunc": 9, "bitcast": 6,
-                       "ceil": 2, "copysign": 6, "fabs": 2, "floor": 2,
-                       "fmax": 4, "fmin": 4, "nearbyint": 2, "rint": 2,
-                       "round": 2, "trunc": 2},
+    # M38's TEN INTRINSIC OPCODES JOINED THAT CENSUS AT THE VENDORING (bead
+    # 9ve.24) AND LEFT IT AT bead 9ve.44, TOGETHER WITH `fneg`. The `trunc`
+    # among them was the intrinsic table's fp round-toward-zero at f64, NOT
+    # `opcode_table.yaml`'s integer cast, which is `trunc_i64_to_i32` and
+    # carries no `_f64` token at all. `fma`, `sqrt` and those eleven are ABSENT
+    # from this census, which is the assertion that they LANDED.
+    sc.check(by_op == {"frem": 15, "uitofp": 3,
+                       "fpext": 9, "fptrunc": 9, "bitcast": 6},
              "the f64 symbols still aborting are not the expected census: %r"
              % by_op)
-    sc.check("fma" not in by_op and "sqrt" not in by_op,
-             "an f64 `fma` or `sqrt` symbol is still in the `fp is v2` bucket; "
-             "bead 9ve.24 landed both")
+    landed = ("fma", "sqrt", "fneg", "fabs", "copysign", "fmin", "fmax",
+              "floor", "ceil", "trunc", "round", "rint", "nearbyint")
+    sc.check(not [op for op in landed if op in by_op],
+             "an f64 symbol of a LANDED opcode is still in the `fp is v2` "
+             "bucket: %s" % [op for op in landed if op in by_op])
 
 
 def the_three_declined_symbols_are_in_the_fp_bucket_with_their_own_reason():
@@ -280,7 +284,14 @@ def the_shim_enums_match_the_opcodes_the_grid_reaches():
     # shim/cq_shim.h is hand-written (it is the M26 contract), so its enums are
     # a second transcription of the ABI and have to be checked against it.
     header = open(os.path.join(sc.SHIM, "cq_shim.h")).read()
+    # THE INTRINSIC GRID TOO since bead 9ve.44: the integer min/max rows reach
+    # `CQ_SHIM_OP_`, the integer unary ones `CQ_SHIM_IUN_`, and M38's fp rows
+    # `CQ_SHIM_FOP_`/`CQ_SHIM_FUN_`, all from intrinsic_table.yaml — so an
+    # opcode-table-only expansion would call their enumerators strays.
     rows = gen_shim.expand(gen_shim.load(sc.YAML)[0])
+    itab = gen_shim.load(sc.SOURCES[1][0])[0]
+    gen_shim.gen_intrinsics.expand_intrinsic(
+        itab, gen_shim._emitter(rows, itab["widths"]))
     live = [r for r in rows if r.bucket == "wrapper"]
     # THE TWO PREDICATE ENUMS ARE SEPARATED BY THE OPCODE AND NOT BY THE KIND,
     # because `icmp` and `fcmp` share `kind == "compare"` and their predicate
@@ -303,7 +314,9 @@ def the_shim_enums_match_the_opcodes_the_grid_reaches():
     # pairwise disjoint rather than assumed — they differ at ONE letter each.
     for a, b in (("CQ_SHIM_FPRED_OEQ", "CQ_SHIM_PRED_"),
                  ("CQ_SHIM_FOP_FADD", "CQ_SHIM_OP_"),
-                 ("CQ_SHIM_FCAST_FPTOSI", "CQ_SHIM_CAST_")):
+                 ("CQ_SHIM_FCAST_FPTOSI", "CQ_SHIM_CAST_"),
+                 ("CQ_SHIM_IUN_CTPOP", "CQ_SHIM_FUN_"),
+                 ("CQ_SHIM_FUN_FNEG", "CQ_SHIM_IUN_")):
         sc.check(not a.startswith(b),
                  "%r starts with %r; the two arms would merge and stop "
                  "discriminating" % (a, b))
@@ -318,25 +331,29 @@ def the_shim_enums_match_the_opcodes_the_grid_reaches():
             ("CQ_SHIM_CAST_", {r.opcode for r in live
                                if r.kind == "cast" and r.family not in xdom}),
             ("CQ_SHIM_FCAST_", {r.opcode for r in live
-                                if r.kind == "cast" and r.family in xdom})):
+                                if r.kind == "cast" and r.family in xdom}),
+            # bead 9ve.44's integer UNARY door: M41's five and M42's `abs`.
+            ("CQ_SHIM_IUN_", {r.opcode for r in live
+                              if r.kind == "unary" and r.domain != "fp"})):
         got = {t[len(prefix):].lower() for t in header.split() if t.startswith(prefix)}
         got = {t.rstrip(",}") for t in got}
         sc.diff_sets(got, want, "%s* enum" % prefix)
 
-    # THE UNARY ENUM IS THE ONE ARM THE GRID CANNOT SUPPLY, AND IT IS ASSERTED
-    # AS AN ABSENCE. `cq_shim_fun_op` holds `fsqrt`, which is `llvm.sqrt` in
-    # CQ_lang's intrinsic_table.yaml and so reaches NO row of this grid (PRD §1:
-    # M27 generates from `opcode_table.yaml` only); the yaml's one unary opcode
-    # is `fneg`, which has no kernel and stays an abort. So the live set is
-    # EMPTY and the header must nonetheless carry exactly one enumerator — the
-    # door is built, tested by name, and unreached. A `CQ_SHIM_FUN_FNEG`
-    # appearing here would mean `fneg` had been landed without its kernel.
+    # THE fp UNARY ENUM IS THE ONE ARM WHOSE SPELLING IS NOT THE OPCODE'S.
+    # `sqrt` is `CQ_SHIM_FUN_FSQRT` — the enumerator carries the `f` the ABI's
+    # token drops — so that ONE name is mapped and every other is compared as
+    # spelled. Until bead 9ve.44 this arm was asserted as an ABSENCE (`fneg`
+    # had no kernel); it is now the nine opcodes the grid reaches through
+    # `cq_shim_fun`, and `round`/`rint`/`nearbyint` are three enumerators
+    # because they are three ABI rows — that two of them share a kernel is the
+    # dispatch table's business (PRD-v2 7.7), not the enum's.
     fun = {t[len("CQ_SHIM_FUN_"):].rstrip(",}").lower()
            for t in header.split() if t.startswith("CQ_SHIM_FUN_")}
-    sc.check(fun == {"fsqrt"}, "cq_shim_fun_op is %r, expected {'fsqrt'}" % fun)
-    sc.check(not [r for r in live if r.kind == "unary"],
-             "a unary opcode went live in the grid; gen_bodies.ENTRY has no "
-             "`funary` row, so this cannot be right")
+    want = {("fsqrt" if r.opcode == "sqrt" else r.opcode) for r in live
+            if r.kind == "unary" and r.domain == "fp"}
+    sc.diff_sets(fun, want, "CQ_SHIM_FUN_* enum")
+    sc.check({"fsqrt", "fneg", "nearbyint"} <= want,
+             "the fp unary arm is vacuous: %r" % sorted(want))
 
 
 def every_family_gets_its_own_file_and_only_its_own_symbols():
@@ -410,8 +427,8 @@ CASES = [
     the_manifest_is_the_expansion_of_the_pinned_yaml,
     the_emitted_symbol_set_equals_the_abi_in_both_directions,
     every_emitted_signature_matches_cq_langs_own_declaration,
-    the_partition_is_1122_wrappers_668_inv_841_fp_and_249_deferred,
-    the_domain_split_is_992_603_237_130_65_and_12,
+    the_partition_is_1262_wrappers_676_inv_810_fp_and_132_deferred,
+    the_domain_split_is_1102_610_120_160_66_and_12,
     the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family,
     the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family,
     the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed,

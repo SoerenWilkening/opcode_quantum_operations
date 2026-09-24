@@ -3,8 +3,9 @@
  *
  * `frem` AND `fneg` ARE NOT HERE AND THAT IS THE POINT OF THE FILE'S FIRST
  * CASE. They are `fp_arith` rows too — the yaml gives that family five binary
- * opcodes and its one unary opcode — and neither has a kernel, so both keep
- * their `"fp is v2"` abort. A `LANDED` key of `(family, width)` would have
+ * opcodes and its one unary opcode — and when this file was written neither
+ * had a kernel, so both kept their `"fp is v2"` abort (`fneg` landed at bead
+ * 9ve.44 through the UNARY door; see tests/test_template_fmisc.c). A `LANDED` key of `(family, width)` would have
  * taken all six together; the key is `(opcode, width)` for exactly this
  * reason, and `tests/test_gen_bodies_provoked.py` provokes the coarse version.
  *

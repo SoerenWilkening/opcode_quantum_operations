@@ -3213,7 +3213,7 @@ set_tests_properties(test_kernel_fmul_death.arity_of_an_unknown_op
 set_tests_properties(test_kernel_fmul_death.width_is_not_64
                      test_kernel_fmul_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "Assertion failed;fpfield: pack;fpfield: view span;fmul: step index outside;fmul: the block's region;fmul: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+                     "D7a;Assertion failed;fpfield: pack;fpfield: view span;fmul: step index outside;fmul: the block's region;fmul: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## (6) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations
 ## and D7b is LEGAL at the handle boundary — its remedy is M26's defensive
@@ -3320,7 +3320,7 @@ set_tests_properties(test_kernel_fsqrt_death.arity_of_an_unknown_op
 set_tests_properties(test_kernel_fsqrt_death.width_is_not_64
                      test_kernel_fsqrt_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "Assertion failed;fpfield: pack;fpfield: view span;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+                     "D7a;Assertion failed;fpfield: pack;fpfield: view span;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## (6) D7a AT THE KERNEL BOUNDARY, AND THE D7b LEG IS VACUOUS AT ARITY 1 — one
 ## source cannot alias another, so there is no `sources_alias_each_other` case
@@ -4235,3 +4235,86 @@ set_tests_properties(test_kernel_fadd_block_death.fadd_block_region_is_one_bit_s
                      test_kernel_fadd_block_death.an_fadd_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "scratch:;fadd: step index outside;fadd: the step dispatch fell off;fpclass: the block's region;fpround: the block's region; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## 9ve.44 — the ABI WIRING for Wave 10's kernels (M38 fmisc/fround, M41 ibits,
+## M42 iminmax), as bead 9ve.36 wired Waves 5-7's.
+##
+## TWO SUITES AND ONE DEATH BINARY, split by DOMAIN as the shim splits them:
+##   test_template_intr        M41/M42 at i8..i64 through the NEW integer unary
+##                             door (cq_shim_iun, tag space 0x60000000) and the
+##                             widened integer binary door; the rows that still
+##                             abort (class-1 `_inv`, fshl/fshr, the four *_sat)
+##                             read back with the sentence true of each
+##   test_template_fmisc       M38 at f64 through cq_shim_fun (eight new rows)
+##                             and cq_shim_fbin_* (fmin/fmax/copysign); the
+##                             LLVM-name -> soft_* map (PRD-v2 7.7) as values
+##   test_template_intr_death  the integer unary door's hard errors
+add_cqops_test(test_template_intr)
+add_cqops_test(test_template_fmisc)
+
+add_cqops_death_test(test_template_intr_death CASES
+    a_bswap_width_that_is_not_a_multiple_of_16_is_refused
+    a_bswap_unc_width_that_is_not_a_multiple_of_16_is_refused
+    an_iun_width_outside_the_abis_range_is_refused
+    an_iun_op_outside_the_abis_enum_is_refused
+    the_iun_kernel_table_refuses_an_index_past_its_end
+    the_iun_name_table_refuses_an_index_past_its_end
+    d7a_out_aliases_the_source_of_an_iun_unc
+    an_iun_source_rail_is_not_the_width_its_symbol_names
+    an_iun_unc_destination_is_not_the_width_its_symbol_names
+)
+
+## EVERY CASE BELOW BANS, besides its own subject: the two sanitizers and
+## `Assertion failed` (bd 9ve.18's third abort source); every layer UNDER the
+## shim a wrong value could reach (kernel:, sandwich:, scratch:, shadow:, qubit
+## pool:, emit:, controlled:, distinctness, I1:, I2:); M07's `FATAL: reg:`, `D7a`
+## and `operand check:` where D7a is not the subject; the OTHER three refusals
+## of this door; and every sibling door's sentence. Each guard-deletion mutant
+## was re-run in BOTH configurations and reddened its own case(s) (bd 9ve.44).
+
+## (1) BSWAP'S WIDTH RULE IS HOISTED TO THE ENTRY POINT AND MUST STAY THERE.
+## `cq_kernel_bswap` refuses the same widths in BOTH configurations one layer
+## down — `kernel: ibits: bswap width is not a multiple of 16` — after the call
+## has minted a rail and opened a D21 bracket it never closes. `kernel:` banned
+## is the whole claim: delete the shim's check and the kernel still aborts.
+## Every sibling door's sentence is banned too, so a request builder whose
+## checks ran in another order, or answered from another family, still fails.
+set_tests_properties(test_template_intr_death.a_bswap_width_that_is_not_a_multiple_of_16_is_refused
+                     test_template_intr_death.a_bswap_unc_width_that_is_not_a_multiple_of_16_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;integer intrinsic opcode is not one of the ABI;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+
+## (2) THE RANGE IS CHECKED BEFORE THE BSWAP RULE. `129` also fails the bswap
+## rule, so a builder that ran it first would answer with ITS sentence, which is
+## banned here; so is every enum sentence and `kernel:`.
+set_tests_properties(test_template_intr_death.an_iun_width_outside_the_abis_range_is_refused
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;multiple of 16 bits;integer intrinsic opcode is not one of the ABI;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+
+## (3) THE ENUM, AT THE ENTRY POINT AND AT EACH TABLE. Both tables refuse with
+## one sentence, so the entry-point case identifies neither and the two direct
+## cases each identify one (bd memory
+## two-guards-one-message-the-entry-point-identifies-neither). Every SIBLING
+## enum sentence is banned — the fp families' and the integer ones' — because a
+## door dispatching through another family's table would satisfy a bare abort.
+set_tests_properties(test_template_intr_death.an_iun_op_outside_the_abis_enum_is_refused
+                     test_template_intr_death.the_iun_kernel_table_refuses_an_index_past_its_end
+                     test_template_intr_death.the_iun_name_table_refuses_an_index_past_its_end
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;multiple of 16 bits;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+
+## (4) D7a IS M07'S REFUSAL AND MUST STAY M07'S. `FATAL: shim:` banned outright
+## covers every sentence the shim could print; `operand check:` because it
+## prefixes every reg_check message that is NOT D7a; `distinctness` because an
+## unrefused D7a reaches the kernel with `dst == a` and aborts there in DEBUG
+## ONLY, a long way from its cause.
+set_tests_properties(test_template_intr_death.d7a_out_aliases_the_source_of_an_iun_unc
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;FATAL: shim:;operand check:;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:")
+
+## (5) THE READ AND WRITE DOORS' WIDTH TOKEN, NOT M07's AND NOT THIS DOOR'S.
+## Every rail is live; the enum and bswap checks have already passed.
+set_tests_properties(test_template_intr_death.an_iun_source_rail_is_not_the_width_its_symbol_names
+                     test_template_intr_death.an_iun_unc_destination_is_not_the_width_its_symbol_names
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;integer intrinsic opcode is not one of the ABI;multiple of 16 bits;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")

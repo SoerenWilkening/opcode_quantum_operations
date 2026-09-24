@@ -158,6 +158,40 @@ def every_way_a_wrapper_can_dispatch_wrong_is_caught():
          lambda s: swap(s, "CQ_SHIM_F64_LO(a_classical)",
                         "CQ_SHIM_F64_HI(a_classical)"),
          "fp literal words transposed on the `_lh` door"),
+        # AND SEVEN WITH bead 9ve.44, one per trap Wave 10's families carry:
+        #   (17) `rint` dispatching `round` — PRD-v2 7.7's ties-even vs
+        #        ties-away, equal on every input that is not an exact N.5;
+        #   (18) `fmin` dispatching `fmax` — the same 17-row program under a
+        #        swapped mux pair, identical counts;
+        #   (19) `smin` dispatching `umin` — K9's signed/unsigned trap, equal
+        #        wherever the operands share a sign bit;
+        #   (20) `copysign` operands swapped — NOT commutative, and a `qq`
+        #        swap is invisible to the compile (both int32_t);
+        #   (21) `ctlz` dispatching `cttz` — the same row machine mirrored;
+        #   (22) the integer unary door sent through the fp one's enum;
+        #   (23) `bswap`'s width from a byte count rather than bits.
+        ("cq_template_rint_f64",
+         lambda s: s.replace("CQ_SHIM_FUN_RINT", "CQ_SHIM_FUN_ROUND", 1),
+         "rint dispatching C round (ties-away)"),
+        ("cq_template_fmin_f64_hl",
+         lambda s: s.replace("CQ_SHIM_FOP_FMIN", "CQ_SHIM_FOP_FMAX", 1),
+         "fmin dispatching fmax"),
+        ("cq_template_smin_i8",
+         lambda s: s.replace("CQ_SHIM_OP_SMIN", "CQ_SHIM_OP_UMIN", 1),
+         "smin dispatching umin"),
+        ("cq_template_copysign_f64",
+         lambda s: swap(s, "a_handle", "b_handle"),
+         "copysign operands swapped"),
+        ("cq_template_ctlz_i32",
+         lambda s: s.replace("CQ_SHIM_IUN_CTLZ", "CQ_SHIM_IUN_CTTZ", 1),
+         "ctlz dispatching cttz"),
+        ("cq_template_abs_i16_unc",
+         lambda s: s.replace("cq_shim_iun_unc(CQ_SHIM_IUN_ABS",
+                             "cq_shim_fun_unc(CQ_SHIM_FUN_FABS", 1),
+         "integer abs through the fp unary door"),
+        ("cq_template_bswap_i32",
+         lambda s: s.replace(", 32,", ", 4,", 1),
+         "bswap width in bytes"),
     ]
     for victim, mutate, what in cases:
         body = [mutate(SHIPPED[victim][1][0])]
@@ -199,17 +233,25 @@ def a_landed_key_that_sweeps_a_kernel_less_opcode_in_is_refused():
     # KeyError actually says, so a row silently acquiring an entry point in
     # EITHER table still turns this red.
     #
-    # THE THIRD ROW IS NEW AND IT IS THE VENDORING'S OWN SHAPE: `ctpop` at i32
-    # is an INTEGER intrinsic in the `defer` bucket, and sweeping it live is
-    # the bead 9ve.29 mistake. It has no `unary` entry at all, so `ENTRY` is
-    # what refuses it.
+    # THE THIRD ROW WAS THE VENDORING'S OWN SHAPE: `ctpop` at i32, refused by
+    # `ENTRY` for want of a `unary` row. BEAD 9ve.44 LANDED BOTH `fneg` AND
+    # `ctpop`, so those two rows would now render correctly and the
+    # provocation had to move to rows that are STILL refused, one per table
+    # and per reason: `uadd_sat` (an integer binary row — `ENTRY` has
+    # `("binary", ...)`, so it is `SELECTOR["binary"]` that must name the
+    # opcode; K27 "Not ported"), `fshl` at i32 (a `rotate` row, `ENTRY`'s
+    # `shift_intrinsic` family, no entry point — bead 9ve.29.3) and `lrint`
+    # (libm, no entry point — PRD-v2 7.9).
     rows = gen_shim.expand(gen_shim.load(sc.YAML)[0])
     itab = gen_shim.load(sc.SOURCES[1][0])[0]
+    ltab = gen_shim.load(sc.SOURCES[2][0])[0]
     gen_shim.gen_intrinsics.expand_intrinsic(
         itab, gen_shim._emitter(rows, itab["widths"]))
-    for opcode, table in (("frem", "frem"), ("fneg", "fneg"),
-                          ("ctpop", "unary")):
-        w = "i32" if opcode == "ctpop" else "f64"
+    gen_shim.gen_intrinsics.expand_libm(
+        ltab, gen_shim._emitter(rows, ltab["widths"]))
+    for opcode, table in (("frem", "frem"), ("uadd_sat", "uadd_sat"),
+                          ("fshl", "shift_intrinsic"), ("lrint", "libm")):
+        w = "i32" if opcode in ("uadd_sat", "fshl") else "f64"
         victims = [r for r in rows
                    if r.opcode == opcode and r.widths[0] == w and not r.inv]
         sc.check(victims, "no %s row at %s to provoke with" % (opcode, w))

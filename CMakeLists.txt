@@ -620,6 +620,13 @@ add_library(cqops STATIC
                                # enums, each with a _Static_assert tying its
                                # length to the last enumerator, and every
                                # src/kernels/ include in the shim
+    shim/cq_template_dispatch_unary.c # bead 9ve.44 (2026-09-24) — the ARITY-1
+                               # half of the dispatch, on a seam recorded in
+                               # cq_template_dispatch.h: the (F, T) tables —
+                               # casts, conversions, and the fp and INTEGER
+                               # unary families with their one-width adapters
+                               # (M38's sign ops and rounding family, M41,
+                               # M42's abs)
     shim/cq_template_impl.c    # M26, Step 23.6 — the handle BOUNDARY: the
                                # FIFTEEN remaining cq_shim_* entry points that
                                # M28's 992 generated wrappers call. Handle

@@ -251,7 +251,10 @@ static void a_freed_source_of_the_wrong_width_is_a_use_after_free(void)
 static void an_opcode_outside_the_abis_enum_is_refused(void)
 {
     (void)open_shim();
-    CQ_EXPECT_ABORT((void)cq_shim_bin_qq((cq_shim_op)(CQ_SHIM_OP_ASHR + 1), 8,
+    /* The LAST enumerator moved from ASHR to UMAX at bead 9ve.44 (M42's four
+     * min/max); `ASHR + 1` is now `SMIN`, a LEGAL opcode, and this case would
+     * have stopped aborting — which is how the widening was seen here. */
+    CQ_EXPECT_ABORT((void)cq_shim_bin_qq((cq_shim_op)(CQ_SHIM_OP_UMAX + 1), 8,
                                          cqrt_alloc_i8(0), cqrt_alloc_i8(0)));
 }
 

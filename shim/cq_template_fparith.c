@@ -22,7 +22,11 @@
  *
  * THE THREE NEW TAG SPACES ARE `0x10000000` (fp binary), `0x20000000` (fp
  * unary) and `0x30000000` (fp conversion), and the arithmetic that makes them
- * safe is in `cq_template_boundary.h` beside the full table. Sharing a space is
+ * safe is in `cq_template_boundary.h` beside the full table. Bead 9ve.44 put
+ * M38's three binary opcodes into the first and its eight unary ones into the
+ * second as NEW ENUMERATORS, not new spaces: the opcode index is folded into
+ * the tag (`op * 1024`), so `fmin` and `fadd` stay distinct operations there
+ * exactly as `fsub` and `fadd` always were. Sharing a space is
  * a SILENT RELEASE OF A DIRTY RAIL, not a tidiness question: `cq_shim_bin_qq(
  * ADD, 64, a, b)` and `cq_shim_fbin_qq_unc(FADD, 64, out, a, b)` agree on the
  * twin opcodes, the width, all four handle slots, the §9 context and the
@@ -68,8 +72,9 @@ static uint32_t fbin_width(int bits)
     if (bits != 64)
         cq_fa_die("the fp arithmetic symbol names a width v2 does not "
                   "implement; PRD-v2 section 1 scopes the fp port to f64 and "
-                  "every soft_fadd / soft_fsub / soft_fmul / soft_fdiv body "
-                  "upstream takes two UInt64", bits);
+                  "every soft_fadd / soft_fsub / soft_fmul / soft_fdiv / "
+                  "soft_fmin / soft_fmax / copysign body upstream takes two "
+                  "UInt64", bits);
     return 64u;
 }
 
@@ -289,8 +294,9 @@ static uint32_t fun_width(int bits)
 {
     if (bits != 64)
         cq_fa_die("the fp unary symbol names a width v2 does not implement; "
-                  "PRD-v2 section 1 scopes the fp port to f64 and soft_fsqrt "
-                  "takes one UInt64", bits);
+                  "PRD-v2 section 1 scopes the fp port to f64 and soft_fsqrt, "
+                  "fneg, fabs and the soft_* rounding family each take one "
+                  "UInt64", bits);
     return 64u;
 }
 
