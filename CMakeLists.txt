@@ -494,6 +494,43 @@ add_library(cqops STATIC
                                # soft_fma over uint64_t with a (hi, lo) pair
                                # for the 128-bit intermediate, NEVER
                                # unsigned __int128 and NEVER the host fma()
+    src/kernels/iminmax_step.c # M42, K27 — abs/smin/smax/umin/umax: the BLOCK
+                               # (layout + one-gate dispatch over M14/M16/M17's
+                               # step functions) <-> the KERNEL seam
+    src/kernels/iminmax.c      # M42, K27 — the five entry points, the R9 fold
+                               # and the one cq_sandwich
+    src/kernels/ibits.c        # M41, K26 — the ROW TABLES of Bennett's
+                               # extractor expansions of ctpop / ctlz / cttz /
+                               # bitreverse / bswap (instructions.jl:4826-4946)
+    src/kernels/ibits_step.c   # M41, K26 — the ROW TABLES <-> STEP MACHINE
+                               # seam: views, one gate per slot over M14's
+                               # add, M16's eq and M17's mux blocks
+    src/kernels/ibits_kernel.c # M41, K26 — the ENTRY POINTS: width door, R9
+                               # short-circuit, one cq_sandwich per call
+    src/kernels/fmisc_sign.c   # M38, K24 (v2) — PRD-v2 §5's SIGN OPS seam:
+                               # fneg / fabs / copysign, one upstream block
+                               # each straight onto dst (K1/K3's shape)
+    src/kernels/fmisc_rows.c   # M38, K24 (v2) — the ROW TABLES: soft_fmin /
+                               # soft_fmax (fmin.jl:86-133), 17 rows each
+    src/kernels/fmisc_step.c   # M38, K24 (v2) — the STEP MACHINE: costs asked
+                               # of M16/M17/M31/M36, operands, the dispatch
+    src/kernels/fmisc_minmax.c # M38, K24 (v2) — the SURFACE: the two Rule 7
+                               # kernels and the uint64_t classical row
+    src/kernels/fround.c       # M38b, K25 (v2) — the PROGRAM ACCESSORS over
+                               # fround_rows.inc's five tables: soft_trunc,
+                               # soft_floor, soft_ceil, soft_round (rint,
+                               # nearbyint), soft_round_away (C round)
+    src/kernels/fround_step.c  # M38b, K25 (v2) — COSTS AND LAYOUT: every row
+                               # cost asked of its module, one memoised prefix
+                               # map per program
+    src/kernels/fround_operand.c # M38b, K25 (v2) — OPERAND RESOLUTION: views,
+                               # constants, block outputs, flags
+    src/kernels/fround_fadd.c  # M38b, K25 (v2) — the M33 HAND-OFF: soft_fadd
+                               # as one row of floor/ceil (fround.jl:73, :93)
+    src/kernels/fround_emit.c  # M38b, K25 (v2) — DISPATCH AND SURFACE: one
+                               # gate per slot and the five unary kernels
+    src/kernels/fround_eval.c  # M38b, K25 (v2) — the _eval <-> CIRCUIT seam:
+                               # the five bodies over uint64_t, NEVER host libm
 
     # Layer 4 — the analog surface. Everything above this line is a classical
     # permutation over {X, CX, CCX} (Rule 4), which is the surface the two-bit

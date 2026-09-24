@@ -1,0 +1,117 @@
+# M41 kernels/ibits*.c — K26 integer intrinsics (sandwiched extractor expansions)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+# measured-at: ALL-QUANTUM on the one source, values all-ones, at ctrl_depth 0
+#
+# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open
+# reads them back, and a checking run fails if either
+# disagrees with the snapshot on disk or with what the suite
+# declares. The mask matters because operand folds still fire
+# (a^0 and x&0 legitimately emit fewer gates, which is what L5
+# proves), so a count is a function of (W, operand mask) — and
+# a golden that does not say which mask it was taken at pins
+# nothing. The line above is per-file for the reason bd 2r5
+# records: as a literal in the writer it was false in four of
+# the twelve files and nothing could contradict it.
+#
+# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with
+# no demotion (D6) a mask can only drift TOWARDS Q, so it is
+# the FIXED POINT, and the one mask where forward and unc
+# agree. A file measured anywhere else says so above, and owes
+# the reader a note saying why.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+ctpop     forward    1     0     5        0
+ctpop     unc        1     0     5        0
+ctpop     forward    2     0    18        6
+ctpop     unc        2     0    18        6
+ctpop     forward    3     0    39       16
+ctpop     unc        3     0    39       16
+ctpop     forward    4     0    68       30
+ctpop     unc        4     0    68       30
+ctpop     forward    5     0   105       48
+ctpop     unc        5     0   105       48
+ctpop     forward    8     0   264      126
+ctpop     unc        8     0   264      126
+ctpop     forward   16     0  1040      510
+ctpop     unc       16     0  1040      510
+ctpop     forward   32     0  4128     2046
+ctpop     unc       32     0  4128     2046
+ctpop     forward   64     0 16448     8190
+ctpop     unc       64     0 16448     8190
+ctlz      forward    1     2    13        2
+ctlz      unc        1     2    13        2
+ctlz      forward    2     4    42       16
+ctlz      unc        2     4    42       16
+ctlz      forward    3     8    87       38
+ctlz      unc        3     8    87       38
+ctlz      forward    4    10   148       68
+ctlz      unc        4    10   148       68
+ctlz      forward    5    14   225      106
+ctlz      unc        5    14   225      106
+ctlz      forward    8    26   552      268
+ctlz      unc        8    26   552      268
+ctlz      forward   16    66  2128     1052
+ctlz      unc       16    66  2128     1052
+ctlz      forward   32   162  8352     4156
+ctlz      unc       32   162  8352     4156
+ctlz      forward   64   386 33088    16508
+ctlz      unc       64   386 33088    16508
+cttz      forward    1     2    13        2
+cttz      unc        1     2    13        2
+cttz      forward    2     4    42       16
+cttz      unc        2     4    42       16
+cttz      forward    3     8    87       38
+cttz      unc        3     8    87       38
+cttz      forward    4    10   148       68
+cttz      unc        4    10   148       68
+cttz      forward    5    14   225      106
+cttz      unc        5    14   225      106
+cttz      forward    8    26   552      268
+cttz      unc        8    26   552      268
+cttz      forward   16    66  2128     1052
+cttz      unc       16    66  2128     1052
+cttz      forward   32   162  8352     4156
+cttz      unc       32   162  8352     4156
+cttz      forward   64   386 33088    16508
+cttz      unc       64   386 33088    16508
+bitreverse forward    1     0     5        0
+bitreverse unc        1     0     5        0
+bitreverse forward    2     0    14        2
+bitreverse unc        2     0    14        2
+bitreverse forward    3     0    27        6
+bitreverse unc        3     0    27        6
+bitreverse forward    4     0    44       10
+bitreverse unc        4     0    44       10
+bitreverse forward    5     0    65       14
+bitreverse unc        5     0    65       14
+bitreverse forward    8     0   152       26
+bitreverse unc        8     0   152       26
+bitreverse forward   16     0   560       58
+bitreverse unc       16     0   560       58
+bitreverse forward   32     0  2144      122
+bitreverse unc       32     0  2144      122
+bitreverse forward   64     0  8384      250
+bitreverse unc       64     0  8384      250
+bswap     forward   16     0   112       30
+bswap     unc       16     0   112       30
+bswap     forward   32     0   352       94
+bswap     unc       32     0   352       94
+bswap     forward   48     0   720      158
+bswap     unc       48     0   720      158
+bswap     forward   64     0  1216      222
+bswap     unc       64     0  1216      222

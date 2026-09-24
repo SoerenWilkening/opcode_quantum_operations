@@ -232,15 +232,18 @@ CQ_TEST(each_program_is_the_sum_of_its_rows)
     cq_fa_probe ps = fa_probe(CQ_FADD_PROG_SUB, sub);
     cq_counter fwd, unc;
 
-    /* THE COMPOSITION IDENTITY, against the ONE count M33 exports. Every `C_*`
-     * is ASKED of its module and never written down; the row table is the
-     * port's own content and the thing a reader checks against the Julia. */
+    /* THE COMPOSITION IDENTITY, against the TWO counts M33 exports. Every
+     * `C_*` is ASKED of its module and never written down; the row table is
+     * the port's own content and the thing a reader checks against the Julia.
+     * `cq_fadd_steps`/`_region` were added for M38b's floor/ceil (bd 9ve.27.2)
+     * and are pinned here against the same independent row walk as fsub's. */
     CHECK_EQ(cq_fsub_steps(),  ps.slots);
     CHECK_EQ(cq_fsub_region(), ps.region);
+    CHECK_EQ(cq_fadd_steps(),  pa.slots);
+    CHECK_EQ(cq_fadd_region(), pa.region);
 
-    /* `fadd` HAS NO EXPORTED COUNT — fptoui composes `fsub` and nothing
-     * composes `fadd` (PRD-v2 §5's M39 row: "M33/M34 owe it nothing") — so its
-     * identity is stated on the TABLE and confirmed on the STREAM. The table
+    /* fadd's identity is ALSO stated on the TABLE and confirmed on the STREAM
+     * (it predates the export and costs nothing to keep). The table
      * half is that fsub is exactly fadd plus the nine-row prologue; the stream
      * half is the slot scan next door, which walks every one of fadd's rows
      * against the recorded gates and would run out of stream or leave gates

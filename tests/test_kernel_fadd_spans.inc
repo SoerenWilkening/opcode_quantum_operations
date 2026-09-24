@@ -188,7 +188,32 @@ CQ_TEST(the_compute_half_is_a_palindrome_at_an_asymmetric_mask)
  * it. */
 enum { FA_CANARY = 96 };
 
-CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
+/* The two exported blocks share one contract and one pair of mapped helpers
+ * (fadd_emit.c), so one body drives both: `add` selects `cq_fadd_block`
+ * (bd 9ve.27.2, M38b's floor/ceil) or `cq_fsub_block` (K19's fptoui). The
+ * block structs have identical fields; the fsub one is the carrier here. */
+static void fa_blk_step(int add, cq_ctx *ctx, const cq_fsub_block *k, int u)
+{
+    if (add) {
+        cq_fadd_block f;
+
+        f.a = k->a; f.b = k->b; f.scr = k->scr; f.off = k->off;
+        cq_fadd_step(ctx, &f, u);
+    } else {
+        cq_fsub_step(ctx, k, u);
+    }
+}
+
+static const cq_bit *fa_blk_result(int add, const cq_fsub_block *k)
+{
+    cq_fadd_block f;
+
+    if (!add) return cq_fsub_result(k);
+    f.a = k->a; f.b = k->b; f.scr = k->scr; f.off = k->off;
+    return cq_fadd_result(&f);
+}
+
+static void fa_two_blocks(int add)
 {
     static const uint64_t VALUES[][2] = {
         { CQ_F64_ONE,    CQ_F64_NEG(CQ_F64_QNAN_A) },   /* the m63k cell    */
@@ -207,8 +232,8 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
         cq_scratch scr;
         cq_ctx ctx;
         cq_sink s = cq_mock_sink(&m);
-        uint32_t r0 = cq_fsub_region();
-        int32_t ha, hb;
+        uint32_t r0 = add ? cq_fadd_region() : cq_fsub_region();
+        int32_t ha, hb[2];
         int bad = 0;
 
         cq_mock_reset(&m);
@@ -216,9 +241,15 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
         ha = cq_bk_reg_w(&ctx, (uint32_t)CQ_FP64_W,
                          cq_ref_w_make(VALUES[v][0], 0u, CQ_FP64_W),
                          cq_ref_w_ones(CQ_FP64_W));
-        hb = cq_bk_reg_w(&ctx, (uint32_t)CQ_FP64_W,
-                         cq_ref_w_make(VALUES[v][1], 0u, CQ_FP64_W),
-                         cq_ref_w_ones(CQ_FP64_W));
+        /* EACH BLOCK GETS ITS OWN `b` (block 1 takes the next row's), so the
+         * two results DIFFER: with one shared operand pair, a result accessor
+         * that ignored its own `off` read the neighbour's identical answer and
+         * stayed green — measured on the fadd twin (bd 9ve.27.2). */
+        for (int b = 0; b < 2; b++)
+            hb[b] = cq_bk_reg_w(&ctx, (uint32_t)CQ_FP64_W,
+                                cq_ref_w_make(VALUES[(v + b) % nvals][1], 0u,
+                                              CQ_FP64_W),
+                                cq_ref_w_ones(CQ_FP64_W));
         cq_scratch_alloc(&scr, 2u * r0 + (uint32_t)FA_CANARY);
         for (uint32_t i = 0; i < scr.n; i++) cq_materialise(&ctx, &scr.bits[i]);
         for (int i = 0; i < FA_CANARY; i++)
@@ -226,7 +257,7 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
 
         for (int b = 0; b < 2; b++) {
             k[b].a = cq_reg_cbits(&ctx.regs, ha);
-            k[b].b = cq_reg_cbits(&ctx.regs, hb);
+            k[b].b = cq_reg_cbits(&ctx.regs, hb[b]);
             k[b].scr = &scr;
             k[b].off = (b == 0) ? 0u : r0;
         }
@@ -242,8 +273,8 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
         for (int b = 0; b < 2 && !bad; b++) {
             size_t before = cq_mock_count(&m);
 
-            for (int u = 0; u < cq_fsub_steps(); u++)
-                cq_fsub_step(&ctx, &k[b], u);
+            for (int u = 0; u < (add ? cq_fadd_steps() : cq_fsub_steps()); u++)
+                fa_blk_step(add, &ctx, &k[b], u);
 
             for (size_t g = before; g < cq_mock_count(&m); g++) {
                 uint32_t t = cq_mock_at(&m, g)->t;
@@ -251,9 +282,9 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
                 CHECK(t < (uint32_t)FA_MAX_Q);
                 if (owner[t] >= 0 && owner[t] != b) {
                     cq_h_fail(__FILE__, __LINE__,
-                              "fsub at off 0 and fsub at off %u: q%u is written "
+                              "%s at off 0 and at off %u: q%u is written "
                               "by BOTH — a program that ignored its own `off` "
-                              "slides onto its neighbour", k[1].off, t);
+                              "slides onto its neighbour", add ? "fadd" : "fsub", k[1].off, t);
                     bad = 1;
                     break;
                 }
@@ -275,16 +306,18 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
          * the other has run over the same region. */
         for (int b = 0; b < 2 && !bad; b++) {
             int known = 0;
-            uint64_t got = fa_wire_value(&ctx, cq_fsub_result(&k[b]), &known);
-            uint64_t want = host_fsub(VALUES[v][0], VALUES[v][1]);
+            uint64_t got = fa_wire_value(&ctx, fa_blk_result(add, &k[b]), &known);
+            uint64_t vb = VALUES[(v + b) % nvals][1];
+            uint64_t want = add ? host_fadd(VALUES[v][0], vb)
+                              : host_fsub(VALUES[v][0], vb);
 
             if (!known || got != want)
                 cq_h_fail(__FILE__, __LINE__,
-                          "two fsub blocks (0 and %u) on (0x%016llx, "
+                          "two %s blocks (0 and %u) on (0x%016llx, "
                           "0x%016llx): block %d's result = %s0x%016llx, want "
-                          "0x%016llx", k[1].off,
+                          "0x%016llx", add ? "fadd" : "fsub", k[1].off,
                           (unsigned long long)VALUES[v][0],
-                          (unsigned long long)VALUES[v][1], b,
+                          (unsigned long long)vb, b,
                           known ? "" : "unknown/", (unsigned long long)got,
                           (unsigned long long)want);
         }
@@ -293,15 +326,15 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
          * every scratch bit provably back at |0> with two programs sharing one
          * region, the canary included. */
         for (int b = 1; b >= 0; b--)
-            for (int u = cq_fsub_steps() - 1; u >= 0; u--)
-                cq_fsub_step(&ctx, &k[b], u);
+            for (int u = (add ? cq_fadd_steps() : cq_fsub_steps()) - 1; u >= 0; u--)
+                fa_blk_step(add, &ctx, &k[b], u);
 
         for (uint32_t i = 0; i < scr.n; i++) {
             if (!cq_bit_is_qubit(scr.bits[i])) continue;
             if (!cq_shadow_known_zero(&ctx.shadow, cq_bit_qindex(scr.bits[i])))
                 cq_h_fail(__FILE__, __LINE__,
-                          "two fsub blocks: scratch bit %u (q%u) is not back at "
-                          "|0> after both reverse halves", i,
+                          "two %s blocks: scratch bit %u (q%u) is not back at "
+                          "|0> after both reverse halves", add ? "fadd" : "fsub", i,
                           cq_bit_qindex(scr.bits[i]));
             scr.bits[i] = cq_bit_zero();
         }
@@ -312,3 +345,9 @@ CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide)
 
     cq_mock_dispose(&m);
 }
+
+CQ_TEST(two_fsub_blocks_in_one_region_do_not_collide) { fa_two_blocks(0); }
+
+/* The same instrument over the ADD twin: the only detector for `cq_fadd_step`
+ * ignoring its own `off`, since no Rule 7 kernel reaches that block. */
+CQ_TEST(two_fadd_blocks_in_one_region_do_not_collide) { fa_two_blocks(1); }

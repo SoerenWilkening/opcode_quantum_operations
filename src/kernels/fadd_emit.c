@@ -273,41 +273,59 @@ const cq_bit *cq_fa_result(const cq_fa_ctx *x, cq_fadd_prog p)
 /* The public block carries no row pointer: a consumer cannot forget to bind
  * internal state. The immutable program map is selected here, and a transient
  * context combines it with this invocation's operands and region. */
-static cq_fa_ctx fsub_ctx(const cq_fsub_block *k, const cq_fa_map *m)
+static cq_fa_ctx blk_ctx(const cq_bit *a, const cq_bit *b, cq_scratch *scr,
+                         uint32_t off, const cq_fa_map *m)
 {
     cq_fa_ctx x;
 
-    x.a = k->a; x.b = k->b; x.scr = k->scr; x.off = k->off;
+    x.a = a; x.b = b; x.scr = scr; x.off = off;
     x.n = m->n;
     x.rows = m->rows;
     return x;
 }
 
-uint32_t cq_fsub_region(void)
+/* One slot, and the result span, of program `p` run as a block. BOTH exported
+ * blocks go through these two, so their guards and their fast path cannot
+ * drift apart: the memoised map, the fit check and one binary search. */
+static void blk_step(cq_ctx *ctx, cq_fadd_prog p, const cq_bit *a,
+                     const cq_bit *b, cq_scratch *scr, uint32_t off, int u)
 {
-    return cq_fa_map_get(CQ_FADD_PROG_SUB)->region;
-}
-
-int cq_fsub_steps(void)
-{
-    return cq_fa_map_get(CQ_FADD_PROG_SUB)->steps;
-}
-
-void cq_fsub_step(cq_ctx *ctx, const cq_fsub_block *k, int u)
-{
-    const cq_fa_map *m = cq_fa_map_get(CQ_FADD_PROG_SUB);
-    cq_fa_ctx x = fsub_ctx(k, m);
+    const cq_fa_map *m = cq_fa_map_get(p);
+    cq_fa_ctx x = blk_ctx(a, b, scr, off, m);
 
     fa_step_mapped(ctx, &x, m, u);
 }
 
-const cq_bit *cq_fsub_result(const cq_fsub_block *k)
+static const cq_bit *blk_result(cq_fadd_prog p, const cq_bit *a,
+                                const cq_bit *b, cq_scratch *scr, uint32_t off)
 {
-    const cq_fa_map *m = cq_fa_map_get(CQ_FADD_PROG_SUB);
-    cq_fa_ctx x = fsub_ctx(k, m);
+    const cq_fa_map *m = cq_fa_map_get(p);
+    cq_fa_ctx x = blk_ctx(a, b, scr, off, m);
 
-    return fa_result_mapped(&x, CQ_FADD_PROG_SUB, m);
+    return fa_result_mapped(&x, p, m);
 }
+
+uint32_t cq_fsub_region(void) { return cq_fa_map_get(CQ_FADD_PROG_SUB)->region; }
+int      cq_fsub_steps (void) { return cq_fa_map_get(CQ_FADD_PROG_SUB)->steps; }
+
+void cq_fsub_step(cq_ctx *ctx, const cq_fsub_block *k, int u)
+{ blk_step(ctx, CQ_FADD_PROG_SUB, k->a, k->b, k->scr, k->off, u); }
+
+const cq_bit *cq_fsub_result(const cq_fsub_block *k)
+{ return blk_result(CQ_FADD_PROG_SUB, k->a, k->b, k->scr, k->off); }
+
+/* --- The exported `fadd` compute half (bd 9ve.27.2 / K25): fsub's twin, for
+ * M38b's `soft_floor`/`soft_ceil` (fround.jl:73, :93). Same helpers as fsub's
+ * above, over the ADD map. ------------------------------------------------ */
+
+uint32_t cq_fadd_region(void) { return cq_fa_map_get(CQ_FADD_PROG_ADD)->region; }
+int      cq_fadd_steps (void) { return cq_fa_map_get(CQ_FADD_PROG_ADD)->steps; }
+
+void cq_fadd_step(cq_ctx *ctx, const cq_fadd_block *k, int u)
+{ blk_step(ctx, CQ_FADD_PROG_ADD, k->a, k->b, k->scr, k->off, u); }
+
+const cq_bit *cq_fadd_result(const cq_fadd_block *k)
+{ return blk_result(CQ_FADD_PROG_ADD, k->a, k->b, k->scr, k->off); }
 
 /* --- The two Rule 7 kernels: Bennett-in-the-small over one flat region. --- */
 

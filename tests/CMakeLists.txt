@@ -34,6 +34,7 @@ add_library(cqops_test_support STATIC
                             # which this file is the check ON (the Step 18 trap:
                             # an oracle sharing shape with the implementation is
                             # blind to what that implementation gets wrong)
+    support/fmiscref.c      # bd 9ve.27.1 — M38 K24's L1 ORACLE: IEEE minNum/maxNum + the sign ops, never fmin.jl
     support/poolcheck.c     # Step 10 — the automatic L2 and L3 assertions
     support/kerneldrv.c     # Step 10 — the shared Phase-B four-level gate
     support/kernelsweep.c   # Step 11 — the sweep shapes (plan §2.2's split seam)
@@ -2905,7 +2906,7 @@ add_cqops_death_test(test_kernel_fadd_death CASES
 set_tests_properties(test_kernel_fadd_death.step_index_past_the_end
                      test_kernel_fadd_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fadd: the step dispatch fell off;fadd: the block's region;fadd: a one-bit operand;fadd: a 64-lane operand;fadd: an operand names a row;fadd: unknown;fadd: a pick;fadd: a view chain;fadd: a class row;fadd: this block has; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;fpclass: step index outside;fpround: step index outside; eq: width is not positive; ult: width is not positive; sub: width is not positive; add: width is not positive; mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fadd: a slot index outside;fadd: the step dispatch fell off;fadd: the block's region;fadd: a one-bit operand;fadd: a 64-lane operand;fadd: an operand names a row;fadd: unknown;fadd: a pick;fadd: a view chain;fadd: a class row;fadd: this block has; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;fpclass: step index outside;fpround: step index outside; eq: width is not positive; ult: width is not positive; sub: width is not positive; add: width is not positive; mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
 
 ## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
 ## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
@@ -3757,3 +3758,480 @@ set_tests_properties(test_template_fma_death.d7a_out_aliases_a_of_a_ternary_qqq_
 set_tests_properties(test_template_fma_death.a_ternary_unc_destination_is_not_the_width_its_symbol_names
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;ternary symbol names a width;is not one of the ABI enumerators;outside the ABI;conversion names a width pair;bead 9ve.34")
+
+## M42 iminmax — K27, the integer intrinsics abs/smin/smax/umin/umax (bd 9ve.29.2).
+## v1-SHAPED integer kernels over M14/M16/M17's exported step blocks, one
+## sandwich each. The suite's no-golden composition identity, slot scan,
+## span-disjointness scan and two-blocks-in-one-region case live in its .inc
+## files; tests/goldens/iminmax.counts is its own new golden file.
+add_cqops_test(test_kernel_iminmax)
+
+## M42's fail-loud paths. Every case calls the layer it is named for DIRECTLY
+## and every classical-operand case falls, with its guard deleted, into the R9
+## fold and returns in silence — so the exit code convicts a deleted guard and
+## the regexes below convict the OTHER direction: a case satisfied by a
+## neighbouring guard, a lower block's identical guard (the LATER-copy shape,
+## bd a-composed-step-count-masks-its-own-width-guard-from-below), or a
+## sanitizer. Both configurations; nothing here is Debug-gated.
+add_cqops_death_test(test_kernel_iminmax_death CASES
+    umax_dst_aliases_a_classical_source
+    abs_dst_aliases_its_source
+    smin_the_two_sources_are_the_same_register
+    abs_wider_than_the_register_cap
+    imm_steps_zero_width
+    imm_region_zero_width
+    imm_steps_unknown_op_past_the_end
+    imm_steps_unknown_op_negative
+    imm_steps_abs_above_the_cap
+    imm_step_index_past_the_end
+    imm_step_index_negative
+    imm_step_region_does_not_fit
+    imm_step_block_has_no_scratch
+)
+set(_im_lower "scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (1) D7a / D7b are kernel.h's; M42's own guards must not be what spoke, and
+## each alias case must not be satisfied by the OTHER D7 sentence.
+set_tests_properties(test_kernel_iminmax_death.umax_dst_aliases_a_classical_source
+                     test_kernel_iminmax_death.abs_dst_aliases_its_source
+                     PROPERTIES FAIL_REGULAR_EXPRESSION "${_im_lower};iminmax:;D7b")
+set_tests_properties(test_kernel_iminmax_death.smin_the_two_sources_are_the_same_register
+                     PROPERTIES FAIL_REGULAR_EXPRESSION "${_im_lower};iminmax:;D7a")
+
+## (2) The abs width cap, through the kernel and directly. The kernel reaches
+## it before the R9 fold (a raw 129-lane classical operand would otherwise fold
+## and return); the direct call has no lower layer with a cap at all.
+set_tests_properties(test_kernel_iminmax_death.abs_wider_than_the_register_cap
+                     test_kernel_iminmax_death.imm_steps_abs_above_the_cap
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "${_im_lower};D7a;D7b;width is not positive;iminmax: unknown op;ult:;slt:;sub:;mux:")
+
+## (3) W <= 0 on the two sizing entries. Masked from ABOVE by kernel.h (hence
+## called directly) and from BELOW by every sibling block's identical guard:
+## `cq_imm_steps` sums cq_ult_steps + cq_mux_steps, `cq_imm_region` sums the
+## regions, and each of those refuses W <= 0 with its own sentence.
+set_tests_properties(test_kernel_iminmax_death.imm_steps_zero_width
+                     test_kernel_iminmax_death.imm_region_zero_width
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "${_im_lower};destination width is not positive;source width is not positive;ult:;slt:;sub:;mux:;iminmax: unknown op;iminmax: abs width")
+
+## (4) An op outside cq_imm_op. With the guard gone the dispatch reads an
+## out-of-range op as an unsigned min/max and returns a plausible count.
+set_tests_properties(test_kernel_iminmax_death.imm_steps_unknown_op_past_the_end
+                     test_kernel_iminmax_death.imm_steps_unknown_op_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "${_im_lower};iminmax: width is not positive;iminmax: abs width;ult:;slt:;sub:;mux:")
+
+## (5) The step index. PAST-THE-END lands in the select row, and cq_mux_step
+## has NO range guard, so M42's is the only one; a NEGATIVE index lands in the
+## compare row, whose own `ult: step index outside` fires one layer down and
+## would carry the case on the exit code alone — so it is forbidden here.
+set_tests_properties(test_kernel_iminmax_death.imm_step_index_past_the_end
+                     test_kernel_iminmax_death.imm_step_index_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "${_im_lower};iminmax: width is not positive;iminmax: unknown op;iminmax: abs width;iminmax: the block's region;ult:;slt:;sub:;mux:")
+
+## (6) The region-fit check, including a NULL scratch. The step index is 0 and
+## in range, so the index guard must not be what spoke.
+set_tests_properties(test_kernel_iminmax_death.imm_step_region_does_not_fit
+                     test_kernel_iminmax_death.imm_step_block_has_no_scratch
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "${_im_lower};iminmax: step index outside;iminmax: width is not positive;iminmax: unknown op;iminmax: abs width;ult:;slt:;sub:;mux:")
+
+## M41 `ibits` — K26, the integer intrinsics ctpop / ctlz / cttz / bitreverse /
+## bswap (bd 9ve.29.1). PRD-v2 §7.14: v1-SHAPED integer kernels over
+## Bennett's extractor expansions (instructions.jl:4826-4946). fshl / fshr are
+## NOT landed — docs/constructions/K26.md §6 carries the witness.
+add_cqops_test(test_kernel_ibits)
+
+## M41's fail-loud paths, every one driven DIRECTLY (the file header lists the
+## four refusals that have a reachability proof instead of a case).
+add_cqops_death_test(test_kernel_ibits_death CASES
+    bswap_kernel_at_a_width_that_is_not_a_multiple_of_16
+    bswap_program_at_w24
+    ctpop_kernel_at_width_zero
+    ctlz_program_above_the_register_maximum
+    program_of_an_unknown_intrinsic
+    program_into_a_null_buffer
+    name_of_an_unknown_intrinsic
+    cttz_dst_aliases_its_source
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    a_block_with_no_region
+    result_of_a_program_that_does_not_fit
+    result_of_a_block_with_no_region
+    result_when_the_last_row_is_not_the_closing_add
+    a_block_whose_width_is_zero
+    steps_of_a_program_of_no_rows
+    row_steps_of_an_unknown_op
+    row_region_of_an_unknown_op
+    a_row_with_an_unknown_op
+    an_operand_that_is_not_an_earlier_row
+    an_unknown_operand_code
+    a_view_field_outside_the_width
+    a_select_whose_condition_is_not_an_ne_row
+    an_ne_row_read_as_a_w_lane_operand
+)
+
+## EACH CASE BANS EVERY OTHER M41 MESSAGE AND EVERY LOWER LAYER a wild index
+## or a mis-sized region can reach (enumerated with
+## `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c`, plus the three
+## step blocks M41 drives: `add: `, `eq: `, `mux: `). So a case passes only on
+## ITS OWN refusal — two same-condition guards (the step's region check and
+## cq_ibits_result's, the step index and the fall-off) cannot answer for each
+## other. `the step dispatch fell off` is banned everywhere, which is what
+## makes the two step-index cases claims about the range check rather than
+## about the fall-off below it; a NEGATIVE index would otherwise dispatch into
+## row 0 and die in M14's `add: step index outside`, which is banned too.
+## `width is not positive` is banned because with M41's width door deleted a
+## W = 0 kernel call still aborts in kernel.h's cq_kernel_check_n (MEASURED:
+## ctpop_kernel_at_width_zero stayed green under that mutant until it was).
+set(_ibits_msgs
+    "bswap width is not a multiple of 16" "ibits: width outside"
+    "program of an unknown intrinsic" "program into a NULL buffer"
+    "name of an unknown intrinsic" "D7a" "ibits: step index outside"
+    "does not fit at its offset" "the block has no region"
+    "not its closing add" "block width outside" "the program is empty"
+    "row_steps of an unknown op" "row_region of an unknown op"
+    "a row with an unknown op" "an operand is not an earlier row"
+    "unknown operand code" "a view field is outside"
+    "a select condition is not" "a one-bit ne row read"
+    "the step dispatch fell off" "outgrew" "emit of an unknown op"
+    "fold of an unknown intrinsic")
+set(_ibits_lower
+    "UndefinedBehaviorSanitizer" "AddressSanitizer" "Assertion failed"
+    "scratch:" "sandwich:" "shadow:" "qubit pool:" "emit:" "FATAL: reg:"
+    "controlled:" "distinctness" "add: " "eq: " "mux: "
+    "width is not positive")
+function(_ibits_pin case own)
+    set(ban ${_ibits_lower})
+    foreach(m IN LISTS _ibits_msgs)
+        if(NOT m STREQUAL own)
+            list(APPEND ban "${m}")
+        endif()
+    endforeach()
+    set_tests_properties(test_kernel_ibits_death.${case}
+                         PROPERTIES FAIL_REGULAR_EXPRESSION "${ban}")
+endfunction()
+_ibits_pin(bswap_kernel_at_a_width_that_is_not_a_multiple_of_16
+           "bswap width is not a multiple of 16")
+_ibits_pin(bswap_program_at_w24 "bswap width is not a multiple of 16")
+_ibits_pin(ctpop_kernel_at_width_zero "ibits: width outside")
+_ibits_pin(ctlz_program_above_the_register_maximum "ibits: width outside")
+_ibits_pin(program_of_an_unknown_intrinsic "program of an unknown intrinsic")
+_ibits_pin(program_into_a_null_buffer "program into a NULL buffer")
+_ibits_pin(name_of_an_unknown_intrinsic "name of an unknown intrinsic")
+_ibits_pin(cttz_dst_aliases_its_source "D7a")
+_ibits_pin(step_index_past_the_end "ibits: step index outside")
+_ibits_pin(step_index_is_negative "ibits: step index outside")
+_ibits_pin(block_region_is_one_bit_short "does not fit at its offset")
+_ibits_pin(block_offset_runs_off_the_region "does not fit at its offset")
+_ibits_pin(a_block_with_no_region "the block has no region")
+_ibits_pin(result_of_a_program_that_does_not_fit "does not fit at its offset")
+_ibits_pin(result_of_a_block_with_no_region "the block has no region")
+_ibits_pin(result_when_the_last_row_is_not_the_closing_add
+           "not its closing add")
+_ibits_pin(a_block_whose_width_is_zero "block width outside")
+_ibits_pin(steps_of_a_program_of_no_rows "the program is empty")
+_ibits_pin(row_steps_of_an_unknown_op "row_steps of an unknown op")
+_ibits_pin(row_region_of_an_unknown_op "row_region of an unknown op")
+_ibits_pin(a_row_with_an_unknown_op "a row with an unknown op")
+_ibits_pin(an_operand_that_is_not_an_earlier_row
+           "an operand is not an earlier row")
+_ibits_pin(an_unknown_operand_code "unknown operand code")
+_ibits_pin(a_view_field_outside_the_width "a view field is outside")
+_ibits_pin(a_select_whose_condition_is_not_an_ne_row
+           "a select condition is not")
+_ibits_pin(an_ne_row_read_as_a_w_lane_operand "a one-bit ne row read")
+
+## M38 `fmisc` — K24, the first half of M38 (bd 9ve.27.1): the SIGN OPS
+## (`fneg`, `fabs`, `copysign`, one upstream block each straight onto dst, no
+## sandwich) and `fmin` / `fmax` (soft_fmin / soft_fmax, 17-row programs over
+## M16/M17/M31/M36's step blocks, sandwiched). PRD-v2 §5's SIGN OPS <->
+## EVERYTHING ELSE seam; docs/constructions/K24.md.
+add_cqops_test(test_kernel_fmisc)
+
+add_cqops_death_test(test_kernel_fmisc_death CASES
+    fneg_width_is_not_64
+    fabs_width_is_not_64
+    copysign_width_is_not_64
+    fmin_width_is_not_64
+    fmax_width_is_not_64
+    fneg_dst_aliases_its_source
+    fabs_dst_aliases_its_source
+    copysign_dst_aliases_its_second_source
+    fmin_dst_aliases_its_first_source
+    fmax_dst_aliases_its_second_source
+    copysign_sources_alias
+    fmin_sources_alias
+    step_index_past_the_end
+    step_index_is_negative
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    result_of_a_program_that_does_not_fit
+    a_block_with_no_region
+    a_block_with_no_operand_b
+    a_block_naming_no_program
+    rows_of_an_unknown_program
+    arity_of_an_unknown_op
+    row_width_outside_the_program
+    row_steps_of_an_unknown_op
+    row_region_of_an_unknown_op
+    a_64_lane_operand_with_an_unknown_code
+    a_64_lane_operand_names_a_row_outside_the_program
+    a_one_bit_operand_that_is_not_a_row
+    a_one_bit_operand_names_a_64_lane_row
+    a_rail_operand_that_is_not_a_rail
+)
+
+## (1) THE WIDTH GUARDS. The sign ops loop over 64 lanes whatever `W` says, so
+## a deleted guard RETURNS and the exit code carries the case; fmin/fmax would
+## reach the sandwich. Every layer a wrong width could reach is pinned absent,
+## `Assertion failed` included (bd 9ve.18's third abort source).
+set_tests_properties(test_kernel_fmisc_death.fneg_width_is_not_64
+                     test_kernel_fmisc_death.fabs_width_is_not_64
+                     test_kernel_fmisc_death.copysign_width_is_not_64
+                     test_kernel_fmisc_death.fmin_width_is_not_64
+                     test_kernel_fmisc_death.fmax_width_is_not_64
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "D7a;D7b;fpfield:;fpclass:;fcmp:;eq:;mux:;fmisc: step index;fmisc: the block;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (2) D7a / D7b. A sign op with dst == a reaches the emitter with a control
+## coinciding with its target, so `distinctness` and `emit:` are the lower
+## copies that would otherwise answer; the width sentence is banned because a
+## guard that refused the wrong thing would satisfy a bare abort.
+set_tests_properties(test_kernel_fmisc_death.fneg_dst_aliases_its_source
+                     test_kernel_fmisc_death.fabs_dst_aliases_its_source
+                     test_kernel_fmisc_death.copysign_dst_aliases_its_second_source
+                     test_kernel_fmisc_death.fmin_dst_aliases_its_first_source
+                     test_kernel_fmisc_death.fmax_dst_aliases_its_second_source
+                     test_kernel_fmisc_death.copysign_sources_alias
+                     test_kernel_fmisc_death.fmin_sources_alias
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "W must be 64;distinctness;emit:;fpfield:;fpclass:;fcmp:;eq:;mux:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (3) THE STEP-INDEX GUARD. Masked from below on the low side (row 0 is an M31
+## class block: "fpclass: step index outside") and by this module's own
+## fall-off message on the high side; both pinned absent, with every inner
+## block's range refusal.
+set_tests_properties(test_kernel_fmisc_death.step_index_past_the_end
+                     test_kernel_fmisc_death.step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fmisc: the step dispatch fell off;fmisc: the block;fmisc: row steps;fpclass:;fcmp:;eq: step index outside;ult: step index outside;sub: step index outside;mux:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (4) THE BLOCK'S PREMISES. The region check is masked from below by M08's
+## cq_scratch_span and by M31's / M36's own region checks one layer in, whose
+## messages name the REGION or the INNER block rather than the consumer that
+## mis-sized its offset. The NULL-operand case drives the LAST slot, a mux that
+## never reads `b`, so a deleted guard returns rather than faulting.
+set_tests_properties(test_kernel_fmisc_death.block_region_is_one_bit_short
+                     test_kernel_fmisc_death.block_offset_runs_off_the_region
+                     test_kernel_fmisc_death.result_of_a_program_that_does_not_fit
+                     test_kernel_fmisc_death.a_block_with_no_region
+                     test_kernel_fmisc_death.a_block_with_no_operand_b
+                     test_kernel_fmisc_death.a_block_naming_no_program
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fmisc: step index;fmisc: the step dispatch fell off;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (5) THE ACCESSORS AND OPERAND RESOLUTION, driven directly with a wild op,
+## index or code (bd a-guard-that-reads-its-own-table-has-no-death-case: the
+## block names a program, so these are the only refusals that CAN have a
+## case). A wild code otherwise indexes the row table or the region out of
+## bounds, which is ASan's or M08's abort, not this module's.
+set_tests_properties(test_kernel_fmisc_death.rows_of_an_unknown_program
+                     test_kernel_fmisc_death.arity_of_an_unknown_op
+                     test_kernel_fmisc_death.row_width_outside_the_program
+                     test_kernel_fmisc_death.row_steps_of_an_unknown_op
+                     test_kernel_fmisc_death.row_region_of_an_unknown_op
+                     test_kernel_fmisc_death.a_rail_operand_that_is_not_a_rail
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## (6) THE FOUR OPERAND REFUSALS MASK EACH OTHER IN RELEASE, AND EACH CASE BANS
+## ITS SIBLINGS' SENTENCES. MEASURED (K24's battery, Release): with op64's row
+## range check deleted, row 17 is read one past the table and handed to
+## cq_fx_flag_of, whose OWN range check aborts — and with flag_of's range check
+## deleted, `rows[-1]` is garbage and lands on its "names a 64-lane row" arm.
+## Both mutants SURVIVED under group (5)'s list, which is the later-copy shape of
+## bd a-guard-can-be-masked-by-a-LATER-copy-in-the-call-chain. In Debug ASan
+## sees the out-of-bounds read first; Release needs these sentences. And a
+## `rows[-1]` that lands on a class or `olt` row dies in cq_fx_rail instead —
+## measured — so the not-a-row case bans the rail, arity and row sentences too.
+set_tests_properties(test_kernel_fmisc_death.a_64_lane_operand_with_an_unknown_code
+                     test_kernel_fmisc_death.a_64_lane_operand_names_a_row_outside_the_program
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fmisc: a one-bit operand;fmisc: a rail operand;fmisc: arity;fmisc: row;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+set_tests_properties(test_kernel_fmisc_death.a_one_bit_operand_that_is_not_a_row
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fmisc: a one-bit operand names a 64-lane row;fmisc: a rail operand;fmisc: arity;fmisc: row;fmisc: unknown 64-lane operand code;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+set_tests_properties(test_kernel_fmisc_death.a_one_bit_operand_names_a_64_lane_row
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fmisc: a one-bit operand is not a row;fmisc: unknown 64-lane operand code;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+
+## M38b `fround` — K25, the rounding-to-integral family at f64 (bd 9ve.27.2):
+## soft_trunc / soft_floor / soft_ceil / soft_round (rint, nearbyint) /
+## soft_round_away (C round). PRD-v2 §5's M38 row, §7.2's literal grain, §7.3's
+## constants-as-sources and views, §7.4's C transcription, §7.6's nine CLAMPED
+## shifts, §7.7's name mapping, §7.11's unary signature, §7.12's anchors.
+##
+## Two binaries, split for wall clock only: floor and ceil carry M33's
+## soft_fadd program as one hand-off row (~48k slots more per compute half), so
+## their circuit sweeps run beside the structural suite.
+add_cqops_test(test_kernel_fround)
+add_cqops_test(test_kernel_fround_fadd)
+
+## M38b's fail-loud paths. EVERY CASE BANS EVERY OTHER fround MESSAGE, every
+## inner block's prefix and every lower layer a wild index or pointer can
+## reach, plus the sanitizer banners — so a case whose own guard was deleted
+## goes red whichever later copy would have caught the fault (bd
+## a-guard-is-untested-if-a-later-copy-of-itself-catches-it), in BOTH
+## configurations (bd a-death-case-on-a-step-index-guard-is-carried-by-its-
+## regex-not-its-exit-code). The three table-reading guards (view chain,
+## zero-slot dispatch, `result` not a mux) have reachability proofs in
+## test_kernel_fround.c instead (bd a-guard-that-reads-its-own-table-has-no-
+## death-case).
+add_cqops_death_test(test_kernel_fround_death CASES
+    width_is_not_64
+    width_is_128
+    kernel_names_a_program_outside_the_five
+    rows_of_a_program_outside_the_five
+    trunc_base_of_a_program_outside_the_five
+    eval_of_a_program_outside_the_five
+    block_names_a_program_outside_the_five
+    step_index_past_the_end
+    step_index_is_negative
+    row_at_outside_the_program
+    block_region_is_one_bit_short
+    block_offset_runs_off_the_region
+    result_of_a_program_that_does_not_fit
+    a_block_with_no_region
+    a_block_with_no_operand_a
+    arity_of_an_unknown_op
+    row_width_outside_the_program
+    row_width_of_an_unknown_op
+    row_steps_of_an_unknown_op
+    row_region_of_an_unknown_op
+    a_64_lane_operand_names_a_one_bit_row
+    a_64_lane_operand_names_a_view_row
+    a_64_lane_operand_names_a_row_outside_the_program
+    a_one_bit_operand_names_a_64_lane_row
+    a_one_bit_operand_names_a_row_outside_the_program
+    an_operand_code_outside_the_vocabulary
+    dst_aliases_its_source
+)
+
+## `own` is the ONE fround message the case is about; every other one is
+## banned. Three messages are shared by design and each sharer's alternative
+## on deletion is "no abort at all" (rows / trunc_base / eval of a program id
+## outside the five), so a shared string cannot mask any of them.
+function(_cqops_fround_death_ban case own)
+    set(ban
+        "fround: a program id outside the five"
+        "fround: the block names a program outside"
+        "fround: the kernel names a program outside"
+        "fround: W must be 64"
+        "fround: a slot index outside"
+        "fround: step index outside"
+        "fround: the step dispatch landed"
+        "fround: the dispatch reached"
+        "fround: the block's region does not fit"
+        "fround: the block has no region"
+        "fround: the block has no operand"
+        "fround: arity of"
+        "fround: a row index outside"
+        "fround: the width of an unknown"
+        "fround: the cost of an unknown"
+        "fround: the region of an unknown"
+        "fround: an operand names a row outside"
+        "fround: a 64-lane operand names"
+        "fround: a one-bit operand is not"
+        "fround: a one-bit operand names"
+        "fround: unknown 64-lane operand code"
+        "fround: a view chain"
+        "fround: `result`"
+        "fround: the program outgrew"
+        "eq:" "slt:" "ult:" "sub:" "add:" "mux:" "barrel:" "fadd:" "fpfield:"
+        "scratch:" "sandwich:" "shadow:" "qubit pool:" "emit:" "reg:"
+        "controlled:" "distinctness" "D7a"
+        "AddressSanitizer" "UndefinedBehaviorSanitizer" "Assertion failed")
+    if(NOT own STREQUAL "")
+        list(REMOVE_ITEM ban "${own}")
+    endif()
+    set_tests_properties(test_kernel_fround_death.${case}
+                         PROPERTIES FAIL_REGULAR_EXPRESSION "${ban}")
+endfunction()
+
+_cqops_fround_death_ban(width_is_not_64 "fround: W must be 64")
+_cqops_fround_death_ban(width_is_128 "fround: W must be 64")
+_cqops_fround_death_ban(kernel_names_a_program_outside_the_five
+                        "fround: the kernel names a program outside")
+_cqops_fround_death_ban(rows_of_a_program_outside_the_five
+                        "fround: a program id outside the five")
+_cqops_fround_death_ban(trunc_base_of_a_program_outside_the_five
+                        "fround: a program id outside the five")
+_cqops_fround_death_ban(eval_of_a_program_outside_the_five
+                        "fround: a program id outside the five")
+_cqops_fround_death_ban(block_names_a_program_outside_the_five
+                        "fround: the block names a program outside")
+_cqops_fround_death_ban(step_index_past_the_end "fround: step index outside")
+_cqops_fround_death_ban(step_index_is_negative "fround: step index outside")
+_cqops_fround_death_ban(row_at_outside_the_program "fround: a slot index outside")
+_cqops_fround_death_ban(block_region_is_one_bit_short
+                        "fround: the block's region does not fit")
+_cqops_fround_death_ban(block_offset_runs_off_the_region
+                        "fround: the block's region does not fit")
+_cqops_fround_death_ban(result_of_a_program_that_does_not_fit
+                        "fround: the block's region does not fit")
+_cqops_fround_death_ban(a_block_with_no_region "fround: the block has no region")
+_cqops_fround_death_ban(a_block_with_no_operand_a
+                        "fround: the block has no operand")
+_cqops_fround_death_ban(arity_of_an_unknown_op "fround: arity of")
+_cqops_fround_death_ban(row_width_outside_the_program
+                        "fround: a row index outside")
+_cqops_fround_death_ban(row_width_of_an_unknown_op
+                        "fround: the width of an unknown")
+_cqops_fround_death_ban(row_steps_of_an_unknown_op "fround: the cost of an unknown")
+_cqops_fround_death_ban(row_region_of_an_unknown_op
+                        "fround: the region of an unknown")
+_cqops_fround_death_ban(a_64_lane_operand_names_a_one_bit_row
+                        "fround: a 64-lane operand names")
+_cqops_fround_death_ban(a_64_lane_operand_names_a_view_row
+                        "fround: a 64-lane operand names")
+_cqops_fround_death_ban(a_64_lane_operand_names_a_row_outside_the_program
+                        "fround: an operand names a row outside")
+_cqops_fround_death_ban(a_one_bit_operand_names_a_64_lane_row
+                        "fround: a one-bit operand names")
+_cqops_fround_death_ban(a_one_bit_operand_names_a_row_outside_the_program
+                        "fround: a one-bit operand is not")
+_cqops_fround_death_ban(an_operand_code_outside_the_vocabulary
+                        "fround: unknown 64-lane operand code")
+## D7a is M10's shared `cq_kernel_check_n` refusal and is banned everywhere else:
+## width_is_128 reaches it (the static `dst` beside `a` overlaps at W = 128)
+## when the W guard is deleted — measured, it masked that guard until banned.
+_cqops_fround_death_ban(dst_aliases_its_source "D7a")
+
+## M33's `cq_fadd_block` export (bd 9ve.27.2, added for M38b's floor/ceil):
+## the six block-surface refusals, driven through the NEW entry points with the
+## SAME two regex groups as test_kernel_fadd_death's fsub-block cases, copied
+## verbatim — the twin runs through the same mapped helpers, so the layers that
+## can mask each guard are the same layers.
+add_cqops_death_test(test_kernel_fadd_block_death CASES
+    fadd_block_step_index_past_the_end
+    fadd_block_step_index_is_negative
+    fadd_block_region_is_one_bit_short
+    fadd_block_offset_runs_off_the_region
+    result_of_an_fadd_block_that_does_not_fit
+    an_fadd_block_with_no_region
+)
+set_tests_properties(test_kernel_fadd_block_death.fadd_block_step_index_past_the_end
+                     test_kernel_fadd_block_death.fadd_block_step_index_is_negative
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "fadd: a slot index outside;fadd: the step dispatch fell off;fadd: the block's region;fadd: a one-bit operand;fadd: a 64-lane operand;fadd: an operand names a row;fadd: unknown;fadd: a pick;fadd: a view chain;fadd: a class row;fadd: this block has; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;fpclass: step index outside;fpround: step index outside; eq: width is not positive; ult: width is not positive; sub: width is not positive; add: width is not positive; mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+set_tests_properties(test_kernel_fadd_block_death.fadd_block_region_is_one_bit_short
+                     test_kernel_fadd_block_death.fadd_block_offset_runs_off_the_region
+                     test_kernel_fadd_block_death.result_of_an_fadd_block_that_does_not_fit
+                     test_kernel_fadd_block_death.an_fadd_block_with_no_region
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "scratch:;fadd: step index outside;fadd: the step dispatch fell off;fpclass: the block's region;fpround: the block's region; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")

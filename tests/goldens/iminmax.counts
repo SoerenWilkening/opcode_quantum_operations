@@ -1,0 +1,127 @@
+# M42 kernels/iminmax.c — K27 abs/smin/smax/umin/umax (icmp + select, abs adds a sub; one sandwich)
+# libcqops L4 gate-count goldens. PIN COUNTS, NEVER TRACES
+# (risk R5): a trace churns on D4 free-list order and D6
+# non-demotion, neither of which changes the circuit.
+#
+# bennett: 980805de85314b3da7ac25cf6454b56566f8e609
+# measured-at: ALL-QUANTUM on every source (abs has one); abs's constant 0 is a CQ_BIT_ZERO source and folds at every mask; at ctrl_depth 0
+#
+# BOTH OF THOSE LINES ARE DATA, NOT DECORATION: cq_gold_open
+# reads them back, and a checking run fails if either
+# disagrees with the snapshot on disk or with what the suite
+# declares. The mask matters because operand folds still fire
+# (a^0 and x&0 legitimately emit fewer gates, which is what L5
+# proves), so a count is a function of (W, operand mask) — and
+# a golden that does not say which mask it was taken at pins
+# nothing. The line above is per-file for the reason bd 2r5
+# records: as a literal in the writer it was false in four of
+# the twelve files and nothing could contradict it.
+#
+# WHY ALL-QUANTUM IS THE RIGHT MASK FOR A KERNEL GOLDEN: with
+# no demotion (D6) a mask can only drift TOWARDS Q, so it is
+# the FIXED POINT, and the one mask where forward and unc
+# agree. A file measured anywhere else says so above, and owes
+# the reader a note saying why.
+#
+# forward and unc are pinned SEPARATELY and their equality is
+# NOT an invariant (Rule 14, PRD §10): _unc may legitimately
+# emit MORE gates than the forward did, because a rotation on
+# a source between the two materialises bits that were
+# constants at forward time. Do not 'fix' a difference.
+#
+# Regenerate: CQOPS_UPDATE_GOLDENS=1 ctest --test-dir
+# build-release -R kernel   (ctest does NOT forward trailing
+# --args to test binaries, so the env var is the mechanism;
+# --update-goldens works when running the binary directly.)
+#
+# kernel   pass      W   NOT  CNOT  Toffoli
+umax      forward    1     4    13        6
+umax      unc        1     4    13        6
+umax      forward    2     6    26       12
+umax      unc        2     6    26       12
+umax      forward    3     8    39       18
+umax      unc        3     8    39       18
+umax      forward    4    10    52       24
+umax      unc        4    10    52       24
+umax      forward    5    12    65       30
+umax      unc        5    12    65       30
+umax      forward    8    18   104       48
+umax      unc        8    18   104       48
+umax      forward   16    34   208       96
+umax      unc       16    34   208       96
+umax      forward   32    66   416      192
+umax      unc       32    66   416      192
+umax      forward   64   130   832      384
+umax      unc       64   130   832      384
+umin      forward    1     4    13        6
+umin      unc        1     4    13        6
+umin      forward    2     6    26       12
+umin      unc        2     6    26       12
+umin      forward    3     8    39       18
+umin      unc        3     8    39       18
+umin      forward    4    10    52       24
+umin      unc        4    10    52       24
+umin      forward    5    12    65       30
+umin      unc        5    12    65       30
+umin      forward    8    18   104       48
+umin      unc        8    18   104       48
+umin      forward   16    34   208       96
+umin      unc       16    34   208       96
+umin      forward   32    66   416      192
+umin      unc       32    66   416      192
+umin      forward   64   130   832      384
+umin      unc       64   130   832      384
+smax      forward    1     8    17        6
+smax      unc        1     8    17        6
+smax      forward    2    10    34       12
+smax      unc        2    10    34       12
+smax      forward    3    12    51       18
+smax      unc        3    12    51       18
+smax      forward    4    14    68       24
+smax      unc        4    14    68       24
+smax      forward    5    16    85       30
+smax      unc        5    16    85       30
+smax      forward    8    22   136       48
+smax      unc        8    22   136       48
+smax      forward   16    38   272       96
+smax      unc       16    38   272       96
+smax      forward   32    70   544      192
+smax      unc       32    70   544      192
+smax      forward   64   134  1088      384
+smax      unc       64   134  1088      384
+smin      forward    1     8    17        6
+smin      unc        1     8    17        6
+smin      forward    2    10    34       12
+smin      unc        2    10    34       12
+smin      forward    3    12    51       18
+smin      unc        3    12    51       18
+smin      forward    4    14    68       24
+smin      unc        4    14    68       24
+smin      forward    5    16    85       30
+smin      unc        5    16    85       30
+smin      forward    8    22   136       48
+smin      unc        8    22   136       48
+smin      forward   16    38   272       96
+smin      unc       16    38   272       96
+smin      forward   32    70   544      192
+smin      unc       32    70   544      192
+smin      forward   64   134  1088      384
+smin      unc       64   134  1088      384
+abs       forward    1    12    21        6
+abs       unc        1    12    21        6
+abs       forward    2    16    42       14
+abs       unc        2    16    42       14
+abs       forward    3    20    63       22
+abs       unc        3    20    63       22
+abs       forward    4    24    84       30
+abs       unc        4    24    84       30
+abs       forward    5    28   105       38
+abs       unc        5    28   105       38
+abs       forward    8    40   168       62
+abs       unc        8    40   168       62
+abs       forward   16    72   336      126
+abs       unc       16    72   336      126
+abs       forward   32   136   672      254
+abs       unc       32   136   672      254
+abs       forward   64   264  1344      510
+abs       unc       64   264  1344      510

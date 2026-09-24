@@ -349,6 +349,7 @@ CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_programs_spans_are_pairwise_disjoint),
     CQ_CASE(the_compute_half_is_a_palindrome_at_an_asymmetric_mask),
     CQ_CASE(two_fsub_blocks_in_one_region_do_not_collide),
+    CQ_CASE(two_fadd_blocks_in_one_region_do_not_collide),
     CQ_CASE(dst_owns_its_lanes_and_the_scratch_comes_back),
     CQ_CASE(l1_sweep),
     CQ_CASE(controlled),

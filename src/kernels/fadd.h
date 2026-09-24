@@ -258,6 +258,23 @@ void cq_fsub_step(cq_ctx *ctx, const cq_fsub_block *k, int u);
 /* The 64-lane result span, inside the caller's own region. */
 const cq_bit *cq_fsub_result(const cq_fsub_block *k);
 
+/* `soft_fadd(a, b)` as a step block — `cq_fsub_block`'s exact twin over the
+ * ADD program, added for M38b (bd 9ve.27.2, K25): `soft_floor` and `soft_ceil`
+ * call `soft_fadd(truncated, ±1.0)` at fround.jl:73 and :93. Same contract,
+ * same guards, same fast path (the memoised ADD map and one binary search per
+ * slot), same `off`-relative spans; see `cq_fsub_block` above for every
+ * clause. There is no prologue: `b` is the second rail verbatim. */
+typedef struct {
+    const cq_bit *a, *b;
+    cq_scratch   *scr;
+    uint32_t      off;
+} cq_fadd_block;
+
+uint32_t      cq_fadd_region(void);
+int           cq_fadd_steps (void);
+void          cq_fadd_step  (cq_ctx *ctx, const cq_fadd_block *k, int u);
+const cq_bit *cq_fadd_result(const cq_fadd_block *k);
+
 /* --- Risk R9's classical rows (PRD-v2 §7.4). ----------------------------- */
 
 /* The SAME two bodies evaluated in C over `uint64_t`, composing M32's four

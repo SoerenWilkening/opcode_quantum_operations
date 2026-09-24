@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 6479
+**Indexed definitions:** 6952
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -3631,16 +3631,22 @@ the definition (or the build-language declaration) in the listed file.
 | `fa_result_armed` | [248](src/kernels/fadd_emit.c:248) |
 | `fa_result_mapped` | [254](src/kernels/fadd_emit.c:254) |
 | `cq_fa_result` | [263](src/kernels/fadd_emit.c:263) |
-| `fsub_ctx` | [276](src/kernels/fadd_emit.c:276) |
-| `cq_fsub_region` | [286](src/kernels/fadd_emit.c:286) |
-| `cq_fsub_steps` | [291](src/kernels/fadd_emit.c:291) |
-| `cq_fsub_step` | [296](src/kernels/fadd_emit.c:296) |
-| `cq_fsub_result` | [304](src/kernels/fadd_emit.c:304) |
-| `fadd_compute` | [322](src/kernels/fadd_emit.c:322) |
-| `fadd_copyout` | [329](src/kernels/fadd_emit.c:329) |
-| `fadd` | [336](src/kernels/fadd_emit.c:336) |
-| `cq_kernel_fadd` | [387](src/kernels/fadd_emit.c:387) |
-| `cq_kernel_fsub` | [391](src/kernels/fadd_emit.c:391) |
+| `blk_ctx` | [276](src/kernels/fadd_emit.c:276) |
+| `blk_step` | [290](src/kernels/fadd_emit.c:290) |
+| `blk_result` | [299](src/kernels/fadd_emit.c:299) |
+| `cq_fsub_region` | [308](src/kernels/fadd_emit.c:308) |
+| `cq_fsub_steps` | [309](src/kernels/fadd_emit.c:309) |
+| `cq_fsub_step` | [311](src/kernels/fadd_emit.c:311) |
+| `cq_fsub_result` | [314](src/kernels/fadd_emit.c:314) |
+| `cq_fadd_region` | [321](src/kernels/fadd_emit.c:321) |
+| `cq_fadd_steps` | [322](src/kernels/fadd_emit.c:322) |
+| `cq_fadd_step` | [324](src/kernels/fadd_emit.c:324) |
+| `cq_fadd_result` | [327](src/kernels/fadd_emit.c:327) |
+| `fadd_compute` | [340](src/kernels/fadd_emit.c:340) |
+| `fadd_copyout` | [347](src/kernels/fadd_emit.c:347) |
+| `fadd` | [354](src/kernels/fadd_emit.c:354) |
+| `cq_kernel_fadd` | [405](src/kernels/fadd_emit.c:405) |
+| `cq_kernel_fsub` | [409](src/kernels/fadd_emit.c:409) |
 
 ## `src/kernels/fadd_eval.c`
 
@@ -3956,6 +3962,61 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_fu_arm` | [189](src/kernels/fma_step.c:189) |
 | `cq_fu_sp` | [206](src/kernels/fma_step.c:206) |
 
+## `src/kernels/fmisc_minmax.c`
+
+| Function | Line |
+|---|---:|
+| `minmax_eval` | [25](src/kernels/fmisc_minmax.c:25) |
+| `cq_fmin_eval` | [46](src/kernels/fmisc_minmax.c:46) |
+| `cq_fmax_eval` | [47](src/kernels/fmisc_minmax.c:47) |
+| `fmisc_compute` | [56](src/kernels/fmisc_minmax.c:56) |
+| `fmisc_copyout` | [65](src/kernels/fmisc_minmax.c:65) |
+| `minmax` | [72](src/kernels/fmisc_minmax.c:72) |
+| `cq_kernel_fmin` | [110](src/kernels/fmisc_minmax.c:110) |
+| `cq_kernel_fmax` | [116](src/kernels/fmisc_minmax.c:116) |
+
+## `src/kernels/fmisc_rows.c`
+
+| Function | Line |
+|---|---:|
+| `cq_fmisc_rows` | [84](src/kernels/fmisc_rows.c:84) |
+| `cq_fmisc_arity` | [95](src/kernels/fmisc_rows.c:95) |
+| `cq_fmisc_row_width` | [107](src/kernels/fmisc_rows.c:107) |
+
+## `src/kernels/fmisc_sign.c`
+
+| Function | Line |
+|---|---:|
+| `cq_fneg_steps` | [43](src/kernels/fmisc_sign.c:43) |
+| `cq_fabs_steps` | [44](src/kernels/fmisc_sign.c:44) |
+| `cq_copysign_steps` | [45](src/kernels/fmisc_sign.c:45) |
+| `sg_view` | [48](src/kernels/fmisc_sign.c:48) |
+| `sg_width` | [57](src/kernels/fmisc_sign.c:57) |
+| `sg_unary_check` | [62](src/kernels/fmisc_sign.c:62) |
+| `cq_kernel_fneg` | [74](src/kernels/fmisc_sign.c:74) |
+| `cq_kernel_fabs` | [90](src/kernels/fmisc_sign.c:90) |
+| `cq_kernel_copysign` | [103](src/kernels/fmisc_sign.c:103) |
+
+## `src/kernels/fmisc_step.c`
+
+| Function | Line |
+|---|---:|
+| `cq_fx_olt` | [42](src/kernels/fmisc_step.c:42) |
+| `cq_fx_row_steps` | [47](src/kernels/fmisc_step.c:47) |
+| `cq_fx_row_region` | [64](src/kernels/fmisc_step.c:64) |
+| `cq_fmisc_region` | [81](src/kernels/fmisc_step.c:81) |
+| `cq_fmisc_steps` | [91](src/kernels/fmisc_step.c:91) |
+| `cq_fx_arm` | [102](src/kernels/fmisc_step.c:102) |
+| `cq_fx_offsets` | [113](src/kernels/fmisc_step.c:113) |
+| `span` | [122](src/kernels/fmisc_step.c:122) |
+| `cq_fx_rail` | [129](src/kernels/fmisc_step.c:129) |
+| `cq_fx_flag_of` | [142](src/kernels/fmisc_step.c:142) |
+| `view_mask` | [184](src/kernels/fmisc_step.c:184) |
+| `cq_fx_op64` | [190](src/kernels/fmisc_step.c:190) |
+| `emit_row` | [215](src/kernels/fmisc_step.c:215) |
+| `cq_fmisc_step` | [271](src/kernels/fmisc_step.c:271) |
+| `cq_fmisc_result` | [292](src/kernels/fmisc_step.c:292) |
+
 ## `src/kernels/fmul.c`
 
 | Function | Line |
@@ -4143,6 +4204,82 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_fpr_view_fill` | [320](src/kernels/fpround_step.c:320) |
 | `cq_fpr_op64` | [332](src/kernels/fpround_step.c:332) |
 
+## `src/kernels/fround.c`
+
+| Function | Line |
+|---|---:|
+| `cq_fround_rows` | [41](src/kernels/fround.c:41) |
+| `cq_fround_trunc_base` | [60](src/kernels/fround.c:60) |
+| `cq_fround_arity` | [77](src/kernels/fround.c:77) |
+| `cq_fround_row_width` | [99](src/kernels/fround.c:99) |
+
+## `src/kernels/fround_emit.c`
+
+| Function | Line |
+|---|---:|
+| `emit_row` | [37](src/kernels/fround_emit.c:37) |
+| `cq_fround_step` | [150](src/kernels/fround_emit.c:150) |
+| `cq_fround_result` | [170](src/kernels/fround_emit.c:170) |
+| `fround_compute` | [189](src/kernels/fround_emit.c:189) |
+| `fround_copyout` | [195](src/kernels/fround_emit.c:195) |
+| `cq_kernel_fround` | [202](src/kernels/fround_emit.c:202) |
+| `cq_kernel_ftrunc` | [246](src/kernels/fround_emit.c:246) |
+| `cq_kernel_ffloor` | [249](src/kernels/fround_emit.c:249) |
+| `cq_kernel_fceil` | [252](src/kernels/fround_emit.c:252) |
+| `cq_kernel_fround_even` | [255](src/kernels/fround_emit.c:255) |
+| `cq_kernel_fround_away` | [258](src/kernels/fround_emit.c:258) |
+
+## `src/kernels/fround_eval.c`
+
+| Function | Line |
+|---|---:|
+| `as_i64` | [32](src/kernels/fround_eval.c:32) |
+| `clamp_i64` | [36](src/kernels/fround_eval.c:36) |
+| `shl` | [43](src/kernels/fround_eval.c:43) |
+| `shr` | [44](src/kernels/fround_eval.c:44) |
+| `trunc_eval` | [47](src/kernels/fround_eval.c:47) |
+| `floor_ceil_eval` | [69](src/kernels/fround_eval.c:69) |
+| `round_eval` | [88](src/kernels/fround_eval.c:88) |
+| `cq_fround_eval` | [136](src/kernels/fround_eval.c:136) |
+
+## `src/kernels/fround_fadd.c`
+
+| Function | Line |
+|---|---:|
+| `fi_fadd` | [21](src/kernels/fround_fadd.c:21) |
+| `cq_fi_fadd_steps` | [30](src/kernels/fround_fadd.c:30) |
+| `cq_fi_fadd_region` | [31](src/kernels/fround_fadd.c:31) |
+| `cq_fi_fadd_step` | [33](src/kernels/fround_fadd.c:33) |
+| `cq_fi_fadd_result` | [41](src/kernels/fround_fadd.c:41) |
+
+## `src/kernels/fround_operand.c`
+
+| Function | Line |
+|---|---:|
+| `const_of` | [41](src/kernels/fround_operand.c:41) |
+| `rows_of` | [62](src/kernels/fround_operand.c:62) |
+| `cq_fi_val64` | [72](src/kernels/fround_operand.c:72) |
+| `cq_fi_flag_of` | [107](src/kernels/fround_operand.c:107) |
+| `shr64` | [144](src/kernels/fround_operand.c:144) |
+| `cq_fi_view_collapse` | [151](src/kernels/fround_operand.c:151) |
+| `view_fill` | [168](src/kernels/fround_operand.c:168) |
+| `base64` | [179](src/kernels/fround_operand.c:179) |
+| `cq_fi_op64` | [190](src/kernels/fround_operand.c:190) |
+
+## `src/kernels/fround_step.c`
+
+| Function | Line |
+|---|---:|
+| `cq_fi_row_steps` | [31](src/kernels/fround_step.c:31) |
+| `cq_fi_row_region` | [56](src/kernels/fround_step.c:56) |
+| `cq_fi_map_get` | [84](src/kernels/fround_step.c:84) |
+| `cq_fround_region` | [111](src/kernels/fround_step.c:111) |
+| `cq_fround_steps` | [112](src/kernels/fround_step.c:112) |
+| `cq_fi_row_at` | [118](src/kernels/fround_step.c:118) |
+| `cq_fi_arm` | [133](src/kernels/fround_step.c:133) |
+| `cq_fi_base` | [152](src/kernels/fround_step.c:152) |
+| `cq_fi_sp` | [157](src/kernels/fround_step.c:157) |
+
 ## `src/kernels/fsqrt.c`
 
 | Function | Line |
@@ -4200,6 +4337,94 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_fs_row_at` | [123](src/kernels/fsqrt_step.c:123) |
 | `cq_fs_arm` | [138](src/kernels/fsqrt_step.c:138) |
 | `cq_fs_sp` | [154](src/kernels/fsqrt_step.c:154) |
+
+## `src/kernels/ibits.c`
+
+| Function | Line |
+|---|---:|
+| `view_a` | [27](src/kernels/ibits.c:27) |
+| `konst` | [36](src/kernels/ibits.c:36) |
+| `row_ref` | [45](src/kernels/ibits.c:45) |
+| `push` | [54](src/kernels/ibits.c:54) |
+| `ctpop` | [67](src/kernels/ibits.c:67) |
+| `ctlz_cttz` | [84](src/kernels/ibits.c:84) |
+| `bitreverse` | [108](src/kernels/ibits.c:108) |
+| `bswap` | [124](src/kernels/ibits.c:124) |
+| `cq_ibits_program` | [137](src/kernels/ibits.c:137) |
+| `cq_ibits_name` | [162](src/kernels/ibits.c:162) |
+
+## `src/kernels/ibits_kernel.c`
+
+| Function | Line |
+|---|---:|
+| `compute` | [34](src/kernels/ibits_kernel.c:34) |
+| `copyout` | [41](src/kernels/ibits_kernel.c:41) |
+| `xor_count` | [50](src/kernels/ibits_kernel.c:50) |
+| `lane` | [56](src/kernels/ibits_kernel.c:56) |
+| `fold_constant` | [58](src/kernels/ibits_kernel.c:58) |
+| `ibits` | [95](src/kernels/ibits_kernel.c:95) |
+| `cq_kernel_ctpop` | [129](src/kernels/ibits_kernel.c:129) |
+| `cq_kernel_ctlz` | [132](src/kernels/ibits_kernel.c:132) |
+| `cq_kernel_cttz` | [135](src/kernels/ibits_kernel.c:135) |
+| `cq_kernel_bitreverse` | [138](src/kernels/ibits_kernel.c:138) |
+| `cq_kernel_bswap` | [141](src/kernels/ibits_kernel.c:141) |
+
+## `src/kernels/ibits_step.c`
+
+| Function | Line |
+|---|---:|
+| `cq_ibits_row_steps` | [41](src/kernels/ibits_step.c:41) |
+| `cq_ibits_row_region` | [54](src/kernels/ibits_step.c:54) |
+| `check_program` | [67](src/kernels/ibits_step.c:67) |
+| `cq_ibits_steps` | [76](src/kernels/ibits_step.c:76) |
+| `cq_ibits_region` | [85](src/kernels/ibits_step.c:85) |
+| `check_block` | [96](src/kernels/ibits_step.c:96) |
+| `span` | [105](src/kernels/ibits_step.c:105) |
+| `out_of` | [111](src/kernels/ibits_step.c:111) |
+| `view` | [122](src/kernels/ibits_step.c:122) |
+| `flag_of` | [156](src/kernels/ibits_step.c:156) |
+| `emit_row` | [169](src/kernels/ibits_step.c:169) |
+| `costs` | [222](src/kernels/ibits_step.c:222) |
+| `op_of` | [233](src/kernels/ibits_step.c:233) |
+| `cq_ibits_step` | [240](src/kernels/ibits_step.c:240) |
+| `cq_ibits_result` | [271](src/kernels/ibits_step.c:271) |
+
+## `src/kernels/iminmax.c`
+
+| Function | Line |
+|---|---:|
+| `compute` | [25](src/kernels/iminmax.c:25) |
+| `copyout` | [32](src/kernels/iminmax.c:32) |
+| `ge_const` | [49](src/kernels/iminmax.c:49) |
+| `fold_minmax` | [59](src/kernels/iminmax.c:59) |
+| `fold_abs` | [73](src/kernels/iminmax.c:73) |
+| `run` | [90](src/kernels/iminmax.c:90) |
+| `minmax` | [110](src/kernels/iminmax.c:110) |
+| `cq_kernel_umax` | [123](src/kernels/iminmax.c:123) |
+| `cq_kernel_umin` | [127](src/kernels/iminmax.c:127) |
+| `cq_kernel_smax` | [131](src/kernels/iminmax.c:131) |
+| `cq_kernel_smin` | [135](src/kernels/iminmax.c:135) |
+| `cq_kernel_abs` | [139](src/kernels/iminmax.c:139) |
+
+## `src/kernels/iminmax_step.c`
+
+| Function | Line |
+|---|---:|
+| `imm_check` | [34](src/kernels/iminmax_step.c:34) |
+| `imm_signed` | [45](src/kernels/iminmax_step.c:45) |
+| `imm_swapped` | [46](src/kernels/iminmax_step.c:46) |
+| `cmp_steps` | [50](src/kernels/iminmax_step.c:50) |
+| `cmp_region` | [52](src/kernels/iminmax_step.c:52) |
+| `cq_imm_steps` | [55](src/kernels/iminmax_step.c:55) |
+| `cq_imm_region` | [63](src/kernels/iminmax_step.c:63) |
+| `return` | [67](src/kernels/iminmax_step.c:67) |
+| `return` | [68](src/kernels/iminmax_step.c:68) |
+| `imm_base` | [72](src/kernels/iminmax_step.c:72) |
+| `slt_at` | [78](src/kernels/iminmax_step.c:78) |
+| `minmax_step` | [89](src/kernels/iminmax_step.c:89) |
+| `abs_step` | [119](src/kernels/iminmax_step.c:119) |
+| `cq_imm_step` | [137](src/kernels/iminmax_step.c:137) |
+| `cq_imm_out` | [154](src/kernels/iminmax_step.c:154) |
 
 ## `src/kernels/kernel.h`
 
@@ -4553,6 +4778,13 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `cqops_version_string` | [10](src/version.c:10) |
 
+## `tests/CMakeLists.txt`
+
+| Function | Line |
+|---|---:|
+| `function _ibits_pin` | [3908](tests/CMakeLists.txt:3908) |
+| `function _cqops_fround_death_ban` | [4129](tests/CMakeLists.txt:4129) |
+
 ## `tests/package-consumer/main.c`
 
 | Function | Line |
@@ -4614,6 +4846,19 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `void` | [42](tests/support/death.h:42) |
+
+## `tests/support/fmiscref.c`
+
+| Function | Line |
+|---|---:|
+| `ref_is_nan` | [12](tests/support/fmiscref.c:12) |
+| `ref_is_zero` | [18](tests/support/fmiscref.c:18) |
+| `ref_minmax` | [22](tests/support/fmiscref.c:22) |
+| `cq_ref_fmin` | [48](tests/support/fmiscref.c:48) |
+| `cq_ref_fmax` | [49](tests/support/fmiscref.c:49) |
+| `cq_ref_fneg` | [51](tests/support/fmiscref.c:51) |
+| `cq_ref_fabs` | [52](tests/support/fmiscref.c:52) |
+| `cq_ref_copysign` | [54](tests/support/fmiscref.c:54) |
 
 ## `tests/support/fpanchors.c`
 
@@ -5660,6 +5905,18 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `fadd_anchors` | [140](tests/test_kernel_fadd_anchors.inc:140) |
 
+## `tests/test_kernel_fadd_block_death.c`
+
+| Function | Line |
+|---|---:|
+| `fadd_block` | [31](tests/test_kernel_fadd_block_death.c:31) |
+| `fadd_block_step_index_past_the_end` | [46](tests/test_kernel_fadd_block_death.c:46) |
+| `fadd_block_step_index_is_negative` | [54](tests/test_kernel_fadd_block_death.c:54) |
+| `fadd_block_region_is_one_bit_short` | [62](tests/test_kernel_fadd_block_death.c:62) |
+| `fadd_block_offset_runs_off_the_region` | [70](tests/test_kernel_fadd_block_death.c:70) |
+| `result_of_an_fadd_block_that_does_not_fit` | [78](tests/test_kernel_fadd_block_death.c:78) |
+| `an_fadd_block_with_no_region` | [86](tests/test_kernel_fadd_block_death.c:86) |
+
 ## `tests/test_kernel_fadd_death.c`
 
 | Function | Line |
@@ -5740,7 +5997,7 @@ the definition (or the build-language declaration) in the listed file.
 | `fa_row_region` | [193](tests/test_kernel_fadd_slots.inc:193) |
 | `fa_probe` | [216](tests/test_kernel_fadd_slots.inc:216) |
 | `each_program_is_the_sum_of_its_rows (via CQ_TEST)` | [228](tests/test_kernel_fadd_slots.inc:228) |
-| `dst_owns_its_lanes_and_the_scratch_comes_back (via CQ_TEST)` | [288](tests/test_kernel_fadd_slots.inc:288) |
+| `dst_owns_its_lanes_and_the_scratch_comes_back (via CQ_TEST)` | [291](tests/test_kernel_fadd_slots.inc:291) |
 
 ## `tests/test_kernel_fadd_spans.inc`
 
@@ -5749,7 +6006,11 @@ the definition (or the build-language declaration) in the listed file.
 | `fa_wire_value` | [22](tests/test_kernel_fadd_spans.inc:22) |
 | `the_programs_spans_are_pairwise_disjoint (via CQ_TEST)` | [55](tests/test_kernel_fadd_spans.inc:55) |
 | `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [130](tests/test_kernel_fadd_spans.inc:130) |
-| `two_fsub_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [191](tests/test_kernel_fadd_spans.inc:191) |
+| `fa_blk_step` | [195](tests/test_kernel_fadd_spans.inc:195) |
+| `fa_blk_result` | [207](tests/test_kernel_fadd_spans.inc:207) |
+| `fa_two_blocks` | [216](tests/test_kernel_fadd_spans.inc:216) |
+| `two_fsub_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [349](tests/test_kernel_fadd_spans.inc:349) |
+| `two_fadd_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [353](tests/test_kernel_fadd_spans.inc:353) |
 
 ## `tests/test_kernel_fcmp.c`
 
@@ -6163,6 +6424,131 @@ the definition (or the build-language declaration) in the listed file.
 | `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [67](tests/test_kernel_fma_spans.inc:67) |
 | `two_programs_in_one_region_do_not_collide (via CQ_TEST)` | [111](tests/test_kernel_fma_spans.inc:111) |
 
+## `tests/test_kernel_fmisc.c`
+
+| Function | Line |
+|---|---:|
+| `shape_unary` | [59](tests/test_kernel_fmisc.c:59) |
+| `shape_binary` | [66](tests/test_kernel_fmisc.c:66) |
+| `fneg_shape` | [73](tests/test_kernel_fmisc.c:73) |
+| `fabs_shape` | [74](tests/test_kernel_fmisc.c:74) |
+| `copysign_shape` | [75](tests/test_kernel_fmisc.c:75) |
+| `fminmax_shape` | [76](tests/test_kernel_fmisc.c:76) |
+| `call_fneg` | [80](tests/test_kernel_fmisc.c:80) |
+| `call_fabs` | [83](tests/test_kernel_fmisc.c:83) |
+| `refn_fneg` | [87](tests/test_kernel_fmisc.c:87) |
+| `refn_fabs` | [89](tests/test_kernel_fmisc.c:89) |
+| `refn_copysign` | [91](tests/test_kernel_fmisc.c:91) |
+| `refn_fmin` | [93](tests/test_kernel_fmisc.c:93) |
+| `refn_fmax` | [95](tests/test_kernel_fmisc.c:95) |
+| `fm_read` | [118](tests/test_kernel_fmisc.c:118) |
+| `fm_run` | [140](tests/test_kernel_fmisc.c:140) |
+| `l1_sweep (via CQ_TEST)` | [182](tests/test_kernel_fmisc.c:182) |
+| `fm_region_body` | [193](tests/test_kernel_fmisc.c:193) |
+| `controlled (via CQ_TEST)` | [213](tests/test_kernel_fmisc.c:213) |
+| `l4_goldens (via CQ_TEST)` | [225](tests/test_kernel_fmisc.c:225) |
+| `dst_ownership_and_the_scratch_high_water_mark (via CQ_TEST)` | [254](tests/test_kernel_fmisc.c:254) |
+
+## `tests/test_kernel_fmisc_anchors.inc`
+
+| Function | Line |
+|---|---:|
+| `fm_pairs` | [104](tests/test_kernel_fmisc_anchors.inc:104) |
+| `fm_singles` | [114](tests/test_kernel_fmisc_anchors.inc:114) |
+| `fminmax_anchors` | [123](tests/test_kernel_fmisc_anchors.inc:123) |
+| `copysign_anchors` | [125](tests/test_kernel_fmisc_anchors.inc:125) |
+| `fneg_anchors` | [127](tests/test_kernel_fmisc_anchors.inc:127) |
+| `fabs_anchors` | [129](tests/test_kernel_fmisc_anchors.inc:129) |
+| `fm_full_binary` | [134](tests/test_kernel_fmisc_anchors.inc:134) |
+| `fm_full_unary` | [143](tests/test_kernel_fmisc_anchors.inc:143) |
+
+## `tests/test_kernel_fmisc_death.c`
+
+| Function | Line |
+|---|---:|
+| `setup` | [45](tests/test_kernel_fmisc_death.c:45) |
+| `block` | [58](tests/test_kernel_fmisc_death.c:58) |
+| `full` | [67](tests/test_kernel_fmisc_death.c:67) |
+| `fneg_width_is_not_64` | [77](tests/test_kernel_fmisc_death.c:77) |
+| `fabs_width_is_not_64` | [79](tests/test_kernel_fmisc_death.c:79) |
+| `copysign_width_is_not_64` | [81](tests/test_kernel_fmisc_death.c:81) |
+| `fmin_width_is_not_64` | [83](tests/test_kernel_fmisc_death.c:83) |
+| `fmax_width_is_not_64` | [85](tests/test_kernel_fmisc_death.c:85) |
+| `fneg_dst_aliases_its_source` | [90](tests/test_kernel_fmisc_death.c:90) |
+| `fabs_dst_aliases_its_source` | [92](tests/test_kernel_fmisc_death.c:92) |
+| `copysign_dst_aliases_its_second_source` | [94](tests/test_kernel_fmisc_death.c:94) |
+| `fmin_dst_aliases_its_first_source` | [96](tests/test_kernel_fmisc_death.c:96) |
+| `fmax_dst_aliases_its_second_source` | [98](tests/test_kernel_fmisc_death.c:98) |
+| `copysign_sources_alias` | [100](tests/test_kernel_fmisc_death.c:100) |
+| `fmin_sources_alias` | [102](tests/test_kernel_fmisc_death.c:102) |
+| `step_index_past_the_end` | [107](tests/test_kernel_fmisc_death.c:107) |
+| `step_index_is_negative` | [115](tests/test_kernel_fmisc_death.c:115) |
+| `block_region_is_one_bit_short` | [123](tests/test_kernel_fmisc_death.c:123) |
+| `block_offset_runs_off_the_region` | [131](tests/test_kernel_fmisc_death.c:131) |
+| `result_of_a_program_that_does_not_fit` | [139](tests/test_kernel_fmisc_death.c:139) |
+| `a_block_with_no_region` | [147](tests/test_kernel_fmisc_death.c:147) |
+| `a_block_with_no_operand_b` | [155](tests/test_kernel_fmisc_death.c:155) |
+| `a_block_naming_no_program` | [163](tests/test_kernel_fmisc_death.c:163) |
+| `rows_of_an_unknown_program` | [173](tests/test_kernel_fmisc_death.c:173) |
+| `arity_of_an_unknown_op` | [175](tests/test_kernel_fmisc_death.c:175) |
+| `row_width_outside_the_program` | [177](tests/test_kernel_fmisc_death.c:177) |
+| `row_steps_of_an_unknown_op` | [180](tests/test_kernel_fmisc_death.c:180) |
+| `row_region_of_an_unknown_op` | [188](tests/test_kernel_fmisc_death.c:188) |
+| `a_64_lane_operand_with_an_unknown_code` | [196](tests/test_kernel_fmisc_death.c:196) |
+| `a_64_lane_operand_names_a_row_outside_the_program` | [205](tests/test_kernel_fmisc_death.c:205) |
+| `a_one_bit_operand_that_is_not_a_row` | [214](tests/test_kernel_fmisc_death.c:214) |
+| `a_one_bit_operand_names_a_64_lane_row` | [222](tests/test_kernel_fmisc_death.c:222) |
+| `a_rail_operand_that_is_not_a_rail` | [230](tests/test_kernel_fmisc_death.c:230) |
+
+## `tests/test_kernel_fmisc_rows.inc`
+
+| Function | Line |
+|---|---:|
+| `the_programs_are_the_source_line_for_line (via CQ_TEST)` | [37](tests/test_kernel_fmisc_rows.inc:37) |
+| `the_programs_are_well_formed (via CQ_TEST)` | [80](tests/test_kernel_fmisc_rows.inc:80) |
+| `fm_olt_rows` | [121](tests/test_kernel_fmisc_rows.inc:121) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [126](tests/test_kernel_fmisc_rows.inc:126) |
+| `each_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [158](tests/test_kernel_fmisc_rows.inc:158) |
+| `the_classical_row_agrees_with_the_oracle (via CQ_TEST)` | [198](tests/test_kernel_fmisc_rows.inc:198) |
+| `the_named_cells_separate_each_row_from_its_neighbour (via CQ_TEST)` | [238](tests/test_kernel_fmisc_rows.inc:238) |
+
+## `tests/test_kernel_fmisc_scan.inc`
+
+| Function | Line |
+|---|---:|
+| `fm_code_lane` | [20](tests/test_kernel_fmisc_scan.inc:20) |
+| `fm_ctrl_fold` | [38](tests/test_kernel_fmisc_scan.inc:38) |
+| `fm_sched_eq` | [49](tests/test_kernel_fmisc_scan.inc:49) |
+| `fm_sched_class` | [63](tests/test_kernel_fmisc_scan.inc:63) |
+| `fm_sched_mux` | [88](tests/test_kernel_fmisc_scan.inc:88) |
+| `fm_row_slots` | [99](tests/test_kernel_fmisc_scan.inc:99) |
+| `fm_olt_replay` | [115](tests/test_kernel_fmisc_scan.inc:115) |
+| `fm_predict` | [155](tests/test_kernel_fmisc_scan.inc:155) |
+| `fm_prog_spec` | [192](tests/test_kernel_fmisc_scan.inc:192) |
+| `fm_prog_ref` | [197](tests/test_kernel_fmisc_scan.inc:197) |
+| `the_slot_boundaries_match_an_independent_four_valued_scan (via CQ_TEST)` | [202](tests/test_kernel_fmisc_scan.inc:202) |
+| `the_rows_spans_are_pairwise_disjoint (via CQ_TEST)` | [238](tests/test_kernel_fmisc_scan.inc:238) |
+| `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [274](tests/test_kernel_fmisc_scan.inc:274) |
+| `two_programs_in_one_region_do_not_collide (via CQ_TEST)` | [304](tests/test_kernel_fmisc_scan.inc:304) |
+| `fm_row_bits` | [396](tests/test_kernel_fmisc_scan.inc:396) |
+| `fm_rail_of` | [409](tests/test_kernel_fmisc_scan.inc:409) |
+| `the_operands_are_wired_lane_for_lane (via CQ_TEST)` | [416](tests/test_kernel_fmisc_scan.inc:416) |
+
+## `tests/test_kernel_fmisc_sign.inc`
+
+| Function | Line |
+|---|---:|
+| `fm_sign_spec` | [25](tests/test_kernel_fmisc_sign.inc:25) |
+| `the_sign_ops_cost_their_upstream_blocks_slot_for_slot (via CQ_TEST)` | [31](tests/test_kernel_fmisc_sign.inc:31) |
+| `fm_lane` | [39](tests/test_kernel_fmisc_sign.inc:39) |
+| `fm_fold` | [51](tests/test_kernel_fmisc_sign.inc:51) |
+| `fm_sign_predict` | [72](tests/test_kernel_fmisc_sign.inc:72) |
+| `the_sign_ops_match_an_independent_lane_scan_and_write_only_dst (via CQ_TEST)` | [107](tests/test_kernel_fmisc_sign.inc:107) |
+| `fm_sign_ref` | [155](tests/test_kernel_fmisc_sign.inc:155) |
+| `fm_sign_full` | [161](tests/test_kernel_fmisc_sign.inc:161) |
+| `the_sign_ops_have_a_true_l5_row_on_every_classical_anchor (via CQ_TEST)` | [174](tests/test_kernel_fmisc_sign.inc:174) |
+| `the_sign_ops_are_zero_toffoli_at_every_scanned_mask (via CQ_TEST)` | [224](tests/test_kernel_fmisc_sign.inc:224) |
+
 ## `tests/test_kernel_fmul.c`
 
 | Function | Line |
@@ -6465,6 +6851,121 @@ the definition (or the build-language declaration) in the listed file.
 | `a_signed_compare_swapped_to_unsigned_goes_red_here (via CQ_TEST)` | [351](tests/test_kernel_fpround_value.inc:351) |
 | `every_anchor_reaches_its_block_and_makes_its_predicate_true (via CQ_TEST)` | [403](tests/test_kernel_fpround_value.inc:403) |
 
+## `tests/test_kernel_fround.c`
+
+| Function | Line |
+|---|---:|
+| `the_host_is_round_to_nearest_before_the_oracle_is_trusted (via CQ_TEST)` | [56](tests/test_kernel_fround.c:56) |
+| `the_classical_rows_agree_with_the_oracle_on_every_table_row (via CQ_TEST)` | [68](tests/test_kernel_fround.c:68) |
+| `the_classical_rows_agree_with_the_host_on_a_seeded_sweep (via CQ_TEST)` | [99](tests/test_kernel_fround.c:99) |
+| `the_name_mapping_separates_on_every_tie (via CQ_TEST)` | [135](tests/test_kernel_fround.c:135) |
+| `circuit_ftrunc (via CQ_TEST)` | [180](tests/test_kernel_fround.c:180) |
+| `circuit_fround_even (via CQ_TEST)` | [181](tests/test_kernel_fround.c:181) |
+| `circuit_fround_away (via CQ_TEST)` | [182](tests/test_kernel_fround.c:182) |
+| `l4_goldens (via CQ_TEST)` | [186](tests/test_kernel_fround.c:186) |
+
+## `tests/test_kernel_fround_death.c`
+
+| Function | Line |
+|---|---:|
+| `setup` | [32](tests/test_kernel_fround_death.c:32) |
+| `region` | [44](tests/test_kernel_fround_death.c:44) |
+| `block` | [50](tests/test_kernel_fround_death.c:50) |
+| `find_row` | [60](tests/test_kernel_fround_death.c:60) |
+| `width_is_not_64` | [72](tests/test_kernel_fround_death.c:72) |
+| `width_is_128` | [78](tests/test_kernel_fround_death.c:78) |
+| `kernel_names_a_program_outside_the_five` | [84](tests/test_kernel_fround_death.c:84) |
+| `rows_of_a_program_outside_the_five` | [91](tests/test_kernel_fround_death.c:91) |
+| `trunc_base_of_a_program_outside_the_five` | [97](tests/test_kernel_fround_death.c:97) |
+| `eval_of_a_program_outside_the_five` | [103](tests/test_kernel_fround_death.c:103) |
+| `block_names_a_program_outside_the_five` | [109](tests/test_kernel_fround_death.c:109) |
+| `step_index_past_the_end` | [121](tests/test_kernel_fround_death.c:121) |
+| `step_index_is_negative` | [131](tests/test_kernel_fround_death.c:131) |
+| `row_at_outside_the_program` | [141](tests/test_kernel_fround_death.c:141) |
+| `block_region_is_one_bit_short` | [150](tests/test_kernel_fround_death.c:150) |
+| `block_offset_runs_off_the_region` | [160](tests/test_kernel_fround_death.c:160) |
+| `result_of_a_program_that_does_not_fit` | [170](tests/test_kernel_fround_death.c:170) |
+| `a_block_with_no_region` | [180](tests/test_kernel_fround_death.c:180) |
+| `a_block_with_no_operand_a` | [192](tests/test_kernel_fround_death.c:192) |
+| `arity_of_an_unknown_op` | [205](tests/test_kernel_fround_death.c:205) |
+| `row_width_outside_the_program` | [211](tests/test_kernel_fround_death.c:211) |
+| `row_width_of_an_unknown_op` | [221](tests/test_kernel_fround_death.c:221) |
+| `row_steps_of_an_unknown_op` | [231](tests/test_kernel_fround_death.c:231) |
+| `row_region_of_an_unknown_op` | [241](tests/test_kernel_fround_death.c:241) |
+| `a_64_lane_operand_names_a_one_bit_row` | [253](tests/test_kernel_fround_death.c:253) |
+| `a_64_lane_operand_names_a_view_row` | [264](tests/test_kernel_fround_death.c:264) |
+| `a_64_lane_operand_names_a_row_outside_the_program` | [275](tests/test_kernel_fround_death.c:275) |
+| `a_one_bit_operand_names_a_64_lane_row` | [285](tests/test_kernel_fround_death.c:285) |
+| `a_one_bit_operand_names_a_row_outside_the_program` | [296](tests/test_kernel_fround_death.c:296) |
+| `an_operand_code_outside_the_vocabulary` | [306](tests/test_kernel_fround_death.c:306) |
+| `dst_aliases_its_source` | [319](tests/test_kernel_fround_death.c:319) |
+
+## `tests/test_kernel_fround_fadd.c`
+
+| Function | Line |
+|---|---:|
+| `the_host_is_round_to_nearest (via CQ_TEST)` | [35](tests/test_kernel_fround_fadd.c:35) |
+| `circuit_ffloor (via CQ_TEST)` | [45](tests/test_kernel_fround_fadd.c:45) |
+| `circuit_fceil (via CQ_TEST)` | [46](tests/test_kernel_fround_fadd.c:46) |
+
+## `tests/test_kernel_fround_scan.inc`
+
+| Function | Line |
+|---|---:|
+| `fr_const` | [37](tests/test_kernel_fround_scan.inc:37) |
+| `fr_lane` | [57](tests/test_kernel_fround_scan.inc:57) |
+| `fr_fold` | [84](tests/test_kernel_fround_scan.inc:84) |
+| `fr_sched_eq` | [101](tests/test_kernel_fround_scan.inc:101) |
+| `fr_sched_slt` | [109](tests/test_kernel_fround_scan.inc:109) |
+| `fr_ripple` | [124](tests/test_kernel_fround_scan.inc:124) |
+| `fr_sched_add` | [141](tests/test_kernel_fround_scan.inc:141) |
+| `fr_sched_sub` | [150](tests/test_kernel_fround_scan.inc:150) |
+| `fr_sched_mux` | [163](tests/test_kernel_fround_scan.inc:163) |
+| `fr_scan_slot` | [175](tests/test_kernel_fround_scan.inc:175) |
+| `fr_std_op` | [206](tests/test_kernel_fround_scan.inc:206) |
+| `fr_std_kinds` | [220](tests/test_kernel_fround_scan.inc:220) |
+| `fr_row_gates` | [268](tests/test_kernel_fround_scan.inc:268) |
+| `fr_run` | [287](tests/test_kernel_fround_scan.inc:287) |
+| `fr_scan_one` | [312](tests/test_kernel_fround_scan.inc:312) |
+| `the_slot_boundaries_match_an_independent_four_valued_scan (via CQ_TEST)` | [400](tests/test_kernel_fround_scan.inc:400) |
+
+## `tests/test_kernel_fround_slots.inc`
+
+| Function | Line |
+|---|---:|
+| `fr_count` | [46](tests/test_kernel_fround_slots.inc:46) |
+| `fr_ref_steps` | [75](tests/test_kernel_fround_slots.inc:75) |
+| `fr_ref_region` | [96](tests/test_kernel_fround_slots.inc:96) |
+| `the_programs_are_the_source_line_for_line (via CQ_TEST)` | [113](tests/test_kernel_fround_slots.inc:113) |
+| `the_table_reading_guards_are_unreachable (via CQ_TEST)` | [179](tests/test_kernel_fround_slots.inc:179) |
+| `floor_and_ceil_inline_the_trunc_body_row_for_row (via CQ_TEST)` | [230](tests/test_kernel_fround_slots.inc:230) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [280](tests/test_kernel_fround_slots.inc:280) |
+| `fr_slots` | [310](tests/test_kernel_fround_slots.inc:310) |
+| `fr_region` | [322](tests/test_kernel_fround_slots.inc:322) |
+| `return` | [324](tests/test_kernel_fround_slots.inc:324) |
+| `the_programs_are_the_sum_of_their_blocks (via CQ_TEST)` | [332](tests/test_kernel_fround_slots.inc:332) |
+
+## `tests/test_kernel_fround_spans.inc`
+
+| Function | Line |
+|---|---:|
+| `fr_read` | [18](tests/test_kernel_fround_spans.inc:18) |
+| `fr_spans_one` | [39](tests/test_kernel_fround_spans.inc:39) |
+| `the_rows_spans_are_pairwise_disjoint (via CQ_TEST)` | [90](tests/test_kernel_fround_spans.inc:90) |
+| `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [101](tests/test_kernel_fround_spans.inc:101) |
+| `two_programs_in_one_region_do_not_collide (via CQ_TEST)` | [137](tests/test_kernel_fround_spans.inc:137) |
+
+## `tests/test_kernel_fround_spec.inc`
+
+| Function | Line |
+|---|---:|
+| `fr_is_nan` | [35](tests/test_kernel_fround_spec.inc:35) |
+| `ref_fround` | [41](tests/test_kernel_fround_spec.inc:41) |
+| `fround_table` | [107](tests/test_kernel_fround_spec.inc:107) |
+| `fr_circuit_anchors_are_table_rows` | [190](tests/test_kernel_fround_spec.inc:190) |
+| `fr_two_rows` | [217](tests/test_kernel_fround_spec.inc:217) |
+| `fr_circuit_suite` | [236](tests/test_kernel_fround_spec.inc:236) |
+
 ## `tests/test_kernel_fsqrt.c`
 
 | Function | Line |
@@ -6573,6 +7074,178 @@ the definition (or the build-language declaration) in the listed file.
 | `the_rows_spans_are_pairwise_disjoint (via CQ_TEST)` | [24](tests/test_kernel_fsqrt_spans.inc:24) |
 | `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [109](tests/test_kernel_fsqrt_spans.inc:109) |
 | `two_programs_in_one_region_do_not_collide (via CQ_TEST)` | [153](tests/test_kernel_fsqrt_spans.inc:153) |
+
+## `tests/test_kernel_ibits.c`
+
+| Function | Line |
+|---|---:|
+| `or_ctpop` | [48](tests/test_kernel_ibits.c:48) |
+| `or_ctlz` | [53](tests/test_kernel_ibits.c:53) |
+| `or_cttz` | [59](tests/test_kernel_ibits.c:59) |
+| `or_bitreverse` | [65](tests/test_kernel_ibits.c:65) |
+| `or_bswap` | [74](tests/test_kernel_ibits.c:74) |
+| `uint64_t` | [84](tests/test_kernel_ibits.c:84) |
+| `void` | [85](tests/test_kernel_ibits.c:85) |
+| `ib_anchors` | [101](tests/test_kernel_ibits.c:101) |
+| `ib_shape` | [113](tests/test_kernel_ibits.c:113) |
+| `ladder` | [151](tests/test_kernel_ibits.c:151) |
+| `ib_run` | [159](tests/test_kernel_ibits.c:159) |
+| `ibits_sweep_narrow_widths (via CQ_TEST)` | [179](tests/test_kernel_ibits.c:179) |
+| `ibits_sweep_abi_widths (via CQ_TEST)` | [185](tests/test_kernel_ibits.c:185) |
+| `ib_narrow` | [198](tests/test_kernel_ibits.c:198) |
+| `controlled (via CQ_TEST)` | [205](tests/test_kernel_ibits.c:205) |
+| `l4_goldens (via CQ_TEST)` | [222](tests/test_kernel_ibits.c:222) |
+| `the_scratch_is_the_programs_region_and_it_all_comes_back (via CQ_TEST)` | [259](tests/test_kernel_ibits.c:259) |
+| `a_classical_rail_into_a_quantum_dst_is_xs_and_no_scratch (via CQ_TEST)` | [285](tests/test_kernel_ibits.c:285) |
+
+## `tests/test_kernel_ibits_death.c`
+
+| Function | Line |
+|---|---:|
+| `setup` | [36](tests/test_kernel_ibits_death.c:36) |
+| `bind` | [46](tests/test_kernel_ibits_death.c:46) |
+| `bswap_kernel_at_a_width_that_is_not_a_multiple_of_16` | [60](tests/test_kernel_ibits_death.c:60) |
+| `bswap_program_at_w24` | [70](tests/test_kernel_ibits_death.c:70) |
+| `ctpop_kernel_at_width_zero` | [75](tests/test_kernel_ibits_death.c:75) |
+| `ctlz_program_above_the_register_maximum` | [81](tests/test_kernel_ibits_death.c:81) |
+| `program_of_an_unknown_intrinsic` | [87](tests/test_kernel_ibits_death.c:87) |
+| `program_into_a_null_buffer` | [92](tests/test_kernel_ibits_death.c:92) |
+| `name_of_an_unknown_intrinsic` | [97](tests/test_kernel_ibits_death.c:97) |
+| `cttz_dst_aliases_its_source` | [102](tests/test_kernel_ibits_death.c:102) |
+| `step_index_past_the_end` | [113](tests/test_kernel_ibits_death.c:113) |
+| `step_index_is_negative` | [122](tests/test_kernel_ibits_death.c:122) |
+| `block_region_is_one_bit_short` | [130](tests/test_kernel_ibits_death.c:130) |
+| `block_offset_runs_off_the_region` | [138](tests/test_kernel_ibits_death.c:138) |
+| `a_block_with_no_region` | [146](tests/test_kernel_ibits_death.c:146) |
+| `result_of_a_program_that_does_not_fit` | [155](tests/test_kernel_ibits_death.c:155) |
+| `result_of_a_block_with_no_region` | [163](tests/test_kernel_ibits_death.c:163) |
+| `result_when_the_last_row_is_not_the_closing_add` | [172](tests/test_kernel_ibits_death.c:172) |
+| `a_block_whose_width_is_zero` | [181](tests/test_kernel_ibits_death.c:181) |
+| `steps_of_a_program_of_no_rows` | [190](tests/test_kernel_ibits_death.c:190) |
+| `row_steps_of_an_unknown_op` | [195](tests/test_kernel_ibits_death.c:195) |
+| `row_region_of_an_unknown_op` | [203](tests/test_kernel_ibits_death.c:203) |
+| `a_row_with_an_unknown_op` | [214](tests/test_kernel_ibits_death.c:214) |
+| `an_operand_that_is_not_an_earlier_row` | [223](tests/test_kernel_ibits_death.c:223) |
+| `an_unknown_operand_code` | [232](tests/test_kernel_ibits_death.c:232) |
+| `a_view_field_outside_the_width` | [241](tests/test_kernel_ibits_death.c:241) |
+| `ctlz2_mux_slot` | [251](tests/test_kernel_ibits_death.c:251) |
+| `a_select_whose_condition_is_not_an_ne_row` | [256](tests/test_kernel_ibits_death.c:256) |
+| `an_ne_row_read_as_a_w_lane_operand` | [265](tests/test_kernel_ibits_death.c:265) |
+
+## `tests/test_kernel_ibits_slots.inc`
+
+| Function | Line |
+|---|---:|
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [23](tests/test_kernel_ibits_slots.inc:23) |
+| `ib_blocks_of` | [64](tests/test_kernel_ibits_slots.inc:64) |
+| `each_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [79](tests/test_kernel_ibits_slots.inc:79) |
+| `the_program_tables_are_well_formed_at_every_width (via CQ_TEST)` | [125](tests/test_kernel_ibits_slots.inc:125) |
+| `onehot` | [165](tests/test_kernel_ibits_slots.inc:165) |
+| `kbit` | [167](tests/test_kernel_ibits_slots.inc:167) |
+| `sc_lane` | [176](tests/test_kernel_ibits_slots.inc:176) |
+| `sc_fold` | [213](tests/test_kernel_ibits_slots.inc:213) |
+| `sc_slot` | [224](tests/test_kernel_ibits_slots.inc:224) |
+| `scan_widths` | [271](tests/test_kernel_ibits_slots.inc:271) |
+| `scan_value` | [279](tests/test_kernel_ibits_slots.inc:279) |
+| `the_slot_boundaries_match_an_independent_four_valued_scan (via CQ_TEST)` | [281](tests/test_kernel_ibits_slots.inc:281) |
+
+## `tests/test_kernel_ibits_spans.inc`
+
+| Function | Line |
+|---|---:|
+| `the_programs_spans_are_pairwise_disjoint (via CQ_TEST)` | [18](tests/test_kernel_ibits_spans.inc:18) |
+| `the_compute_half_is_a_palindrome_at_a_mixed_mask (via CQ_TEST)` | [74](tests/test_kernel_ibits_spans.inc:74) |
+| `ib_read` | [112](tests/test_kernel_ibits_spans.inc:112) |
+| `two_programs_in_one_region_do_not_collide (via CQ_TEST)` | [129](tests/test_kernel_ibits_spans.inc:129) |
+
+## `tests/test_kernel_iminmax.c`
+
+| Function | Line |
+|---|---:|
+| `im_mask` | [43](tests/test_kernel_iminmax.c:43) |
+| `im_sext` | [47](tests/test_kernel_iminmax.c:47) |
+| `ref_umax` | [54](tests/test_kernel_iminmax.c:54) |
+| `ref_umin` | [56](tests/test_kernel_iminmax.c:56) |
+| `ref_smax` | [58](tests/test_kernel_iminmax.c:58) |
+| `ref_smin` | [60](tests/test_kernel_iminmax.c:60) |
+| `ref_abs` | [65](tests/test_kernel_iminmax.c:65) |
+| `im_int_min` | [72](tests/test_kernel_iminmax.c:72) |
+| `im_int_max` | [73](tests/test_kernel_iminmax.c:73) |
+| `im_bin_anchor` | [82](tests/test_kernel_iminmax.c:82) |
+| `im_abs_anchor` | [97](tests/test_kernel_iminmax.c:97) |
+| `im_bin_anchors` | [111](tests/test_kernel_iminmax.c:111) |
+| `im_abs_anchors` | [123](tests/test_kernel_iminmax.c:123) |
+| `bin_shape` | [133](tests/test_kernel_iminmax.c:133) |
+| `abs_shape` | [139](tests/test_kernel_iminmax.c:139) |
+| `call_abs` | [148](tests/test_kernel_iminmax.c:148) |
+| `refn_abs` | [154](tests/test_kernel_iminmax.c:154) |
+| `the_anchors_separate_each_op_from_its_neighbour (via CQ_TEST)` | [179](tests/test_kernel_iminmax.c:179) |
+| `sweep_umax (via CQ_TEST)` | [218](tests/test_kernel_iminmax.c:218) |
+| `sweep_umin (via CQ_TEST)` | [219](tests/test_kernel_iminmax.c:219) |
+| `sweep_smax (via CQ_TEST)` | [220](tests/test_kernel_iminmax.c:220) |
+| `sweep_smin (via CQ_TEST)` | [221](tests/test_kernel_iminmax.c:221) |
+| `sweep_abs (via CQ_TEST)` | [222](tests/test_kernel_iminmax.c:222) |
+| `the_anchors_at_the_all_quantum_mask (via CQ_TEST)` | [228](tests/test_kernel_iminmax.c:228) |
+| `im_narrow` | [260](tests/test_kernel_iminmax.c:260) |
+| `controlled (via CQ_TEST)` | [267](tests/test_kernel_iminmax.c:267) |
+
+## `tests/test_kernel_iminmax_death.c`
+
+| Function | Line |
+|---|---:|
+| `setup` | [38](tests/test_kernel_iminmax_death.c:38) |
+| `umax_dst_aliases_a_classical_source` | [46](tests/test_kernel_iminmax_death.c:46) |
+| `abs_dst_aliases_its_source` | [57](tests/test_kernel_iminmax_death.c:57) |
+| `smin_the_two_sources_are_the_same_register` | [68](tests/test_kernel_iminmax_death.c:68) |
+| `abs_wider_than_the_register_cap` | [85](tests/test_kernel_iminmax_death.c:85) |
+| `imm_steps_zero_width` | [93](tests/test_kernel_iminmax_death.c:93) |
+| `imm_region_zero_width` | [99](tests/test_kernel_iminmax_death.c:99) |
+| `imm_steps_unknown_op_past_the_end` | [105](tests/test_kernel_iminmax_death.c:105) |
+| `imm_steps_unknown_op_negative` | [111](tests/test_kernel_iminmax_death.c:111) |
+| `imm_steps_abs_above_the_cap` | [117](tests/test_kernel_iminmax_death.c:117) |
+| `imm_block` | [125](tests/test_kernel_iminmax_death.c:125) |
+| `imm_step_index_past_the_end` | [137](tests/test_kernel_iminmax_death.c:137) |
+| `imm_step_index_negative` | [145](tests/test_kernel_iminmax_death.c:145) |
+| `imm_step_region_does_not_fit` | [154](tests/test_kernel_iminmax_death.c:154) |
+| `imm_step_block_has_no_scratch` | [163](tests/test_kernel_iminmax_death.c:163) |
+
+## `tests/test_kernel_iminmax_l4.inc`
+
+| Function | Line |
+|---|---:|
+| `im_closed_form` | [12](tests/test_kernel_iminmax_l4.inc:12) |
+| `l4_goldens (via CQ_TEST)` | [33](tests/test_kernel_iminmax_l4.inc:33) |
+| `the_closed_forms_in_k27_match_what_is_emitted (via CQ_TEST)` | [74](tests/test_kernel_iminmax_l4.inc:74) |
+| `dst_owns_w_qubits_and_the_scratch_comes_back (via CQ_TEST)` | [100](tests/test_kernel_iminmax_l4.inc:100) |
+
+## `tests/test_kernel_iminmax_slots.inc`
+
+| Function | Line |
+|---|---:|
+| `im_rows` | [25](tests/test_kernel_iminmax_slots.inc:25) |
+| `im_row_steps` | [47](tests/test_kernel_iminmax_slots.inc:47) |
+| `im_row_region` | [57](tests/test_kernel_iminmax_slots.inc:57) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [72](tests/test_kernel_iminmax_slots.inc:72) |
+| `im_src` | [107](tests/test_kernel_iminmax_slots.inc:107) |
+| `im_row_measure` | [118](tests/test_kernel_iminmax_slots.inc:118) |
+| `each_kernel_is_twice_the_sum_of_its_blocks_plus_the_copyout (via CQ_TEST)` | [164](tests/test_kernel_iminmax_slots.inc:164) |
+| `im_gate` | [206](tests/test_kernel_iminmax_slots.inc:206) |
+| `im_sched_ult` | [213](tests/test_kernel_iminmax_slots.inc:213) |
+| `im_sched_slt` | [227](tests/test_kernel_iminmax_slots.inc:227) |
+| `im_sched_sub` | [236](tests/test_kernel_iminmax_slots.inc:236) |
+| `im_sched` | [255](tests/test_kernel_iminmax_slots.inc:255) |
+| `im_run` | [267](tests/test_kernel_iminmax_slots.inc:267) |
+| `im_ref` | [292](tests/test_kernel_iminmax_slots.inc:292) |
+| `the_slot_boundaries_match_an_independent_four_valued_scan (via CQ_TEST)` | [300](tests/test_kernel_iminmax_slots.inc:300) |
+
+## `tests/test_kernel_iminmax_spans.inc`
+
+| Function | Line |
+|---|---:|
+| `the_rows_spans_are_pairwise_disjoint (via CQ_TEST)` | [17](tests/test_kernel_iminmax_spans.inc:17) |
+| `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [66](tests/test_kernel_iminmax_spans.inc:66) |
+| `im_out_value` | [106](tests/test_kernel_iminmax_spans.inc:106) |
+| `two_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [120](tests/test_kernel_iminmax_spans.inc:120) |
 
 ## `tests/test_kernel_mul.c`
 
