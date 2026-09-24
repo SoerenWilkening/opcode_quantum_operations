@@ -300,6 +300,7 @@ CQ_TEST(an_fma_f64_round_trip_on_wires_is_the_value_l2_and_the_pool)
 }
 
 #include "test_template_fma_cert.inc"
+#include "test_template_fma_rec.inc"   /* bd 9ve.37 */
 
 CQ_TEST_MAIN(
     CQ_CASE(every_fma_f64_wrapper_agrees_with_its_kernels_own_eval),
@@ -309,5 +310,6 @@ CQ_TEST_MAIN(
     CQ_CASE(an_fma_unc_on_a_poisoned_source_is_discharged_by_the_certificate),
     CQ_CASE(an_fma_unc_does_not_pair_with_an_fmul_forward_on_the_same_handles),
     CQ_CASE(d7b_on_every_aliasing_shape_gives_the_unaliased_answer),
-    CQ_CASE(the_fma_record_names_all_four_slots_and_pairs_on_them)
+    CQ_CASE(the_fma_record_names_all_four_slots_and_pairs_on_them),
+    CQ_CASE(an_aliased_fma_call_records_every_d7b_copy_and_its_uncopy)
 )

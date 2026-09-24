@@ -620,6 +620,55 @@ why that edit had to land in the same commit.
    never-called fp symbols stay in the existing one? A bucketing question with the same shape as D16,
    and the answer probably follows D16's *family first, width second* rule.
 
+   **DECIDED 2026-09-24 (bead `c5x`, the maintainer authorised deciding it this session): NO NEW
+   RESIDUAL BUCKET, AND NOTHING MOVES.** Every still-aborting fp body stays where it lives today,
+   and that is D16's rule applied, not inertia.
+
+   *Measured today* (grid from `python3 shim/gen_shim.py --list-symbols` and the generator's own
+   rows; banners from `grep family: shim/generated/*.gen.c`; the corpus from CQ_lang's
+   `tests/e2e/*.expected.log`, read-only, **413** goldens at `c98b86cb` with a dirty working tree —
+   carry the shape, not the counts):
+
+   | | Symbols | Where the body lives |
+   |---|---:|---|
+   | fp-touching `cq_template_*` rows (884 opcode + 152 intrinsic + 12 libm) | **1,048** | one `.gen.c` per opcode family (R7) |
+   | … live fp wrappers | **160** (90 called) | their family's `.gen.c` |
+   | … fp D14 `_inv` aborts | **66** (0 called) | their family's `.gen.c` |
+   | … still aborting — bucket `fp` | **810** | `fp_compare` 252, `fp_arith` 219, `intrinsic_fp` 114, `int_to_fp` 84, `fp_to_int` 81, `fp_width` 36, `reinterpret` 24 |
+   | … still aborting — bucket `defer` (libm's `lrint`/`llrint`) | **12** | `cq_template_libm.gen.c` |
+   | hand-written fp-width core aborts in `shim/cq_runtime_v2.c` | **28** | `CQ_V2_N_THUNKS` = 9 × {f16, f32, f80} + `cqrt_ry_f32_controlled_inv` = 28, plus `cqrt_alloc_handle` = **29** |
+
+   **The 688 reproduces exactly** at 413 goldens: of the 884 opcode-grid fp symbols, **196** are
+   called and **688** are not. Over today's 822 still-aborting fp rows, **641** are never called and
+   **181** are. By width the aborts are almost entirely *not* `f64`: **46** touch `f64` —
+   `frem` 15, `fpext`/`fptrunc` 18 (every one also touches f16/f32/f80), `uitofp i64` 3 (`DECLINED`,
+   `9ve.34`), `lrint`/`llrint` 4, `bitcast` 6.
+
+   *The rule applied.* **Family first:** the generator already places every `cq_template_*` body by
+   FAMILY (`files()` in `shim/gen_shim.py`: one file per family, never per bucket), and each file's
+   banner prints its own wrapper / `_inv` / fp / deferred split — so the fp residue is *already*
+   bucketed by family, seven files of it. A `cq_runtime_v2.c`-style residual file would pull a
+   family's unlanded rows away from its landed siblings on the WIDTH key, which is the rule's
+   second key promoted to first. It would also turn every future landing into a move between files,
+   where today a landing is one `LANDED` line and the body re-renders in place. **Width second:**
+   width decides a row's *bucket and its reason string* inside its family file (`bucket_of`,
+   `DECLINED`, `DEFER_REASON`), never the file. `shim/cq_runtime_v2.c` keeps the 28 fp-width
+   *core* symbols (and `cqrt_alloc_handle`) on D16's recorded ground — hand-written, one width token
+   from `cq_runtime_rail.c` / `cq_runtime_gate.c`, and they become code by WIDENING those files.
+   **No generated `cq_template_*` body joins it** (the generated shim is never hand-written).
+   §7.9's residents stay put: `lrint`/`llrint` in `cq_template_libm.gen.c` (bucket `defer`, own
+   reason), `fpext`/`fptrunc` in `cq_template_fp_width.gen.c`, `frem` in
+   `cq_template_fp_arith.gen.c`, `uitofp i64 → f64` in `cq_template_int_to_fp.gen.c`
+   (`DECLINED`).
+
+   *What the measurement found beyond the question — filed, not decided here.* (i) **`bitcast`
+   `f64↔i64` is a GAP, not a residual:** §3.5 puts the pair in `f64` scope, it is not in `LANDED`,
+   and the corpus calls its 4 non-`_inv` symbols **448** times across **59** goldens (bead
+   `s8g`). (ii) **The `"fp is v2"` reason string is false at `f64`** — by the
+   generator's own `DECLINED` doctrine — on `frem_f64` (15), the `f64`-touching `fpext`/`fptrunc`
+   (18) and `bitcast` `f64` (6); none of them is waiting on a v2 that has not shipped (bead
+   `ar9`). Both are text/whitelist changes in `shim/gen_shim.py`, and neither moves a file.
+
 ---
 
 ## 7. The port's mechanics — decided 2026-09-18

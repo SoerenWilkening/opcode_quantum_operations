@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7045
+**Indexed definitions:** 7059
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -3928,11 +3928,11 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `emit_row` | [54](src/kernels/fma_emit.c:54) |
-| `cq_fma_step` | [247](src/kernels/fma_emit.c:247) |
-| `cq_fma_result` | [272](src/kernels/fma_emit.c:272) |
-| `fma_compute` | [296](src/kernels/fma_emit.c:296) |
-| `fma_copyout` | [304](src/kernels/fma_emit.c:304) |
-| `cq_kernel_fma` | [311](src/kernels/fma_emit.c:311) |
+| `cq_fma_step` | [236](src/kernels/fma_emit.c:236) |
+| `cq_fma_result` | [261](src/kernels/fma_emit.c:261) |
+| `fma_compute` | [285](src/kernels/fma_emit.c:285) |
+| `fma_copyout` | [293](src/kernels/fma_emit.c:293) |
+| `cq_kernel_fma` | [300](src/kernels/fma_emit.c:300) |
 
 ## `src/kernels/fma_eval.c`
 
@@ -3954,16 +3954,14 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `const_of` | [50](src/kernels/fma_operand.c:50) |
-| `eq_at` | [94](src/kernels/fma_operand.c:94) |
-| `slt_at` | [104](src/kernels/fma_operand.c:104) |
-| `out64` | [119](src/kernels/fma_operand.c:119) |
-| `cq_fu_val64` | [160](src/kernels/fma_operand.c:160) |
-| `cq_fu_flag_of` | [200](src/kernels/fma_operand.c:200) |
-| `shr64` | [254](src/kernels/fma_operand.c:254) |
-| `cq_fu_view_collapse` | [261](src/kernels/fma_operand.c:261) |
-| `cq_fu_view_fill` | [280](src/kernels/fma_operand.c:280) |
-| `base64` | [292](src/kernels/fma_operand.c:292) |
-| `cq_fu_op64` | [312](src/kernels/fma_operand.c:312) |
+| `out64` | [91](src/kernels/fma_operand.c:91) |
+| `cq_fu_val64` | [132](src/kernels/fma_operand.c:132) |
+| `cq_fu_flag_of` | [172](src/kernels/fma_operand.c:172) |
+| `shr64` | [235](src/kernels/fma_operand.c:235) |
+| `cq_fu_view_collapse` | [242](src/kernels/fma_operand.c:242) |
+| `cq_fu_view_fill` | [261](src/kernels/fma_operand.c:261) |
+| `base64` | [273](src/kernels/fma_operand.c:273) |
+| `cq_fu_op64` | [293](src/kernels/fma_operand.c:293) |
 
 ## `src/kernels/fma_step.c`
 
@@ -3978,6 +3976,9 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_fma_steps` | [181](src/kernels/fma_step.c:181) |
 | `cq_fu_arm` | [189](src/kernels/fma_step.c:189) |
 | `cq_fu_sp` | [206](src/kernels/fma_step.c:206) |
+| `cq_fu_eq_at` | [219](src/kernels/fma_step.c:219) |
+| `cq_fu_ult_at` | [229](src/kernels/fma_step.c:229) |
+| `cq_fu_slt_at` | [240](src/kernels/fma_step.c:240) |
 
 ## `src/kernels/fmisc_minmax.c`
 
@@ -4799,8 +4800,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _ibits_pin` | [3908](tests/CMakeLists.txt:3908) |
-| `function _cqops_fround_death_ban` | [4129](tests/CMakeLists.txt:4129) |
+| `function _ibits_pin` | [3914](tests/CMakeLists.txt:3914) |
+| `function _cqops_fround_death_ban` | [4135](tests/CMakeLists.txt:4135) |
 
 ## `tests/package-consumer/main.c`
 
@@ -4973,7 +4974,8 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_kd_call_kernel` | [172](tests/support/kerneldrv.c:172) |
 | `call_ref` | [185](tests/support/kerneldrv.c:185) |
 | `cq_kd_case` | [192](tests/support/kerneldrv.c:192) |
-| `cq_kd_case2` | [428](tests/support/kerneldrv.c:428) |
+| `cq_kd_case_q3` | [198](tests/support/kerneldrv.c:198) |
+| `cq_kd_case2` | [438](tests/support/kerneldrv.c:438) |
 
 ## `tests/support/kerneldrv.h`
 
@@ -4984,7 +4986,7 @@ the definition (or the build-language declaration) in the listed file.
 | `void` | [171](tests/support/kerneldrv.h:171) |
 | `cq_ref_w` | [177](tests/support/kerneldrv.h:177) |
 | `uint64_t` | [180](tests/support/kerneldrv.h:180) |
-| `void` | [297](tests/support/kerneldrv.h:297) |
+| `void` | [307](tests/support/kerneldrv.h:307) |
 
 ## `tests/support/kernelmeasure.c`
 
@@ -5004,8 +5006,8 @@ the definition (or the build-language declaration) in the listed file.
 | `pairs_for` | [127](tests/support/kernelsweep.c:127) |
 | `row_by_name` | [160](tests/support/kernelsweep.c:160) |
 | `cq_kd_sample_at` | [181](tests/support/kernelsweep.c:181) |
-| `cq_kd_sweep_at` | [309](tests/support/kernelsweep.c:309) |
-| `cq_kd_sweep` | [314](tests/support/kernelsweep.c:314) |
+| `cq_kd_sweep_at` | [332](tests/support/kernelsweep.c:332) |
+| `cq_kd_sweep` | [337](tests/support/kernelsweep.c:337) |
 
 ## `tests/support/mock_sink.c`
 
@@ -6445,9 +6447,12 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `fa_cost_of` | [51](tests/test_kernel_fma_slots.inc:51) |
 | `fa_bits_of` | [78](tests/test_kernel_fma_slots.inc:78) |
-| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [103](tests/test_kernel_fma_slots.inc:103) |
-| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [184](tests/test_kernel_fma_slots.inc:184) |
-| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [235](tests/test_kernel_fma_slots.inc:235) |
+| `fa_width_or_refuse` | [112](tests/test_kernel_fma_slots.inc:112) |
+| `fa_bool_operand_faults` | [126](tests/test_kernel_fma_slots.inc:126) |
+| `the_bool_operand_scan_reports_rather_than_aborts (via CQ_TEST)` | [165](tests/test_kernel_fma_slots.inc:165) |
+| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [184](tests/test_kernel_fma_slots.inc:184) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [262](tests/test_kernel_fma_slots.inc:262) |
+| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [313](tests/test_kernel_fma_slots.inc:313) |
 
 ## `tests/test_kernel_fma_spans.inc`
 
@@ -7695,6 +7700,16 @@ the definition (or the build-language declaration) in the listed file.
 | `anchors_sit_inside_the_budget_and_never_on_top_of_it (via CQ_TEST)` | [290](tests/test_kerneldrv_anchors.inc:290) |
 | `the_f64_anchor_constants_are_what_they_claim (via CQ_TEST)` | [321](tests/test_kerneldrv_anchors.inc:321) |
 
+## `tests/test_kerneldrv_third.inc`
+
+| Function | Line |
+|---|---:|
+| `third_qmask` | [22](tests/test_kerneldrv_third.inc:22) |
+| `third_call` | [33](tests/test_kerneldrv_third.inc:33) |
+| `third_ref` | [44](tests/test_kerneldrv_third.inc:44) |
+| `third_shape` | [50](tests/test_kerneldrv_third.inc:50) |
+| `a_third_source_draws_its_own_mask (via CQ_TEST)` | [56](tests/test_kerneldrv_third.inc:56) |
+
 ## `tests/test_lsan_negative.c`
 
 | Function | Line |
@@ -8638,19 +8653,19 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `fresh` | [72](tests/test_template.c:72) |
-| `open_with` | [79](tests/test_template.c:79) |
-| `close_with` | [88](tests/test_template.c:88) |
-| `qreg` | [98](tests/test_template.c:98) |
-| `ref_bin` | [113](tests/test_template.c:113) |
-| `every_opcode_dispatches_to_its_own_kernel_through_the_qq_door (via CQ_TEST)` | [173](tests/test_template.c:173) |
-| `the_hl_and_lh_doors_put_the_literal_on_the_side_the_symbol_names (via CQ_TEST)` | [207](tests/test_template.c:207) |
-| `the_two_word_literal_reaches_a_rail_above_bit_63 (via CQ_TEST)` | [237](tests/test_template.c:237) |
-| `every_unc_shape_xors_the_same_function_back_out (via CQ_TEST)` | [272](tests/test_template.c:272) |
-| `a_controlled_call_obeys_row_zero_on_a_classical_flag (via CQ_TEST)` | [322](tests/test_template.c:322) |
-| `a_quantum_flag_promotes_every_gate_the_kernel_emits (via CQ_TEST)` | [361](tests/test_template.c:361) |
-| `the_controlled_literal_doors_reach_the_region_with_the_right_lane (via CQ_TEST)` | [395](tests/test_template.c:395) |
-| `a_measured_rail_is_a_legal_template_source (via CQ_TEST)` | [464](tests/test_template.c:464) |
+| `fresh` | [73](tests/test_template.c:73) |
+| `open_with` | [80](tests/test_template.c:80) |
+| `close_with` | [89](tests/test_template.c:89) |
+| `qreg` | [99](tests/test_template.c:99) |
+| `ref_bin` | [114](tests/test_template.c:114) |
+| `every_opcode_dispatches_to_its_own_kernel_through_the_qq_door (via CQ_TEST)` | [174](tests/test_template.c:174) |
+| `the_hl_and_lh_doors_put_the_literal_on_the_side_the_symbol_names (via CQ_TEST)` | [208](tests/test_template.c:208) |
+| `the_two_word_literal_reaches_a_rail_above_bit_63 (via CQ_TEST)` | [238](tests/test_template.c:238) |
+| `every_unc_shape_xors_the_same_function_back_out (via CQ_TEST)` | [273](tests/test_template.c:273) |
+| `a_controlled_call_obeys_row_zero_on_a_classical_flag (via CQ_TEST)` | [323](tests/test_template.c:323) |
+| `a_quantum_flag_promotes_every_gate_the_kernel_emits (via CQ_TEST)` | [362](tests/test_template.c:362) |
+| `the_controlled_literal_doors_reach_the_region_with_the_right_lane (via CQ_TEST)` | [396](tests/test_template.c:396) |
+| `a_measured_rail_is_a_legal_template_source (via CQ_TEST)` | [466](tests/test_template.c:466) |
 
 ## `tests/test_template_d7.inc`
 
@@ -8661,6 +8676,13 @@ the definition (or the build-language declaration) in the listed file.
 | `d7b_reaches_the_unc_and_icmp_doors_too (via CQ_TEST)` | [136](tests/test_template_d7.inc:136) |
 | `d7b_on_a_rotation_poisoned_source_is_discharged_by_the_certificate (via CQ_TEST)` | [200](tests/test_template_d7.inc:200) |
 | `the_d7b_copy_brackets_the_region_from_outside_on_both_sides (via CQ_TEST)` | [258](tests/test_template_d7.inc:258) |
+
+## `tests/test_template_d7_rec.inc`
+
+| Function | Line |
+|---|---:|
+| `d7r_walk` | [32](tests/test_template_d7_rec.inc:32) |
+| `an_aliased_binary_call_records_the_d7b_copy_and_its_uncopy (via CQ_TEST)` | [82](tests/test_template_d7_rec.inc:82) |
 
 ## `tests/test_template_death.c`
 
@@ -8798,6 +8820,13 @@ the definition (or the build-language declaration) in the listed file.
 | `d7a_out_aliases_c_of_a_ternary_qlq_unc` | [201](tests/test_template_fma_death.c:201) |
 | `d7a_out_aliases_the_only_handle_of_a_ternary_qll_unc` | [215](tests/test_template_fma_death.c:215) |
 | `a_ternary_unc_destination_is_not_the_width_its_symbol_names` | [232](tests/test_template_fma_death.c:232) |
+
+## `tests/test_template_fma_rec.inc`
+
+| Function | Line |
+|---|---:|
+| `fr_walk` | [28](tests/test_template_fma_rec.inc:28) |
+| `an_aliased_fma_call_records_every_d7b_copy_and_its_uncopy (via CQ_TEST)` | [99](tests/test_template_fma_rec.inc:99) |
 
 ## `tests/test_template_fmisc.c`
 

@@ -207,3 +207,46 @@ cq_bit *cq_fu_sp(const cq_fma_block *k, uint32_t at, uint32_t len)
 {
     return cq_scratch_span(k->scr, at, len);
 }
+
+/* M16's THREE COMPARATOR BLOCKS AT A ROW'S OFFSET — THE ONE PLACE THEIR SPANS
+ * ARE LAID OUT (bd 9ve.41). The dispatch (fma_emit.c) and the flag reads
+ * (fma_operand.c) used to hand-lay them separately, and the two copies had to
+ * agree with nothing checking that they did: move a span in ONE and the step
+ * writes one set of wires while the flag is read off another. The order is
+ * cmp.h's own — `diff ++ orr`, `nb ++ carry ++ axnb`, and slt as `af ++ bf ++`
+ * the inner ult — and each footprint is the cq_*_region(64) the prefix map
+ * reserves. `a` and `b` come back NULL; only the dispatch binds them. */
+cq_eq_block cq_fu_eq_at(const cq_fma_block *k, uint32_t o)
+{
+    cq_eq_block e;
+
+    e.a = NULL; e.b = NULL; e.W = W64;
+    e.diff = cq_fu_sp(k, o,                 (uint32_t)W64);
+    e.orr  = cq_fu_sp(k, o + (uint32_t)W64, (uint32_t)W64 - 1u);
+    return e;
+}
+
+cq_ult_block cq_fu_ult_at(const cq_fma_block *k, uint32_t o)
+{
+    cq_ult_block c;
+
+    c.a = NULL; c.b = NULL; c.W = W64;
+    c.nb    = cq_fu_sp(k, o,                            (uint32_t)W64);
+    c.carry = cq_fu_sp(k, o + (uint32_t)W64,            (uint32_t)W64 + 1u);
+    c.axnb  = cq_fu_sp(k, o + (uint32_t)(2 * W64) + 1u, (uint32_t)W64);
+    return c;
+}
+
+cq_slt_block cq_fu_slt_at(const cq_fma_block *k, uint32_t o)
+{
+    cq_ult_block u = cq_fu_ult_at(k, o + (uint32_t)(2 * W64));
+    cq_slt_block c;
+
+    c.a = NULL; c.b = NULL; c.W = W64;
+    c.af    = cq_fu_sp(k, o,                 (uint32_t)W64);
+    c.bf    = cq_fu_sp(k, o + (uint32_t)W64, (uint32_t)W64);
+    c.nb    = u.nb;
+    c.carry = u.carry;
+    c.axnb  = u.axnb;
+    return c;
+}

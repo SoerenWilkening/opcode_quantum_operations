@@ -203,6 +203,12 @@ void cq_kd_default_shape(int W, cq_kd_shape *out);
 void cq_kd_case(const cq_kd_spec *k, int W,
                 const cq_ref_w *values, const cq_bk_pair *m);
 
+/* The same case with the THIRD source's quantum mask given explicitly (bd
+ * 9ve.40). NULL means "reuse m->q[0]", which is exactly cq_kd_case — so every
+ * hand-driven three-source case keeps its meaning. Ignored when n_src < 3. */
+void cq_kd_case_q3(const cq_kd_spec *k, int W, const cq_ref_w *values,
+                   const cq_bk_pair *m, const cq_ref_w *q_third);
+
 /* The arity-2, one-word convenience form the bitwise suite uses. */
 void cq_kd_case2(const cq_kd_spec *k, int W,
                  uint64_t va, uint64_t vb, const cq_bk_pair *m);
@@ -223,6 +229,10 @@ int cq_kd_samples(void);
  * Serves every arity and every operand width from the spec's own shape, so a
  * three-source kernel needs no bespoke driver: the old cq_kd_case2 path filled
  * values[2] with ZERO and ran every mux case with one arm pinned at 0.
+ *
+ * A THIRD SOURCE'S MASK is drawn independently in every random slot, from its
+ * own RNG stream (bd 9ve.40), and follows operand 0's mask in every forced
+ * slot below. 1- and 2-source kernels draw exactly what they drew before.
  *
  * WHEN THE SHAPE DECLARES ANCHORS the schedule becomes, per width:
  *

@@ -192,6 +192,12 @@ static cq_ref_w call_ref(const cq_kd_spec *k, const cq_ref_w *v,
 void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
                 const cq_bk_pair *m)
 {
+    cq_kd_case_q3(k, W, values, m, NULL);
+}
+
+void cq_kd_case_q3(const cq_kd_spec *k, int W, const cq_ref_w *values,
+                   const cq_bk_pair *m, const cq_ref_w *q_third)
+{
     cq_kd_fixture f;
     cq_kd_shape sh;
     int32_t h[CQ_KD_MAX_SRC];
@@ -205,11 +211,15 @@ void cq_kd_case(const cq_kd_spec *k, int W, const cq_ref_w *values,
     cq_kd_fx_open(&f);
 
     for (int i = 0; i < sh.n_src; i++) {
-        /* The mask pair carries two entries; a third source reuses the first,
-         * which is fine because K10's cond is one bit and its arms are the
-         * pair. `classical[i]` is then subtracted, so a constrained operand
+        /* The mask pair carries two entries. A THIRD source takes `q_third`
+         * when the caller drew one (cq_kd_sample_at's random slots do, bd
+         * 9ve.40) and reuses the first entry otherwise — which is what every
+         * hand-driven case and every forced slot (all-classical, all-quantum,
+         * corners, anchor rows) means by "this mask pair". Reusing it
+         * EVERYWHERE was the bug: fma never saw `c` classical with `a`
+         * quantum. `classical[i]` is then subtracted, so a constrained operand
          * (K4's shift amount) is never handed a qubit. */
-        cq_ref_w raw = m->q[i < 2 ? i : 0];
+        cq_ref_w raw = i < 2 ? m->q[i] : (q_third ? *q_third : m->q[0]);
         cq_ref_w cls = cq_ref_w_make(sh.classical[i], sh.classical[i] ? ~0ull : 0ull,
                                      sh.w[i]);
 

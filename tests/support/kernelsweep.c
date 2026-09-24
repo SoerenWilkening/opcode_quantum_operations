@@ -226,8 +226,23 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
 
     cq_bk_rng_init(&rng, seed);
 
+    /* THE THIRD SOURCE'S MASK HAS ITS OWN STREAM (bd 9ve.40). A three-source
+     * kernel used to give `c` operand 0's mask in every slot, so fma never ran
+     * `c` classical against a quantum `a` except by hand. Each RANDOM slot now
+     * draws `c` a mask from the same pool, independently — a row, then one of
+     * its two columns. A SEPARATE RNG, seeded from the same seed, and only
+     * ever advanced when n_src > 2, so `rng` is untouched: a 1- or 2-source
+     * kernel draws byte for byte what it drew before, and a 3-source kernel's
+     * a/b masks and every value are unchanged too. The forced slots (0, 1,
+     * corners, anchor rows) keep `c` on operand 0's mask — that is the anchor
+     * contract as written, and slot 0 must stay all-classical for L5. */
+    cq_bk_rng rng_c;
+    cq_bk_rng_init(&rng_c, seed ^ 0x7468697264ull);   /* "third" */
+
     for (int s = 0; s < n; s++) {
         cq_ref_w v[CQ_KD_MAX_SRC];
+        cq_ref_w q_c;
+        const cq_ref_w *q_third = NULL;
         uint32_t p;
         int anch = -1;
 
@@ -242,7 +257,15 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
             p    = anchor_row[(s - 2) / n_anch];
         }
         else if (n_anch == 0 && s < N_ANCHORS) p = 1u;  /* the value corners */
-        else                       p = (uint32_t)cq_bk_rng_below(&rng, np);
+        else {
+            p = (uint32_t)cq_bk_rng_below(&rng, np);
+            if (sh.n_src > 2) {
+                const uint64_t r = cq_bk_rng_below(&rng_c, 2u * (uint64_t)np);
+
+                q_c     = pairs[r >> 1].q[r & 1u];
+                q_third = &q_c;
+            }
+        }
 
         for (int i = 0; i < sh.n_src; i++) {
             if (n_anch == 0 && s >= 2 && s < N_ANCHORS && i < 2) {
@@ -269,7 +292,7 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
                       "%s W=%d: the anchor provider refused index %d of the %d "
                       "it declared at this width", k->name, W, anch, n_anch);
 
-        cq_kd_case(k, W, v, &pairs[p]);
+        cq_kd_case_q3(k, W, v, &pairs[p], q_third);
     }
 
     if (n_anch == 0)

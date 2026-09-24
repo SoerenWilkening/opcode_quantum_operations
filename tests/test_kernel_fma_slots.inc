@@ -98,6 +98,87 @@ static uint32_t fa_bits_of(int op)
     return 0u;
 }
 
+/* ---- The Bool-operand scan, which must REPORT and never abort. ----------
+ *
+ * `cq_fma_row_width` is the one place the row -> width mapping lives, and it
+ * is a LIBRARY guard: it dies on an index outside the program, a projection of
+ * a later row or of a non-tuple row, and an unknown op. So a test that hands
+ * it a mux whose condition is a constant code (`CQ_FU_K_ZERO`, negative)
+ * reports nothing and ABORTS the binary — every later case unrun, and the
+ * message a library refusal rather than "row N's condition is a constant"
+ * (bd 9ve.41). `fa_width_or_refuse` pre-screens exactly the inputs that
+ * function dies on and answers -1 for them; `fa_bool_operand_faults` counts
+ * and, when asked, names each fault as a test FAILURE. */
+static int fa_width_or_refuse(const cq_fma_row *rows, int n, int i, int s)
+{
+    if (s < 0 || s >= i || s >= n) return -1;
+    if (rows[s].op < 0 || rows[s].op >= CQ_FUOP_N_OP) return -1;
+    if (rows[s].op == CQ_FUOP_OUT) {
+        int p = rows[s].s0;
+
+        if (p < 0 || p >= s) return -1;
+        if (rows[p].op != CQ_FUOP_NORM52 && rows[p].op != CQ_FUOP_SUBNORM
+            && rows[p].op != CQ_FUOP_ROUND) return -1;
+    }
+    return cq_fma_row_width(rows, n, s);
+}
+
+static int fa_bool_operand_faults(const cq_fma_row *rows, int n, int report)
+{
+    int faults = 0;
+
+    for (int i = 0; i < n; i++) {
+        int op = rows[i].op, slots;
+        short s[2];
+
+        if (op == CQ_FUOP_MUX || op == CQ_FUOP_NOT1) slots = 1;
+        else if (op == CQ_FUOP_AND1 || op == CQ_FUOP_OR1) slots = 2;
+        else continue;
+        s[0] = rows[i].s0; s[1] = rows[i].s1;
+        for (int j = 0; j < slots; j++) {
+            int w = fa_width_or_refuse(rows, n, i, s[j]);
+
+            if (w == 1) continue;
+            faults++;
+            if (!report) continue;
+            if (s[j] < 0)
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d is operand code %d, a "
+                          "constant or a rail, not a Bool row", i, op, j,
+                          (int)s[j]);
+            else if (w < 0)
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d names row %d, which is not "
+                          "a well-formed earlier row", i, op, j, (int)s[j]);
+            else
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d names row %d of width %d, "
+                          "not a Bool row", i, op, j, (int)s[j], w);
+        }
+    }
+    return faults;
+}
+
+/* THE SCAN'S OWN PROVOCATION: a hand-built table with one fault of each kind
+ * it names, plus one well-formed mux as the negative control. Reaching the
+ * CHECK at all is the claim that nothing aborted. */
+CQ_TEST(the_bool_operand_scan_reports_rather_than_aborts)
+{
+    static const cq_fma_row bad[] = {
+        { CQ_FUOP_EQ,   CQ_FU_A,      CQ_FU_B, 0,       0, 0 }, /* 0: Bool   */
+        { CQ_FUOP_MUX,  CQ_FU_K_ZERO, CQ_FU_A, CQ_FU_B, 0, 0 }, /* 1: const  */
+        { CQ_FUOP_MUX,  0,            CQ_FU_A, CQ_FU_B, 0, 0 }, /* 2: fine   */
+        { CQ_FUOP_NOT1, 9,            0,       0,       0, 0 }, /* 3: later  */
+        { CQ_FUOP_MUX,  1,            CQ_FU_A, CQ_FU_B, 0, 0 }, /* 4: 64-bit */
+        { CQ_FUOP_OUT,  CQ_FU_A,      0,       0,       0, 0 }, /* 5: bad    */
+        { CQ_FUOP_AND1, 0,            5,       0,       0, 0 }, /* 6: via 5  */
+    };
+    int n = (int)(sizeof bad / sizeof bad[0]);
+
+    CHECK_EQ(fa_bool_operand_faults(bad, n, 0), 4);
+    CHECK_EQ(fa_bool_operand_faults(bad, 3, 0), 1); /* rows 0-2: only row 1 */
+}
+
 /* ---- The port, checked against itself structurally. --------------------- */
 
 CQ_TEST(the_program_is_the_source_line_for_line)
@@ -143,15 +224,12 @@ CQ_TEST(the_program_is_the_source_line_for_line)
         if (rows[i].op == CQ_FUOP_OUT && (rows[i].s0 < 0 || rows[i].s0 >= i))
             cq_h_fail(__FILE__, __LINE__,
                       "row %d is a projection of row %d", i, (int)rows[i].s0);
-        /* A MUX's condition and the three 1-bit ops' operands must be Bool
-         * rows, and the 64-lane operands must not be. `cq_fma_row_width` is
-         * the one place that mapping lives. */
-        if (rows[i].op == CQ_FUOP_MUX || rows[i].op == CQ_FUOP_NOT1
-            || rows[i].op == CQ_FUOP_AND1 || rows[i].op == CQ_FUOP_OR1)
-            CHECK_EQ(cq_fma_row_width(rows, n, rows[i].s0), 1);
-        if ((rows[i].op == CQ_FUOP_AND1 || rows[i].op == CQ_FUOP_OR1))
-            CHECK_EQ(cq_fma_row_width(rows, n, rows[i].s1), 1);
     }
+    /* A MUX's condition and the three 1-bit ops' operands must be Bool rows.
+     * `cq_fma_row_width` is the one place that mapping lives, reached through
+     * a pre-screen so a constant condition FAILS here instead of aborting in
+     * the library guard (bd 9ve.41). */
+    CHECK_EQ(fa_bool_operand_faults(rows, n, 1), 0);
 
     /* PRD-v2 §5's seam, as a row index. What must be ABOVE it is the whole
      * product-and-align half and what must be BELOW it is the single

@@ -3030,10 +3030,13 @@ add_cqops_death_test(test_kernel_fma_death CASES
 ## the region has been drawn from the pool, so `fpfield:` and `fpclass:` are
 ## pinned ABSENT. So is every sibling kernel's identical message: a dispatch
 ## that reached `cq_kernel_fmul` instead would satisfy a bare abort assertion.
+## D7a is pinned absent too: the fixture's static g_d[64] sits beside g_a, so
+## a 128-lane dst overlaps a and `cq_kernel_check_n` answers W=128 by itself
+## once the guard is gone (measured, bd 9ve.45, both configs).
 set_tests_properties(test_kernel_fma_death.width_is_not_64
                      test_kernel_fma_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fpfield:;fpclass:;fmul:;fadd:;fdiv:;fsqrt:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "D7a;fpfield:;fpclass:;fmul:;fadd:;fdiv:;fsqrt:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
 
 ## THE STRUCTURAL GUARDS ARE M39'S AND NOT M08'S. `cq_scratch_span` names the
 ## REGION rather than the consumer that mis-sized its offset, and a NULL `scr`
@@ -3549,10 +3552,13 @@ set_tests_properties(test_kernel_fdiv_death.arity_of_an_unknown_op
 ## the guard and a W = 32 call reaches M31's `cq_fp_pack` or `cq_fp_view`,
 ## whose messages name the FIELD geometry rather than the fiction that a
 ## 32-bit `soft_fdiv` exists; both are pinned absent, as M34 and M36 pin them.
+## D7a is pinned absent too: the fixture's static g_d[64] sits beside g_a, so
+## a 128-lane dst overlaps a and `cq_kernel_check_dst` answers W=128 by itself
+## once the guard is gone (measured, bd 9ve.45, both configs).
 set_tests_properties(test_kernel_fdiv_death.width_is_not_64
                      test_kernel_fdiv_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "Assertion failed;fpfield: pack;fpfield: view span;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+                     "D7a;Assertion failed;fpfield: pack;fpfield: view span;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## (6) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations
 ## and D7b is LEGAL at the handle boundary — its remedy is M26's defensive

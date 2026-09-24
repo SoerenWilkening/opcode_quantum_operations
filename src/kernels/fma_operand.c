@@ -86,34 +86,6 @@ static uint64_t const_of(int s)
 #define FA_SUB(k, o)  ((cq_subnorm_block){ NULL, NULL, NULL, (k)->scr, (o) })
 #define FA_RND(k, o)  ((cq_round_block){ NULL, NULL, NULL, (k)->scr, (o) })
 
-/* M16's two comparators, assembled from the spans this module lays out. The
- * flag is read through the owning module's accessor and never by the rule:
- * `cq_eq_flag` is `orr[W-2]` in general and `diff[0]` at W == 1, and
- * `cq_slt_flag` is `carry[W]` of an inner comparator whose base a consumer
- * must not re-derive (cmp.h). */
-static cq_eq_block eq_at(const cq_fma_block *k, uint32_t o)
-{
-    cq_eq_block e;
-
-    e.a = NULL; e.b = NULL; e.W = W64;
-    e.diff = cq_fu_sp(k, o, (uint32_t)W64);
-    e.orr  = cq_fu_sp(k, o + (uint32_t)W64, (uint32_t)W64 - 1u);
-    return e;
-}
-
-static cq_slt_block slt_at(const cq_fma_block *k, uint32_t o)
-{
-    cq_slt_block c;
-
-    c.a = NULL; c.b = NULL; c.W = W64;
-    c.af    = cq_fu_sp(k, o,                            (uint32_t)W64);
-    c.bf    = cq_fu_sp(k, o + (uint32_t)W64,            (uint32_t)W64);
-    c.nb    = cq_fu_sp(k, o + (uint32_t)(2 * W64),      (uint32_t)W64);
-    c.carry = cq_fu_sp(k, o + (uint32_t)(3 * W64),      (uint32_t)W64 + 1u);
-    c.axnb  = cq_fu_sp(k, o + (uint32_t)(4 * W64) + 1u, (uint32_t)W64);
-    return c;
-}
-
 /* A projection of a hand-off's tuple, 64 lanes. `flushed_result` is assembled
  * into `buf`; every other output is a span inside the caller's region. */
 static const cq_bit *out64(const cq_fma_block *k, const uint32_t *off,
@@ -233,19 +205,28 @@ const cq_bit *cq_fu_flag_of(const cq_fma_block *k, const uint32_t *off, int i)
                                            : cq_round_exp_overflow_aft(&b);
         }
     }
+    /* M16's three comparators, laid out by cq_fu_*_at — the SAME accessors
+     * the dispatch steps them through (bd 9ve.41). The flag is read through
+     * the owning module's accessor and never by the rule: `cq_eq_flag` is
+     * `orr[W-2]` in general and `diff[0]` at W == 1, and `cq_slt_flag` is
+     * `carry[W]` of an inner comparator whose base a consumer must not
+     * re-derive (cmp.h). M16 publishes no ult flag, so that one is `carry[W]`,
+     * which IS `a >=u b` by cmp.h's struct comment. */
     if (rows[i].op == CQ_FUOP_EQ) {
-        cq_eq_block e = eq_at(k, o);
+        cq_eq_block e = cq_fu_eq_at(k, o);
 
         return cq_eq_flag(&e);
     }
     if (rows[i].op == CQ_FUOP_SLT) {
-        cq_slt_block c = slt_at(k, o);
+        cq_slt_block c = cq_fu_slt_at(k, o);
 
         return cq_slt_flag(&c);
     }
-    /* `carry[W]` IS `a >=u b` (cmp.h), and carry starts one vector in. */
-    if (rows[i].op == CQ_FUOP_ULT)
-        return cq_fu_sp(k, o + (uint32_t)(2 * W64), 1u);
+    if (rows[i].op == CQ_FUOP_ULT) {
+        cq_ult_block c = cq_fu_ult_at(k, o);
+
+        return &c.carry[W64];
+    }
     return cq_fu_sp(k, o, 1u);            /* not1, and1, or1 sit at rel 0 */
 }
 

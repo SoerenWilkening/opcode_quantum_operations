@@ -22,6 +22,7 @@
 #ifndef CQOPS_KERNELS_FMA_INT_H
 #define CQOPS_KERNELS_FMA_INT_H
 
+#include "kernels/cmp.h"
 #include "kernels/fma.h"
 
 enum { CQ_FU_W = CQ_FP64_W, CQ_FU_MAXR = CQ_FMA_MAX_ROWS };
@@ -73,6 +74,14 @@ int cq_fu_row_at(const cq_fu_map *m, int u, int *within);
  * a-step-block-cannot-see-its-own-offset-and-inherits-the-kernels-w1-hole). */
 void    cq_fu_arm(const cq_fma_block *k, uint32_t *off);
 cq_bit *cq_fu_sp (const cq_fma_block *k, uint32_t at, uint32_t len);
+
+/* M16's three comparator blocks laid out at absolute offset `o` — ONE
+ * definition (fma_step.c) read by BOTH the dispatch that steps a block and the
+ * operand resolution that reads its flag, so the two cannot disagree on where
+ * a span lies (bd 9ve.41). `a` and `b` come back NULL. */
+cq_eq_block  cq_fu_eq_at (const cq_fma_block *k, uint32_t o);
+cq_ult_block cq_fu_ult_at(const cq_fma_block *k, uint32_t o);
+cq_slt_block cq_fu_slt_at(const cq_fma_block *k, uint32_t o);
 
 /* Row `i`'s value. `cq_fu_val64` needs a 64-entry `buf` for a view, a constant
  * or `flushed_result`; `cq_fu_flag_of` is pure addressing. Each refuses a row

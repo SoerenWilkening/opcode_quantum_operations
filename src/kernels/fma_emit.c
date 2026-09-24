@@ -69,37 +69,26 @@ static void emit_row(cq_ctx *ctx, const cq_fma_block *k, const uint32_t *off,
         cq_fp_class_step(ctx, &c, u);
         return; }
     case CQ_FUOP_EQ: {
-        cq_eq_block e;
+        /* The three comparators' spans come from cq_fu_*_at, the SAME
+         * accessors fma_operand.c reads their flags through (bd 9ve.41). */
+        cq_eq_block e = cq_fu_eq_at(k, o);
 
         e.a = cq_fu_op64(k, off, r->s0, v0, t0);
         e.b = cq_fu_op64(k, off, r->s1, v1, t1);
-        e.diff = cq_fu_sp(k, o, (uint32_t)W64);
-        e.orr  = cq_fu_sp(k, o + (uint32_t)W64, (uint32_t)W64 - 1u);
-        e.W = W64;
         cq_eq_step(ctx, &e, u);
         return; }
     case CQ_FUOP_ULT: {
-        cq_ult_block c;
+        cq_ult_block c = cq_fu_ult_at(k, o);
 
         c.a = cq_fu_op64(k, off, r->s0, v0, t0);
         c.b = cq_fu_op64(k, off, r->s1, v1, t1);
-        c.nb    = cq_fu_sp(k, o,                            (uint32_t)W64);
-        c.carry = cq_fu_sp(k, o + (uint32_t)W64,            (uint32_t)W64 + 1u);
-        c.axnb  = cq_fu_sp(k, o + (uint32_t)(2 * W64) + 1u, (uint32_t)W64);
-        c.W = W64;
         cq_ult_step(ctx, &c, u);
         return; }
     case CQ_FUOP_SLT: {
-        cq_slt_block c;
+        cq_slt_block c = cq_fu_slt_at(k, o);
 
         c.a = cq_fu_op64(k, off, r->s0, v0, t0);
         c.b = cq_fu_op64(k, off, r->s1, v1, t1);
-        c.af    = cq_fu_sp(k, o,                            (uint32_t)W64);
-        c.bf    = cq_fu_sp(k, o + (uint32_t)W64,            (uint32_t)W64);
-        c.nb    = cq_fu_sp(k, o + (uint32_t)(2 * W64),      (uint32_t)W64);
-        c.carry = cq_fu_sp(k, o + (uint32_t)(3 * W64),      (uint32_t)W64 + 1u);
-        c.axnb  = cq_fu_sp(k, o + (uint32_t)(4 * W64) + 1u, (uint32_t)W64);
-        c.W = W64;
         cq_slt_step(ctx, &c, u);
         return; }
     case CQ_FUOP_ADD: {

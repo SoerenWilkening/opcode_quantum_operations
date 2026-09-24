@@ -41,6 +41,7 @@
 #include "cq_shim.h"
 #include "cq_shim_ctx.h"
 #include "cq_shim_proof.h"
+#include "cq_shim_record.h"
 
 #include "cq_runtime_abi.h"
 
@@ -425,6 +426,7 @@ CQ_TEST(the_controlled_literal_doors_reach_the_region_with_the_right_lane)
  * ------------------------------------------------------------------------- */
 
 #include "test_template_d7.inc"
+#include "test_template_d7_rec.inc"   /* bd 9ve.37 */
 
 /* Subject 5: the fp OPCODE surface (PRD-v2 §1, bead 9ve.28), on a third seam
  * with the same discriminator the shim took one file over — `the INTEGER opcode
@@ -504,6 +506,7 @@ CQ_TEST_MAIN(
     CQ_CASE(d7b_reaches_the_unc_and_icmp_doors_too),
     CQ_CASE(d7b_on_a_rotation_poisoned_source_is_discharged_by_the_certificate),
     CQ_CASE(the_d7b_copy_brackets_the_region_from_outside_on_both_sides),
+    CQ_CASE(an_aliased_binary_call_records_the_d7b_copy_and_its_uncopy),
     CQ_CASE(a_measured_rail_is_a_legal_template_source),
     CQ_CASE(every_fcmp_f64_wrapper_agrees_with_the_host_on_two_constant_rails),
     CQ_CASE(the_fcmp_hl_shape_carries_the_ieee_pattern_and_not_a_converted_value),

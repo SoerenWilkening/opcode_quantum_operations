@@ -391,7 +391,7 @@ Most have a `bd` memory with the full measured story — read it before touching
 - **A 395-row flat fp table needs the memoised prefix map**, or the suite never finishes.
 - **Plan §0.3's `cq_cxt*` is a typo for `cq_ctx*`.**
 - **Our only coupling to CQ_lang is the frozen `cqrt_*` ABI** (repo at
-  `/Users/sorenwilkening/Desktop/CQ_lang`) — never its trace format or harness.
+  `/Users/sorenwilkening/Desktop/Projects/CQ_lang`) — never its trace format or harness.
   `bd remember libcqops-couples-to-cq-lang-only-through-the-abi`.
 
 ---
