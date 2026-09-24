@@ -63,10 +63,22 @@
  * enumeration with it, the message half sizes the parsed name. */
 #define V2_NAME_MAX 48
 
-/* THE THREE BUCKET STRINGS (four until D23 retired `tape is v2`), WRITTEN OUT BY HAND. They are the contract, so the
+/* THE BUCKET STRINGS (fp one per width since bead 9fe), WRITTEN OUT BY HAND. They are the contract, so the
  * test states them rather than importing them: a shim that swapped two buckets
  * would agree with itself and with any oracle derived from it. */
-#define V2_R_FP   "fp is v2"
+/* THE fp BUCKET IS ONE SENTENCE PER WIDTH SINCE bead 9fe (2026-09-24, the
+ * maintainer's "reword all" on bead ar9): "fp is v2" was false here too — v2
+ * SHIPPED, f64-only (PRD-v2 §1a), so f16/f32/f80 wait on UPSTREAM rather than on
+ * a port. The shape is the generated grid's width default, shim/gen_reasons.py
+ * `_OUT_OF_SCOPE`, transcribed here by hand and NOT imported, so a body printing
+ * the wrong WIDTH is red: each width's text is its own literal. */
+#define V2_R_FP_TAIL " is outside v2's f64-only scope; that width is an "     \
+                     "upstream dependency, not a pending port "               \
+                     "(PRD-v2 1a, 6.2/6.3)"
+#define V2_R_F16  "f16" V2_R_FP_TAIL
+#define V2_R_F32  "f32" V2_R_FP_TAIL
+#define V2_R_F80  "f80" V2_R_FP_TAIL
+#define V2_R_RETIRED "fp is v2"
 #define V2_R_HAND "a CQ_lang intrinsic or libm template minted a handle; "    \
                   "libcqops cannot mint a register-less handle without "      \
                   "diverging the shared D5 counter (bd ck6)"
@@ -100,8 +112,9 @@ static const char *bucket_of(const char *name)
     if (strcmp(name, "cqrt_alloc_handle") == 0)  return V2_R_HAND;
     if (strncmp(name, "cqrt_qram_", 10) == 0)    return NULL;   /* v1.2, D24 */
     if (strstr(name, "_f64"))                    return NULL;   /* v2, PRD-v2 §1 */
-    if (strstr(name, "_f16") || strstr(name, "_f32") ||
-        strstr(name, "_f80"))                    return V2_R_FP;
+    if (strstr(name, "_f16"))                    return V2_R_F16;
+    if (strstr(name, "_f32"))                    return V2_R_F32;
+    if (strstr(name, "_f80"))                    return V2_R_F80;
     return NULL;                                  /* v1 serves it */
 }
 
@@ -192,15 +205,20 @@ CQ_TEST(the_deferred_surface_is_exactly_the_headers_29_declarations)
      * required to share an address, so a pointer comparison here is
      * unspecified — and -Wstring-compare says so, which is why it is a build
      * error in this project rather than a latent one. */
-    uint32_t fp = 0u, hand = 0u;
+    uint32_t f16 = 0u, f32 = 0u, f80 = 0u, hand = 0u;
     for (uint32_t i = 0; i < nw; i++) {
         const char *b = bucket_of(want[i]);
 
         if (!b)                              continue;
-        if (strcmp(b, V2_R_FP) == 0)         fp++;
+        if (strcmp(b, V2_R_F16) == 0)        f16++;
+        else if (strcmp(b, V2_R_F32) == 0)   f32++;
+        else if (strcmp(b, V2_R_F80) == 0)   f80++;
         else if (strcmp(b, V2_R_HAND) == 0)  hand++;
     }
-    CHECK_EQ((int)fp, 28);
+    CHECK_EQ((int)(f16 + f32 + f80), 28);
+    CHECK_EQ((int)f16, 9);
+    CHECK_EQ((int)f32, 10);
+    CHECK_EQ((int)f80, 9);
     CHECK_EQ((int)hand, 1);
 }
 
@@ -337,5 +355,6 @@ CQ_TEST_MAIN(
     CQ_CASE(every_deferred_symbol_aborts_with_a_well_formed_message),
     CQ_CASE(the_names_the_bodies_print_are_exactly_the_headers_deferred_set),
     CQ_CASE(each_body_carries_its_own_buckets_reason),
+    CQ_CASE(each_fp_width_prints_its_own_sentence_and_none_says_fp_is_v2),
     CQ_CASE(cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim)
 )

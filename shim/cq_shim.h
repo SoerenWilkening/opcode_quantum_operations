@@ -133,8 +133,9 @@ typedef enum {
  * yaml's own order (`:200-204`).
  *
  * TWO OF THAT FAMILY'S SIX OPCODES ARE ABSENT AND THE ABSENCE IS THE POINT.
- * `frem` is a `fp_arith` binary row with no kernel and keeps its `"fp is v2"`
- * abort; `fneg` is the yaml's ONE unary opcode and also in `fp_arith`, and
+ * `frem` is a `fp_arith` binary row with no kernel and keeps its fp abort —
+ * whose reason, since bead ar9, is its own (shim/gen_reasons.py: at f64 the
+ * missing construction, at f16/f32/f80 the width's out-of-scope sentence); `fneg` is the yaml's ONE unary opcode and also in `fp_arith`, and
  * since bead 9ve.44 it is live — through `cq_shim_fun_op`, not this enum.
  * That is why `gen_shim.LANDED`'s key is `(opcode, width)` and not
  * `(family, width)` — a family-grained key would take all six together, which
@@ -193,7 +194,7 @@ typedef enum {
  * seven are intrinsic_table.yaml's.
  *
  * `ROUND`, `RINT` AND `NEARBYINT` ARE THREE ENUMERATORS AND TWO KERNELS, and
- * the table that says which is shim/cq_template_dispatch_unary.c's (PRD-v2
+ * the table that says which is shim/cq_template_dispatch_funary.c's (PRD-v2
  * 7.7): `rint` and `nearbyint` are soft_round (ties-to-EVEN) and C's `round`
  * is soft_round_away (ties-AWAY). Folding them into one enumerator here would
  * give `rint` and `round` one twin identity, and an `_unc` of one would then
@@ -370,8 +371,11 @@ int32_t cq_shim_iun(cq_shim_iun_op op, int bits, int32_t a_handle);
 void cq_shim_iun_unc(cq_shim_iun_op op, int bits, int32_t out_handle, int32_t a_handle);
 
 /* The v1 boundary, made visible at RUNTIME rather than at link time (PRD §1).
- * `reason` distinguishes the two abort buckets — "fp is v2" and D14's `_inv` —
- * so a symbol swept into the wrong one says which. Read the populations from
+ * `reason` is the abort's own sentence, so a symbol swept into the wrong bucket
+ * says which: the generated grid passes D14's `_inv` sentence or a per-row
+ * `fp` / `defer` reason written in shim/gen_reasons.py (bead ar9 retired PRD
+ * §1's "fp is v2" from it), and cq_runtime_v2.c passes a per-width fp sentence
+ * or its `cqrt_alloc_handle` reason (bead 9fe). Read the populations from
  * `shim/gen_shim.py`'s EXPECTED, never from a comment: they were 884 / 603
  * until `fp_compare`/`f64` landed and they move again with every LANDED line.
  * _Noreturn is what lets a value-returning abort body carry no return. */

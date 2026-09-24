@@ -623,11 +623,12 @@ add_library(cqops STATIC
     shim/cq_template_dispatch_unary.c # bead 9ve.44 (2026-09-24) — the ARITY-1
                                # half of the dispatch, on a seam recorded in
                                # cq_template_dispatch.h: the (F, T) tables —
-                               # casts, conversions, and the fp and INTEGER
-                               # unary families with their one-width adapters
-                               # (M38's sign ops and rounding family, M41,
-                               # M42's abs)
-    shim/cq_template_impl.c    # M26, Step 23.6 — the handle BOUNDARY: the
+                               # casts, conversions, and the INTEGER unary
+                               # family with its one-width adapters (M41,
+                               # M42's abs); the fp unary table moved to
+                               # _funary.c (bead 6y9)
+    shim/cq_template_dispatch_funary.c # bead 6y9 — the fp UNARY table + adapters, cut out of _unary.c
+    shim/cq_template_impl.c   # M26, Step 23.6 — the handle BOUNDARY: the
                                # FIFTEEN remaining cq_shim_* entry points that
                                # M28's 992 generated wrappers call. Handle
                                # resolution, D7a's refusal, D7b's defensive

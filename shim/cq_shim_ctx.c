@@ -344,26 +344,31 @@ void cq_shim_region(int32_t ctrl_flag, void (*body)(void *), void *arg)
 
 /* THE MESSAGE IS THE CONTRACT AND ITS PREFIX IS DELIBERATELY NOT THE HOUSE ONE.
  * Every other hard error in libcqops prints `libcqops: FATAL: <layer>: ...`;
- * PRD §1 fixes this one verbatim as
+ * PRD §1 fixed this one verbatim as
  *
  *     cqops: cq_template_sitofp_i32_to_f64 not implemented (fp is v2)
  *
- * and tests/test_gen_bodies.py has been pinning those bytes since Step 22 —
+ * and the SHAPE `cqops: <symbol> not implemented (<reason>)` is what survives:
+ * that symbol is live since v2 Wave 8, and the "fp is v2" sentence is retired
+ * (bead ar9 from the generated grid, bead 9fe from cq_runtime_v2.c) — every
+ * abort now names its own reason. The generator tests have pinned the shape
+ * since Step 22 (today tests/test_gen_bodies_run.py) —
  * against a stub it writes for itself, because M26 did not exist. This is the
  * definition that stub stood in for, and tests/test_shim_ctx.c forks to read
  * its stderr so the two are pinned to the same string rather than to each
  * other. The difference in prefix is also what lets the death case assert
  * negatively that no OTHER layer spoke.
  *
- * `reason` is the CALLER's string and is not validated. Two buckets reach here
- * from the generated bodies today — PRD §1's "fp is v2" (884 symbols) and
- * D14's `_inv` (603) — and bd vxk and bd ck6 are expected to add a third from
- * cq_runtime_v2.c for the qram / alloc_handle refusals (tape is v1.1, D23), so nothing here
- * may be written against a fixed set of two.
+ * `reason` is the CALLER's string and is not validated. Many sentences reach
+ * here: from the generated bodies D14's `_inv` and a per-row `fp` / `defer`
+ * reason (shim/gen_reasons.py, bead ar9), and from cq_runtime_v2.c a per-width
+ * fp sentence and the `cqrt_alloc_handle` reason (bd ck6, bead 9fe) — so
+ * nothing here may be written against a fixed set. Populations: read
+ * `python3 shim/gen_shim.py`, never a comment.
  *
  * THE NULL SUBSTITUTES FOLLOW src/sink.c's PRECEDENT — cq_sink_die writes "-"
  * for a missing detail — rather than inventing a louder placeholder here.
- * Nothing in the tree passes NULL, since all 1,487 generated abort bodies pass
+ * Nothing in the tree passes NULL, since every generated abort body passes
  * string literals, so this is exactly the defensive branch this project
  * distrusts; it is exercised by tests/test_shim_ctx_region.inc rather than left
  * as code nobody has seen run.

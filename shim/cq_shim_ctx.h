@@ -135,10 +135,11 @@ void cq_shim_region(int32_t ctrl_flag, void (*body)(void *), void *arg);
  * .c; this header does not redeclare it, so there is one declaration to drift
  * from.
  *
- * `reason` is the CALLER's string and is not validated. There are two buckets
- * in the generated bodies today — PRD §1's "fp is v2" (884 symbols) and D14's
- * `_inv` (603) — and the v1-scope refusals `bd vxk` and `bd ck6` are expected
- * to add a third from cq_runtime_v2.c, so nothing here may be written against a
- * fixed set of two. */
+ * `reason` is the CALLER's string and is not validated. The callers pass many
+ * sentences, not a fixed set: D14's `_inv`, a per-row `fp` / `defer` reason
+ * from shim/gen_reasons.py (PRD §1's "fp is v2" is retired, bead ar9), and
+ * cq_runtime_v2.c's per-width fp sentence and `cqrt_alloc_handle` reason
+ * (bead 9fe) — so nothing here may be written against a fixed set. Read the
+ * bucket populations from `python3 shim/gen_shim.py`, never from a comment. */
 
 #endif /* CQ_SHIM_CTX_H */

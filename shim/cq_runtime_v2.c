@@ -111,12 +111,17 @@
 
 #include <stdint.h>
 
-/* The reason strings — two since D24 retired `qram is v2` (three after D23). `"fp is v2"` is
- * VERBATIM the bucket string M28's generated bodies already use (shim/cq_shim.h),
- * because it is the same reason; the other two are what `bd vxk`'s "a third
- * reason string" asked for. They are pinned literally, per symbol, in
- * tests/test_runtime_v2.c. */
-static const char *const V2_FP     = "fp is v2";
+/* The reason strings. The fp one is PER WIDTH since bead 9fe (2026-09-24, the
+ * maintainer's "reword all" on bead ar9). It WAS `"fp is v2"`, verbatim the
+ * generated grid's bucket string; ar9 retired that sentence from the grid
+ * because v2 SHIPPED and is f64-only (PRD-v2 §1a), so at f16/f32/f80 it promised
+ * a release that will never come — those widths wait on UPSTREAM (§6.2/§6.3).
+ * `V2_FP(W)` is the SAME SENTENCE SHAPE as the grid's width default,
+ * shim/gen_reasons.py `_OUT_OF_SCOPE`, naming the body's own width; it is a
+ * copy, not an import, and tests/test_runtime_v2.c types all three out by hand.
+ * `V2_HANDLE` is what `bd vxk`'s "a third reason string" asked for. */
+#define V2_FP(W) "f" #W " is outside v2's f64-only scope; that width is an "  \
+                 "upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)"
 static const char *const V2_HANDLE = "a CQ_lang intrinsic or libm template "
                                      "minted a handle; libcqops cannot mint a "
                                      "register-less handle without diverging "
@@ -130,28 +135,28 @@ static const char *const V2_HANDLE = "a CQ_lang intrinsic or libm template "
  * carry no `return` at all. */
 #define CQ_V2_FP_WIDTH(W, VT)                                                 \
     int32_t cqrt_alloc_f##W(VT value)                                         \
-    { (void)value; cq_shim_unsupported("cqrt_alloc_f" #W, V2_FP); }           \
+    { (void)value; cq_shim_unsupported("cqrt_alloc_f" #W, V2_FP(W)); }        \
     VT cqrt_measure_f##W(int32_t handle)                                      \
-    { (void)handle; cq_shim_unsupported("cqrt_measure_f" #W, V2_FP); }        \
+    { (void)handle; cq_shim_unsupported("cqrt_measure_f" #W, V2_FP(W)); }     \
     void cqrt_ry_f##W(int32_t handle, double angle)                           \
     { (void)handle; (void)angle;                                              \
-      cq_shim_unsupported("cqrt_ry_f" #W, V2_FP); }                           \
+      cq_shim_unsupported("cqrt_ry_f" #W, V2_FP(W)); }                        \
     void cqrt_rz_f##W(int32_t handle, double angle)                           \
     { (void)handle; (void)angle;                                              \
-      cq_shim_unsupported("cqrt_rz_f" #W, V2_FP); }                           \
+      cq_shim_unsupported("cqrt_rz_f" #W, V2_FP(W)); }                        \
     void cqrt_rz_f##W##_controlled(int32_t ctrl, int32_t handle, double angle)\
     { (void)ctrl; (void)handle; (void)angle;                                  \
-      cq_shim_unsupported("cqrt_rz_f" #W "_controlled", V2_FP); }             \
+      cq_shim_unsupported("cqrt_rz_f" #W "_controlled", V2_FP(W)); }          \
     void cqrt_rz_f##W##_controlled_inv(int32_t ctrl, int32_t handle,          \
                                        double angle)                          \
     { (void)ctrl; (void)handle; (void)angle;                                  \
-      cq_shim_unsupported("cqrt_rz_f" #W "_controlled_inv", V2_FP); }         \
+      cq_shim_unsupported("cqrt_rz_f" #W "_controlled_inv", V2_FP(W)); }      \
     void cqrt_copy_f##W(int32_t src, int32_t dst)                             \
     { (void)src; (void)dst;                                                   \
-      cq_shim_unsupported("cqrt_copy_f" #W, V2_FP); }                         \
+      cq_shim_unsupported("cqrt_copy_f" #W, V2_FP(W)); }                      \
     void cqrt_copy_f##W##_controlled(int32_t ctrl, int32_t src, int32_t dst)  \
     { (void)ctrl; (void)src; (void)dst;                                       \
-      cq_shim_unsupported("cqrt_copy_f" #W "_controlled", V2_FP); }
+      cq_shim_unsupported("cqrt_copy_f" #W "_controlled", V2_FP(W)); }
 
 /* f64 IS GONE FROM THIS LIST SINCE 2026-09-18 (bead 9ve.28, PRD-v2 §1 + §3.1).
  * Its ten core symbols are real code in `shim/cq_runtime_rail.c` and
@@ -194,10 +199,11 @@ CQ_V2_FP_WIDTH(80, long double)
  * M07's GENERIC handle error instead of `cq_shim_unsupported`'s named-symbol
  * one: strictly worse diagnostics, a forward implemented where its own `_inv`
  * is not, and the only implemented fp rotation of any kind. The abort's reason
- * string is `"fp is v2"`, which is precisely the claim. */
+ * names the width as outside v2's f64-only scope (`V2_FP(W)`, bead 9fe), which
+ * is precisely the claim. */
 void cqrt_ry_f32_controlled(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
-  cq_shim_unsupported("cqrt_ry_f32_controlled", V2_FP); }
+  cq_shim_unsupported("cqrt_ry_f32_controlled", V2_FP(32)); }
 
 /* `cqrt_ry_f64_controlled` and `cqrt_ry_f64_controlled_inv` LEFT THIS FILE on
  * 2026-09-18 with the rest of the f64 core; they are `CQ_GATE_ROT_CTRL(f64, 64)`
@@ -208,11 +214,11 @@ void cqrt_ry_f32_controlled(int32_t ctrl, int32_t handle, double angle)
  * they did not. */
 void cqrt_ry_f16_controlled(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
-  cq_shim_unsupported("cqrt_ry_f16_controlled", V2_FP); }
+  cq_shim_unsupported("cqrt_ry_f16_controlled", V2_FP(16)); }
 
 void cqrt_ry_f80_controlled(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
-  cq_shim_unsupported("cqrt_ry_f80_controlled", V2_FP); }
+  cq_shim_unsupported("cqrt_ry_f80_controlled", V2_FP(80)); }
 
 /* THE `_inv` HALF IS NOW ONE SYMBOL, AND ITS SIBLING MOVED RATHER THAN VANISHED.
  * `cqrt_ry_f32_controlled_inv` is the ONLY fp `ry` `_inv` the frozen ABI still
@@ -221,7 +227,7 @@ void cqrt_ry_f80_controlled(int32_t ctrl, int32_t handle, double angle)
  * controlled_inv for Ry against Rz's 9 + 9 + 9, measured from the declarations. */
 void cqrt_ry_f32_controlled_inv(int32_t ctrl, int32_t handle, double angle)
 { (void)ctrl; (void)handle; (void)angle;
-  cq_shim_unsupported("cqrt_ry_f32_controlled_inv", V2_FP); }
+  cq_shim_unsupported("cqrt_ry_f32_controlled_inv", V2_FP(32)); }
 
 /* --- The 63 qram symbols: GONE, 2026-09-02 (PRD §15 D24) ----------------- */
 /* They live in shim/cq_runtime_qram.c as v1.2 — D23's token plus `count`

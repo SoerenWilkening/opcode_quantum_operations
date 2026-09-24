@@ -1698,7 +1698,7 @@ uniformly" was weighed and NOT taken**, and the reason is unreachability rather 
 body would take M07's generic handle error instead of `cq_shim_unsupported`'s named one — worse
 diagnostics on a path nothing can reach, a forward implemented where its own `_inv` is not, and
 the only implemented fp rotation of any kind. The abort's reason string is `"fp is v2"`, which
-is the claim, and is what those four bodies become when fp lands.
+is the claim, and is what those four bodies become when fp lands. *(Amended 2026-09-24, beads `ar9`/`9fe`: that string is retired — the Ry thunks now print that their width is outside v2's `f64`-only scope.)*
 
 **NEW COVERAGE, because the forward twin is a comparison the tree could not make before.**
 `tests/test_runtime_gate_rotate.inc` gains `ry_controlled_inv_is_ry_controlled_at_a_negated_angle`

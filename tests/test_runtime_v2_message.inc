@@ -149,7 +149,7 @@ CQ_TEST(the_names_the_bodies_print_are_exactly_the_headers_deferred_set)
 }
 
 /* THE BUCKET IS PART OF THE CONTRACT AND `bd vxk` NAMES THE WAY IT GOES WRONG.
- * The four strings are written out in this file, so a shim that swapped two of
+ * The strings are written out in the .c, so a shim that swapped two of
  * them cannot agree with itself into green. The load-bearing row is
  * `cqrt_qram_alloc_f32`: it carries an fp token AND a qram family, and D16
  * assigns it to QRAM because there is no addressable quantum array in libcqops
@@ -174,6 +174,34 @@ CQ_TEST(each_body_carries_its_own_buckets_reason)
                       "`%s` said `%s`, wanted `%s`",
                       g_said[i].name, g_said[i].reason, want);
     }
+}
+
+/* EACH fp WIDTH SAYS ITS OWN SENTENCE, READ FROM WHAT THE BODIES PRINTED
+ * (bead 9fe, 2026-09-24). The case above compares every body against
+ * `bucket_of`; this one counts the SWEPT reasons against the three typed
+ * texts, so it is red if any width's sentence is missing from the output
+ * (9 f16 + 10 f32 + 9 f80 — the asymmetry is the ABI's lone
+ * `cqrt_ry_f32_controlled_inv`). And the negative: no deferred body in this
+ * file still prints the retired "fp is v2", whatever its name says. */
+CQ_TEST(each_fp_width_prints_its_own_sentence_and_none_says_fp_is_v2)
+{
+    uint32_t f16 = 0u, f32 = 0u, f80 = 0u;
+
+    v2_sweep();
+
+    for (size_t i = 0; i < CQ_V2_N_THUNKS; i++) {
+        const char *r = g_said[i].reason;
+
+        if (strcmp(r, V2_R_F16) == 0)      f16++;
+        else if (strcmp(r, V2_R_F32) == 0) f32++;
+        else if (strcmp(r, V2_R_F80) == 0) f80++;
+        if (strstr(r, V2_R_RETIRED) != NULL)
+            cq_h_fail(__FILE__, __LINE__, "`%s` still says `%s`",
+                      g_said[i].name, r);
+    }
+    CHECK_EQ((int)f16, 9);
+    CHECK_EQ((int)f32, 10);
+    CHECK_EQ((int)f80, 9);
 }
 
 /* The fp-width-qram case that stood here is GONE with PRD §15 D24: the 63

@@ -9,7 +9,7 @@
  * WHEN BUILT, NO `cq_template_*` SYMBOL REACHED IT, AND THAT WAS RECORDED
  * RATHER THAN WORKED AROUND. `opcode_table.yaml`'s only unary opcode is `fneg`
  * (`:209-210`), whose kernel is bead 9ve.27's and does not exist, so `fneg`
- * keeps its `"fp is v2"` abort and `gen_bodies.ENTRY` has no `("funary", ...)`
+ * kept its `"fp is v2"` abort (text retired by bead ar9) and `gen_bodies.ENTRY` has no `("funary", ...)`
  * row — its KeyError is the documented failure for a premature landing.
  * `fsqrt` is `llvm.sqrt` in CQ_lang's intrinsic_table.yaml, which bead 9ve.24
  * vendors; M27's scope is `opcode_table.yaml` ONLY (PRD §1).

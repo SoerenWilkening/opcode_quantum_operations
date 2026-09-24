@@ -129,7 +129,7 @@ The **integer** half of CQ_lang's frozen ABI, at widths `i1, i8, i16, i32, i64, 
 > **THE AXIS IS STILL NOT A UNIFORM CROSS PRODUCT.** Measured from the declarations at
 > `170ede1`: Ry is 9 forward + **9 controlled** + 7 `controlled_inv` = **25** (the `_inv` half
 > still lacks f16 and f80), against Rz's 9 + 9 + 9 = 27. Minting the two missing `_inv`
-> symbols to tidy the grid would invent symbols the frozen ABI does not declare.
+> symbols to tidy the grid would invent symbols the frozen ABI does not declare. *(Amended 2026-09-24, beads `ar9`/`9fe`: that string is retired — the Ry thunks now print that their width is outside v2's `f64`-only scope.)*
 
 > **`cqrt_h` is struck from this row (Step 0.7 — resolved).** Earlier drafts listed
 > `cqrt_x/h/cnot/toffoli`, which contradicted three other places: constraint 1 below forbids

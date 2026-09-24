@@ -5,10 +5,13 @@
  *
  * AN fp WIDTH IS A BIT-PATTERN CELL, on the ABI's own words (cq_runtime.h,
  * READ-ONLY, `bd 38t2`: "fp-as-bitpattern cell"): `cqrt_qram_alloc_f64` is an
- * array of 64-bit registers and nothing in it is an angle. What keeps those
- * symbols unreachable on the corpus is v2's fp CORE — a `cqrt_alloc_f64` rail
- * cannot exist — so the fixtures that hit them first move from `qram is v2` to
- * `fp is v2`, and this file has no fp arm at all (D16: buckets by FAMILY first).
+ * array of 64-bit registers and nothing in it is an angle. What kept those
+ * symbols unreachable on the corpus in v1 was the fp CORE — no `cqrt_alloc_f<W>`
+ * rail could exist — so the fixtures that hit them first moved from `qram is v2`
+ * to the core's abort, then printed as `fp is v2`. Since bead 9ve.28 the f64
+ * core is live; at f16/f32/f80 it still aborts, and since bead 9fe it names the
+ * width as outside v2's f64-only scope (cq_runtime_v2.c `V2_FP`). This file has
+ * no fp arm at all either way (D16: buckets by FAMILY first).
  *
  * WHAT EACH ENTRY POINT IS, from cq_runtime.h:500-660 and PRD §15 D24:
  *   alloc  — D23's token plus `count` cells (shim/cq_shim_qram.c); NO bracket

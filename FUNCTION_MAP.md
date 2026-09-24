@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7124
+**Indexed definitions:** 7126
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -122,17 +122,17 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_qram_die` | [81](shim/cq_runtime_qram.c:81) |
-| `qram_arr` | [92](shim/cq_runtime_qram.c:92) |
-| `qram_src` | [112](shim/cq_runtime_qram.c:112) |
-| `qram_idx` | [121](shim/cq_runtime_qram.c:121) |
-| `qram_cells` | [128](shim/cq_runtime_qram.c:128) |
-| `rec` | [137](shim/cq_runtime_qram.c:137) |
-| `load_body` | [150](shim/cq_runtime_qram.c:150) |
-| `qram_load` | [159](shim/cq_runtime_qram.c:159) |
-| `qram_load_unc` | [175](shim/cq_runtime_qram.c:175) |
-| `store_body` | [198](shim/cq_runtime_qram.c:198) |
-| `qram_store` | [213](shim/cq_runtime_qram.c:213) |
+| `cq_qram_die` | [84](shim/cq_runtime_qram.c:84) |
+| `qram_arr` | [95](shim/cq_runtime_qram.c:95) |
+| `qram_src` | [115](shim/cq_runtime_qram.c:115) |
+| `qram_idx` | [124](shim/cq_runtime_qram.c:124) |
+| `qram_cells` | [131](shim/cq_runtime_qram.c:131) |
+| `rec` | [140](shim/cq_runtime_qram.c:140) |
+| `load_body` | [153](shim/cq_runtime_qram.c:153) |
+| `qram_load` | [162](shim/cq_runtime_qram.c:162) |
+| `qram_load_unc` | [178](shim/cq_runtime_qram.c:178) |
+| `store_body` | [201](shim/cq_runtime_qram.c:201) |
+| `qram_store` | [216](shim/cq_runtime_qram.c:216) |
 
 ## `shim/cq_runtime_rail.c`
 
@@ -172,11 +172,11 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cqrt_ry_f32_controlled` | [198](shim/cq_runtime_v2.c:198) |
-| `cqrt_ry_f16_controlled` | [209](shim/cq_runtime_v2.c:209) |
-| `cqrt_ry_f80_controlled` | [213](shim/cq_runtime_v2.c:213) |
-| `cqrt_ry_f32_controlled_inv` | [222](shim/cq_runtime_v2.c:222) |
-| `cqrt_alloc_handle` | [257](shim/cq_runtime_v2.c:257) |
+| `cqrt_ry_f32_controlled` | [204](shim/cq_runtime_v2.c:204) |
+| `cqrt_ry_f16_controlled` | [215](shim/cq_runtime_v2.c:215) |
+| `cqrt_ry_f80_controlled` | [219](shim/cq_runtime_v2.c:219) |
+| `cqrt_ry_f32_controlled_inv` | [228](shim/cq_runtime_v2.c:228) |
+| `cqrt_alloc_handle` | [263](shim/cq_runtime_v2.c:263) |
 
 ## `shim/cq_shim.h`
 
@@ -194,7 +194,7 @@ the definition (or the build-language declaration) in the listed file.
 | `cqops_read_residue` | [158](shim/cq_shim_ctx.c:158) |
 | `void` | [264](shim/cq_shim_ctx.c:264) |
 | `cq_shim_region` | [264](shim/cq_shim_ctx.c:264) |
-| `cq_shim_unsupported` | [375](shim/cq_shim_ctx.c:375) |
+| `cq_shim_unsupported` | [380](shim/cq_shim_ctx.c:380) |
 
 ## `shim/cq_shim_ctx.h`
 
@@ -302,21 +302,27 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `void` | [33](shim/cq_template_dispatch.h:33) |
-| `void` | [114](shim/cq_template_dispatch.h:114) |
+| `void` | [140](shim/cq_template_dispatch.h:140) |
+
+## `shim/cq_template_dispatch_funary.c`
+
+| Function | Line |
+|---|---:|
+| `cq_dispf_die` | [40](shim/cq_template_dispatch_funary.c:40) |
+| `cq_tpl_fun_kernel` | [69](shim/cq_template_dispatch_funary.c:69) |
+| `cq_tpl_fun_name` | [93](shim/cq_template_dispatch_funary.c:93) |
 
 ## `shim/cq_template_dispatch_unary.c`
 
 | Function | Line |
 |---|---:|
-| `cq_dispu_die` | [41](shim/cq_template_dispatch_unary.c:41) |
-| `cq_tpl_cast_kernel` | [49](shim/cq_template_dispatch_unary.c:49) |
-| `cq_tpl_fcast_kernel` | [74](shim/cq_template_dispatch_unary.c:74) |
-| `cq_tpl_fun_kernel` | [136](shim/cq_template_dispatch_unary.c:136) |
-| `cq_tpl_iun_kernel` | [160](shim/cq_template_dispatch_unary.c:160) |
-| `cq_tpl_cast_name` | [181](shim/cq_template_dispatch_unary.c:181) |
-| `cq_tpl_fcast_name` | [193](shim/cq_template_dispatch_unary.c:193) |
-| `cq_tpl_fun_name` | [205](shim/cq_template_dispatch_unary.c:205) |
-| `cq_tpl_iun_name` | [220](shim/cq_template_dispatch_unary.c:220) |
+| `cq_dispu_die` | [44](shim/cq_template_dispatch_unary.c:44) |
+| `cq_tpl_cast_kernel` | [52](shim/cq_template_dispatch_unary.c:52) |
+| `cq_tpl_fcast_kernel` | [77](shim/cq_template_dispatch_unary.c:77) |
+| `cq_tpl_iun_kernel` | [106](shim/cq_template_dispatch_unary.c:106) |
+| `cq_tpl_cast_name` | [125](shim/cq_template_dispatch_unary.c:125) |
+| `cq_tpl_fcast_name` | [137](shim/cq_template_dispatch_unary.c:137) |
+| `cq_tpl_iun_name` | [149](shim/cq_template_dispatch_unary.c:149) |
 
 ## `shim/cq_template_fp.c`
 
@@ -4807,8 +4813,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _ibits_pin` | [3918](tests/CMakeLists.txt:3918) |
-| `function _cqops_fround_death_ban` | [4139](tests/CMakeLists.txt:4139) |
+| `function _ibits_pin` | [3921](tests/CMakeLists.txt:3921) |
+| `function _cqops_fround_death_ban` | [4142](tests/CMakeLists.txt:4142) |
 
 ## `tests/package-consumer/main.c`
 
@@ -5370,19 +5376,24 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `selector_opcode` | [110](tests/test_gen_bodies.py:110) |
-| `wrappers` | [123](tests/test_gen_bodies.py:123) |
-| `aborts` | [127](tests/test_gen_bodies.py:127) |
-| `one_call` | [131](tests/test_gen_bodies.py:131) |
-| `expected_args` | [142](tests/test_gen_bodies.py:142) |
-| `no_wrapper_is_inert` | [222](tests/test_gen_bodies.py:222) |
-| `the_wrapper_calls_cover_every_dispatched_opcode` | [236](tests/test_gen_bodies.py:236) |
-| `the_wrapper_shape_split_is_521_forward_521_unc_224_controlled` | [258](tests/test_gen_bodies.py:258) |
-| `every_wrapper_body_is_exactly_the_call_its_symbol_names` | [285](tests/test_gen_bodies.py:285) |
-| `the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type` | [298](tests/test_gen_bodies.py:298) |
-| `every_abort_body_names_its_own_symbol_and_silences_its_parameters` | [355](tests/test_gen_bodies.py:355) |
-| `the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket` | [367](tests/test_gen_bodies.py:367) |
-| `the_new_fp_shapes_are_pinned_body_by_body` | [470](tests/test_gen_bodies.py:470) |
+| `selector_opcode` | [119](tests/test_gen_bodies.py:119) |
+| `wrappers` | [132](tests/test_gen_bodies.py:132) |
+| `one_call` | [136](tests/test_gen_bodies.py:136) |
+| `expected_args` | [147](tests/test_gen_bodies.py:147) |
+| `no_wrapper_is_inert` | [227](tests/test_gen_bodies.py:227) |
+| `the_wrapper_calls_cover_every_dispatched_opcode` | [241](tests/test_gen_bodies.py:241) |
+| `the_wrapper_shape_split_is_521_forward_521_unc_224_controlled` | [263](tests/test_gen_bodies.py:263) |
+| `every_wrapper_body_is_exactly_the_call_its_symbol_names` | [290](tests/test_gen_bodies.py:290) |
+| `the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type` | [303](tests/test_gen_bodies.py:303) |
+| `the_new_fp_shapes_are_pinned_body_by_body` | [360](tests/test_gen_bodies.py:360) |
+
+## `tests/test_gen_bodies_abort.py`
+
+| Function | Line |
+|---|---:|
+| `aborts` | [44](tests/test_gen_bodies_abort.py:44) |
+| `every_abort_body_names_its_own_symbol_and_silences_its_parameters` | [48](tests/test_gen_bodies_abort.py:48) |
+| `the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket` | [60](tests/test_gen_bodies_abort.py:60) |
 
 ## `tests/test_gen_bodies_provoked.py`
 
@@ -8238,12 +8249,12 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `bucket_of` | [98](tests/test_runtime_v2.c:98) |
-| `cqrt_idents` | [115](tests/test_runtime_v2.c:115) |
-| `header_deferred` | [138](tests/test_runtime_v2.c:138) |
-| `the_deferred_surface_is_exactly_the_headers_29_declarations (via CQ_TEST)` | [183](tests/test_runtime_v2.c:183) |
-| `the_ten_f64_core_symbols_are_live_and_the_other_fp_widths_are_not (via CQ_TEST)` | [226](tests/test_runtime_v2.c:226) |
-| `cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim (via CQ_TEST)` | [276](tests/test_runtime_v2.c:276) |
+| `bucket_of` | [110](tests/test_runtime_v2.c:110) |
+| `cqrt_idents` | [128](tests/test_runtime_v2.c:128) |
+| `header_deferred` | [151](tests/test_runtime_v2.c:151) |
+| `the_deferred_surface_is_exactly_the_headers_29_declarations (via CQ_TEST)` | [196](tests/test_runtime_v2.c:196) |
+| `the_ten_f64_core_symbols_are_live_and_the_other_fp_widths_are_not (via CQ_TEST)` | [244](tests/test_runtime_v2.c:244) |
+| `cqrt_h_and_its_controlled_twin_are_defined_nowhere_in_the_shim (via CQ_TEST)` | [294](tests/test_runtime_v2.c:294) |
 
 ## `tests/test_runtime_v2_message.inc`
 
@@ -8254,6 +8265,7 @@ the definition (or the build-language declaration) in the listed file.
 | `every_deferred_symbol_aborts_with_a_well_formed_message (via CQ_TEST)` | [103](tests/test_runtime_v2_message.inc:103) |
 | `the_names_the_bodies_print_are_exactly_the_headers_deferred_set (via CQ_TEST)` | [126](tests/test_runtime_v2_message.inc:126) |
 | `each_body_carries_its_own_buckets_reason (via CQ_TEST)` | [160](tests/test_runtime_v2_message.inc:160) |
+| `each_fp_width_prints_its_own_sentence_and_none_says_fp_is_v2 (via CQ_TEST)` | [186](tests/test_runtime_v2_message.inc:186) |
 
 ## `tests/test_runtime_v2_table.inc`
 

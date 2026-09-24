@@ -78,12 +78,38 @@ cq_kernel_fn   cq_tpl_fbin_kernel(cq_shim_fop op);
  * more, most of them unary ADAPTERS. The discriminator is the one
  * cq_template_boundary.h draws for the ordered call sequences: the unary half
  * is reached only through `cq_tpl_unary`, and grows when a unary family
- * lands. THE NEXT CUT, recorded now: the fp unary table and its adapters from
+ * lands. THE NEXT CUT, recorded then: the fp unary table and its adapters from
  * the integer one (`..._dispatch_funary.c`), on the domain line
- * cq_template_boundary.h already draws between integer and fp surfaces. */
+ * cq_template_boundary.h already draws between integer and fp surfaces —
+ * TAKEN 2026-09-24 (bead 6y9) as recorded: `cq_tpl_fun_kernel`, its eight
+ * adapters and `cq_tpl_fun_name` are shim/cq_template_dispatch_funary.c's,
+ * which records the cut after it. */
 cq_tpl_cast_fn cq_tpl_fcast_kernel(cq_shim_fcast_kind kind);
 cq_tpl_cast_fn cq_tpl_fun_kernel  (cq_shim_fun_op op);
 cq_tpl_cast_fn cq_tpl_iun_kernel  (cq_shim_iun_op op);
+
+/* THE UNARY ADAPTERS, AND THEY ARE WHERE `ckd.15` IS PAID FOR. Every kernel
+ * below is `(ctx, dst, a, W)` — one source, ONE width — so none fits the
+ * `(F, T)` pointer type the arity-1 ordered call sequence is written over (the
+ * CASTS need two widths). Rule 7 fixes the SEMANTICS and not the parameter
+ * list, so the kernels are right and the boundary adapts: a one-width
+ * operation is handed the same number twice.
+ *
+ * `T` IS DISCARDED AND THAT IS SAFE HERE AND ONLY HERE. `cq_shim_fun` and
+ * `cq_shim_iun` set both widths from their single `bits` argument, so the two
+ * cannot disagree; a future unary family with a result width of its own would
+ * need its own adapter rather than a `T`-aware version of these.
+ *
+ * (Moved here verbatim from cq_template_dispatch_unary.c by bead 6y9 so that
+ * file and cq_template_dispatch_funary.c share ONE definition; "below" is the
+ * instances in those two files. It defines a `static` function, so each use
+ * belongs to its own translation unit.) */
+#define CQ_UN_ADAPTER(name, kernel)                                           \
+    static void name(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, int F, int T) \
+    {                                                                         \
+        (void)T;                                                              \
+        kernel(ctx, dst, a, F);                                               \
+    }
 
 /* THE DISPLAY NAME OF THE OPERATION, for `bd 76r`'s `# STAGE: op begin` payload
  * (PRD §15 D21). It belongs on THIS side of the seam by the seam's own

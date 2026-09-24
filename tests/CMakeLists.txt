@@ -2654,7 +2654,7 @@ set_tests_properties(test_runtime_gate_death.rz_controlled_on_a_constant_lane_is
 ## is the source root because the generator's default paths are relative to it.
 cqops_select_python(CQOPS_PY)
 if(CQOPS_PY)
-    ## FIVE ENTRIES SINCE 2026-09-19 (bead 9ve.36), and every one of the four
+    ## SIX ENTRIES SINCE 2026-09-24 (bead 6y9), and every one of the five
     ## splits is a Rule 12 seam RECORDED before it was taken. Python has no
     ## `.inc` escape hatch — check_loc.sh counts every line of a multi-line
     ## string as code — so a Rule 12 split of a `.py` is necessarily a new
@@ -2668,8 +2668,11 @@ if(CQOPS_PY)
     ##   test_gen_bodies          what is BETWEEN THE BRACES, read as text
     ##   test_gen_bodies_run      ...and the four claims that need a COMPILER
     ##   test_gen_bodies_provoked ...and the provocations for the text half
+    ##   test_gen_bodies_abort    ...and the ABORT bucket's claims (bead 6y9,
+    ##                            the `WRAPPER <-> ABORT claims` seam)
     foreach(pysuite test_gen_shim test_gen_shim_provoked
-                    test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked)
+                    test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked
+                    test_gen_bodies_abort)
         add_test(NAME ${pysuite}
                  COMMAND ${CQOPS_PY} "${CMAKE_CURRENT_SOURCE_DIR}/${pysuite}.py"
                  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
