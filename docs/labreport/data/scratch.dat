@@ -1,6 +1,6 @@
 # cq_kd_peak (high-water mark during the call) and
-# cq_divrem_region, measured against build-release/libcqops.a, last built 2026-09-24 15:51:29 (local mtime).
-# Working tree at 680b2a7 (dirty) when the probe RAN — that SHA dates the RUN,
+# cq_divrem_region, measured against build-release/libcqops.a, last built 2026-09-24 17:12:59 (local mtime).
+# Working tree at bd18cb1 (dirty) when the probe RAN — that SHA dates the RUN,
 # not the ARCHIVE. Nothing records the commit the archive was built
 # from, so compare the mtime above against that commit's date.
 W mulpeak divpeak divregion
