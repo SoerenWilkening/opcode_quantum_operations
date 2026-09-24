@@ -388,6 +388,7 @@ CQ_TEST(dst_owns_64_qubits_and_the_scratch_comes_back)
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_program_is_the_source_line_for_line),
+    CQ_CASE(the_bool_operand_scan_reports_rather_than_aborts),
     CQ_CASE(every_iteration_is_the_template_at_a_distinct_offset),
     CQ_CASE(the_blocks_cost_what_their_modules_say_they_cost),
     CQ_CASE(the_program_is_the_sum_of_its_blocks),

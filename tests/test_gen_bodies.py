@@ -366,14 +366,13 @@ def every_abort_body_names_its_own_symbol_and_silences_its_parameters(defs=None)
 
 def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=None):
     # One distinct message per bucket, so a symbol swept into the wrong one says
-    # which it landed in. "fp is v2" on an integer symbol would be a FALSE
+    # which it landed in. An fp sentence on an integer symbol would be a FALSE
     # statement, not merely a vague one.
     defs = defs or SHIPPED
-    sc.check(sc.FP_REASON != sc.INV_REASON, "the two abort reasons are the same string")
     # THE DISCRIMINATOR IS `is_deferred_fp`, NOT `is_fp`, SINCE 2026-09-18 — and
     # the difference is a FALSEHOOD PRINTED AT RUNTIME either way round. A landed
     # family's `_inv` carries an fp width token and is refused for D14's reason,
-    # not because fp is v2: `cq_template_fcmp_oeq_f64_inv` saying "fp is v2"
+    # not for an fp reason: `cq_template_fcmp_oeq_f64_inv` saying "fp is v2"
     # would tell a caller to wait for a version that will never define it, since
     # an `fcmp` is non-injective at every width and in every version.
     # AND A THIRD REASON SINCE 2026-09-19 (bead 9ve.36), WHICH IS AN OVERRIDE
@@ -399,15 +398,29 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
             # `fshl`/`fshr` REFUSED (9ve.29.3), `*_sat` unported (K27), libm.
             want = sc.defer_reason_of(name)
         else:
-            want = sc.FP_REASON if sc.is_deferred_fp(name) else sc.INV_REASON
+            # bead ar9: the `fp` reason is per NAME (its width, or the f64
+            # row's own §7.9 reason) — sc.fp_reason_of, typed independently.
+            want = (sc.fp_reason_of(name) if sc.is_deferred_fp(name)
+                    else sc.INV_REASON)
         sc.check('"%s"' % want in "\n".join(body),
                  "%s: abort reason is not %r" % (name, want))
     # THE FOUR REASONS ARE PAIRWISE DISTINCT, which is what makes
     # `bucket_of_body` a partition rather than a first-match.
-    reasons = [sc.FP_REASON, sc.INV_REASON, sc.DECLINED_REASON] \
-        + list(sc.DEFER_REASONS)
-    sc.check(len(set(reasons)) == len(reasons),
+    fp_texts = {sc.fp_reason_of(n) for n in aborts(defs) if sc.is_deferred_fp(n)}
+    reasons = [sc.INV_REASON] + list(sc.DEFER_REASONS)
+    sc.check(len(set(reasons)) == len(reasons) and not fp_texts & set(reasons),
              "two abort reasons are the same string")
+    # bead ar9's CENSUS of the `fp` sentences, by class (measured off the
+    # generator 2026-09-24): 15 frem f64, 18 fpext/fptrunc f64, 3 declined,
+    # 768 width default (250 at each single width + 18 two-width casts).
+    census = {}
+    for n in aborts(defs):
+        if sc.is_deferred_fp(n) and not sc.is_defer(n):
+            k = sc.fp_reason_of(n)
+            k = ("width" if "outside v2's" in k else k.split(" ")[0])
+            census[k] = census.get(k, 0) + 1
+    sc.check(census == {"frem": 15, "fpext": 9, "fptrunc": 9, "uitofp": 3,
+                        "width": 768}, "fp reason census moved: %r" % census)
     deferred = {n for n in aborts(defs) if sc.is_defer(n)}
     sc.check(len(deferred) == 132,
              "expected 132 deferred aborts, got %d" % len(deferred))
@@ -420,8 +433,8 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
     declined = {n for n in aborts(defs) if sc.is_declined(n)}
     sc.check(len(declined) == 3,
              "expected 3 declined aborts, got %d" % len(declined))
-    sc.check(sc.DECLINED_REASON not in (sc.FP_REASON, sc.INV_REASON),
-             "the declined reason is one of the other two")
+    sc.check(sc.DECLINED_REASON != sc.INV_REASON,
+             "the declined reason is D14's")
     landed_inv = {n for n in aborts(defs) if sc.is_landed(n)}
     # 68 since bead s8g: + the two bitcast f64 <-> i64 `_inv`.
     sc.check(len(landed_inv) == 68,
@@ -430,8 +443,11 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
     sc.check(all(n.endswith("_inv") for n in landed_inv),
              "a LANDED fp symbol aborts without being an `_inv`: %s"
              % sorted(n for n in landed_inv if not n.endswith("_inv"))[:4])
-    # PRD §1 fixes the fp wording verbatim; this is that sentence, reassembled.
-    sc.check(sc.FP_REASON == "fp is v2", "PRD §1's fp reason clause changed")
+    # bead ar9 RETIRED PRD §1's "fp is v2" from the generated grid: no body at
+    # any width may print it (true of none since v2 shipped at f64).
+    stale = sorted(n for n, (_d, b) in defs.items()
+                   if sc.RETIRED_FP_REASON in "\n".join(b))
+    sc.check(not stale, "\"fp is v2\" survives on %s" % stale[:4])
     # AND THE `_inv` REASON MUST BE TRUE OF THE WHOLE BUCKET, WHICH IS A LIVE
     # CONSTRAINT rather than a style note. D14 scopes "f-inverse does not exist"
     # to tier 1 — and/or/udiv/trunc/icmp — so 119 of the 603 have an inverse that

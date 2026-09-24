@@ -4354,3 +4354,12 @@ set_tests_properties(test_template_bitcast_death.a_bitcast_that_widens_is_refuse
                      test_template_bitcast_death.a_bitcast_unc_whose_widths_differ_is_refused_at_the_door
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;width pair is inverted;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;cast kind outside the ABI's enum;not the width its cq_template;opcode outside the ABI's enum;fp conversion kind")
+
+## ar9 — the SENTENCE every still-aborting `fp` body prints. "fp is v2" is
+## retired from the generated grid (maintainer, 2026-09-24): the f64 rows carry
+## their own PRD-v2 7.9 reasons (`frem`; `fpext`/`fptrunc`) and every other
+## `fp` row names its f16/f32/f80 width as outside v2's f64-only scope
+## (shim/gen_reasons.py). Buckets unchanged. One symbol or more per reason
+## class is forked and its stderr compared byte for byte against text typed in
+## the test; the static sweep of all 804 is tests/test_gen_bodies.py's.
+add_cqops_test(test_template_reasons)

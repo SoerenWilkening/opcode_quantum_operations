@@ -664,7 +664,7 @@ why that edit had to land in the same commit.
    *What the measurement found beyond the question — filed, not decided here.* (i) **`bitcast`
    `f64↔i64` is a GAP, not a residual:** §3.5 puts the pair in `f64` scope, it is not in `LANDED`,
    and the corpus calls its 4 non-`_inv` symbols **448** times across **59** goldens (bead
-   `s8g`). **Landed the same day by `s8g`** (partition 2880 = 1266 / 678 / 804 / 132). (ii) **The `"fp is v2"` reason string is false at `f64`** — by the
+   `s8g`). **Landed the same day by `s8g`** (partition 2880 = 1266 / 678 / 804 / 132). (ii) **The `"fp is v2"` reason string is false at `f64`** **(done 2026-09-24 by `ar9`; see §7.9's amendment)** — by the
    generator's own `DECLINED` doctrine — on `frem_f64` (15), the `f64`-touching `fpext`/`fptrunc`
    (18) and `bitcast` `f64` (6); none of them is waiting on a v2 that has not shipped (bead
    `ar9`). Both are text/whitelist changes in `shim/gen_shim.py`, and neither moves a file.
@@ -908,6 +908,8 @@ is a dozen `fma`s, on the order of 3M gates before Rule 2 doubles it.
   the day a caller appears.
 - **`fpext`/`fptrunc`** — need an `f32` rail, which cannot exist (`cqrt_alloc_f32` aborts).
 - **`frem`** — §3.3, unchanged.
+
+**Amended 2026-09-24 (bead `ar9`, the maintainer's decision):** each of these rows now prints its OWN reason — `frem` at `f64` (15) names the missing construction and zero corpus calls, the `f64`-touching `fpext`/`fptrunc` (18) name the rail that cannot be allocated — and the generic `"fp is v2"` is retired from the generated grid: an `f16`/`f32`/`f80` row prints that its width is outside v2's `f64`-only scope, an upstream dependency (§1a, §6.2/§6.3). Buckets unchanged; the reason tables live in `shim/gen_reasons.py`. The 28 hand-written fp-width core aborts in `shim/cq_runtime_v2.c` still print the old text (bead `9fe`).
 - **`uitofp` from `i64` only** (decided 2026-09-18, bead `9ve.34`) — upstream has no `soft_uitofp`;
   `extract/instructions.jl:7666-7677` routes `UIToFP` to `soft_sitofp`, zext-widening narrower sources
   (correct) and passing an `i64` source straight through, so `u ≥ 2^63` comes back NEGATIVE. Porting it

@@ -46,7 +46,7 @@ ABI = sc.manifest_decls()
 # `fcmp` is non-injective at every width, so its `_inv` is refused whether or not
 # its forward ships.
 # A FOURTH BUCKET SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24). `defer` is
-# everything that aborts for a reason that is neither D14 nor "fp is v2" — the
+# everything that aborts for a reason that is neither D14 nor an fp width — the
 # integer `llvm.*` intrinsics (bead 9ve.29; since bead 9ve.44 only the funnel
 # shifts and the four `*_sat`) and libm's `lrint`/`llrint` (§7.9). It is a BUCKET rather than a third reason inside `fp` because the
 # bucket is what the audit counts and what each `.gen.c` banner prints, so
@@ -194,7 +194,7 @@ def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
              "expected 252 still-deferred fcmp symbols (f16/f32/f80), got %d"
              % len(deferred_fcmp))
     sc.check(not any("_f64" in n for n in deferred_fcmp),
-             "an f64 fcmp symbol is still in the `fp is v2` bucket")
+             "an f64 fcmp symbol is still in the `fp` abort bucket")
     # AND THE OPCODE-GRAINED HALF OF THE KEY, WHICH IS WHAT bead 9ve.36 ADDED.
     # FORTY-FIVE f64 SYMBOLS ARE STILL ABORTS and the census is the assertion: a
     # `LANDED` key widened back to `(family, width)` would take `frem` and
@@ -221,7 +221,7 @@ def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
     landed = ("fma", "sqrt", "fneg", "fabs", "copysign", "fmin", "fmax",
               "floor", "ceil", "trunc", "round", "rint", "nearbyint", "bitcast")
     sc.check(not [op for op in landed if op in by_op],
-             "an f64 symbol of a LANDED opcode is still in the `fp is v2` "
+             "an f64 symbol of a LANDED opcode is still in the `fp` abort "
              "bucket: %s" % [op for op in landed if op in by_op])
 
 
@@ -244,7 +244,7 @@ def the_three_declined_symbols_are_in_the_fp_bucket_with_their_own_reason():
         text = "\n".join(SHIPPED[n][1])
         sc.check('"%s"' % sc.DECLINED_REASON in text,
                  "%s does not carry bead 9ve.34's reason: %s" % (n, text))
-        sc.check('"%s"' % sc.FP_REASON not in text and
+        sc.check("outside v2's f64-only scope" not in text and
                  '"%s"' % sc.INV_REASON not in text,
                  "%s carries a second, wrong reason as well" % n)
     # AND NOTHING ELSE CARRIES IT. A reason that leaked onto a sibling row would

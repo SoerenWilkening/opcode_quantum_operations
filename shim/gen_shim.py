@@ -53,6 +53,7 @@ import yaml
 import gen_bodies
 import gen_intrinsics
 import gen_opcodes
+import gen_reasons
 
 # THE RESERVE SEAM RECORDED 2026-09-19 (bead 9ve.24) WAS TAKEN 2026-09-24
 # (bead 9ve.44), exactly as recorded: this file stood at 292 counted lines of
@@ -63,10 +64,11 @@ import gen_opcodes
 # shim/gen_opcodes.py beside gen_intrinsics.py's two, and `expand` below is the
 # one-line entry point every caller already used. Do NOT split the audit or the
 # renderer next: they are what every expander answers to, and two copies of
-# either is two readings of one frozen ABI. THE NEXT CUT, recorded now: the
-# REASON TABLES (DEFER_REASON, INTRINSIC_DEFER_REASON, DECLINED) to
-# shim/gen_reasons.py — they are the one part of this file that grows with
-# every refusal rather than with a schema.
+# either is two readings of one frozen ABI. THE NEXT CUT, recorded at 9ve.44,
+# WAS TAKEN 2026-09-24 (bead ar9): the REASON TABLES (DECLINED, DEFER_REASON,
+# INTRINSIC_DEFER_REASON, and ar9's F64_REASON + width default) are
+# shim/gen_reasons.py — the one part of this file that grew with every refusal
+# rather than with a schema. No further cut is recorded yet.
 
 # --- Row model ---------------------------------------------------------------
 # One record per emitted symbol. This is the whole interface to gen_bodies.
@@ -175,7 +177,8 @@ def signature(kind, shape, axis, ctype):
 # --- What has LANDED (PRD-v2 §1, §5, §7.15) ----------------------------------
 # ONE ENTRY PER ABI ROW WHOSE KERNEL AND M26 ENTRY POINT BOTH EXIST. That row
 # then takes the ORDINARY bucket rule below — a live wrapper, or a D14 `_inv`
-# abort — and every other fp-touching row keeps its `"fp is v2"` abort. Adding
+# abort — and every other fp-touching row keeps an `fp` abort, whose sentence
+# is shim/gen_reasons.py's (it names the width, or the f64 row's own reason). Adding
 # the next family is a LINE here plus its dispatch row; nothing else in this
 # file moves.
 #
@@ -190,7 +193,7 @@ def signature(kind, shape, axis, ctype):
 #
 # A CAST'S KEY NAMES BOTH WIDTHS, `(opcode, from, to)`, which is the same
 # tightening one step further. `uitofp i64 -> f64` is the row it exists for:
-# every other `uitofp` source width ships and that one is DECLINED below, so no
+# every other `uitofp` source width ships and that one is DECLINED (gen_reasons), so no
 # coarser key could express the set at all.
 #
 # THE CONSERVATIVE DIRECTION IS `bucket_of`'s: a row touching ANY fp width is an
@@ -218,7 +221,7 @@ LANDED = frozenset((
     # bead s8g — `bitcast` f64 <-> i64, the `reinterpret` family's in-scope
     # pair (PRD-v2 §3.5). An IDENTITY RELABEL: gen_bodies routes it through
     # the integer cast door as CQ_SHIM_CAST_BITCAST, i.e. M13's `zext` at
-    # F == T. The f16/f32/f80 pairs keep "fp is v2".
+    # F == T. The f16/f32/f80 pairs stay `fp` aborts naming their width.
     ("bitcast", "f64", "i64"), ("bitcast", "i64", "f64"),
     #
     # --- intrinsic_table.yaml, vendored 2026-09-19 (PRD-v2 §6.1, bead 9ve.24).
@@ -245,65 +248,17 @@ LANDED = frozenset((
     for w in ("i8", "i16", "i32", "i64")
 )
 
-# --- Rows that are REFUSED rather than unported ------------------------------
-# A KEY HERE IS NOT LANDED AND CARRIES ITS OWN ABORT TEXT. The default `"fp is
-# v2"` would be a FALSEHOOD PRINTED AT RUNTIME for these: f64 IS v2 and is
-# already shipping for the other seventeen conversion pairs, so a caller told to
-# wait for the fp release is being pointed at a release that has happened.
-#
-# ALL THREE OF THE ROW'S SYMBOLS TAKE THIS REASON, INCLUDING `_inv`. D14's
-# sentence attaches to a LANDED family-width — it is what an `_inv` of a family
-# whose forward SHIPS is refused for — and this pair has not landed at all, so
-# its `_inv` is not a D14 row. The reason a body prints must be TRUE of that
-# body (gen_bodies' own recorded lesson, which cost 119 symbols a falsehood),
-# and the bead is true of all three.
-# --- Rows that abort for a reason that is NEITHER D14 NOR "fp is v2" ---------
-# THE VENDORING EXPOSED A POPULATION THE THREE OLD BUCKETS COULD NOT DESCRIBE,
-# and printing `"fp is v2"` at `cq_template_ctpop_i32` would be a falsehood of
-# exactly the kind that cost 119 symbols one already: `ctpop` is an INTEGER
-# opcode at an INTEGER width and no amount of floating-point work reaches it.
-# PRD-v2 §6.1 measured that six L6 fixtures are blocked today by symbols with
-# no fp in them at all.
-#
-# SO `defer` IS A FOURTH BUCKET RATHER THAN A FOURTH REASON INSIDE `fp`. The
-# bucket is what the audit counts and what the .gen.c banner prints, so folding
-# these rows into `fp` would make every published fp figure wrong by the 389
-# minus the ten that landed — the "a count is not an identification" failure
-# applied to the buckets themselves.
-DEFER_REASON = {
-    "libm": "lrint/llrint have no soft_lrint upstream and ZERO corpus calls; "
-            "they are composable as soft_round then soft_fptosi the day a "
-            "caller appears (PRD-v2 7.9)",
-}
-
-# THE INTRINSIC TABLE'S REASON IS PER OPCODE SINCE bead 9ve.44, AND THE OLD ONE
-# IS GONE RATHER THAN NARROWED. It said the integer intrinsics were "a
-# v1-shaped port that has not run yet (bead 9ve.29)"; M41/M42 have run, so the
-# sentence is true of NO row now, and the six opcodes that still defer do so
-# for two different reasons of their own. A KeyError here is the failure for an
-# integer intrinsic row that defers with no reason written down.
-_FUNNEL = ("fshl/fshr are REFUSED, not unported: Bennett's expansion "
-           "(instructions.jl:4947-4996) is not LLVM's funnel shift at a shift "
-           "congruent to 0 mod W, so porting it is a known miscompile and "
-           "correcting it is a re-derivation (bead 9ve.29.3, K26.md section 6)")
-_SAT = ("the saturating add/sub intrinsics have NO construction in the pinned "
-        "Bennett snapshot, so Rule 1 forbids writing one (K27.md, Not ported)")
-INTRINSIC_DEFER_REASON = {"fshl": _FUNNEL, "fshr": _FUNNEL,
-                          "uadd_sat": _SAT, "sadd_sat": _SAT,
-                          "usub_sat": _SAT, "ssub_sat": _SAT}
-
-DECLINED = {
-    ("uitofp", "i64", "f64"):
-        "uitofp i64 -> f64 is REFUSED, not unported: upstream routes UIToFP to "
-        "soft_sitofp with no bias correction at this width, so every u >= 2^63 "
-        "would convert as a negative number (bead 9ve.34, PRD-v2 7.9)",
-}
+# --- The abort TEXT: shim/gen_reasons.py (bead ar9) ---------------------------
+# DECLINED, F64_REASON, the f16/f32/f80 width default, DEFER_REASON and
+# INTRINSIC_DEFER_REASON live there since bead ar9 took the cut this file's
+# header recorded. They decide only the SENTENCE an abort prints; which bucket a
+# row is in is `bucket_of`'s, below, and a reason can never move it.
 
 
 # --- Buckets (PRD §1 + §15 D14 + PRD-v2 §1) ----------------------------------
 # ONE RULE, NO PER-SYMBOL SPECIAL CASE: a row touching an fp width is an abort
 # unless its key is LANDED; otherwise it is D14's `_inv` abort or a wrapper.
-# `DECLINED` changes only the TEXT of an abort, never which bucket it is in.
+# gen_reasons changes only the TEXT of an abort, never which bucket it is in.
 def landed_key(kind, opcode, widths):
     if kind == "cast":
         return (opcode, widths[0], widths[1])
@@ -321,15 +276,15 @@ def bucket_of(key, widths, inv, domains, source):
         return "inv" if inv else "wrapper"
     if source == "libm":
         # EVERY libm ROW DEFERS, AND ITS fp WIDTH IS NOT THE REASON. `lrint
-        # f64 -> i64` touches f64, which SHIPS — so "fp is v2" would point a
-        # caller at a release that has already happened. What is actually
+        # f64 -> i64` touches f64, which SHIPS — so an fp-width sentence would
+        # point a caller at a release that has already happened. What is actually
         # missing is a construction: there is no `soft_lrint` upstream at any
         # width (PRD-v2 §7.9). The by-domain split below keeps these visible
         # as `fp_defer` rather than losing them among the integer ones.
         return "defer"
     if source == "intrinsic":
-        # An UNLANDED intrinsic row. An fp one is honestly "fp is v2"; an
-        # integer one is not, and `defer` is where it goes.
+        # An UNLANDED intrinsic row. An fp one is an `fp` abort naming its
+        # width (gen_reasons); an integer one is not, and `defer` is where it goes.
         return "fp" if any(domains[w] == "fp" for w in widths) else "defer"
     if any(domains[w] == "fp" for w in widths):
         return "fp"
@@ -353,10 +308,9 @@ def _emitter(rows, W):
         key = landed_key(kind, opcode, widths)
         bucket = bucket_of(key, widths, inv, dom, source)
         if bucket == "fp":
-            reason = DECLINED.get(key)
+            reason = gen_reasons.fp_reason(opcode, key, widths, dom)
         elif bucket == "defer":
-            reason = (INTRINSIC_DEFER_REASON[opcode] if source == "intrinsic"
-                      else DEFER_REASON[source])
+            reason = gen_reasons.defer_reason(opcode, source)
         else:
             reason = None
         rows.append(Row(

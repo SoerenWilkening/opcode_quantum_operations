@@ -48,193 +48,193 @@ void cq_template_fptrunc_f80_to_f64_unc(int32_t out_handle, int32_t a_handle);
 
 int32_t cq_template_fpext_f16_to_f32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f32", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f32", "f16 and f32 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fpext_f16_to_f32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f32_inv", "f16 and f32 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fpext_f16_to_f32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f32_unc", "f16 and f32 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fpext_f16_to_f64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f64", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f64", "fpext f16 -> f64 stays an abort: it needs an f16 rail, and v2 is f64-only, so no f16 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fpext_f16_to_f64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f64_inv", "fpext f16 -> f64 stays an abort: it needs an f16 rail, and v2 is f64-only, so no f16 rail can be allocated (PRD-v2 7.9)");
 }
 
 void cq_template_fpext_f16_to_f64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f64_unc", "fpext f16 -> f64 stays an abort: it needs an f16 rail, and v2 is f64-only, so no f16 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fpext_f16_to_f80(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f80", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f80", "f16 and f80 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fpext_f16_to_f80_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f80_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f80_inv", "f16 and f80 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fpext_f16_to_f80_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f16_to_f80_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f16_to_f80_unc", "f16 and f80 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fpext_f32_to_f64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f32_to_f64", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f32_to_f64", "fpext f32 -> f64 stays an abort: it needs an f32 rail, and v2 is f64-only, so no f32 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fpext_f32_to_f64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f32_to_f64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f32_to_f64_inv", "fpext f32 -> f64 stays an abort: it needs an f32 rail, and v2 is f64-only, so no f32 rail can be allocated (PRD-v2 7.9)");
 }
 
 void cq_template_fpext_f32_to_f64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f32_to_f64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f32_to_f64_unc", "fpext f32 -> f64 stays an abort: it needs an f32 rail, and v2 is f64-only, so no f32 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fpext_f32_to_f80(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f32_to_f80", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f32_to_f80", "f32 and f80 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fpext_f32_to_f80_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f32_to_f80_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f32_to_f80_inv", "f32 and f80 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fpext_f32_to_f80_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f32_to_f80_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f32_to_f80_unc", "f32 and f80 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fpext_f64_to_f80(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f64_to_f80", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f64_to_f80", "fpext f64 -> f80 stays an abort: it needs an f80 rail, and v2 is f64-only, so no f80 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fpext_f64_to_f80_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f64_to_f80_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f64_to_f80_inv", "fpext f64 -> f80 stays an abort: it needs an f80 rail, and v2 is f64-only, so no f80 rail can be allocated (PRD-v2 7.9)");
 }
 
 void cq_template_fpext_f64_to_f80_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fpext_f64_to_f80_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fpext_f64_to_f80_unc", "fpext f64 -> f80 stays an abort: it needs an f80 rail, and v2 is f64-only, so no f80 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fptrunc_f32_to_f16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f32_to_f16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f32_to_f16", "f32 and f16 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptrunc_f32_to_f16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f32_to_f16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f32_to_f16_inv", "f32 and f16 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptrunc_f32_to_f16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f32_to_f16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f32_to_f16_unc", "f32 and f16 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptrunc_f64_to_f16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f64_to_f16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f64_to_f16", "fptrunc f64 -> f16 stays an abort: it needs an f16 rail, and v2 is f64-only, so no f16 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fptrunc_f64_to_f16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f64_to_f16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f64_to_f16_inv", "fptrunc f64 -> f16 stays an abort: it needs an f16 rail, and v2 is f64-only, so no f16 rail can be allocated (PRD-v2 7.9)");
 }
 
 void cq_template_fptrunc_f64_to_f16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f64_to_f16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f64_to_f16_unc", "fptrunc f64 -> f16 stays an abort: it needs an f16 rail, and v2 is f64-only, so no f16 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fptrunc_f64_to_f32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f64_to_f32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f64_to_f32", "fptrunc f64 -> f32 stays an abort: it needs an f32 rail, and v2 is f64-only, so no f32 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fptrunc_f64_to_f32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f64_to_f32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f64_to_f32_inv", "fptrunc f64 -> f32 stays an abort: it needs an f32 rail, and v2 is f64-only, so no f32 rail can be allocated (PRD-v2 7.9)");
 }
 
 void cq_template_fptrunc_f64_to_f32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f64_to_f32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f64_to_f32_unc", "fptrunc f64 -> f32 stays an abort: it needs an f32 rail, and v2 is f64-only, so no f32 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fptrunc_f80_to_f16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f16", "f80 and f16 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptrunc_f80_to_f16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f16_inv", "f80 and f16 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptrunc_f80_to_f16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f16_unc", "f80 and f16 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptrunc_f80_to_f32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f32", "f80 and f32 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptrunc_f80_to_f32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f32_inv", "f80 and f32 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptrunc_f80_to_f32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f32_unc", "f80 and f32 are outside v2's f64-only scope; those widths are an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptrunc_f80_to_f64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f64", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f64", "fptrunc f80 -> f64 stays an abort: it needs an f80 rail, and v2 is f64-only, so no f80 rail can be allocated (PRD-v2 7.9)");
 }
 
 int32_t cq_template_fptrunc_f80_to_f64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f64_inv", "fptrunc f80 -> f64 stays an abort: it needs an f80 rail, and v2 is f64-only, so no f80 rail can be allocated (PRD-v2 7.9)");
 }
 
 void cq_template_fptrunc_f80_to_f64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptrunc_f80_to_f64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptrunc_f80_to_f64_unc", "fptrunc f80 -> f64 stays an abort: it needs an f80 rail, and v2 is f64-only, so no f80 rail can be allocated (PRD-v2 7.9)");
 }
 

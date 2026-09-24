@@ -31,6 +31,9 @@ static int fa_is_flag_row(const cq_fadd_row *rows, int i)
     case CQ_FAOP_NOT1:  case CQ_FAOP_AND1: case CQ_FAOP_OR1:
         return 1;
     case CQ_FAOP_PICK:
+        /* A pick of no earlier row is its own fault, reported when row `i`
+         * is scanned; here it only must not index out of bounds. */
+        if (r->s0 < 0 || r->s0 >= i) return 0;
         if (rows[r->s0].op == CQ_FAOP_SUBNORM)
             return r->shift == CQ_FA_PICK_FLAG || r->shift == CQ_FA_PICK_FTZ;
         if (rows[r->s0].op == CQ_FAOP_ROUND)
@@ -52,6 +55,85 @@ static int fa_operand_is_flag(int op, int j)
     return 0;
 }
 
+/* THE OPERAND SCAN. Until bd 9ve.47 a negative code was `continue`d past
+ * after the vocabulary check, in EVERY slot — so a mux whose condition is a
+ * constant (`CQ_FA_K_ZERO`) or a rail was SILENTLY ACCEPTED here, and the
+ * first thing to notice was the library's own runtime refusal three cases
+ * later. A negative code is legal only in a 64-lane slot. Each fault is a
+ * named FAILURE with row, op, slot and code; nothing is indexed that is not a
+ * strictly earlier row. */
+static int fa_operand_faults(const cq_fadd_row *rows, int n, const char *name,
+                             int report)
+{
+    int faults = 0;
+
+    for (int i = 0; i < n; i++) {
+        const short s[3] = { rows[i].s0, rows[i].s1, rows[i].s2 };
+        int op = rows[i].op, arity = cq_fadd_arity(op);
+
+        for (int j = 0; j < arity; j++) {
+            int flag = fa_operand_is_flag(op, j);
+
+            if (s[j] >= i) {
+                faults++;
+                if (report)
+                    cq_h_fail(__FILE__, __LINE__,
+                              "%s row %d operand %d names row %d — a row "
+                              "reference must be strictly backwards", name, i,
+                              j, (int)s[j]);
+                continue;
+            }
+            if (s[j] < 0) {
+                if (s[j] < -CQ_FA_N_CODE) {
+                    faults++;
+                    if (report)
+                        cq_h_fail(__FILE__, __LINE__,
+                                  "%s row %d operand %d: code %d is outside "
+                                  "the vocabulary", name, i, j, (int)s[j]);
+                } else if (flag) {
+                    faults++;
+                    if (report)
+                        cq_h_fail(__FILE__, __LINE__,
+                                  "%s row %d (op %d) slot %d is operand code "
+                                  "%d, a constant or a rail, not a Bool row",
+                                  name, i, op, j, (int)s[j]);
+                }
+                continue;
+            }
+            if (flag != fa_is_flag_row(rows, s[j])) {
+                faults++;
+                if (report)
+                    cq_h_fail(__FILE__, __LINE__,
+                              "%s row %d operand %d: a %s operator is handed "
+                              "a %s row", name, i, j,
+                              flag ? "1-bit" : "64-lane",
+                              flag ? "64-lane" : "1-bit");
+            }
+        }
+    }
+    return faults;
+}
+
+/* THE SCAN'S OWN PROVOCATION: one fault of each kind it names, plus one
+ * well-formed mux as the negative control. Row 1 is the fault the old loop
+ * accepted. */
+CQ_TEST(the_operand_scan_detects_a_constant_where_a_bool_row_is_required)
+{
+    static const cq_fadd_row bad[] = {
+        { CQ_FAOP_EQ,   CQ_FA_A,      CQ_FA_B, 0,       0, 0u }, /* 0: Bool   */
+        { CQ_FAOP_MUX,  CQ_FA_K_ZERO, CQ_FA_A, CQ_FA_B, 0, 0u }, /* 1: const  */
+        { CQ_FAOP_MUX,  0,            CQ_FA_A, CQ_FA_B, 0, 0u }, /* 2: fine   */
+        { CQ_FAOP_NOT1, 9,            0,       0,       0, 0u }, /* 3: later  */
+        { CQ_FAOP_MUX,  2,            CQ_FA_A, CQ_FA_B, 0, 0u }, /* 4: 64-bit */
+        { CQ_FAOP_AND1, 0,            -99,     0,       0, 0u }, /* 5: vocab  */
+        { CQ_FAOP_MUX,  0,            0,       CQ_FA_B, 0, 0u }, /* 6: 1-bit arm */
+    };
+    int n = (int)(sizeof bad / sizeof bad[0]);
+
+    CHECK_EQ(fa_operand_faults(bad, n, "bad", 0), 5);
+    CHECK_EQ(fa_operand_faults(bad, 3, "bad", 0), 1); /* rows 0-2: row 1 */
+}
+
 CQ_TEST(the_two_programs_are_well_formed_and_reference_only_backwards)
 {
     static const int WANT_ROWS[2] = { 124, 133 };
@@ -71,39 +153,13 @@ CQ_TEST(the_two_programs_are_well_formed_and_reference_only_backwards)
         CHECK_EQ(cq_fadd_result_row(ROWS[p].prog), n - 1);
 
         for (int i = 0; i < n; i++) {
-            const short s[3] = { rows[i].s0, rows[i].s1, rows[i].s2 };
-            int arity = cq_fadd_arity(rows[i].op);
-
             if (rows[i].op == CQ_FAOP_VIEW) n_view++;
             else if (rows[i].op == CQ_FAOP_PICK) n_pick++;
             else n_emit++;
             if (rows[i].op == CQ_FAOP_CLZ || rows[i].op == CQ_FAOP_SUBNORM
                 || rows[i].op == CQ_FAOP_ROUND) n_handoff++;
-
-            for (int j = 0; j < arity; j++) {
-                if (s[j] >= 0 && s[j] >= i)
-                    cq_h_fail(__FILE__, __LINE__,
-                              "%s row %d operand %d names row %d — a row "
-                              "reference must be strictly backwards",
-                              ROWS[p].spec.name, i, j, (int)s[j]);
-                if (s[j] < 0) {
-                    if (s[j] < -CQ_FA_N_CODE)
-                        cq_h_fail(__FILE__, __LINE__,
-                                  "%s row %d operand %d: code %d is outside "
-                                  "the vocabulary", ROWS[p].spec.name, i, j,
-                                  (int)s[j]);
-                    continue;
-                }
-                if (fa_operand_is_flag(rows[i].op, j)
-                    != fa_is_flag_row(rows, s[j]))
-                    cq_h_fail(__FILE__, __LINE__,
-                              "%s row %d operand %d: a %s operator is handed a "
-                              "%s row", ROWS[p].spec.name, i, j,
-                              fa_operand_is_flag(rows[i].op, j) ? "1-bit"
-                                                               : "64-lane",
-                              fa_is_flag_row(rows, s[j]) ? "1-bit" : "64-lane");
-            }
         }
+        CHECK_EQ(fa_operand_faults(rows, n, ROWS[p].spec.name, 1), 0);
 
         /* THE COUNTS ARE THE PORT'S OWN CONTENT (K15.md §3.1, re-counted under
          * the views amendment and M32's four blocks): fadd.jl is 124 operator

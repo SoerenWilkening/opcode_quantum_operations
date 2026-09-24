@@ -100,7 +100,7 @@ def a_signature_that_diverges_from_the_abi_is_caught(defs=None):
 
 def an_abort_body_really_aborts_with_prd_1s_message(defs=None):
     # PRD §1 names the runtime behaviour, not a string in a generator:
-    #   cqops: cq_template_sitofp_i32_to_f64 not implemented (fp is v2)
+    #   cqops: <symbol> not implemented (<reason>)
     # M26 does not exist yet, so the entry point is stubbed HERE — which is the
     # point: it witnesses the emitted body, not a future implementation.
     #
@@ -108,8 +108,8 @@ def an_abort_body_really_aborts_with_prd_1s_message(defs=None):
     # witness moved one width over to `_to_f32`. That is the decision working
     # rather than a drift: `sitofp i32 -> f64` is one of the seventeen landed
     # conversion pairs and is now a live wrapper, while f32 has no rail at all
-    # (PRD-v2 §7.9) and is exactly as deferred as it ever was. The MESSAGE is
-    # unchanged, which is what the PRD fixes.
+    # (PRD-v2 §7.9) and is exactly as deferred as it ever was. The message's
+    # SHAPE is PRD §1's; its sentence is bead ar9's (below).
     #
     # THE TWO `cq_shim_fcast*` STUBS ARE WHY THIS FILE STILL LINKS. The same
     # `.gen.c` now holds 34 live conversion wrappers; without them the witness
@@ -135,7 +135,11 @@ def an_abort_body_really_aborts_with_prd_1s_message(defs=None):
     sc.check(r.returncode == 0, "witness program did not build:\n%s" % r.stdout.decode()[:1500])
     r = subprocess.run([exe], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     sc.check(r.returncode != 0, "an fp abort body returned normally")
-    want = b"cqops: cq_template_sitofp_i32_to_f32 not implemented (fp is v2)"
+    # bead ar9: PRD §1's SHAPE, with the width-naming sentence that replaced
+    # "fp is v2" (typed here, not imported from shim/gen_reasons.py).
+    want = (b"cqops: cq_template_sitofp_i32_to_f32 not implemented (f32 is "
+            b"outside v2's f64-only scope; that width is an upstream "
+            b"dependency, not a pending port (PRD-v2 1a, 6.2/6.3))\n")
     sc.check(want in r.stderr, "PRD §1's message not emitted; got %r" % r.stderr[:200])
     # AND PRD §1's LITERAL EXAMPLE IS NOW A WRAPPER, asserted rather than left
     # as a comment: if it ever goes back to aborting, this bead was reverted and

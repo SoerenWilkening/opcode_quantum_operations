@@ -336,6 +336,7 @@ CQ_TEST(l4_goldens)
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_two_programs_are_well_formed_and_reference_only_backwards),
+    CQ_CASE(the_operand_scan_detects_a_constant_where_a_bool_row_is_required),
     CQ_CASE(fsub_is_fadds_body_under_a_prologue_and_b_is_rebased),
     CQ_CASE(fsub_differs_from_fadd_of_fneg_on_exactly_the_nan_rhs_sign),
     CQ_CASE(the_classical_row_agrees_with_the_host_on_every_anchor),

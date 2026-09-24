@@ -254,7 +254,7 @@ but available on every target CQ_lang already requires.
   of the 884: a loud abort naming the symbol, so the link always succeeds and an fp
   program fails with `cqops: cq_template_sitofp_i32_to_f64 not implemented (fp is v2)`
   rather than an undefined-reference wall. Free diagnostics, and it makes the v2 boundary
-  visible at runtime instead of at link time.
+  visible at runtime instead of at link time. *(Amended 2026-09-24: that symbol is live since v2 Wave 8, and PRD-v2 bead `ar9` retired the `"fp is v2"` text from the generated grid — every fp abort now names its own reason; the shape of the message is unchanged.)*
 - ~~**`cqrt_tape_*`** (reversible I/O tape) — no consumer until `printf` on tainted data.~~
   **IN SCOPE SINCE 2026-09-02 AS v1.1 — §15 D23.** The stated reason was FALSE: six shipped
   fixtures ARE that consumer (`slice_io`, `slice_io_both_arm`, `slice_io_chained_theta`,

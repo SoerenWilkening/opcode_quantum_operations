@@ -443,6 +443,7 @@ CQ_TEST(l4_goldens)
 
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_three_programs_are_well_formed_and_reference_only_backwards),
+    CQ_CASE(the_bool_operand_scan_reports_rather_than_reading_out_of_bounds),
     CQ_CASE(the_clz_ladder_is_five_uniform_stages_and_a_short_sixth),
     CQ_CASE(fptoui_inlines_fptosi_twice_at_two_disjoint_offsets),
     CQ_CASE(uitofps_row_program_is_sitofps_byte_for_byte_at_every_width),

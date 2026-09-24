@@ -30,8 +30,10 @@
 # the rail-leak wording would implicitly settle PRD §15 D15 §4's still-open
 # abort-vs-strand clause (bd 06t) inside a generated body. Unrelated question.
 
-# PRD §1 fixes the fp message verbatim:
-#   cqops: cq_template_sitofp_i32_to_f64 not implemented (fp is v2)
+# PRD §1 fixed the fp message as `cqops: <symbol> not implemented (fp is v2)`.
+# THE SHAPE SURVIVES AND THE PARENTHESISED SENTENCE DOES NOT (bead ar9,
+# 2026-09-24): "fp is v2" was false of every remaining `fp` row once v2 shipped
+# at f64 — see shim/gen_reasons.py, which now writes every `fp` row's reason.
 # THE `_inv` REASON MUST BE TRUE OF ALL 603, AND THE FIRST ONE WAS NOT.
 # It read "_inv is f-inverse, which does not exist" — and D14 scopes
 # non-existence to TIER 1 only: `and`, `or`, `udiv`, `trunc` and every `icmp`.
@@ -45,14 +47,13 @@
 # summary sentence, which is true of the whole bucket: "No uniform definition of
 # the data family is possible in ANY version."
 #
-# AND A ROW MAY CARRY ITS OWN REASON, WHICH IS AN OVERRIDE AND NOT A FOURTH
-# BUCKET. `gen_shim.DECLINED` names the ABI rows that are REFUSED rather than
-# unported — `uitofp i64 -> f64`, bead 9ve.34 — and sets `row.reason`. The
-# bucket stays `fp` (it is an fp-touching row that has not landed), so every
-# count and every file banner is unmoved; what changes is the sentence, because
-# "fp is v2" would be false for a width v2 already ships.
+# AND EVERY `fp` AND `defer` ROW CARRIES ITS OWN REASON, WHICH IS TEXT AND NOT
+# A BUCKET. shim/gen_reasons.py sets `row.reason` (DECLINED, the f64 rows'
+# F64_REASON, the f16/f32/f80 width default, the defer tables); the bucket stays
+# gen_shim's, so every count and every file banner is unmoved by a sentence.
+# THERE IS NO `fp` KEY BELOW, DELIBERATELY: an `fp` row reaching `abort` with no
+# reason is a KeyError naming the bucket, never a stale default at runtime.
 REASON = {
-    "fp": "fp is v2",
     "inv": "_inv is f-inverse, not f; the data family has no uniform definition (PRD 15 D14)",
 }
 

@@ -82,8 +82,8 @@ LANDED_NAME = re.compile(
     r")(?:_|$)")
 
 # THE ROWS THAT ARE REFUSED RATHER THAN UNPORTED — gen_shim.DECLINED's test-side
-# twin, again by NAME. They are NOT landed and they are NOT `"fp is v2"`: f64 is
-# in v2's scope and seventeen sibling conversion pairs already ship, so that
+# twin, again by NAME. They are NOT landed and they do NOT name a width as out
+# of scope: f64 is in v2's scope and seventeen sibling conversion pairs already ship, so that
 # sentence would be a falsehood printed at runtime.
 DECLINED_NAME = re.compile(r"^cq_template_uitofp_i64_to_f64(?:_|$)")
 
@@ -165,13 +165,13 @@ def is_fp(name):
 
 def is_landed(name):
     # An fp-touching symbol whose ABI ROW v2 has IMPLEMENTED. Such a symbol is
-    # NOT in the `"fp is v2"` bucket: its non-`_inv` rows are live wrappers and
+    # NOT in the `fp` abort bucket: its non-`_inv` rows are live wrappers and
     # its `_inv` rows are D14 aborts, exactly as an integer family's are.
     return LANDED_NAME.match(name) is not None
 
 
 def is_declined(name):
-    # Not landed, and NOT `"fp is v2"` either: a row refused for a reason of its
+    # Not landed, and NOT the width default either: a row refused for a reason of its
     # own. It stays in the `fp` BUCKET — the counts and the file banners do not
     # move — and only the sentence differs.
     return DECLINED_NAME.match(name) is not None
@@ -220,7 +220,47 @@ def read_dir(directory):
 # THE BUCKET IS READ BACK OUT OF THE EMITTED BODY, not asked of gen_shim. What
 # ships is what is tested, and the two abort reasons have to be distinguishable
 # from the outside or "the abort set is exactly the 603" cannot be stated.
-FP_REASON = "fp is v2"
+#
+# THE `fp` BUCKET HAS NO SINGLE SENTENCE SINCE bead ar9 (maintainer, 2026-09-24):
+# "fp is v2" was false of every row left in it once v2 shipped at f64, and is
+# RETIRED from the generated grid — kept here only so a test can assert its
+# absence. Each `fp` body's reason is now a function of its NAME, transcribed
+# below by hand from the decision rather than imported from
+# shim/gen_reasons.py, so a generator that named the wrong width disagrees with
+# it: f64 rows carry their own PRD-v2 7.9 reason (`frem`; `fpext`/`fptrunc`,
+# naming the other width's rail), and every other `fp` row names its
+# f16/f32/f80 width(s) as outside v2's f64-only scope.
+RETIRED_FP_REASON = "fp is v2"
+FREM_F64_REASON = (
+    "frem f64 stays an abort on liveness: the pinned Bennett snapshot has no "
+    "frem construction (no soft_frem) and the corpus calls it zero times "
+    "(PRD-v2 3.3, 7.9)")
+F64_RAIL_REASON = ("{op} {src} -> {dst} stays an abort: it needs an {w} rail, "
+                   "and v2 is f64-only, so no {w} rail can be allocated "
+                   "(PRD-v2 7.9)")
+WIDTH_REASON = ("{0} is outside v2's f64-only scope; that width is an upstream "
+                "dependency, not a pending port (PRD-v2 1a, 6.2/6.3)")
+WIDTHS_REASON = ("{0} and {1} are outside v2's f64-only scope; those widths are "
+                 "an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)")
+_WIDTH_TOKENS = re.compile(r"(?:^|_)(f16|f32|f64|f80|i\d+)(?=_|$)")
+
+
+def fp_reason_of(name):
+    # The sentence an `fp`-bucket body must print, read off its NAME alone.
+    if is_declined(name):
+        return DECLINED_REASON
+    stem = name[len("cq_template_"):]
+    op = stem.split("_")[0]
+    ws = _WIDTH_TOKENS.findall(stem)
+    fpw = [w for w in ws if w.startswith("f")]
+    if "f64" in fpw and op == "frem":
+        return FREM_F64_REASON
+    if "f64" in fpw and op in ("fpext", "fptrunc"):
+        other = [w for w in fpw if w != "f64"][0]
+        return F64_RAIL_REASON.format(op=op, src=ws[0], dst=ws[1], w=other)
+    return (WIDTH_REASON if len(fpw) == 1 else WIDTHS_REASON).format(*fpw)
+
+
 INV_REASON = "_inv is f-inverse, not f; the data family has no uniform definition (PRD 15 D14)"
 # Bead 9ve.34's row (2026-09-19). A THIRD REASON IN THE SAME `fp` BUCKET — not a
 # fourth bucket — so the three coarse counts, the five-way domain split and
@@ -231,7 +271,7 @@ DECLINED_REASON = (
     "would convert as a negative number (bead 9ve.34, PRD-v2 7.9)")
 
 
-# THE FOURTH BUCKET (bead 9ve.24). `"fp is v2"` printed at an INTEGER
+# THE FOURTH BUCKET (bead 9ve.24). An fp sentence printed at an INTEGER
 # intrinsic would be a falsehood — an integer opcode at an integer width that no
 # amount of fp work reaches — and `lrint f64 -> i64` touches a width that
 # already SHIPS, so neither can honestly take the fp reason. Transcribed here
@@ -269,16 +309,23 @@ def defer_reason_of(name):
     return DEFER_SAT_REASON
 
 
+ABORT_CALL = re.compile(r'cq_shim_unsupported\("([^"]+)", "([^"]*)"\);')
+
+
 def bucket_of_body(body):
+    # The reason is compared WHOLE against the one its own symbol must carry,
+    # so an `fp` body naming the wrong width is unrecognised, not `fp`.
     text = "\n".join(body)
     if "cq_shim_unsupported(" not in text:
         return "wrapper"
-    if '"%s"' % FP_REASON in text or '"%s"' % DECLINED_REASON in text:
-        return "fp"
-    if '"%s"' % INV_REASON in text:
+    m = ABORT_CALL.search(text)
+    why = m.group(2) if m else None
+    if why == INV_REASON:
         return "inv"
-    if any('"%s"' % r in text for r in DEFER_REASONS):
+    if why in DEFER_REASONS:
         return "defer"
+    if m and why == fp_reason_of(m.group(1)):
+        return "fp"
     return "abort-with-an-unrecognised-reason"
 
 

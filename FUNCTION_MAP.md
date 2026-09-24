@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7107
+**Indexed definitions:** 7124
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -420,13 +420,13 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `entry_family` | [79](shim/gen_bodies.py:79) |
-| `entry_key` | [94](shim/gen_bodies.py:94) |
-| `literal` | [231](shim/gen_bodies.py:231) |
-| `call_args` | [245](shim/gen_bodies.py:245) |
-| `wrapper` | [277](shim/gen_bodies.py:277) |
-| `abort` | [289](shim/gen_bodies.py:289) |
-| `body` | [300](shim/gen_bodies.py:300) |
+| `entry_family` | [80](shim/gen_bodies.py:80) |
+| `entry_key` | [95](shim/gen_bodies.py:95) |
+| `literal` | [232](shim/gen_bodies.py:232) |
+| `call_args` | [246](shim/gen_bodies.py:246) |
+| `wrapper` | [278](shim/gen_bodies.py:278) |
+| `abort` | [290](shim/gen_bodies.py:290) |
+| `body` | [301](shim/gen_bodies.py:301) |
 
 ## `shim/gen_intrinsics.py`
 
@@ -442,26 +442,33 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `expand_opcodes` | [21](shim/gen_opcodes.py:21) |
 
+## `shim/gen_reasons.py`
+
+| Function | Line |
+|---|---:|
+| `fp_reason` | [69](shim/gen_reasons.py:69) |
+| `defer_reason` | [117](shim/gen_reasons.py:117) |
+
 ## `shim/gen_shim.py`
 
 | Function | Line |
 |---|---:|
-| `__init__` | [99](shim/gen_shim.py:99) |
-| `decl` | [103](shim/gen_shim.py:103) |
-| `variant_axes` | [123](shim/gen_shim.py:123) |
-| `suffix` | [134](shim/gen_shim.py:134) |
-| `signature` | [157](shim/gen_shim.py:157) |
-| `landed_key` | [307](shim/gen_shim.py:307) |
-| `bucket_of` | [319](shim/gen_shim.py:319) |
-| `_emitter` | [345](shim/gen_shim.py:345) |
-| `emit` | [346](shim/gen_shim.py:346) |
-| `expand` | [373](shim/gen_shim.py:373) |
-| `_is_fp` | [416](shim/gen_shim.py:416) |
-| `audit` | [420](shim/gen_shim.py:420) |
-| `render` | [467](shim/gen_shim.py:467) |
-| `files` | [487](shim/gen_shim.py:487) |
-| `load` | [493](shim/gen_shim.py:493) |
-| `main` | [498](shim/gen_shim.py:498) |
+| `__init__` | [101](shim/gen_shim.py:101) |
+| `decl` | [105](shim/gen_shim.py:105) |
+| `variant_axes` | [125](shim/gen_shim.py:125) |
+| `suffix` | [136](shim/gen_shim.py:136) |
+| `signature` | [159](shim/gen_shim.py:159) |
+| `landed_key` | [262](shim/gen_shim.py:262) |
+| `bucket_of` | [274](shim/gen_shim.py:274) |
+| `_emitter` | [300](shim/gen_shim.py:300) |
+| `emit` | [301](shim/gen_shim.py:301) |
+| `expand` | [327](shim/gen_shim.py:327) |
+| `_is_fp` | [370](shim/gen_shim.py:370) |
+| `audit` | [374](shim/gen_shim.py:374) |
+| `render` | [421](shim/gen_shim.py:421) |
+| `files` | [441](shim/gen_shim.py:441) |
+| `load` | [447](shim/gen_shim.py:447) |
+| `main` | [452](shim/gen_shim.py:452) |
 
 ## `shim/generated/cq_template_fp_arith.gen.c`
 
@@ -5118,12 +5125,13 @@ the definition (or the build-language declaration) in the listed file.
 | `generate` | [184](tests/support/shimcheck.py:184) |
 | `parse_definitions` | [194](tests/support/shimcheck.py:194) |
 | `read_dir` | [215](tests/support/shimcheck.py:215) |
-| `defer_reason_of` | [262](tests/support/shimcheck.py:262) |
-| `bucket_of_body` | [272](tests/support/shimcheck.py:272) |
-| `is_defer` | [297](tests/support/shimcheck.py:297) |
-| `run` | [301](tests/support/shimcheck.py:301) |
-| `abi_header` | [331](tests/support/shimcheck.py:331) |
-| `compile_gen` | [342](tests/support/shimcheck.py:342) |
+| `fp_reason_of` | [248](tests/support/shimcheck.py:248) |
+| `defer_reason_of` | [302](tests/support/shimcheck.py:302) |
+| `bucket_of_body` | [315](tests/support/shimcheck.py:315) |
+| `is_defer` | [344](tests/support/shimcheck.py:344) |
+| `run` | [348](tests/support/shimcheck.py:348) |
+| `abi_header` | [378](tests/support/shimcheck.py:378) |
+| `compile_gen` | [389](tests/support/shimcheck.py:389) |
 
 ## `tests/test_angle.c`
 
@@ -5374,7 +5382,7 @@ the definition (or the build-language declaration) in the listed file.
 | `the_classical_literal_rides_the_widths_bits_not_sizeof_the_c_type` | [298](tests/test_gen_bodies.py:298) |
 | `every_abort_body_names_its_own_symbol_and_silences_its_parameters` | [355](tests/test_gen_bodies.py:355) |
 | `the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket` | [367](tests/test_gen_bodies.py:367) |
-| `the_new_fp_shapes_are_pinned_body_by_body` | [454](tests/test_gen_bodies.py:454) |
+| `the_new_fp_shapes_are_pinned_body_by_body` | [470](tests/test_gen_bodies.py:470) |
 
 ## `tests/test_gen_bodies_provoked.py`
 
@@ -5394,7 +5402,7 @@ the definition (or the build-language declaration) in the listed file.
 | `a_signature_that_diverges_from_the_abi_is_caught` | [57](tests/test_gen_bodies_run.py:57) |
 | `swapped` | [66](tests/test_gen_bodies_run.py:66) |
 | `an_abort_body_really_aborts_with_prd_1s_message` | [101](tests/test_gen_bodies_run.py:101) |
-| `the_two_word_literal_round_trips_at_every_shipped_width` | [149](tests/test_gen_bodies_run.py:149) |
+| `the_two_word_literal_round_trips_at_every_shipped_width` | [153](tests/test_gen_bodies_run.py:153) |
 
 ## `tests/test_gen_shim.py`
 
@@ -5978,14 +5986,16 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `fa_is_flag_row` | [25](tests/test_kernel_fadd_prog.inc:25) |
-| `fa_operand_is_flag` | [47](tests/test_kernel_fadd_prog.inc:47) |
-| `the_two_programs_are_well_formed_and_reference_only_backwards (via CQ_TEST)` | [55](tests/test_kernel_fadd_prog.inc:55) |
-| `fsub_is_fadds_body_under_a_prologue_and_b_is_rebased (via CQ_TEST)` | [123](tests/test_kernel_fadd_prog.inc:123) |
-| `fsub_differs_from_fadd_of_fneg_on_exactly_the_nan_rhs_sign (via CQ_TEST)` | [182](tests/test_kernel_fadd_prog.inc:182) |
-| `the_classical_row_agrees_with_the_host_on_every_anchor (via CQ_TEST)` | [250](tests/test_kernel_fadd_prog.inc:250) |
-| `the_three_unspecified_cells_are_the_pinned_literals (via CQ_TEST)` | [312](tests/test_kernel_fadd_prog.inc:312) |
-| `the_working_format_handed_to_m32_is_grs_in_bits_2_1_0 (via CQ_TEST)` | [363](tests/test_kernel_fadd_prog.inc:363) |
-| `the_d8_band_is_discarded_and_the_select_that_discards_it_is_live (via CQ_TEST)` | [410](tests/test_kernel_fadd_prog.inc:410) |
+| `fa_operand_is_flag` | [50](tests/test_kernel_fadd_prog.inc:50) |
+| `fa_operand_faults` | [65](tests/test_kernel_fadd_prog.inc:65) |
+| `the_operand_scan_detects_a_constant_where_a_bool_row_is_required (via CQ_TEST)` | [120](tests/test_kernel_fadd_prog.inc:120) |
+| `the_two_programs_are_well_formed_and_reference_only_backwards (via CQ_TEST)` | [137](tests/test_kernel_fadd_prog.inc:137) |
+| `fsub_is_fadds_body_under_a_prologue_and_b_is_rebased (via CQ_TEST)` | [179](tests/test_kernel_fadd_prog.inc:179) |
+| `fsub_differs_from_fadd_of_fneg_on_exactly_the_nan_rhs_sign (via CQ_TEST)` | [238](tests/test_kernel_fadd_prog.inc:238) |
+| `the_classical_row_agrees_with_the_host_on_every_anchor (via CQ_TEST)` | [306](tests/test_kernel_fadd_prog.inc:306) |
+| `the_three_unspecified_cells_are_the_pinned_literals (via CQ_TEST)` | [368](tests/test_kernel_fadd_prog.inc:368) |
+| `the_working_format_handed_to_m32_is_grs_in_bits_2_1_0 (via CQ_TEST)` | [419](tests/test_kernel_fadd_prog.inc:419) |
+| `the_d8_band_is_discarded_and_the_select_that_discards_it_is_live (via CQ_TEST)` | [466](tests/test_kernel_fadd_prog.inc:466) |
 
 ## `tests/test_kernel_fadd_scan.inc`
 
@@ -6230,14 +6240,16 @@ the definition (or the build-language declaration) in the listed file.
 | `fv_row_slots` | [110](tests/test_kernel_fconv_slots.inc:110) |
 | `fv_row_region` | [130](tests/test_kernel_fconv_slots.inc:130) |
 | `fv_probe` | [150](tests/test_kernel_fconv_slots.inc:150) |
-| `the_three_programs_are_well_formed_and_reference_only_backwards (via CQ_TEST)` | [170](tests/test_kernel_fconv_slots.inc:170) |
-| `the_clz_ladder_is_five_uniform_stages_and_a_short_sixth (via CQ_TEST)` | [240](tests/test_kernel_fconv_slots.inc:240) |
-| `fptoui_inlines_fptosi_twice_at_two_disjoint_offsets (via CQ_TEST)` | [310](tests/test_kernel_fconv_slots.inc:310) |
-| `uitofps_row_program_is_sitofps_byte_for_byte_at_every_width (via CQ_TEST)` | [372](tests/test_kernel_fconv_slots.inc:372) |
-| `no_named_span_crosses_the_int_to_fp_seam (via CQ_TEST)` | [419](tests/test_kernel_fconv_slots.inc:419) |
-| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [468](tests/test_kernel_fconv_slots.inc:468) |
-| `each_program_is_the_sum_of_its_rows (via CQ_TEST)` | [512](tests/test_kernel_fconv_slots.inc:512) |
-| `dst_owns_its_lanes_and_the_scratch_comes_back (via CQ_TEST)` | [577](tests/test_kernel_fconv_slots.inc:577) |
+| `fv_bool_operand_faults` | [176](tests/test_kernel_fconv_slots.inc:176) |
+| `the_bool_operand_scan_reports_rather_than_reading_out_of_bounds (via CQ_TEST)` | [218](tests/test_kernel_fconv_slots.inc:218) |
+| `the_three_programs_are_well_formed_and_reference_only_backwards (via CQ_TEST)` | [234](tests/test_kernel_fconv_slots.inc:234) |
+| `the_clz_ladder_is_five_uniform_stages_and_a_short_sixth (via CQ_TEST)` | [291](tests/test_kernel_fconv_slots.inc:291) |
+| `fptoui_inlines_fptosi_twice_at_two_disjoint_offsets (via CQ_TEST)` | [361](tests/test_kernel_fconv_slots.inc:361) |
+| `uitofps_row_program_is_sitofps_byte_for_byte_at_every_width (via CQ_TEST)` | [423](tests/test_kernel_fconv_slots.inc:423) |
+| `no_named_span_crosses_the_int_to_fp_seam (via CQ_TEST)` | [470](tests/test_kernel_fconv_slots.inc:470) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [519](tests/test_kernel_fconv_slots.inc:519) |
+| `each_program_is_the_sum_of_its_rows (via CQ_TEST)` | [563](tests/test_kernel_fconv_slots.inc:563) |
+| `dst_owns_its_lanes_and_the_scratch_comes_back (via CQ_TEST)` | [628](tests/test_kernel_fconv_slots.inc:628) |
 
 ## `tests/test_kernel_fconv_spans.inc`
 
@@ -6334,13 +6346,16 @@ the definition (or the build-language declaration) in the listed file.
 | `fd_ref_row_steps` | [64](tests/test_kernel_fdiv_slots.inc:64) |
 | `fd_ref_row_region` | [86](tests/test_kernel_fdiv_slots.inc:86) |
 | `fd_count` | [123](tests/test_kernel_fdiv_slots.inc:123) |
-| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [154](tests/test_kernel_fdiv_slots.inc:154) |
-| `every_iteration_is_the_template_at_a_distinct_offset (via CQ_TEST)` | [310](tests/test_kernel_fdiv_slots.inc:310) |
-| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [386](tests/test_kernel_fdiv_slots.inc:386) |
-| `fd_slots` | [440](tests/test_kernel_fdiv_slots.inc:440) |
-| `fd_region` | [459](tests/test_kernel_fdiv_slots.inc:459) |
-| `return` | [461](tests/test_kernel_fdiv_slots.inc:461) |
-| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [477](tests/test_kernel_fdiv_slots.inc:477) |
+| `fd_width_or_refuse` | [165](tests/test_kernel_fdiv_slots.inc:165) |
+| `fd_bool_operand_faults` | [186](tests/test_kernel_fdiv_slots.inc:186) |
+| `the_bool_operand_scan_reports_rather_than_aborts (via CQ_TEST)` | [235](tests/test_kernel_fdiv_slots.inc:235) |
+| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [252](tests/test_kernel_fdiv_slots.inc:252) |
+| `every_iteration_is_the_template_at_a_distinct_offset (via CQ_TEST)` | [407](tests/test_kernel_fdiv_slots.inc:407) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [483](tests/test_kernel_fdiv_slots.inc:483) |
+| `fd_slots` | [537](tests/test_kernel_fdiv_slots.inc:537) |
+| `fd_region` | [556](tests/test_kernel_fdiv_slots.inc:556) |
+| `return` | [558](tests/test_kernel_fdiv_slots.inc:558) |
+| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [574](tests/test_kernel_fdiv_slots.inc:574) |
 
 ## `tests/test_kernel_fdiv_spans.inc`
 
@@ -6977,14 +6992,17 @@ the definition (or the build-language declaration) in the listed file.
 | `fr_count` | [46](tests/test_kernel_fround_slots.inc:46) |
 | `fr_ref_steps` | [75](tests/test_kernel_fround_slots.inc:75) |
 | `fr_ref_region` | [96](tests/test_kernel_fround_slots.inc:96) |
-| `the_programs_are_the_source_line_for_line (via CQ_TEST)` | [113](tests/test_kernel_fround_slots.inc:113) |
-| `the_table_reading_guards_are_unreachable (via CQ_TEST)` | [179](tests/test_kernel_fround_slots.inc:179) |
-| `floor_and_ceil_inline_the_trunc_body_row_for_row (via CQ_TEST)` | [230](tests/test_kernel_fround_slots.inc:230) |
-| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [280](tests/test_kernel_fround_slots.inc:280) |
-| `fr_slots` | [310](tests/test_kernel_fround_slots.inc:310) |
-| `fr_region` | [322](tests/test_kernel_fround_slots.inc:322) |
-| `return` | [324](tests/test_kernel_fround_slots.inc:324) |
-| `the_programs_are_the_sum_of_their_blocks (via CQ_TEST)` | [332](tests/test_kernel_fround_slots.inc:332) |
+| `fr_width_or_refuse` | [123](tests/test_kernel_fround_slots.inc:123) |
+| `fr_bool_operand_faults` | [130](tests/test_kernel_fround_slots.inc:130) |
+| `the_bool_operand_scan_reports_rather_than_aborts (via CQ_TEST)` | [172](tests/test_kernel_fround_slots.inc:172) |
+| `the_programs_are_the_source_line_for_line (via CQ_TEST)` | [191](tests/test_kernel_fround_slots.inc:191) |
+| `the_table_reading_guards_are_unreachable (via CQ_TEST)` | [256](tests/test_kernel_fround_slots.inc:256) |
+| `floor_and_ceil_inline_the_trunc_body_row_for_row (via CQ_TEST)` | [307](tests/test_kernel_fround_slots.inc:307) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [357](tests/test_kernel_fround_slots.inc:357) |
+| `fr_slots` | [387](tests/test_kernel_fround_slots.inc:387) |
+| `fr_region` | [399](tests/test_kernel_fround_slots.inc:399) |
+| `return` | [401](tests/test_kernel_fround_slots.inc:401) |
+| `the_programs_are_the_sum_of_their_blocks (via CQ_TEST)` | [409](tests/test_kernel_fround_slots.inc:409) |
 
 ## `tests/test_kernel_fround_spans.inc`
 
@@ -9057,6 +9075,15 @@ the definition (or the build-language declaration) in the listed file.
 | `iu_find` | [139](tests/test_template_intr_value.inc:139) |
 | `an_integer_unary_round_trip_on_wires_is_the_value_l2_and_the_pool (via CQ_TEST)` | [150](tests/test_template_intr_value.inc:150) |
 | `a_min_max_round_trip_on_wires_is_the_value_l2_and_the_pool (via CQ_TEST)` | [159](tests/test_template_intr_value.inc:159) |
+
+## `tests/test_template_reasons.c`
+
+| Function | Line |
+|---|---:|
+| `sym` | [124](tests/test_template_reasons.c:124) |
+| `void` | [131](tests/test_template_reasons.c:131) |
+| `every_reason_class_prints_its_own_sentence_at_runtime (via CQ_TEST)` | [139](tests/test_template_reasons.c:139) |
+| `no_reason_class_prints_the_retired_fp_is_v2 (via CQ_TEST)` | [160](tests/test_template_reasons.c:160) |
 
 ## `tests/test_template_width.inc`
 

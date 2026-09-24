@@ -151,6 +151,104 @@ static void fd_count(fd_census *c)
     }
 }
 
+/* ---- The Bool-operand scan, which must REPORT and never abort. ----------
+ *
+ * `cq_fdiv_width_at` and `cq_fdiv_row_width` are LIBRARY guards: they die on
+ * an index outside the program, on a projection of a row that is not earlier,
+ * and on a projection of a row that returns no tuple. So a test that hands one
+ * a mux whose condition is a constant code (`CQ_FD_K_ZERO`, negative)
+ * reports nothing and ABORTS the binary before the first TAP line — every
+ * later case unrun (bd 9ve.47; fma's 9ve.41, fmul/fsqrt's 9ve.46).
+ * `fd_width_or_refuse` pre-screens exactly the inputs the array form dies on
+ * and answers -1 for them; `fd_bool_operand_faults` counts and, when asked,
+ * names each fault as a test FAILURE. */
+static int fd_width_or_refuse(const cq_fdiv_row *rows, int n, int i, int s)
+{
+    if (s < 0 || s >= i || s >= n) return -1;
+    if (rows[s].op == CQ_FDOP_OUT) {
+        int p = rows[s].s0;
+
+        if (p < 0 || p >= s) return -1;
+        if (rows[p].op != CQ_FDOP_NORM52 && rows[p].op != CQ_FDOP_CLZ
+            && rows[p].op != CQ_FDOP_SUBNORM && rows[p].op != CQ_FDOP_ROUND)
+            return -1;
+    }
+    return cq_fdiv_row_width(rows, n, s);
+}
+
+/* The shipped program has no `cq_fdiv_row *` (fdiv.h), so `rows == NULL`
+ * materialises it through `cq_fdiv_row_at` — every index in range, which is
+ * the one input that accessor dies on — into a buffer bounded by fdiv.c's
+ * own `_Static_assert`s: PRE and POST are each at most CQ_FDIV_MAX_SEG. */
+enum { FD_SCAN_MAX = 2 * CQ_FDIV_MAX_SEG
+                     + CQ_FDIV_N_ITERS * CQ_FDIV_ITER_ROWS };
+
+static int fd_bool_operand_faults(const cq_fdiv_row *rows, int n, int report)
+{
+    static cq_fdiv_row all[FD_SCAN_MAX];
+    int faults = 0;
+
+    if (rows == NULL) {
+        if (n < 0 || n > FD_SCAN_MAX) {
+            cq_h_fail(__FILE__, __LINE__, "%d rows exceed the scan's bound %d",
+                      n, (int)FD_SCAN_MAX);
+            return 1;
+        }
+        for (int i = 0; i < n; i++) cq_fdiv_row_at(i, &all[i]);
+        rows = all;
+    }
+    for (int i = 0; i < n; i++) {
+        int op = rows[i].op, slots;
+        short s[2];
+
+        if (op == CQ_FDOP_MUX || op == CQ_FDOP_NOT1) slots = 1;
+        else if (op == CQ_FDOP_AND1 || op == CQ_FDOP_OR1) slots = 2;
+        else continue;
+        s[0] = rows[i].s0; s[1] = rows[i].s1;
+        for (int j = 0; j < slots; j++) {
+            int w = fd_width_or_refuse(rows, n, i, s[j]);
+
+            if (w == 1) continue;
+            faults++;
+            if (!report) continue;
+            if (s[j] < 0)
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d is operand code %d, a "
+                          "constant or a rail, not a Bool row", i, op, j,
+                          (int)s[j]);
+            else if (w < 0)
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d names row %d, which is not "
+                          "a well-formed earlier row", i, op, j, (int)s[j]);
+            else
+                cq_h_fail(__FILE__, __LINE__,
+                          "row %d (op %d) slot %d names row %d of width %d, "
+                          "not a Bool row", i, op, j, (int)s[j], w);
+        }
+    }
+    return faults;
+}
+
+/* THE SCAN'S OWN PROVOCATION: a hand-built table with one fault of each kind
+ * it names, plus one well-formed mux as the negative control. Reaching the
+ * CHECK at all is the claim that nothing aborted. */
+CQ_TEST(the_bool_operand_scan_reports_rather_than_aborts)
+{
+    static const cq_fdiv_row bad[] = {
+        { CQ_FDOP_EQ,   CQ_FD_A,      CQ_FD_B, 0,       0, 0u }, /* 0: Bool   */
+        { CQ_FDOP_MUX,  CQ_FD_K_ZERO, CQ_FD_A, CQ_FD_B, 0, 0u }, /* 1: const  */
+        { CQ_FDOP_MUX,  0,            CQ_FD_A, CQ_FD_B, 0, 0u }, /* 2: fine   */
+        { CQ_FDOP_NOT1, 9,            0,       0,       0, 0u }, /* 3: later  */
+        { CQ_FDOP_MUX,  1,            CQ_FD_A, CQ_FD_B, 0, 0u }, /* 4: 64-bit */
+        { CQ_FDOP_OUT,  CQ_FD_A,      0,       0,       0, 0u }, /* 5: bad    */
+        { CQ_FDOP_AND1, 0,            5,       0,       0, 0u }, /* 6: via 5  */
+    };
+    int n = (int)(sizeof bad / sizeof bad[0]);
+
+    CHECK_EQ(fd_bool_operand_faults(bad, n, 0), 4);
+    CHECK_EQ(fd_bool_operand_faults(bad, 3, 0), 1); /* rows 0-2: only row 1 */
+}
+
 CQ_TEST(the_program_is_the_source_line_for_line)
 {
     fd_census c;
@@ -279,13 +377,12 @@ CQ_TEST(the_program_is_the_source_line_for_line)
             CHECK(r.shift > -64 && r.shift < 64);
             CHECK(r.mask != 0u);
         }
-        if (r.op == CQ_FDOP_NOT1 || r.op == CQ_FDOP_AND1
-            || r.op == CQ_FDOP_OR1)
-            for (int j = 0; j < ar; j++)
-                CHECK_EQ(cq_fdiv_width_at(s[j]), 1);
-        if (r.op == CQ_FDOP_MUX)
-            CHECK_EQ(cq_fdiv_width_at(r.s0), 1);
     }
+    /* A MUX's condition and the three 1-bit ops' operands must be Bool rows.
+     * `cq_fdiv_row_width` is the one place that mapping lives, reached through
+     * a pre-screen over the materialised program so a constant condition
+     * FAILS here instead of aborting in `cq_fdiv_row_at` (bd 9ve.47). */
+    CHECK_EQ(fd_bool_operand_faults(NULL, n, 1), 0);
 }
 
 /* ---- (a0) Every iteration is the template, at a distinct offset. -------- */

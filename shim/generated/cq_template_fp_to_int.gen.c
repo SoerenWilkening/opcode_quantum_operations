@@ -120,130 +120,130 @@ void cq_template_fptoui_f80_to_i8_unc(int32_t out_handle, int32_t a_handle);
 
 int32_t cq_template_fptosi_f16_to_i16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i16", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f16_to_i16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i16_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f16_to_i16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i16_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f16_to_i32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i32", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f16_to_i32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i32_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f16_to_i32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i32_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f16_to_i64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i64", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i64", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f16_to_i64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i64_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f16_to_i64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i64_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f16_to_i8(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i8", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i8", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f16_to_i8_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i8_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i8_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f16_to_i8_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f16_to_i8_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f16_to_i8_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i16", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i16_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f32_to_i16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i16_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i32", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i32_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f32_to_i32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i32_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i64", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i64", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i64_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f32_to_i64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i64_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i8(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i8", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i8", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f32_to_i8_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i8_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i8_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f32_to_i8_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f32_to_i8_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f32_to_i8_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f64_to_i16(int32_t a_handle) {
@@ -300,226 +300,226 @@ void cq_template_fptosi_f64_to_i8_unc(int32_t out_handle, int32_t a_handle) {
 
 int32_t cq_template_fptosi_f80_to_i16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i16", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f80_to_i16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i16_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f80_to_i16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i16_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f80_to_i32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i32", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f80_to_i32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i32_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f80_to_i32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i32_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f80_to_i64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i64", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i64", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f80_to_i64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i64_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f80_to_i64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i64_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f80_to_i8(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i8", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i8", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptosi_f80_to_i8_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i8_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i8_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptosi_f80_to_i8_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptosi_f80_to_i8_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptosi_f80_to_i8_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i1(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i1", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i1", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i16", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i16_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f16_to_i16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i16_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i1_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i1_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i1_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f16_to_i1_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i1_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i1_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i32", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i32_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f16_to_i32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i32_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i64", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i64", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i64_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f16_to_i64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i64_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i8(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i8", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i8", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f16_to_i8_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i8_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i8_inv", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f16_to_i8_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f16_to_i8_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f16_to_i8_unc", "f16 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i1(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i1", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i1", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i16", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i16_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f32_to_i16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i16_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i1_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i1_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i1_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f32_to_i1_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i1_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i1_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i32", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i32_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f32_to_i32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i32_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i64", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i64", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i64_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f32_to_i64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i64_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i8(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i8", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i8", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f32_to_i8_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i8_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i8_inv", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f32_to_i8_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f32_to_i8_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f32_to_i8_unc", "f32 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f64_to_i1(int32_t a_handle) {
@@ -589,81 +589,81 @@ void cq_template_fptoui_f64_to_i8_unc(int32_t out_handle, int32_t a_handle) {
 
 int32_t cq_template_fptoui_f80_to_i1(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i1", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i1", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i16(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i16", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i16", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i16_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i16_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i16_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f80_to_i16_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i16_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i16_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i1_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i1_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i1_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f80_to_i1_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i1_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i1_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i32(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i32", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i32", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i32_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i32_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i32_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f80_to_i32_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i32_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i32_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i64(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i64", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i64", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i64_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i64_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i64_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f80_to_i64_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i64_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i64_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i8(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i8", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i8", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 int32_t cq_template_fptoui_f80_to_i8_inv(int32_t a_handle) {
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i8_inv", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i8_inv", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 
 void cq_template_fptoui_f80_to_i8_unc(int32_t out_handle, int32_t a_handle) {
     (void)out_handle;
     (void)a_handle;
-    cq_shim_unsupported("cq_template_fptoui_f80_to_i8_unc", "fp is v2");
+    cq_shim_unsupported("cq_template_fptoui_f80_to_i8_unc", "f80 is outside v2's f64-only scope; that width is an upstream dependency, not a pending port (PRD-v2 1a, 6.2/6.3)");
 }
 

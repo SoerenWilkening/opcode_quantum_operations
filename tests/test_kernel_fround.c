@@ -214,6 +214,7 @@ CQ_TEST(l4_goldens)
 CQ_TEST_MAIN_ARGV(
     CQ_CASE(the_host_is_round_to_nearest_before_the_oracle_is_trusted),
     CQ_CASE(the_programs_are_the_source_line_for_line),
+    CQ_CASE(the_bool_operand_scan_reports_rather_than_aborts),
     CQ_CASE(the_table_reading_guards_are_unreachable),
     CQ_CASE(floor_and_ceil_inline_the_trunc_body_row_for_row),
     CQ_CASE(the_blocks_cost_what_their_modules_say_they_cost),

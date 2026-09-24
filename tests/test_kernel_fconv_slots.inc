@@ -167,6 +167,70 @@ static cq_fv_probe fv_probe(cq_fconv_prog p, cq_fconv_row *rows)
  * not run, which is a plausible gate and a wrong value. It also pins the two
  * placeholder operands `cq_fconv_program` fills in, whose failure mode is a
  * row index of 0 rather than an abort. */
+/* THE BOOL-OPERAND SCAN, WHICH MUST REPORT AND NEVER READ OUT OF BOUNDS.
+ * Until bd 9ve.47 this was an inline `CHECK(r >= 0 && r < i)` followed by
+ * `rows[r].op` regardless — so a mux whose condition is a constant code
+ * (`CQ_FV_K_0`, negative) read `rows[-2]`: UBSan's "index -2 out of bounds"
+ * abort in Debug, an unchecked stack read in Release. A slot that does not
+ * name a strictly earlier row is now a named FAILURE and is never indexed. */
+static int fv_bool_operand_faults(const cq_fconv_row *rows, int n,
+                                  const char *name, int report)
+{
+    int faults = 0;
+
+    for (int i = 0; i < n; i++) {
+        int op = rows[i].op, slots;
+        short s[2];
+
+        if (op == CQ_FVOP_MUX || op == CQ_FVOP_NOT1) slots = 1;
+        else if (op == CQ_FVOP_AND1) slots = 2;
+        else continue;
+        s[0] = rows[i].s0; s[1] = rows[i].s1;
+        for (int j = 0; j < slots; j++) {
+            int r = s[j], rop;
+
+            if (r < 0 || r >= i || r >= n) {
+                faults++;
+                if (report)
+                    cq_h_fail(__FILE__, __LINE__,
+                              "%s row %d (op %d) slot %d is %d — %s, not a "
+                              "Bool row", name, i, op, j, r,
+                              r < 0 ? "a constant or the rail"
+                                    : "not a strictly earlier row");
+                continue;
+            }
+            rop = rows[r].op;
+            if (rop == CQ_FVOP_EQ || rop == CQ_FVOP_ULT
+                || rop == CQ_FVOP_NOT1 || rop == CQ_FVOP_AND1)
+                continue;
+            faults++;
+            if (report)
+                cq_h_fail(__FILE__, __LINE__,
+                          "%s row %d (op %d) slot %d names row %d (op %d), "
+                          "not a Bool row", name, i, op, j, r, rop);
+        }
+    }
+    return faults;
+}
+
+/* THE SCAN'S OWN PROVOCATION: one fault of each kind it names, plus one
+ * well-formed mux as the negative control. */
+CQ_TEST(the_bool_operand_scan_reports_rather_than_reading_out_of_bounds)
+{
+    static const cq_fconv_row bad[] = {
+        { CQ_FVOP_EQ,   CQ_FV_A,   CQ_FV_K_0, 0,         0, 0u }, /* 0: Bool  */
+        { CQ_FVOP_MUX,  CQ_FV_K_0, CQ_FV_A,   CQ_FV_K_1, 0, 0u }, /* 1: const */
+        { CQ_FVOP_MUX,  0,         CQ_FV_A,   CQ_FV_K_1, 0, 0u }, /* 2: fine  */
+        { CQ_FVOP_NOT1, 9,         0,         0,         0, 0u }, /* 3: later */
+        { CQ_FVOP_MUX,  1,         CQ_FV_A,   CQ_FV_K_1, 0, 0u }, /* 4: 64    */
+        { CQ_FVOP_AND1, 0,         CQ_FV_A,   0,         0, 0u }, /* 5: rail  */
+    };
+    int n = (int)(sizeof bad / sizeof bad[0]);
+
+    CHECK_EQ(fv_bool_operand_faults(bad, n, "bad", 0), 4);
+    CHECK_EQ(fv_bool_operand_faults(bad, 3, "bad", 0), 1); /* rows 0-2 */
+}
+
 CQ_TEST(the_three_programs_are_well_formed_and_reference_only_backwards)
 {
     static const cq_fconv_prog PROGS[] = {
@@ -199,24 +263,11 @@ CQ_TEST(the_three_programs_are_well_formed_and_reference_only_backwards)
                               "vocabulary — a placeholder was not filled in",
                               NAMES[p], i, j, (int)s[j]);
             }
-            /* A MUX's cond and an AND1's operands must be Bool rows and a
-             * 64-lane operand must not be; the library refuses both at run
-             * time and this asserts it of the TABLE, where it is a property of
-             * the port rather than of a call. */
-            if (rows[i].op == CQ_FVOP_MUX || rows[i].op == CQ_FVOP_NOT1
-                || rows[i].op == CQ_FVOP_AND1) {
-                int nb = (rows[i].op == CQ_FVOP_AND1) ? 2 : 1;
-
-                for (int j = 0; j < nb; j++) {
-                    int r = s[j];
-
-                    CHECK(r >= 0 && r < i);
-                    CHECK(rows[r].op == CQ_FVOP_EQ || rows[r].op == CQ_FVOP_ULT
-                          || rows[r].op == CQ_FVOP_NOT1
-                          || rows[r].op == CQ_FVOP_AND1);
-                }
-            }
         }
+        /* A MUX's cond and an AND1's operands must be Bool rows; the library
+         * refuses both at run time and this asserts it of the TABLE, where it
+         * is a property of the port rather than of a call. */
+        CHECK_EQ(fv_bool_operand_faults(rows, n, NAMES[p], 1), 0);
         CHECK_EQ(views, WANT_VIEWS[p]);
         CHECK_EQ(cq_fconv_result_row(PROGS[p]), n - 1);
     }
