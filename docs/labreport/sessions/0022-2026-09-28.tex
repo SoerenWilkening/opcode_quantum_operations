@@ -1,0 +1,81 @@
+% labreport entry 22 — 2026-09-28
+% labreport-to: bb7c030
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{22}{field}.
+
+\entry{22}{2026-09-28}{v2 close-out: rulings a-j, PRD-v2 §6 decided, 9ve closed, b6a re-measured and ruled}
+
+\begin{generated}
+  \gitem{Range}{\texttt{bd18cb1..bb7c030}}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{707} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{708} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 349 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{bb7c030} v2 close-out Wave 2: rulings a-h — PRD-v2 §6 decided (1us f80, 4tr f32, 9ns goldens of record), D14 amended (213), 0po own measured-READ fixture, 4ib/bpw/luk
+    \item \texttt{a1694f8} v2 close-out Wave 1: bd 4a5 iun D21 trace case, nik K10 sweep claim, 6kg check\_cites names its set, awt death-test SOURCES + unparsed-argument error
+    \item \texttt{d12f577} labreport entry 21: v2 Wave 16 — D15 twin identity reads literal lanes
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{9ve} v2 = floating point: scope of record is PRD §15 D26 + PRD-v2.md (f64 only, port not re-derive), \bead{0po} bd tgx's sole witness fixture was DELETED upstream at 66428ddc - the measured-rail READ relaxation now rests on no golden, \bead{9ns} v2 R14: BENCHMARKS.md's MAGNITUDES are not goldens -- re-measure against our own port at the all-quantum mask, \bead{4tr} v2 §6.3 / R10: do NOT take f32 on the fpext->f64->fptrunc round trip -- upstream rejects the compile and L1 would be correctly red, \bead{1us} v2 §6.2: f80 is an UPSTREAM DEPENDENCY, not a gap to close here -- 5,891 corpus calls, 53 fixtures, zero bytes in the snapshot, \bead{4a5} D21 trace-prediction case for the cq\_shim\_iun door (opt-in, needs -DCQOPS\_QEC\_DIR), \bead{luk} A ctest -R regex is not a coverage claim: it over-selects on CASE names and can match ZERO tests silently - measured twice in one batch, \bead{cmu} dr\_sweep and dr\_sweep\_small are compile-time indistinguishable since bd 16s — the arity discriminator is gone, \bead{213} v2 §6.4: is D14's non-injective set 232 or 460? The five NAMED opcodes are 232; another 228 are non-injective by the same argument, \bead{6kg} check\_cites.sh's printed 'file(s) scanned' is box-local exactly as check\_loc.sh's was: 298 local vs 288 in CI, \bead{awt} add\_cqops\_death\_test accepts no SOURCES, so a death binary can only be split with an .inc, \bead{97s} Phase B suite runtime: kernel suites are 202s of the Debug run's 218s, with 7 kernel modules still to come, \bead{ljk} Steps 11-13 depend on the shared kernel driver but the tracker records no edge, \bead{4ib} .claude/worktrees/ is untracked and NOT gitignored - a git add -A during an agent batch would stage four full checkouts, \bead{nik} docs/constructions/K10.md:604 says the M12 refmodel must match mod-2\textasciicircum{}L 'or the exhaustive W in \{1,2,4,8\} sweep will report false failures', \bead{bpw} K05 §5 item 5 says a cast with T == F should be refused; src/kernels/cast.c:15-20 accepts it as an identity copy -- decide which}
+  \gitem{Beads filed}{\bead{p2y5} L6: e2e-slice-condtree-classical-leaf is RUN\_FAIL rc=7 with empty stderr -- its main returns a sum of cq\_measure results, so the exit status is program data, not a crash, \bead{5mqp} test\_kernel\_fma is the whole Debug critical path: 4503 s of a 4503 s wall under ctest -j 6 (2026-09-28)}
+  \gitem{Diff}{\texttt{21 files changed, 550 insertions(+), 51 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Close five sections of open work left after the f64 port, as an orchestrated
+session of Opus agents, with the maintainer ruling on (a)--(j).
+
+\field{What landed}
+PRD-v2 \S6 no longer has an open question: \texttt{f80} is an upstream
+dependency, \texttt{f32} is declined until upstream ships native primitives,
+D14's wording carries the 460/143 split, and our all-quantum fp goldens are the
+magnitudes of record.  \bead{9ve} is closed.  \bead{0po}'s measured-rail READ
+relaxation has its own fixture through a frozen template symbol.  The
+\texttt{cq\_shim\_iun} door's D21 payload is pinned.  Both test macros refuse
+an unparsed argument, and the death macro accepts \texttt{SOURCES}.
+\texttt{tools/ctest\_names.sh} shows what a \texttt{-R} regex selects and fails
+on zero selection.  \texttt{.claude/worktrees/} is gitignored.  Upstream issue
+drafts for \bead{9ve.34} and \bead{9ve.29.3} are notes on those beads; nothing
+was filed.  The \bead{b6a} handoff to CQ\_lang is a note on that bead.
+
+\field{Measured}
+\begin{figures}
+  \fig{Debug wall 4503~s, \texttt{test\_kernel\_fma} 4503~s; Release wall 522~s}{Wave 1 gate's \texttt{ctest -j 6} per-test times, one run, L6 competing for CPU}{\texttt{a1694f8} content, \texttt{-E l6\_cqlang\_fixtures}}
+  \fig{440 fixtures: OK 343, DEFERRED 93, ABORT 3 (qram index not i32), RUN\_FAIL 1}{\texttt{tools/l6/l6\_run.py}, resumed by hand after the ctest entry timed out at 3606~s}{Release, libcqops \texttt{d12f577}, CQ\_lang \texttt{9a230646}}
+  \fig{232 named, 228 unnamed non-injective, 143 invertible}{scratch census over the pinned \texttt{opcode\_table.yaml}}{yaml sha256 \texttt{6245117d\ldots}}
+  \fig{548 walked, 538 tracked; the 10 are \texttt{tools/qtg/}}{\texttt{find} vs \texttt{git ls-files} through \texttt{check\_cites.sh}'s filter}{\texttt{d12f577}}
+\end{figures}
+
+\field{Decided}
+Maintainer rulings (a)--(j), recorded on \bead{1us}, \bead{4tr}, \bead{213},
+\bead{9ns}, \bead{0po}, \bead{4ib}, \bead{bpw}, \bead{luk}, \bead{b6a} and
+\bead{97s}; ruling (i) amended by the maintainer the same day, also on
+\bead{b6a}; PRD-v2 \S6.2, \S6.3, R14; PRD-v1 \S15 D14.
+
+\field{Not taken}
+No side-by-side BENCHMARKS table (ruling d).  No code refusal of \texttt{T ==
+F} (ruling g): the bitcast \texttt{f64}$\leftrightarrow$\texttt{i64} reaches
+it since \bead{s8g}, so the bead's ``unreachable'' premise had gone stale.
+No CQ\_lang edit for \bead{b6a}: the agent dispatched under ruling (i)'s
+first form (edit CQ\_lang's lowering in a CQ\_lang worktree) was stopped
+before any edit, and ruling (i) as amended leaves the fix to CQ\_lang.  The
+CQ\_lang worktree and branch \texttt{b6a-qram-index-i32} were removed with no
+edit and no commit on them.
+
+\field{Verified}
+Wave 1 and Wave 2 gates each: \texttt{make lint}, \texttt{make shim-check}
+(2880), Debug 707/707 and Release 706/706 with \texttt{-E
+l6\_cqlang\_fixtures}.  New guards seen red: the iun case under four breaks
+(Release, one also Debug); the \texttt{awt} macro guard by link failure and
+FATAL\_ERROR (both configs); the \texttt{0po} case with the READ relaxation
+reverted (both configs) and under six library mutants (Release).  L6 ran once,
+on an agent's worktree, as measured above.
+
+\field{Left open}
+\bead{b6a}, upstream-owned under ruling (i) as amended: the maintainer
+delivers the handoff, CQ\_lang lands the lowering fix, and our own L6 run
+decides the close against the condition on the bead.  Filed: \bead{5mqp},
+\bead{p2y5}.
