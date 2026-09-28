@@ -102,9 +102,22 @@ endfunction()
 ## report — and it is spelled out at the call site rather than inferred from
 ## WILL_FAIL. See _cqops_sanitizer_env above for the measurement, the CI run,
 ## and what the option costs.
+##
+## ANY OTHER TOKEN IS A CONFIGURE-TIME FATAL_ERROR THAT NAMES IT (`bd awt`,
+## 2026-09-28), the same guard as add_cqops_death_test's: a misspelt option
+## would otherwise land in ARG_UNPARSED_ARGUMENTS and be ignored. A token after
+## SOURCES is still read as a source file, and fails as a missing one.
 
 function(add_cqops_test name)
     cmake_parse_arguments(ARG "WILL_FAIL;LEAK_EXIT_NOT_ABORT" "" "SOURCES" ${ARGN})
+
+    if(ARG_UNPARSED_ARGUMENTS)
+        list(JOIN ARG_UNPARSED_ARGUMENTS " " bad)
+        message(FATAL_ERROR "add_cqops_test(${name}): unrecognised argument(s) "
+                "'${bad}' — only WILL_FAIL, LEAK_EXIT_NOT_ABORT and SOURCES are "
+                "parsed, and an unparsed token would otherwise be dropped "
+                "silently (bd awt)")
+    endif()
 
     add_executable(${name} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.c" ${ARG_SOURCES})
 
@@ -129,11 +142,26 @@ function(add_cqops_test name)
     endif()
 endfunction()
 
-## add_cqops_death_test(<name> CASES <case> [<case> ...])
+## add_cqops_death_test(<name> [SOURCES <file> ...] CASES <case> [<case> ...])
 ##
 ## One binary hosting several fail-loud assertions, registered as one CTest
 ## test per case: the binary takes the case name on argv[1] and the process is
 ## gone after the abort, so it is one death per RUN but not one per FILE.
+##
+## SOURCES adds extra translation units exactly as add_cqops_test's does
+## (`bd awt`, 2026-09-28), so a death binary nearing Rule 12's limit can be
+## split into a second .c rather than only into a textual .inc. Either keyword
+## may come first.
+##
+## ANY OTHER TOKEN IS A CONFIGURE-TIME FATAL_ERROR THAT NAMES IT. Until
+## 2026-09-28 this function parsed CASES alone and never read
+## ARG_UNPARSED_ARGUMENTS, so `SOURCES x.c` written before CASES was dropped
+## without a word and x.c was never compiled — measured that day as a clean
+## configure followed by an undefined-symbol link failure. ONE HOLE IS NOT
+## CLOSABLE HERE: CASES takes every token up to the next keyword, so an unknown
+## token written AFTER it is indistinguishable from a case name. It is
+## registered as a case and fails at RUN time instead, when
+## tests/support/death.c reports "unknown death case" and exits 3.
 ##
 ## Deliberately NOT WILL_FAIL. That property inverts a non-zero exit code and
 ## does not invert a crash, so it cannot express "this abort()s" at all — see
@@ -148,13 +176,19 @@ endfunction()
 ## tripwire is for and what it measured.
 
 function(add_cqops_death_test name)
-    cmake_parse_arguments(ARG "" "" "CASES" ${ARGN})
+    cmake_parse_arguments(ARG "" "" "CASES;SOURCES" ${ARGN})
 
+    if(ARG_UNPARSED_ARGUMENTS)
+        list(JOIN ARG_UNPARSED_ARGUMENTS " " bad)
+        message(FATAL_ERROR "add_cqops_death_test(${name}): unrecognised "
+                "argument(s) '${bad}' — only SOURCES and CASES are parsed, and "
+                "an unparsed token would otherwise be dropped silently (bd awt)")
+    endif()
     if(NOT ARG_CASES)
         message(FATAL_ERROR "add_cqops_death_test(${name}): CASES is required")
     endif()
 
-    add_executable(${name} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.c")
+    add_executable(${name} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.c" ${ARG_SOURCES})
     target_link_libraries(${name} PRIVATE cqops_test_support cqops_build_flags)
 
     ## `bd u76`: every death case is born with the sanitizer tripwire in its

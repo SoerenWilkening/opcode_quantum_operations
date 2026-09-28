@@ -24,6 +24,11 @@
  * likewise pool rows rather than guaranteed. What still enumerates amounts at
  * EVERY shipped width, brackets included, is the D8 cross-check in
  * test_kernel_shift_var_d8.inc, which is not an L1 sweep and was not touched.
+ * (Clarified 2026-09-28, bd nik review: every shipped WIDTH, but every AMOUNT
+ * only where 2^S <= 32, i.e. W <= 32 — its amount_set takes all of [0, 2^S)
+ * up to 32 of them. At W = 64, 80 and 128 (S = 6, 7, 7) it takes a stride of
+ * 2^S/32 plus the brackets W-1, W, W+1 (if below 2^S) and 2^S-1: 35 of 64,
+ * 36 of 128 and 35 of 128 amounts, per its own "# D8 cross-check" line.)
  *
  * WIDTHS ARE ENUMERATED, NEVER SAMPLED — that is the axis that catches faults
  * in a width-generic kernel, and this suite's ladder is not the standard one.

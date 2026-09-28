@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7156
+**Indexed definitions:** 7157
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -82,10 +82,10 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `function _cqops_sanitizer_env` | [69](cmake/CqopsTest.cmake:69) |
-| `function add_cqops_test` | [106](cmake/CqopsTest.cmake:106) |
-| `function add_cqops_death_test` | [150](cmake/CqopsTest.cmake:150) |
-| `function _cqops_death_tripwire` | [222](cmake/CqopsTest.cmake:222) |
-| `function cqops_death_arm_sanitizer_tripwire` | [245](cmake/CqopsTest.cmake:245) |
+| `function add_cqops_test` | [111](cmake/CqopsTest.cmake:111) |
+| `function add_cqops_death_test` | [178](cmake/CqopsTest.cmake:178) |
+| `function _cqops_death_tripwire` | [256](cmake/CqopsTest.cmake:256) |
+| `function cqops_death_arm_sanitizer_tripwire` | [279](cmake/CqopsTest.cmake:279) |
 
 ## `include/cqops/cqops.h`
 
@@ -7650,12 +7650,12 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `sweep_dir` | [36](tests/test_kernel_shift_var_sweep.inc:36) |
-| `k10_barrel_shl_sweep (via CQ_TEST)` | [46](tests/test_kernel_shift_var_sweep.inc:46) |
-| `k10_barrel_lshr_sweep (via CQ_TEST)` | [47](tests/test_kernel_shift_var_sweep.inc:47) |
-| `k10_barrel_ashr_sweep (via CQ_TEST)` | [48](tests/test_kernel_shift_var_sweep.inc:48) |
-| `barrel_narrow` | [56](tests/test_kernel_shift_var_sweep.inc:56) |
-| `controlled (via CQ_TEST)` | [68](tests/test_kernel_shift_var_sweep.inc:68) |
+| `sweep_dir` | [41](tests/test_kernel_shift_var_sweep.inc:41) |
+| `k10_barrel_shl_sweep (via CQ_TEST)` | [51](tests/test_kernel_shift_var_sweep.inc:51) |
+| `k10_barrel_lshr_sweep (via CQ_TEST)` | [52](tests/test_kernel_shift_var_sweep.inc:52) |
+| `k10_barrel_ashr_sweep (via CQ_TEST)` | [53](tests/test_kernel_shift_var_sweep.inc:53) |
+| `barrel_narrow` | [61](tests/test_kernel_shift_var_sweep.inc:61) |
+| `controlled (via CQ_TEST)` | [73](tests/test_kernel_shift_var_sweep.inc:73) |
 
 ## `tests/test_kernel_step11_death.c`
 
@@ -8562,10 +8562,11 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `a_composed_conversion_names_the_handle_past_its_workspace (via CQ_TEST)` | [39](tests/test_shim_trace_fp.inc:39) |
-| `a_flat_conversion_names_the_handle_with_no_workspace_term (via CQ_TEST)` | [67](tests/test_shim_trace_fp.inc:67) |
-| `a_ternary_call_names_the_handle_with_no_temporary_term (via CQ_TEST)` | [115](tests/test_shim_trace_fp.inc:115) |
-| `an_aliased_ternary_call_names_the_handle_past_its_one_temporary (via CQ_TEST)` | [146](tests/test_shim_trace_fp.inc:146) |
+| `a_composed_conversion_names_the_handle_past_its_workspace (via CQ_TEST)` | [45](tests/test_shim_trace_fp.inc:45) |
+| `a_flat_conversion_names_the_handle_with_no_workspace_term (via CQ_TEST)` | [73](tests/test_shim_trace_fp.inc:73) |
+| `an_integer_unary_intrinsic_brackets_under_its_own_name (via CQ_TEST)` | [116](tests/test_shim_trace_fp.inc:116) |
+| `a_ternary_call_names_the_handle_with_no_temporary_term (via CQ_TEST)` | [168](tests/test_shim_trace_fp.inc:168) |
+| `an_aliased_ternary_call_names_the_handle_past_its_one_temporary (via CQ_TEST)` | [199](tests/test_shim_trace_fp.inc:199) |
 
 ## `tests/test_shim_twin_lit.c`
 

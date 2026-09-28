@@ -129,6 +129,11 @@ jobs:
       # staged — and the OK line now names the set it counted instead.
       # check_cites.sh has the same shape for the same reason: 298 here, 288
       # here in CI, the same nine plus tools/qtg/sweep/run_sweep.sh.
+      # RE-MEASURED 2026-09-28 (bd 6kg) at d12f577: 548 on the dev box, 538
+      # tracked — the count a CI checkout should print, PREDICTED from a fresh
+      # worktree and not yet observed in CI — the difference still exactly the
+      # ten tools/qtg/ files. And from bd 6kg check_cites.sh's OK line names
+      # its set too: "N file(s) walked (filesystem, not the git index)".
       - name: make lint
         run: make lint
 

@@ -4,6 +4,12 @@
  * the ARITY-3 shape `shim/cq_template_ternary.c` brought (bead 9ve.24). Each
  * has its own header where its cases begin.
  *
+ * ONE INTEGER CASE LIVES IN THE ARITY-1 SECTION (bead 4a5), because the
+ * subject is the SEQUENCE and not the domain. The integer unary door
+ * `cq_shim_iun` reaches D21 through the same `cq_tpl_unary` the conversions do;
+ * giving it a file of its own would be the `INTEGER <-> fp` cut a second time,
+ * which tests/test_shim_trace.c's header rules out.
+ *
  * WHY AN `.inc` AND WHY THIS SUBJECT. tests/test_shim_trace.c stood at 292
  * counted lines of Rule 12's 300, and the cut is the discriminator this repo
  * has now used three times — `the INTEGER surface <-> the fp surface`. What is
@@ -81,6 +87,53 @@ CQ_TEST(a_flat_conversion_names_the_handle_with_no_workspace_term)
     CHECK_EQ((long long)q, 0);
     CHECK_EQ((long long)r, 2);
     CHECK_STR_EQ(c.op[c.n_ops - 1], "name=fptosi, in=h1, out=h2");
+    CHECK_EQ(c.n_reg, 1);
+}
+
+/* THE INTEGER UNARY DOOR RIDES THE SAME FLAT SEQUENCE, AND WHAT IT OWNS IS ITS
+ * NAME (bead 4a5). `cq_shim_iun` (bead 9ve.44) reaches D21 through
+ * `cq_tpl_unary` exactly as the flat conversion above does — one stage, no
+ * workspace, `out=` predicted as `cq_reg_count` — so the bracket's shape is
+ * already pinned. What the door adds to the picture is the `name=` token, from
+ * `cq_tpl_iun_name`, and the `_unc` suffix its second entry point earns only by
+ * handing `out` through to the request. No other case in this suite calls the
+ * door, so without this one a transposed name table, or a door that borrowed a
+ * sibling's, would render a confident wrong label and stay green.
+ *
+ * WHY `bswap`. It is index 4 of `cq_shim_iun_op`, and at 4 every sibling name
+ * table either says something else (`udiv`, `ceil`, `fmin`, `icmp_sle`) or is
+ * past its end and dies (`cq_tpl_cast_name` and `cq_tpl_fcast_name` stop at 3);
+ * inside its own table it is unique. BOTH ENTRY POINTS, because the `_unc` one
+ * is a separate function whose only job is to route `out`: one that dropped it
+ * would mint a rail and print a forward, and only the second line sees that.
+ *
+ * ON AN ALL-CONSTANT i16, for this file's standing reason, and it is MEASURED
+ * rather than assumed: a single quantum lane zero-extended to i16 and bswapped
+ * dies `qubit pool: ceiling exceeded (4, 3)` on the forward alone, since K26's
+ * rows run in scratch and D21 (b) keeps recycling off. A constant rail owns no
+ * qubit (I4), the handles advance as they would on wires, and `n_reg` is ONE —
+ * the quantum bit `trace_header`'s package rule needs. */
+CQ_TEST(an_integer_unary_intrinsic_brackets_under_its_own_name)
+{
+    const char *path = "test_shim_trace_iun.out";
+    cq_conf c;
+    int32_t q, a, r;
+
+    trace_begin(path);
+    q = a_quantum_bit(0.9);                                  /* h0, q0       */
+    a = cqrt_alloc_i16(0x1234);                              /* h1, no qubit */
+    r = cq_shim_iun(CQ_SHIM_IUN_BSWAP, 16, a);               /* h2           */
+    cq_shim_iun_unc(CQ_SHIM_IUN_BSWAP, 16, r, a);
+    trace_finish();
+
+    cq_conf_scan(path, &c);
+    cq_conf_ok(&c, "the integer unary door");
+    CHECK_EQ((long long)q, 0);
+    CHECK_EQ((long long)a, 1);
+    CHECK_EQ((long long)r, 2);
+    CHECK_EQ(c.n_ops, 3);                    /* ry, then the door's two */
+    CHECK_STR_EQ(c.op[1], "name=bswap, in=h1, out=h2");
+    CHECK_STR_EQ(c.op[2], "name=bswap_unc, in=h1, out=h2");
     CHECK_EQ(c.n_reg, 1);
 }
 

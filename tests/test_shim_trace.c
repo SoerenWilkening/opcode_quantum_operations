@@ -32,9 +32,9 @@
  * the default 20 against `config.json`. Precision is an accuracy knob for the
  * SYNTHESIS and nothing here reads an angle, so 0 costs the suite nothing.
  *
- * THE NEXT SEAM IS RECORDED HERE BECAUSE THIS FILE IS THREE LINES FROM RULE
- * 12's LIMIT (297 counted at bd 9ve.24's review round 1, up from 295 when the
- * arity-3 pair joined `test_shim_trace_fp.inc`). The cut is
+ * THE NEXT SEAM IS RECORDED HERE BECAUSE THIS FILE IS TWO LINES FROM RULE 12's
+ * LIMIT (298 counted at bead 4a5, whose `.inc` case cost one `CQ_CASE` line;
+ * 297 at bd 9ve.24's review round 1, 295 before its arity-3 pair). The cut is
  * `the ANNOTATION CASES <-> the CONFORMANCE READER AND THE SINK SWITCH`: the
  * last two cases, `the_conformance_reader_catches_what_it_is_written_to_catch`
  * and `the_annotation_layer_is_inert_under_every_other_sink`, are about the
@@ -520,6 +520,7 @@ CQ_TEST_MAIN(
     CQ_CASE(an_aliased_template_call_names_the_handle_it_will_mint),
     CQ_CASE(a_composed_conversion_names_the_handle_past_its_workspace),
     CQ_CASE(a_flat_conversion_names_the_handle_with_no_workspace_term),
+    CQ_CASE(an_integer_unary_intrinsic_brackets_under_its_own_name),
     CQ_CASE(a_ternary_call_names_the_handle_with_no_temporary_term),
     CQ_CASE(an_aliased_ternary_call_names_the_handle_past_its_one_temporary),
     CQ_CASE(a_multi_lane_register_lists_its_lanes_in_bit_order),

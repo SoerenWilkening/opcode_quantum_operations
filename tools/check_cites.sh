@@ -143,4 +143,9 @@ if [ -n "$all" ]; then
     exit 1
 fi
 
-echo "check_cites: OK — $scanned file(s) scanned, 0 bare living-target line citations"
+# "walked" and the parenthetical are load-bearing (bd 6kg, the same fix bd a9e
+# made to check_loc.sh): this count is the filesystem's, so it differs from a
+# fresh checkout's by whatever is gitignored under the paths list_files walks,
+# and a reader comparing two boxes must not read the difference as a
+# regression. The zero-bare-citations verdict is what is enforced.
+echo "check_cites: OK — $scanned file(s) walked (filesystem, not the git index), 0 bare living-target line citations"
