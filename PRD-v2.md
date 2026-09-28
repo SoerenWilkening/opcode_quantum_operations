@@ -1,6 +1,19 @@
 # PRD — `libcqops` v2: the floating-point opcode surface
 
-Status: **scoping draft, nothing implemented — the port's MECHANICS decided 2026-09-18, §7** · Target: the fp half of the frozen `cq_template_*` grid
+Status: **scoping draft, ~~nothing implemented~~ — the port's MECHANICS decided 2026-09-18, §7** · Target: the fp half of the frozen `cq_template_*` grid
+
+**Status amended 2026-09-28 — an ERROR by staleness, not an intent change:** *"nothing
+implemented"* was true when written (2026-09-14, `7f2ee99`) and when §7 was added (`7cf0664`), and
+false from v2 Wave 1 (`127ce04`, 2026-09-18) on. **The `f64` port is IMPLEMENTED.** What landed is
+read elsewhere, not restated here: the children of bead `9ve` (`bd show
+opcode_quantum_operations-9ve`); the M31–M42 modules in `src/kernels/` — `fpfield`, `fpround`,
+`fadd`, `fmul`, `fdiv`, `fcmp`, `fconv`, `fmisc` + `fround` (M38's two file families), `fma`,
+`fsqrt`, `ibits`, `iminmax` — with their ABI wiring in `shim/`; §5's LANDED notes; and the lab
+report under `docs/labreport/sessions/`, where entries 14, 15, 16, 20 and 21 are the v2 waves,
+18 and 19 the fp test budget and row-map memoisation, and 6 and 13 the scoping and the mechanics.
+**The box below is NOT amended:** *"IT IMPLEMENTS NOTHING"* is about this DOCUMENT's role — it
+decides scope and records seams, and the implementation lives in the code — and that is still
+true.
 Companions: [`NORTH_STAR.md`](NORTH_STAR.md) (why) · [`PRD-v1.md`](PRD-v1.md) (v1's what, and §15 where
 every decision lives) · [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) (v1's how)
 
@@ -84,7 +97,13 @@ Three clauses, and each is a decision rather than a description.
 
 1. **`f64` ONLY.** `f16`, `f32` and `f80` keep v1's loud abort. §3 is why: the gap is a *width*
    gap, not a construction gap, and only `f64` is portable. This is the clause most likely to be
-   re-litigated and §3.2 is written to be re-read before it is.
+   re-litigated and §3.2 is written to be re-read before it is. *(ERROR, noted 2026-09-28: §3.2
+   is the shadow / alphabet section and carries no width argument — it mentions no `f16`, `f32`,
+   `f80` or width, and it was already the shadow section in the first draft (`7f2ee99`), so the
+   pointer was wrong when written rather than displaced by a renumbering. The section written to
+   be re-read is **§3.4** — its `f32` box and its scope-by-width table — now with the decisions at
+   §6.2 (`f80`) and §6.3 (`f32`). Same error as §1a's `f32` bullet. The "§3.2" is kept as
+   written.)*
 2. **A PORT, NOT A RE-DERIVATION.** Every construction comes out of the pinned snapshot. Rule 1's
    *"how should we build a reversible comparator?"* is never an open question here either.
 3. **NO REPRESENTATION CHANGE.** An fp rail is v1's register at an fp width. §3.1 establishes that
@@ -106,8 +125,12 @@ in.
   2026-09-17 at `b1b1dc02` (this row read *"5,891 calls, 53 fixtures"* when written on
   2026-09-14 and **neither figure reproduced**; the fixture count was already contradicted by
   §3.4's own table, 191 − 139 = 52) — and the pinned snapshot has **zero** bytes of it. Porting is impossible and re-deriving is what Rule 1 exists to forbid. §6
-  records it as the v3 boundary with the one condition that would move it.
-- **Not `f32`.** Bennett *appears* to cover it and does not. §3.2.
+  records it as the v3 boundary with the one condition that would move it. **DECIDED
+  2026-09-28 (§6.2 item 2, bead `1us`): an upstream dependency, not a gap.**
+- **Not `f32`.** Bennett *appears* to cover it and does not. §3.2. **DECIDED 2026-09-28 (§6.3
+  item 3, bead `4tr`): declined unless upstream ships native `f32` primitives.** *(Error,
+  corrected 2026-09-28: the argument this bullet points at is §3.4's `f32` box; §3.2 is the
+  alphabet argument and does not discuss `f32`. The "§3.2" above is kept as written.)*
 - **Not the transcendentals — and the ground is the ABI, not the corpus.** `soft_sin`, `soft_exp`,
   `soft_log`, `soft_pow` and their siblings — **27 exported names in all**, re-counted off
   `softfloat.jl`'s `export` list on 2026-09-17 — are in the snapshot and are **not** on any table
@@ -117,7 +140,10 @@ in.
   a `math.h` function by SOURCE INJECTION (its Rule 18)** and names a per-function template
   *"fiction"*. So they arrive through the arithmetic port, at CQ_lang's injected algorithm, and a
   Bennett-backed single-opcode form is a CQ_lang decision. **§7.8**, measured 2026-09-18.
-- **Not a change to D14.** §5.
+- **Not a change to D14.** §5. **Amended 2026-09-28 (bead `213`):** still not a change to D14's
+  *disposition*; D14's *wording* now carries a dated amendment naming the 232 / 460 / 143 split
+  (§3.5, §6.4 item 4). *(Error, corrected the same day: the "§5" above means §3.5 — §5 is the
+  module map. Kept as written.)*
 - **Not reachable through the QEC sink.** §4 condition 5, and it is arithmetic, not pessimism.
 - **Not an optimisation pass.** The five v2-labelled beads (`2kl`, `5zn`, `b8g`, `e05`, `mri`) are
   inputs to this document, not tasks in it. Every one was measured and refused for v1 on Rule 1 or
@@ -165,7 +191,9 @@ flags as **deliberately not vendored** and as *"an open scope question, not a se
 
 **(c) THE 884 SAYS NOTHING ABOUT WIDTH, WHICH IS THE ONLY THING THAT ACTUALLY BINDS.** The grid is
 perfectly uniform — 230 symbol-occurrences at each of `f16`, `f32`, `f64`, `f80` — and the corpus is
-not, and the pinned snapshot is not. §3.2.
+not, and the pinned snapshot is not. §3.2. *(ERROR, noted 2026-09-28: the width argument is
+§3.4's — its scope-by-width table and its `f32` box — not §3.2's, which has none; the same wrong
+pointer as §1 clause 1 and §1a's `f32` bullet, present since `7f2ee99`. Kept as written.)*
 
 **The unit v2 should be sized, scheduled and reported in is the FIXTURE**, which is what
 NORTH_STAR condition 1 is written in and what D23 and D18 already use. §4.
@@ -245,6 +273,11 @@ Three exact matches. **Bennett's softfloat lowering emits `{X, CX, CCX}` and not
 > and not at this file's `100/4/68/28`. **The alphabet conclusion is immune to both**: it is a
 > statement that three columns sum to a fourth, which no fold setting changes. **The magnitudes in
 > §3.3 are NOT immune and are labelled accordingly.**
+>
+> **DECIDED 2026-09-28 (R14, bead `9ns`): the magnitudes of record for our port are OUR pinned fp
+> goldens in `tests/goldens/*.counts`, and this file is kept for order of magnitude and for the
+> alphabet argument above, nothing else.** No side-by-side table. The three rows above were
+> re-read in the pinned `BENCHMARKS.md` (`:26-28`) the same day and still sum exactly.
 
 ### 3.3 How many kernels, and what is the ancilla cost? — *fewer kernels than v1, each one to two orders of magnitude larger*
 
@@ -264,7 +297,7 @@ surface with nothing left over** (§0's fourth row). Grouped by what a port actu
 | rounding | 120 | `fround.jl` | `floor`/`ceil`/`trunc`/`round`/`rint`/`nearbyint`, **out of grid**. **The names do not map one-to-one (§7.7, 2026-09-18):** `rint`/`nearbyint` are `soft_round` (ties-to-even), C's `round` is `soft_round_away`; there is **no `soft_rint`** — this row named the right file and implied a function that does not exist |
 | `fmin` / `fmax` | 84 | `fmin.jl` | **out of grid**. `llvm.minnum`/`maxnum` are **`soft_fmin`/`soft_fmax`** (NaN-absorbing), NOT the NaN-propagating `soft_fminimum`/`soft_fmaximum` in the same file (§7.7) |
 | `fsqrt` | 79 | `fsqrt.jl` | **out of grid**; digit-by-digit restoring root that *"structurally mirrors `soft_fdiv`'s restoring loop"* (`fsqrt.jl:9` (mirror) / `:11-15` (Kahan) — corrected 2026-09-18 by K21.md from `:6-7`, which was the docstring's opening line). **Had no §5 row until 2026-09-18 — now M40** |
-| `fsqrt` | 79 | `fsqrt.jl` | **out of grid** |
+| ~~`fsqrt`~~ | ~~79~~ | ~~`fsqrt.jl`~~ | ~~**out of grid**~~ — **ERROR, struck 2026-09-28: a pure duplicate of the row above.** `7cf0664` (2026-09-18) added the annotated row above and left this 2026-09-14 original in place; the first three cells are identical and this note is the start of that one. Counted once, the column sums to **20,795**, §3.4's total (§0a's 20,785 tell, taken 2026-09-17 before the duplicate existed, counted it once); counted twice it is 20,874 |
 
 **`frem` is in the grid (60 symbols) and the corpus calls it ZERO times** — and Bennett does not have
 it, listing it as future work (`Bennett-VISION-PRD.md` Tier 2, *"Soft remainder via soft_fdiv"*).
@@ -273,7 +306,9 @@ where an in-grid symbol is deliberately left behind on liveness. That is D23's t
 time.
 
 **Cost, from upstream's published table — and these are the figures §3.2's rider says to treat as
-order-of-magnitude:**
+order-of-magnitude:** *(2026-09-28, R14 / bead `9ns`: the magnitudes of record for OUR kernels are
+the pinned goldens in `tests/goldens/`; the upstream rows below and the ~126k estimate after them
+stay order-of-magnitude.)*
 
 | | Gates | Toffoli | **Ancillae** |
 |---|---:|---:|---:|
@@ -378,6 +413,10 @@ second and decisive reason `f32` is out** — see the box below. Two riders v1 d
 > project whose condition 2 is a *bit-exact* differential test. **L1 would be red, correctly.** The
 > file names *"native 24-bit-mantissa f32 primitives"* as upstream future work — which is the
 > condition that moves this, and §6 files it.
+>
+> **DECIDED 2026-09-28 (§6.3 item 3, bead `4tr`): `f32` is declined unless upstream ships those
+> primitives.** The quotes above were re-read that day in the pinned snapshot — the range
+> `fpconv.jl:1-40` holds them at `:20-21`, `:29-32` and `:37`.
 
 **Condition 5 is unreachable and the arithmetic is short.** D20 measured the shipped QEC configs
 carrying `n_logical ∈ {1, 3, 4, 6, 7}`, and raising it raises the code distance. One `f64` `fadd`
@@ -406,6 +445,15 @@ and reproduces exactly**; the 228 is a widening this document offers and D14 doe
 filed as a bead rather than written into D14, because D14 is a decision of record and this is a
 re-reading of it.
 
+**DECIDED 2026-09-28 (bead `213`, the maintainer's ruling) — and now written INTO D14.** PRD-v1
+§15 D14's row carries a dated WORDING amendment: the five named opcodes stay D14's named set at
+**232**, the **460** are non-injective by the same argument, and the **143** are invertible but
+uncalled. **The disposition is unchanged** — all 603 keep the loud abort, on specifiability — so
+the sentence above that says the widening is not in D14 is superseded as to *where* the 228 is
+written, and stands as to what it *is*. Re-measured the same day from the pinned yaml by expanding
+its naming rules over the integer `_inv` variants and grouping by opcode: every per-opcode figure
+in the table above reproduces exactly, and the expanded set is identical to the generator's 603.
+
 **The 24 bitcasts become reachable exactly when fp does, and cost ~zero** — an identity relabel, per
 D16's third worked example (`bd 3ep`, 2026-09-14). Measured, and every figure here re-confirmed
 exactly on 2026-09-17: **1,511** bitcast lines across **127** fixtures, of which **12 of the 24**
@@ -429,13 +477,13 @@ Numbered to continue plan §6's register rather than restart it.
 
 | # | Risk | Mitigation |
 |---|---|---|
-| **R10** | **The f32 round trip gets taken to widen the fixture count from 100 to 138.** It is one flag away, it looks like a port, and it is a 38-fixture prize | §3.4's box. Upstream rejects the compile; L1 would be red and **correctly** red. If it is ever taken it must be as a **declared approximation with its own test tier**, never inside condition 2 |
+| **R10** | **The f32 round trip gets taken to widen the fixture count from 100 to 138.** It is one flag away, it looks like a port, and it is a 38-fixture prize | §3.4's box. Upstream rejects the compile; L1 would be red and **correctly** red. If it is ever taken it must be as a **declared approximation with its own test tier**, never inside condition 2. **DECIDED 2026-09-28 (§6.3 item 3, bead `4tr`): `f32` is declined unless upstream ships native 24-bit-mantissa primitives; the quote this row rests on was re-read at `fpconv.jl:20`, `:29-32` and `:37`** |
 | **R11** | **An fp kernel's scratch region trips D2's ceiling and the refusal is read as a libcqops bug.** `fadd` needs ~30k qubits where K12 i8 needs 543 | D25 already resolved the behaviour (abort from the pool during pre-materialisation, unswallowed at the opcode surface) and **D25's prohibition is the live one here: the shim must never grow its own "that will not fit" check** |
 | **R12** | **The L1 sample budget is carried over without widening the anchors**, so NaN/±Inf/±0/subnormal/rounding-boundary rows are drawn at random and no run guarantees any of them | §3.4 and §7.12. The 32-sample circuit budget is fixed. Eight representatives guarantee the major semantic classes at three mask rows; the complete per-kernel tables remain exhaustive on the cheap classical/oracle path |
 | **R13** | ~~**`fma` is scoped out because it is not in the grid, and it is 4,295 calls**~~ — **RETIRED 2026-09-17 as a risk and RESOLVED as a decision.** It was filed as a *sizing* risk and was measured to be an *acceptance* one: without §6.1, an `f64`-only v2 completes **23** fixtures rather than 100, and **6 fixtures with no floating point anywhere** are already blocked by it today | §6.1, now a resolution. **What remains a risk is the inverse and it has its own row: R16.** Do not re-open R13 to re-argue the sizing — the number is measured and the decision is written |
 | **R16** | **The vendoring lands AHEAD of the port, and 401 symbols become libcqops aborts for no fixture gain** while the LINK GATE widens from 2,479 to 2,880 and `tools/l6/run_slice_cqops.sh` must stop passing CQ_lang's two stub objects. Both are load-bearing and both have recorded silent-failure modes | §6.1's order clause: **vendor WITH the port of the families it exposes, never ahead of it.** The L6 link-line change is not optional once we define those symbols — the two objects are passed *loose*, so a duplicate definition is a hard link error rather than the silent shadowing `CqopsSymbolSets.cmake` records for the archive form |
-| **R14** | **`BENCHMARKS.md`'s magnitudes are reused as if they were L4 goldens.** This repo has a recorded instance of exactly that (`x+1 i8` at `100/4/68/28`) | §3.2's rider (ii). The alphabet conclusion is fold-invariant; **the magnitudes are not and must be re-measured against our own port**, at the all-quantum mask, before any golden is pinned |
-| **R15** | **`f80`'s `long double` bit extraction is written as a `sizeof` `memcpy`**, silently hashing unspecified padding into a rail | §3.1's box. Not live while `f80` is out of scope, which is part of why it is out |
+| **R14** | **`BENCHMARKS.md`'s magnitudes are reused as if they were L4 goldens.** This repo has a recorded instance of exactly that (`x+1 i8` at `100/4/68/28`) | §3.2's rider (ii). The alphabet conclusion is fold-invariant; **the magnitudes are not and must be re-measured against our own port**, at the all-quantum mask, before any golden is pinned. **DECIDED 2026-09-28 (bead `9ns`; a DECISION — the maintainer's ruling): OUR pinned fp goldens are the MAGNITUDES OF RECORD** — `tests/goldens/` `fadd`, `fcmp`, `fconv`, `fdiv`, `fma`, `fmisc`, `fmul`, `fpfield`, `fpround`, `fround`, `fsqrt` `.counts` (listed 2026-09-28; each file's `measured-at:` header names its mask — all-quantum, and `fpround.counts` pins caller-shaped rows beside its all-quantum ones, D-K23-7). `BENCHMARKS.md` is kept for ORDER OF MAGNITUDE and for §3.2's alphabet argument (`Total = NOT+CNOT+Toffoli`) ONLY. **No side-by-side table.** Where this document already quotes a golden-derived figure (§3.3's `udiv` rows, §5's landing notes) it is a dated reading of the file; the file is authoritative, and `CQOPS_UPDATE_GOLDENS=1` can re-bless it where prose cannot follow |
+| **R15** | **`f80`'s `long double` bit extraction is written as a `sizeof` `memcpy`**, silently hashing unspecified padding into a rail | §3.1's box. Not live while `f80` is out of scope, which is part of why it is out. **Kept 2026-09-28 as the rider of §6.2 item 2's decision (bead `1us`): `f80` is an upstream dependency, so this stays recorded and not live until a re-vendor brings 80-bit support** |
 
 ---
 
@@ -481,6 +529,12 @@ Numbering continues v1's M01–M30.
 ## 6. Open questions — decide in a document, never in code
 
 **§6.1 is RESOLVED (2026-09-17). The rest are open, and each is a bead.**
+
+**Amended 2026-09-28: none of §6 is open any more.** §6.2 (`f80`, bead `1us`), §6.3 (`f32`, bead
+`4tr`) and §6.4 (D14's set, bead `213`) were DECIDED on 2026-09-28 by the maintainer; §6.5 was
+WRITTEN on 2026-09-18 in §7.12 (bead `hkg`) and §6.6 DECIDED on 2026-09-24 (bead `c5x`). The
+sentence above is kept as it was true when written. Tracker state is read from `bd`,
+not from here.
 
 ### 6.1 Does v2 vendor `intrinsic_table.yaml` and `libm_table.yaml`? — **YES, and it is not only a v2 question**
 
@@ -598,9 +652,11 @@ set-identical to the archive in both directions. `tools/l6/run_slice_cqops.sh` a
 once libcqops defines those symbols the loose objects are a duplicate-symbol hard error, which is
 why that edit had to land in the same commit.
 
-### 6.2–6.6 Still open — decide each in a document, never in code
+### 6.2–6.6 ~~Still open~~ Decided — decide each in a document, never in code
 
-**Numbering is preserved so existing references still resolve.**
+**Numbering is preserved so existing references still resolve.** *(Heading amended 2026-09-28: it
+read "Still open"; every item below now carries its decision date — items 2–4 on 2026-09-28,
+item 5 on 2026-09-18, item 6 on 2026-09-24. Each question is kept as it was asked.)*
 
 2. **Does `f80` ever arrive, and on what condition?** Not by porting — the snapshot has zero bytes of
    it — and not by re-deriving, which Rule 1 forbids. The only clean route is **upstream growing
@@ -608,10 +664,60 @@ why that edit had to land in the same commit.
    Until then `f80`'s **5,955 calls and 52 fixtures** (re-measured 2026-09-17; this read *"5,891
    calls and 53 fixtures"* and neither reproduced) are the v3 boundary. **It should be stated as a
    dependency, not carried as a gap.**
+
+   **DECIDED 2026-09-28 (bead `1us`; a DECISION — the maintainer took this item's own
+   recommendation): `f80` IS AN UPSTREAM DEPENDENCY OF libcqops, NOT A GAP IN IT.** The question
+   above is kept as asked; the answer is now of record. Three grounds, each re-checked the same day.
+   - **There is nothing to port.** `grep -rlE 'Float80|UInt80' third_party/bennett/src | wc -l`
+     → **0** at the pinned `980805de` (also 0 over the whole snapshot, and 0 for a
+     case-insensitive `float80|uint80|fp80|x86_fp80` over `src/`).
+   - **Re-deriving is what Rule 1 forbids**, so there is no second route inside this repo.
+   - **The only route is upstream growing 80-bit support and this repo re-vendoring at a new
+     pin** — risk R3, which invalidates every L4 golden (each `tests/goldens/*.counts` carries the
+     Bennett commit, and `cq_gold_open` fails a checking run on a mismatch). That is an upstream
+     event, not a libcqops work item, and no bead here schedules it.
+
+   *What stays as it is.* Every `f80`-touching `cq_template_*` row keeps its loud abort
+   (`python3 shim/gen_shim.py --list-symbols`, 2026-09-28: 268 in bucket `fp`, 4 in `defer`, none
+   a wrapper), as do the `f80` core symbols in `shim/cq_runtime_v2.c`. **R15's rider is kept, not
+   retired:** `long double` is an 80-bit value in a 12- or 16-byte object with unspecified padding,
+   so a `sizeof` `memcpy` is the wrong length and hashes padding into the rail (§3.1's box). It
+   stays not live because `f80` stays out, and whoever takes `f80` after a re-vendor inherits it.
+
+   *Both corpus figures are carried, and neither was re-measured on 2026-09-28 (L6 was not
+   re-run).* **5,891 calls / 53 fixtures** is the figure bead `1us` recorded on 2026-09-14 (the
+   session this document's header places at CQ_lang `607b6fe4`), and §0a records that it did not
+   reproduce under any of three definitions. **5,955 calls / 52 fixtures** is §1a's re-measurement
+   of 2026-09-17 at CQ_lang `b1b1dc02` (dirty tree, 392 goldens). The second is §1a's current
+   figure; the first is kept so the record shows it was checked.
 3. **Does `f32` arrive on upstream's native primitives?** `fpconv.jl` names *"native 24-bit-mantissa
    f32 primitives"* as upstream future work. That — and only that — flips §3.4's box.
+
+   **DECIDED 2026-09-28 (bead `4tr`; a DECISION — the maintainer took the recommended option):
+   `f32` IS DECLINED UNLESS UPSTREAM SHIPS NATIVE `f32` (24-bit-mantissa) PRIMITIVES.** The
+   `fpext → f64 → fptrunc` round trip is **never** taken inside NORTH_STAR condition 2. If it is
+   ever taken it is R10's case — a declared approximation with its own test tier — and that would
+   be a new decision, not a reading of this one. Same shape as item 2: the route runs through
+   upstream and a re-vendor (R3), not through this repo.
+
+   *The source, re-read in the pinned snapshot on 2026-09-28* (`grep -nF` over
+   `third_party/bennett/src/softfloat/fpconv.jl`, inside the module docstring at `:1-38`):
+   - `fpconv.jl:20` — *"There are no native f32 arithmetic primitives — `soft_f32_fadd`, etc."*,
+     and `:21` finishes the sentence, *"do not exist."* `grep -rn 'soft_f32_' third_party/bennett/src`
+     finds only that line.
+   - `fpconv.jl:29-32` — the bit-exact contract *"**does NOT extend to f32 arithmetic.**
+     `reversible_compile(f, Float32)` is rejected at the validation step"*.
+   - `fpconv.jl:37` — *"Native 24-bit-mantissa f32 primitives are tracked as future work."*
+     That line is the only thing that moves this decision.
 4. **Is D14's non-injective set 232 or 460?** §3.5. A re-reading of a decision of record, which
    should be settled in D14 or in a new row, not assumed by an implementer.
+
+   **DECIDED 2026-09-28 (bead `213`; a DECISION on wording — settled IN D14, as this item asked):
+   both numbers are right and they answer different questions.** D14 NAMES 232 (`and`, `or`,
+   `udiv`, `trunc`, `icmp`); **460** are non-injective (the 232 plus `urem`/`sdiv`/`srem`/`shl`/
+   `lshr`/`ashr`, 228); **143** are invertible but uncalled. PRD-v1 §15 D14's row now says so
+   under a dated amendment. **Disposition unchanged: all 603 integer `_inv` bodies stay loud
+   aborts on specifiability.** Figures re-measured 2026-09-28 against the pinned yaml; see §3.5.
 5. **What are L1's fp anchors?** R12. **WRITTEN 2026-09-18 in §7.12**; bead `hkg` keeps only the
    sampler change in `tests/support/`. Needs to be written down before M31, because it changes
    `tests/support/`'s sampler and not just a test.

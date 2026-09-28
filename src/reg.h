@@ -107,7 +107,17 @@ enum {
                             * for the FREE and for the WRITE, and was never a
                             * claim about the READ or about the MEASURE. The
                             * qubits are still never reclaimed; that is the
-                            * whole of what this state means.                */
+                            * whole of what this state means.
+                            *
+                            * AMENDED 2026-09-28 (bd 0po); the rows above stay
+                            * as written. The golden bd tgx cited was deleted at
+                            * CQ_lang 66428ddc (mode D, not a rename), so the
+                            * READ relaxation now rests on a fixture of OUR OWN
+                            * rather than on any golden — test_runtime_rail's
+                            * a_measured_rail_is_a_legal_source_of_a_frozen_template_symbol,
+                            * that golden's shape through the frozen symbol
+                            * cq_template_icmp_ne_i32_hl. Seen red with the
+                            * source slot reverted to LIVE-only.              */
     CQ_SLOT_TOKEN    = 4   /* a CLASSICAL RESOURCE TOKEN — `cqrt_tape_alloc`'s
                             * t<N>, and qram's a<N> when it lands (PRD §15 D23,
                             * plan §0.5). NOT A RAIL: width 0, bits NULL, owns

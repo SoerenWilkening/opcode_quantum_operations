@@ -275,6 +275,62 @@ CQ_TEST(a_second_cqrt_measure_of_one_handle_is_legal_and_idempotent)
     close_with(&m);
 }
 
+/* Copied verbatim from tests/abi/cq_templates_abi.txt (CQ_lang's generated
+ * header): shim/cq_runtime_abi.h is the `cqrt_*` core and declares no
+ * `cq_template_*`. The shape every template suite uses. */
+int32_t cq_template_icmp_ne_i32_hl(int32_t a_handle, int32_t b_classical);
+void cq_template_icmp_ne_i32_hl_unc(int32_t out_handle, int32_t a_handle, int32_t b_classical);
+
+/* A MEASURED RAIL IS A LEGAL SOURCE, AT THE ABI BOUNDARY (bd 0po, 2026-09-28).
+ * bd tgx widened cq_reg_check_operands' SOURCE slot from LIVE to READABLE (LIVE
+ * or MEASURED) on the strength of one CQ_lang golden — `cqrt_measure_i32(h2)`
+ * then `cq_template_icmp_ne_i32_hl(h2, 0)` — and that golden was DELETED
+ * upstream at 66428ddc. This is its shape through the frozen symbol, so the
+ * relaxation keeps a fixture of OUR OWN, as the repeat measure above got one.
+ * tests/test_template.c's a_measured_rail_is_a_legal_template_source is the
+ * same claim one layer down: it calls cq_shim_icmp_hl and left the linkage to
+ * L6, whose witness is gone.
+ *
+ * "IT DID NOT ABORT" IS NOT THE CLAIM. The flag's VALUE (a read door that
+ * handed the kernel the wrong bits would be silent), the source unmoved in
+ * value and state, L2 after the forward and the `_unc`, L3 after `f`'s free.
+ * `h` is never freed and never written: terminal for both (PRD §7). */
+CQ_TEST(a_measured_rail_is_a_legal_source_of_a_frozen_template_symbol)
+{
+    cq_mock m; cq_sink s;
+    cq_ctx *ctx = open_with(&m, &s);
+
+    const int32_t h = cq_bk_reg(ctx, 32u, 0xB5u, 0xFFu);   /* eight wires */
+    CHECK_EQ(cqrt_measure_i32(h), 0xB5);
+    CHECK_EQ(cq_reg_state(&ctx->regs, h), CQ_SLOT_MEASURED);
+
+    const int32_t f = cq_template_icmp_ne_i32_hl(h, 0);
+    const int32_t both[2] = { h, f };
+    CHECK_EQ(cq_reg_state(&ctx->regs, f), CQ_SLOT_LIVE);
+    CHECK_EQ(cq_reg_width(&ctx->regs, f), 1u);
+    CHECK_EQ(cq_pc_value(ctx, f), 1u);
+    CHECK(cq_pc_live_is_exactly(ctx, both, 2u));
+
+    /* The `_unc` twin reads `h` through the READ door and writes `f` through
+     * the WRITE door in one call — the asymmetry bd tgx made, both halves. */
+    cq_template_icmp_ne_i32_hl_unc(f, h, 0);
+    CHECK_EQ(cq_pc_value(ctx, f), 0u);
+    CHECK(cq_pc_live_is_exactly(ctx, both, 2u));
+
+    uint32_t fq[1];
+    const uint32_t nf = cq_pc_indices(ctx, f, fq, 1u);
+    CHECK_EQ(nf, 1u);
+    cqrt_free(f);
+    CHECK(cq_pc_indices_are_free(ctx, fq, nf));
+    CHECK(cq_pc_live_is_exactly(ctx, &h, 1u));
+
+    CHECK_EQ(cq_reg_state(&ctx->regs, h), CQ_SLOT_MEASURED);
+    CHECK_EQ(cq_pc_value(ctx, h), 0xB5u);
+    cq_reg_audit(ctx);
+
+    close_with(&m);
+}
+
 /* -------------------------------------------------------------------------
  * 4. free — D15's three-valued verdict and its two-valued act.
  * ------------------------------------------------------------------------- */
@@ -449,6 +505,7 @@ CQ_TEST_MAIN(
     CQ_CASE(measure_round_trips_every_width_at_the_abis_own_signed_type),
     CQ_CASE(measure_emits_one_mz_per_qubit_and_makes_the_rail_terminal),
     CQ_CASE(a_second_cqrt_measure_of_one_handle_is_legal_and_idempotent),
+    CQ_CASE(a_measured_rail_is_a_legal_source_of_a_frozen_template_symbol),
     CQ_CASE(free_of_an_all_constant_rail_costs_nothing_and_strands_nothing),
     CQ_CASE(free_of_a_determinate_zero_rail_releases_every_index_by_name),
     CQ_CASE(free_of_a_determinate_one_rail_is_convicted_and_strands_by_name),

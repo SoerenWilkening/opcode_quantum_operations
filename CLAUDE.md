@@ -255,6 +255,7 @@ make test                 # lint + shim-check + both configurations
 ctest --test-dir build-debug   -j 6 --output-on-failure
 ctest --test-dir build-release -j 6 --output-on-failure
 ctest --test-dir build-debug -R death     # every fail-loud path
+sh tools/ctest_names.sh build-release 'regex'   # a -R gate's names grouped by binary; exits 1 on zero selection
 
 # Regenerate L4 goldens — an ENV VAR; `ctest -- --update-goldens` is an error that runs 0 tests
 CQOPS_UPDATE_GOLDENS=1 ctest --test-dir build-release -R kernel

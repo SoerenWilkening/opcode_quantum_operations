@@ -9,6 +9,10 @@
 # Editor / IDE
 .idea/
 
+# Agent worktrees are created INSIDE the repo at .claude/worktrees/agent-*/, so a
+# `git add -A` would stage full checkouts (bd 4ib). .claude/settings.json stays tracked.
+.claude/worktrees/
+
 # CMake build trees
 build*/
 cmake-build-*/

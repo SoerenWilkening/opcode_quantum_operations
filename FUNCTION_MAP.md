@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7157
+**Indexed definitions:** 7158
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -4632,7 +4632,7 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `int` | [271](src/reg.h:271) |
+| `int` | [281](src/reg.h:281) |
 
 ## `src/reg_check.c`
 
@@ -8135,11 +8135,12 @@ the definition (or the build-language declaration) in the listed file.
 | `measure_round_trips_every_width_at_the_abis_own_signed_type (via CQ_TEST)` | [180](tests/test_runtime_rail.c:180) |
 | `measure_emits_one_mz_per_qubit_and_makes_the_rail_terminal (via CQ_TEST)` | [205](tests/test_runtime_rail.c:205) |
 | `a_second_cqrt_measure_of_one_handle_is_legal_and_idempotent (via CQ_TEST)` | [246](tests/test_runtime_rail.c:246) |
-| `free_of_an_all_constant_rail_costs_nothing_and_strands_nothing (via CQ_TEST)` | [287](tests/test_runtime_rail.c:287) |
-| `free_of_a_determinate_zero_rail_releases_every_index_by_name (via CQ_TEST)` | [310](tests/test_runtime_rail.c:310) |
-| `free_of_a_determinate_one_rail_is_convicted_and_strands_by_name (via CQ_TEST)` | [342](tests/test_runtime_rail.c:342) |
-| `free_of_a_rotation_tainted_rail_is_unproven_and_strands_by_name (via CQ_TEST)` | [382](tests/test_runtime_rail.c:382) |
-| `a_mixed_rail_releases_its_provable_lanes_and_strands_the_rest (via CQ_TEST)` | [413](tests/test_runtime_rail.c:413) |
+| `a_measured_rail_is_a_legal_source_of_a_frozen_template_symbol (via CQ_TEST)` | [298](tests/test_runtime_rail.c:298) |
+| `free_of_an_all_constant_rail_costs_nothing_and_strands_nothing (via CQ_TEST)` | [343](tests/test_runtime_rail.c:343) |
+| `free_of_a_determinate_zero_rail_releases_every_index_by_name (via CQ_TEST)` | [366](tests/test_runtime_rail.c:366) |
+| `free_of_a_determinate_one_rail_is_convicted_and_strands_by_name (via CQ_TEST)` | [398](tests/test_runtime_rail.c:398) |
+| `free_of_a_rotation_tainted_rail_is_unproven_and_strands_by_name (via CQ_TEST)` | [438](tests/test_runtime_rail.c:438) |
+| `a_mixed_rail_releases_its_provable_lanes_and_strands_the_rest (via CQ_TEST)` | [469](tests/test_runtime_rail.c:469) |
 
 ## `tests/test_runtime_rail_death.c`
 
