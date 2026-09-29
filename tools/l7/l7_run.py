@@ -66,7 +66,7 @@ OPT-IN behind -DCQOPS_CQLANG_DIR=, for L6's reason: this repository neither pins
 nor can build CQ_lang, and a report that cannot name the revision it ran against
 is not a report.
 """
-import argparse, json, os, re, shutil, subprocess, sys
+import argparse, json, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUNNER = os.path.join(os.path.dirname(HERE), "l6", "run_slice_cqops.sh")
@@ -114,53 +114,6 @@ def toolchain(cqdir, builddir):
     sys.exit("no single-file e2e slice registered in " + builddir)
 
 
-# DUPLICATED FROM `tools/l6/l6_run.py` ON PURPOSE, SO IT IS KEPT IN STEP BY HAND.
-# `bd ss8` weighed hoisting this, `cq_revision` and `read` into a module both
-# directories import and rejected it: 27 lines, no second subject, and a
-# cross-directory import needs a `sys.path` line. The price is drift, and it has
-# been paid once already -- the `ar x` verification below was missing from this
-# copy until `bd y4o` (2026-09-11). Mirror any edit into the L6 copy.
-def extract_intrinsics(cqdir, builddir, out):
-    """The two objects the link DOES take, extracted FRESH on every run.
-
-    Named, never globbed, and the archive itself is never on the link line:
-    `libcq_templates.a`'s third member is CQ_lang's trace-only stub with a second
-    definition of all 2479 grid symbols, and measured, the same two archives in
-    opposite order both link cleanly and behave differently. `bd 216` item 20;
-    `tools/l6/run_slice_cqops.sh`'s header carries the full statement.
-    """
-    src = os.path.join(cqdir, builddir, "runtime", "libcq_templates.a")
-    if not os.path.exists(src):
-        sys.exit("no cq_templates archive at " + src)
-    d = os.path.join(os.path.abspath(out), "_intrinsics")
-    if os.path.exists(d):
-        shutil.rmtree(d)
-    os.makedirs(d)
-    # EMPTY SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24): libcqops now defines
-    # all 2,880 `cq_template_*` symbols, so extracting CQ_lang's two stub
-    # objects and putting them on the link line is a duplicate-symbol hard
-    # error. The list is kept rather than deleted so the `ar x` plumbing and
-    # its "extracted fresh on every run" discipline survive for the next
-    # member that needs it.
-    members = []
-    r = subprocess.run(["ar", "x", src] + members, cwd=d, capture_output=True,
-                       text=True)
-    if r.returncode != 0:
-        sys.exit("ar x failed: " + r.stderr)
-    # AND `ar x` CAN EXIT 0 HAVING PRODUCED NOTHING NAMED -- that is what this loop
-    # detects, and it is why the members are taken BY NAME rather than globbed. A
-    # member silently absent here leaves the link to resolve those symbols from
-    # wherever else it can, which is `bd 216` checklist item 20's failure mode:
-    # `libcq_templates.a`'s third member is CQ_lang's trace-only stub, and the same
-    # two archives in opposite order both exit 0 with different answers. L7 has no
-    # `--reuse`, so an absent member cannot be caught by re-reading a previous run
-    # either -- this exit is the only detector there is.
-    for m in members:
-        if not os.path.exists(os.path.join(d, m)):
-            sys.exit("ar x did not produce " + m)
-    return d
-
-
 def read(p):
     try:
         with open(p, "r", errors="replace") as fh:
@@ -188,7 +141,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     archive = os.path.abspath(a.archive)
     tc = toolchain(a.cqlang, a.cqbuild)
-    objdir = extract_intrinsics(a.cqlang, a.cqbuild, a.out)
+    objdir = ""  # Legacy positional slot in run_slice_cqops.sh.
     stem = os.path.join(a.out, "grover")
 
     print("L7 — PRD §12(1), Grover through CQ_lang")

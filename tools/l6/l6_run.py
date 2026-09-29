@@ -21,14 +21,14 @@ the report, by SHA and date, every run. Quote ratios out of it, never counts.
 THE VERDICT LIVES IN `l6_report.py` SINCE 2026-09-10 (`bd wgi`), split off at
 Rule 12's limit along the seam IMPLEMENTATION_PLAN §3's Layer 6 table recorded
 in advance. WHAT IS LEFT HERE BREAKS WITH CQ_LANG AND WITH NOTHING ELSE: the
-fixture list, the revision, the two archive members, the four-stage
+fixture list, the revision, the four-stage
 invocation. What moved breaks with THIS repository: `classify`, the `DEFERRED`
 regex, the residue observation. That discriminator -- which repository a line
 breaks with -- is the seam; `run` vs `report` sounds like the same cut and is
 not, because `--reuse` already makes the report runnable without the run and a
 cut there would only move the loop below.
 """
-import argparse, json, os, shutil, subprocess, sys
+import argparse, json, os, subprocess, sys
 
 # A stale tools/l6/__pycache__/l6_report.pyc silently serves the PREVIOUS
 # verdict logic, and a re-classification that reads a cached `classify` is a
@@ -77,58 +77,13 @@ def fixtures(cqdir, builddir):
     return out
 
 
-# `tools/l7/l7_run.py` CARRIES A DELIBERATE COPY OF THIS FUNCTION (and of
-# `cq_revision`); `bd ss8` weighed hoisting them and rejected it. The two drifted
-# once, the L7 copy losing the `ar x` verification below (`bd y4o`, restored
-# 2026-09-11). Mirror any edit there.
-def extract_intrinsics(cqdir, builddir, out):
-    """`ar x` the two members we DO take, fresh, on every run.
-
-    FRESH IS THE POINT. An objdir that persists between runs is a cache of
-    whatever CQ_lang's archive held when it was last extracted, and this project
-    has already been bitten twice by a stale copy standing in for the tree (the
-    Step 9 `mv`-mtime leak, and `bd 18j`'s backup that captured a mutant).
-
-    AND THE MEMBERS ARE NAMED, NEVER GLOBBED. `libcq_templates.a` holds THREE
-    objects and the third is `cq_templates.c.o` -- the trace-only stub with a
-    second definition of all 2479 grid symbols. Taking the archive, or extracting
-    it wholesale, is `bd 216` checklist item 20's silent failure: measured
-    2026-08-27, the same two archives in opposite order both link cleanly and
-    behave differently, with CQ_lang's stub serving every call in one of them.
-    """
-    src = os.path.join(cqdir, builddir, "runtime", "libcq_templates.a")
-    if not os.path.exists(src):
-        sys.exit("no cq_templates archive at " + src)
-    d = os.path.join(os.path.abspath(out), "_intrinsics")
-    if os.path.exists(d):
-        shutil.rmtree(d)
-    os.makedirs(d)
-    # EMPTY SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24): libcqops now defines
-    # all 2,880 `cq_template_*` symbols, so extracting CQ_lang's two stub
-    # objects and putting them on the link line is a duplicate-symbol hard
-    # error. The list is kept rather than deleted so the `ar x` plumbing and
-    # its "extracted fresh on every run" discipline survive for the next
-    # member that needs it.
-    members = []
-    r = subprocess.run(["ar", "x", src] + members, cwd=d, capture_output=True,
-                       text=True)
-    if r.returncode != 0:
-        sys.exit("ar x failed: " + r.stderr)
-    for m in members:
-        if not os.path.exists(os.path.join(d, m)):
-            sys.exit("ar x did not produce " + m)
-    return d
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cqlang", default="/Users/sorenwilkening/Desktop/CQ_lang")
     ap.add_argument("--cqbuild", default="build")
     ap.add_argument("--archive", default="build-release/libcqops.a")
     ap.add_argument("--objdir", default="",
-                    help="where CQ_lang archive members would be extracted; "
-                         "EMPTY since bead 9ve.24 — extracted fresh with `ar x` on "
-                         "every run unless the directory is supplied ready-made")
+                    help="unused legacy argument; CQ_lang objects are not linked")
     ap.add_argument("--out", required=True)
     ap.add_argument("--sink", default="counter")
     ap.add_argument("--only", default="")
@@ -146,8 +101,7 @@ def main():
 
     os.makedirs(a.out, exist_ok=True)
     archive = os.path.abspath(a.archive)
-    objdir = (os.path.abspath(a.objdir) if a.objdir
-              else extract_intrinsics(a.cqlang, a.cqbuild, a.out))
+    objdir = a.objdir  # Legacy positional slot in run_slice_cqops.sh.
 
     print("CQ_lang @", cq_revision(a.cqlang))
     print("archive  ", archive)

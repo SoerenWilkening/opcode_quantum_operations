@@ -18,19 +18,24 @@
 # `third_party/cq_free_pairing/` is READING MATERIAL that Rule 1 forbids us to
 # execute or add to any build.
 #
-# THE LINK LINE IS THE SHARP EDGE, AND IT IS `bd 216` CHECKLIST ITEM 20.
-# CQ_lang/runtime/CMakeLists.txt builds ONE `cq_templates` archive out of
-# cq_templates.c + cq_intrinsic_templates.c + cq_libm_templates.c. Naming that
-# archive here would put a SECOND definition of all 2479 grid symbols on the
-# line, and the failure is SILENT: measured, the same two archives in opposite
-# order both exit 0 with DIFFERENT ANSWERS (7 vs -1). So the intrinsic and libm
-# members are taken as OBJECTS (`ar x`) and `libcq_runtime.a` is never on the
-# line at all. Measured 2026-08-27 against CQ_lang 134e625: those two objects
-# define exactly 401 symbols — PRD §1's "deliberately not ours" — and their
-# intersection with libcqops.a's 2850 defined symbols is EMPTY.
+# THE CURRENT LINK LINE (PRD-v2 §6.1, bead 9ve.24) IS:
+#   s2.o  l6_residue.o  libcqops.a  [libcqops dependencies]
+# libcqops defines all 2,880 cq_template_* symbols. No CQ_lang template object
+# is extracted or linked; `libcq_runtime.a` is absent too. The link map below
+# checks that no CQ_lang archive supplied an object.
+#
+# WHY THE PROVENANCE ARM EXISTS — measured 2026-08-27 against CQ_lang 134e625,
+# BEFORE the intrinsic/libm symbols were vendored. The old line extracted
+# cq_intrinsic_templates.c.o and cq_libm_templates.c.o from libcq_templates.a
+# and linked them before libcqops.a. Naming the WHOLE archive was dangerous:
+# opposite archive orders both linked with exit 0 but produced different answers
+# (7 vs -1), because cq_templates.c.o is CQ_lang's trace-only stub. That is
+# `bd 216` checklist item 20's silent link failure. The old two objects defined
+# 401 symbols disjoint from libcqops.a's then 2850 symbols; this is historical
+# measurement, not today's link contract.
 #
 # usage:
-#   run_slice_cqops.sh CLANG OPT LLVMLINK PASS INC SRC LIBSRCS CQOPS OBJDIR OUT
+#   run_slice_cqops.sh CLANG OPT LLVMLINK PASS INC SRC LIBSRCS CQOPS UNUSED OUT
 # LIBSRCS is a space-separated list of companion .c files, empty for the
 # single-file shape.
 set -euo pipefail
@@ -119,8 +124,7 @@ set -f
 # Loud, at the link stage, and the good failure mode — but it has to go in the
 # same commit as the definitions, which is why this edit is not optional.
 #
-# `l6_run.py` and `l7_run.py` no longer extract them either, and
-# `tools/bitlevel/run.sh` carries the same change for the same reason.
+# The L6, L7 and bit-level drivers also skip extraction.
 # shellcheck disable=SC2086
 "$LINKCC" $LDX "$TMP/s2.o" "$TMP/l6_residue.o" "$CQOPS" $LDLIBS \
          -Wl,-map,"$OUT.map" -o "$OUT.bin" 2>> "$OUT.link"

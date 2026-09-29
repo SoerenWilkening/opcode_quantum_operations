@@ -8,10 +8,9 @@ run it in both modes, and tabulate: what clang left in the IR before the pass
 mix, the pool's peak/live/stranded, the residue, the classical answer and the
 wall time. No golden, no verdict: the numbers are the deliverable.
 
-Toolchain resolution and `ar x` are l7_run.py's, copied on the same footing
-that file copies l6_run.py's (a cross-directory import needs a sys.path line).
+Toolchain resolution follows l7_run.py's CTest query.
 """
-import argparse, collections, json, os, re, shutil, subprocess, sys, time
+import argparse, collections, json, os, re, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUNNER = os.path.join(HERE, "run.sh")
@@ -32,31 +31,6 @@ def toolchain(cqdir, builddir):
         if len(c) > 1 and c[1].endswith("run_slice.sh"):
             return dict(clang=c[2], opt=c[3], pas=c[4], inc=c[5])
     sys.exit("no single-file e2e slice registered in " + builddir)
-
-
-def extract_intrinsics(cqdir, builddir, out):
-    src = os.path.join(cqdir, builddir, "runtime", "libcq_templates.a")
-    if not os.path.exists(src):
-        sys.exit("no cq_templates archive at " + src)
-    d = os.path.join(os.path.abspath(out), "_intrinsics")
-    if os.path.exists(d):
-        shutil.rmtree(d)
-    os.makedirs(d)
-    # EMPTY SINCE PRD-v2 §6.1's VENDORING (bead 9ve.24): libcqops now defines
-    # all 2,880 `cq_template_*` symbols, so extracting CQ_lang's two stub
-    # objects and putting them on the link line is a duplicate-symbol hard
-    # error. The list is kept rather than deleted so the `ar x` plumbing and
-    # its "extracted fresh on every run" discipline survive for the next
-    # member that needs it.
-    members = []
-    r = subprocess.run(["ar", "x", src] + members, cwd=d, capture_output=True,
-                       text=True)
-    if r.returncode != 0:
-        sys.exit("ar x failed: " + r.stderr)
-    for m in members:
-        if not os.path.exists(os.path.join(d, m)):
-            sys.exit("ar x did not produce " + m)
-    return d
 
 
 def read(p):
@@ -154,7 +128,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     archive = os.path.abspath(a.archive)
     tc = toolchain(a.cqlang, a.cqbuild)
-    objdir = extract_intrinsics(a.cqlang, a.cqbuild, a.out)
+    objdir = ""  # Legacy positional slot in run.sh.
     rows = []
     for w in [int(x) for x in a.widths.split(",")]:
         for chain in a.chains.split(","):

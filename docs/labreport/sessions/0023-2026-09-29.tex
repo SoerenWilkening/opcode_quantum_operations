@@ -1,0 +1,56 @@
+% labreport entry 23 — 2026-09-29
+% labreport-to: 4b63501
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{23}{field}.
+
+\entry{23}{2026-09-29}{L6 link documentation and extraction cleanup}
+
+\begin{generated}
+  \gitem{Range}{\texttt{bb7c030..4b63501}}
+  \gitem{Tree}{\emph{dirty at capture} --- 8 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{707} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{708} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 349 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{4b63501} labreport entry 22: v2 close-out — rulings a-j, PRD-v2 §6 decided, 9ve closed, b6a ruling (i) amended to a CQ\_lang handoff
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{akax} bd memory l6-link-line-and-the-order-that-changes-the-backend and tools/l6/run\_slice\_cqops.sh:21-30 still describe the pre-9ve.24 link line (two ar x'd CQ\_lang objects)}
+  \gitem{Beads filed}{none}
+  \gitem{Diff}{\texttt{5 files changed, 86 insertions(+), 4 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Implement bead akax: correct the L6 link account and remove obsolete
+CQ\_lang template archive extraction.
+
+\field{What landed}
+The L6, L7 and bit-level drivers no longer unpack an unused archive.
+L6 and L7 registration now checks CQ\_lang's CTest catalog, which the
+drivers actually read. The L6 runner's header and the Beads link-line
+memory state the current libcqops-only link while retaining the dated
+archive-order failure as history. The link command itself is unchanged.
+
+\field{Measured}
+% Use \begin{figures} ... \fig{value}{instrument}{configuration}. A number without its instrument does not go in.
+
+\field{Decided}
+% The D-number or plan section ONLY. Never restate a decision's content.
+
+\field{Not taken}
+The full L6 corpus was not rerun for this harness cleanup. The bit-level
+\texttt{-O0} fixture was rejected by CQ\_lang's pass with a taint-escape
+error in both configurations; the \texttt{-O1} fixture completed.
+
+\field{Verified}
+Lint, Python compilation, shell syntax and CMake configuration ran.
+One L6 slice, L7 Grover and the bit-level \texttt{-O1} experiment ran
+in both Debug and Release. The CQ\_lang CTest catalog was copied to
+temporary storage so CTest could write its own logs without touching
+the separate checkout.
+
+\field{Left open}
+% Beads filed and what a next session would pick up.

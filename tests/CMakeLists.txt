@@ -2719,7 +2719,7 @@ set(CQOPS_L6_MIN_OK "43" CACHE STRING
 
 find_program(CQOPS_PY3 NAMES python3)
 if(CQOPS_CQLANG_DIR AND CQOPS_PY3 AND EXISTS
-   "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/runtime/libcq_templates.a")
+   "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/CTestTestfile.cmake")
     add_test(NAME l6_cqlang_fixtures
              COMMAND ${CQOPS_PY3} "${CMAKE_SOURCE_DIR}/tools/l6/l6_run.py"
                      --cqlang "${CQOPS_CQLANG_DIR}"
@@ -2810,7 +2810,7 @@ endif()
 ## not pinned here and its lowering moves, so a count pinned against its output
 ## would churn on every upstream commit — risk R5, one layer up.
 if(CQOPS_CQLANG_DIR AND CQOPS_PY3 AND EXISTS
-   "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/runtime/libcq_templates.a")
+   "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/CTestTestfile.cmake")
     add_test(NAME l7_grover_cqlang
              COMMAND ${CQOPS_PY3} "${CMAKE_SOURCE_DIR}/tools/l7/l7_run.py"
                      --cqlang "${CQOPS_CQLANG_DIR}"

@@ -6,7 +6,7 @@
 # link line. Stages, link order and the provenance arm are the runner's;
 # read its header for why each is the way it is.
 #
-# usage: run.sh CLANG OPT PASS INC SRC OLEVEL "DEFS" CQOPS OBJDIR OUT
+# usage: run.sh CLANG OPT PASS INC SRC OLEVEL "DEFS" CQOPS UNUSED OUT
 set -euo pipefail
 CLANG=$1 OPT=$2 PASS=$3 INC=$4 SRC=$5 OLEVEL=$6 DEFS=$7 CQOPS=$8 OBJDIR=$9
 OUT=${10}

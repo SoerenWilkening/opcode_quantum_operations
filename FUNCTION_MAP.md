@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7158
+**Indexed definitions:** 7155
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -9192,14 +9192,13 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `toolchain` | [25](tools/bitlevel/bitlevel.py:25) |
-| `extract_intrinsics` | [37](tools/bitlevel/bitlevel.py:37) |
-| `read` | [62](tools/bitlevel/bitlevel.py:62) |
-| `kv` | [70](tools/bitlevel/bitlevel.py:70) |
-| `ir_profile` | [79](tools/bitlevel/bitlevel.py:79) |
-| `timed_run` | [91](tools/bitlevel/bitlevel.py:91) |
-| `run_one` | [98](tools/bitlevel/bitlevel.py:98) |
-| `main` | [143](tools/bitlevel/bitlevel.py:143) |
+| `toolchain` | [24](tools/bitlevel/bitlevel.py:24) |
+| `read` | [36](tools/bitlevel/bitlevel.py:36) |
+| `kv` | [44](tools/bitlevel/bitlevel.py:44) |
+| `ir_profile` | [53](tools/bitlevel/bitlevel.py:53) |
+| `timed_run` | [65](tools/bitlevel/bitlevel.py:65) |
+| `run_one` | [72](tools/bitlevel/bitlevel.py:72) |
+| `main` | [117](tools/bitlevel/bitlevel.py:117) |
 
 ## `tools/bitlevel/gen_fixture.py`
 
@@ -9289,8 +9288,7 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `cq_revision` | [50](tools/l6/l6_run.py:50) |
 | `fixtures` | [58](tools/l6/l6_run.py:58) |
-| `extract_intrinsics` | [84](tools/l6/l6_run.py:84) |
-| `main` | [123](tools/l6/l6_run.py:123) |
+| `main` | [80](tools/l6/l6_run.py:80) |
 
 ## `tools/l7/grover.cq.c`
 
@@ -9304,12 +9302,11 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `cq_revision` | [89](tools/l7/l7_run.py:89) |
 | `toolchain` | [97](tools/l7/l7_run.py:97) |
-| `extract_intrinsics` | [123](tools/l7/l7_run.py:123) |
-| `read` | [164](tools/l7/l7_run.py:164) |
-| `gate_mix` | [172](tools/l7/l7_run.py:172) |
-| `main` | [179](tools/l7/l7_run.py:179) |
-| `tail_value` | [291](tools/l7/l7_run.py:291) |
-| `report` | [299](tools/l7/l7_run.py:299) |
+| `read` | [117](tools/l7/l7_run.py:117) |
+| `gate_mix` | [125](tools/l7/l7_run.py:125) |
+| `main` | [132](tools/l7/l7_run.py:132) |
+| `tail_value` | [244](tools/l7/l7_run.py:244) |
+| `report` | [252](tools/l7/l7_run.py:252) |
 
 ## `tools/labreport/gen_data.py`
 
