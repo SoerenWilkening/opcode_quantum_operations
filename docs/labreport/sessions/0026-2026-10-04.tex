@@ -1,0 +1,72 @@
+% labreport entry 26 — 2026-10-04
+% labreport-to: 4c3a141
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{26}{field}.
+
+\entry{26}{2026-10-04}{worktree cleanup and n4ut: opcode\_table.yaml re-vendored, grid 2820}
+
+\begin{generated}
+  \gitem{Range}{\texttt{b1d2c12..4c3a141}}
+  \gitem{Tree}{\emph{dirty at capture} --- 72 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{720} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{721} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 352 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{4c3a141} labreport entry 25: four-lane burn-down + 13zl
+    \item \texttt{38b3500} Wave 2: 4jj axis compositions, 65q D20 QEC pin, 5mqp fma SPLIT, p2y5 EXIT\_STATUS, bz8 notes, 13zl CQ\_lang ABI re-pin
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{13zl} [bug] CQ\_lang ec284441 (its bd 1501, 2026-10-04 10:41) made cq\_theta in place and removed cq\_ry: backend\_contract\_cq, package\_install\_cqbackend and l7\_grover\_cqlang are red against CQ\_lang 5088c536, \bead{n4ut} Re-vendor CQ\_lang opcode\_table.yaml at >= 61999c4a (frem removed): grid 2880 -> 2820 -- maintainer decision, \bead{p2y5} L6: e2e-slice-condtree-classical-leaf is RUN\_FAIL rc=7 with empty stderr -- its main returns a sum of cq\_measure results, so the exit status is program data, not a crash, \bead{5mqp} test\_kernel\_fma is the whole Debug critical path: 4503 s of a 4503 s wall under ctest -j 6 (2026-09-28), \bead{65q} D20's per-gate physical costs (CX 1,830 / CCX 562,564 at d=3) are pinned by no test and by no QEC revision, \bead{4jj} Step 21 follow-on: three axis compositions the \_unc suite defers, \bead{bz8} K06/K07 follow-ups from bd 18f: evaluated tables stop at W=64 (goldens run to 128); 'does CQ\_lang ever pass a constant register to cq\_template\_add\_*' is now measurable off L6}
+  \gitem{Beads filed}{\bead{13zl} [bug] CQ\_lang ec284441 (its bd 1501, 2026-10-04 10:41) made cq\_theta in place and removed cq\_ry: backend\_contract\_cq, package\_install\_cqbackend and l7\_grover\_cqlang are red against CQ\_lang 5088c536, \bead{n4ut} Re-vendor CQ\_lang opcode\_table.yaml at >= 61999c4a (frem removed): grid 2880 -> 2820 -- maintainer decision, \bead{cwiy} [bug] CI's must-be-absent list for QEC-gated suites omits test\_shim\_trace and test\_shim\_trace\_death, \bead{hcvb} [bug] FAIL\_REGULAR\_EXPRESSION 'Assertion failed' is Apple libc's banner; glibc (the CI box) prints "Assertion `cond' failed.", so those discriminators may be blind on CI, \bead{3s9b} PRD-v1:2359 cites opcode\_table.yaml ':39-44' for the whole grid expansion rule; those lines hold only the \_inv/controlled forms, the full naming rule is :35-59, \bead{7s60} 5mqp follow-up: re-measure the next Debug poles alone and decide whether SPLIT them (fmul, ibits, fadd, fconv, template\_fma), \bead{143g} bz8(2) exact answer: does CQ\_lang ever pass a CONSTANT REGISTER to cq\_template\_add\_* -- needs a bd-c55-shaped shim read; no L6 artefact records operand kinds, \bead{oqp8} Stale tool/CI text: l6\_run.py's --cqlang default is the pre-move path; ci.yml's 'two PyYAML-gated generator suites' comment, \bead{64d1} 65q follow-ups: three more QEC-figure claims re-measure differently or were never true}
+  \gitem{Diff}{\texttt{42 files changed, 2587 insertions(+), 184 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Same session, after entry~25: remove the agent worktrees, then take
+\bead{n4ut}. The generated range and bead lists above repeat entry~25's,
+because that entry was captured before its own commit. This entry covers only
+the work after \texttt{4c3a141}.
+
+\field{What landed}
+All 13 agent worktrees under \texttt{.claude/worktrees/} are removed, with
+their branches. Before removal, every line each one added was checked
+present on main; the only misses were text this session had superseded.
+Their diffs are kept in the session scratchpad. \bead{n4ut}:
+\texttt{opcode\_table.yaml} was re-vendored under the maintainer's explicit
+Rule~1 authorisation, with a new \texttt{COMMIT.opcode} as its live pin and a
+configure-time check for it. The grid is now 2820 and the backend's provided
+set equals CQ\_lang's required set. Yaml line citations that moved with the
+re-vendor were re-pointed; dated records carry a bracket instead.
+
+\field{Measured}
+\begin{figures}
+  \fig{2820 = 1266 wrappers + 678 \texttt{\_inv} + 744 fp aborts + 132 deferred (was 2880 with 804 fp aborts); integer 992 + 603 unchanged}{\texttt{python3 shim/gen\_shim.py}}{yaml \texttt{7307995f}, copied from CQ\_lang \texttt{4266c40d}}
+  \fig{3000 required = 3000 provided, set-equal; ABI \texttt{e1cc2bbc}}{CQ\_lang's \texttt{backend\_contract.py check} and \texttt{nm} on the Release archive}{CQ\_lang \texttt{ad2d4ec6}}
+  \fig{58 citations re-pointed and checked, 56 text-identical, 2 intentionally drop the deleted \texttt{frem} row}{scratch \texttt{lf\_cite\_verify.py} over a \texttt{diff}-derived line map}{yaml \texttt{6245117d} $\to$ \texttt{7307995f}}
+\end{figures}
+
+\field{Decided}
+\bead{n4ut}: the maintainer's ruling ``Re-vendor, authorized'', recorded on
+the bead; it ends \bead{13zl}'s superset.
+
+\field{Not taken}
+\texttt{third\_party/cq\_lang/COMMIT} and the other vendored files were not
+touched. \texttt{frem}'s abort reason was kept as a dormant entry in
+\texttt{gen\_reasons.py}. PRD-v1's imprecise \texttt{:39-44} citation was
+left to \bead{3s9b}.
+
+\field{Verified}
+Gate on main, \texttt{4c3a141} plus the n4ut lane, uncommitted:
+\texttt{make lint}, \texttt{make shim-check} (2820), Release ctest 719/719
+and Debug 720/720 (sanitizers on), both with
+\texttt{-E '\^{}l6\_cqlang\_fixtures\$'}, including
+\texttt{backend\_contract\_cq}, \texttt{package\_install\_cqbackend} and
+\texttt{l7\_grover\_cqlang}. Another project loaded the box throughout, so no
+timings are quoted. In a scratch tree, the old yaml, a stale manifest and a
+stale \texttt{.gen.c} each tripped their own check.
+
+\field{Left open}
+\bead{3s9b}, plus the beads entry~25 lists.
