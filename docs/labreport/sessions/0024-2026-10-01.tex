@@ -1,0 +1,58 @@
+% labreport entry 24 — 2026-10-01
+% labreport-to: 57b24c8
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{24}{field}.
+
+\entry{24}{2026-10-01}{vmz9 ownership and nonzero seed frees}
+
+\begin{generated}
+  \gitem{Range}{\texttt{4b63501..57b24c8}}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{707} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{708} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 349 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{57b24c8} akax: remove unused CQ\_lang archive extraction
+  \end{commitlist}}
+  \gitem{Beads closed}{\bead{b6a} Reconcile CQ L6 i64 QRAM index with frozen i32 contract}
+  \gitem{Beads filed}{\bead{vmz9} Investigate proven-dirty frees in new CQ\_lang z0re runtime-seed fixtures}
+  \gitem{Diff}{\texttt{9 files changed, 100 insertions(+), 161 deletions(-)}}
+\end{generated}
+
+%% ---- Hand-written below. Omit any field the session did not earn; a
+%% ---- one-bead session is a paragraph, not a page. Fields 1, 2 and 6 are
+%% ---- the ones that are never omitted.
+
+\field{The ask}
+Implement \bead{vmz9}: resolve proven-dirty frees from the new CQ\_lang
+z0re runtime-seed fixtures. The owner then clarified that work must stay in
+this repository.
+
+\field{What landed}
+The bead and the \texttt{vmz9-nonzero-seed-free-owner} memory now record
+the ownership boundary and the existing backend regression case.
+No backend source or test changed. Two mistaken local CQ\_lang commits
+were undone, restoring that checkout's tracked tree to \texttt{dc6f6872}.
+
+\field{Not taken}
+No change to the free certificate or L6 verdict: the certificate correctly
+convicts an inverse rotation that restores a nonzero allocation seed, and
+PRD \S15 D18 makes residue observational in L6. The owner declined a fourth
+CQ\_lang lit invocation and directed that no work remain in the other checkout.
+
+\field{Verified}
+Source inspection found an existing \texttt{tests/test\_shim\_cert\_rules.inc}
+case for \texttt{alloc(5); Ry(0.9); Ry(-0.9); free}, with a zero-seed sibling.
+Earlier Release and Debug L6 runs of
+\texttt{python3 tools/l6/l6\_run.py --only z0re-runtime-seed}
+each completed six fixtures with zero convicted residue against a transient
+CQ\_lang compiler edit. That edit was undone; these are not current-tree
+green claims. No tests ran after the scope correction.
+
+\field{Left open}
+\bead{vmz9} was left open when this session ended: correcting free emission
+required CQ\_lang lowering work, followed by its review and a fresh Release
+and Debug L6 run. It closed on 2026-10-03, after CQ\_lang \texttt{c22cc4a1}
+changed that lowering; its close reason records the re-run, which this
+session did not make. (This field was corrected in place on 2026-10-04,
+before the entry was first committed; it had said that \bead{vmz9}
+remains open.)
