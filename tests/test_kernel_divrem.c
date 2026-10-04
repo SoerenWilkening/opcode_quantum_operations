@@ -61,7 +61,7 @@
 #include <stdio.h>
 #include <time.h>
 
-/* TWO-WORD, because `divrem` ships at i128 (opcode_table.yaml:187-190, all four
+/* TWO-WORD, because `divrem` ships at i128 (opcode_table.yaml:188-191, all four
  * opcodes, the full 15-variant grid including the bare `qq` shape — K12.md said
  * the opposite until 2026-08-16 and it was a Rule 16 trap). Rule 7's canonical
  * shape otherwise — arity 2, one width, |dst| = W — so no `shape` and no `call`
@@ -228,10 +228,10 @@ static void check_counts(cq_gold *g, const cq_kd_spec *k, int W, int want_q)
 
 /* THE SHIPPED LADDER IS {i1, i8, i16, i32, i64, i128} — not 8/16/32/64, which
  * K12.md said until 2026-08-16 and which was a Rule 16 trap.
- * opcode_table.yaml:187-190 gives all four opcodes at `[i1,i8,i16,i32,i64,i128]`
+ * opcode_table.yaml:188-191 gives all four opcodes at `[i1,i8,i16,i32,i64,i128]`
  * with the full 15-variant grid, and docs/cqrt_census.txt:498-501 counts them
- * 6 x 15 = 90 symbols each on that basis. i80 is NOT a divrem width (yaml :85,
- * :133-135) — the mirror image of `icmp`'s fence. The narrow L1 sweep widths
+ * 6 x 15 = 90 symbols each on that basis. i80 is NOT a divrem width (yaml :86,
+ * :134-136) — the mirror image of `icmp`'s fence. The narrow L1 sweep widths
  * are pinned too, so every width the sweep runs is also a golden. (Read "the
  * exhaustive L1 widths" until 2026-09-11, bd aei: since 2026-08-21 every width
  * gets the same constant sample budget, so no width is exhaustive. The widths

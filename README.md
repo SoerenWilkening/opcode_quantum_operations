@@ -20,6 +20,10 @@ measurement); it does not store a circuit or run a statevector simulation.
   libcqops provides 3,060 from its pinned `opcode_table.yaml` `6245117d…`
   grid, and the 60 extra are the `cq_template_frem_*` that CQ_lang `61999c4a`
   removed. See [`docs/BACKEND_CONTRACT.md`](docs/BACKEND_CONTRACT.md) §1.1.
+  **Amended again 2026-10-04 (bd n4ut):** the superset ended. The pinned
+  `opcode_table.yaml` was re-vendored at `7307995f…` (CQ_lang `4266c40d`), so
+  libcqops provides exactly the 3,000 symbols CQ_lang requires: 3,000 = 3,000.
+  The ABI id above is unchanged.
 
 The CQ checkout must already have a configured build directory (normally
 `build/`). An optional QEC sink can be enabled with a built QEC checkout; see

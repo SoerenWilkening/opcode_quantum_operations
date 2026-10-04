@@ -106,14 +106,18 @@ def the_two_abort_reasons_are_distinct_and_neither_lies_about_its_bucket(defs=No
     # bead ar9's CENSUS of the `fp` sentences, by class (measured off the
     # generator 2026-09-24): 15 frem f64, 18 fpext/fptrunc f64, 3 declined,
     # 768 width default (250 at each single width + 18 two-width casts).
+    # bd n4ut (2026-10-04) RE-MEASURED after the re-vendor removed `frem`: its
+    # 15 f64 rows and its 45 f16/f32/f80 width-default rows left the grid, so
+    # the frem class is EMPTY (no body prints it) and the width default is
+    # 723 (235 at each single width + the same 18 two-width casts).
     census = {}
     for n in aborts(defs):
         if sc.is_deferred_fp(n) and not sc.is_defer(n):
             k = sc.fp_reason_of(n)
             k = ("width" if "outside v2's" in k else k.split(" ")[0])
             census[k] = census.get(k, 0) + 1
-    sc.check(census == {"frem": 15, "fpext": 9, "fptrunc": 9, "uitofp": 3,
-                        "width": 768}, "fp reason census moved: %r" % census)
+    sc.check(census == {"fpext": 9, "fptrunc": 9, "uitofp": 3,
+                        "width": 723}, "fp reason census moved: %r" % census)
     deferred = {n for n in aborts(defs) if sc.is_defer(n)}
     sc.check(len(deferred) == 132,
              "expected 132 deferred aborts, got %d" % len(deferred))

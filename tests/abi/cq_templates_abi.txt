@@ -1,8 +1,8 @@
-# cq_templates_abi.txt -- the cq_template_* ABI, 2479 declarations VERBATIM.
+# cq_templates_abi.txt -- the cq_template_* ABI, 2419 declarations VERBATIM.
 #
 # WHAT THIS IS AND WHY IT IS NOT A REGENERABLE GOLDEN. tests/goldens/*.counts are
 # L4 gate counts that CQOPS_UPDATE_GOLDENS=1 re-pins from our own library; this
-# file is the opposite. It is an INDEPENDENT ORACLE: the 2479 declarations
+# file is the opposite. It is an INDEPENDENT ORACLE: the 2419 declarations
 # CQ_lang's own tools/gen_templates.py produced from the SAME pinned yaml, by a
 # different program that cannot share our reading of the naming rules.
 #
@@ -16,8 +16,8 @@
 #
 # PROVENANCE, and the R3-shaped drift check that rides on it:
 #   source        : CQ_lang runtime/cq_templates.h (generated, not hand-written)
-#   CQ_lang HEAD  : b978796b7b3cc110571c4d920adbaef6f645556f
-#   yaml-sha256   : 6245117dcffb4b1c34935ac9ba3f9d42d754c2dc5a881c9510ad594ba3e82426
+#   CQ_lang HEAD  : 4266c40ddc24bc538e75eda5d80598c46cda851f
+#   yaml-sha256   : 7307995f9cc69bec91d601b65a3da19bda74d49392585fe0775f198cfd6f8322
 #
 # The sha above is the banner of that generated header AND the sha256 of our
 # pinned third_party/cq_lang/opcode_table.yaml -- they are equal, which is what
@@ -30,6 +30,14 @@
 #
 # To refresh: re-pin opcode_table.yaml first, then re-extract from CQ_lang's
 # regenerated header. Never hand-edit a declaration.
+#
+# AMENDED 2026-10-04 (bd n4ut): RE-EXTRACTED after the maintainer-authorised
+# re-vendor of opcode_table.yaml. Its live record is now
+# third_party/cq_lang/COMMIT.opcode (CQ_lang 4266c40d), not COMMIT's a6a92fe,
+# so the "UNPINNED ... while the yaml has not" clause above describes the
+# extraction this one replaces: CQ_lang HEAD b978796b, yaml sha
+# 6245117d...a3e82426, 2479 declarations. This extraction is the same lines
+# minus exactly the 60 cq_template_frem_* that CQ_lang 61999c4a removed.
 int32_t cq_template_add_i1(int32_t a_handle, int32_t b_handle);
 int32_t cq_template_add_i128(int32_t a_handle, int32_t b_handle);
 int32_t cq_template_add_i128_controlled(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
@@ -906,66 +914,6 @@ void cq_template_fptrunc_f80_to_f32_unc(int32_t out_handle, int32_t a_handle);
 int32_t cq_template_fptrunc_f80_to_f64(int32_t a_handle);
 int32_t cq_template_fptrunc_f80_to_f64_inv(int32_t a_handle);
 void cq_template_fptrunc_f80_to_f64_unc(int32_t out_handle, int32_t a_handle);
-int32_t cq_template_frem_f16(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f16_controlled(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f16_controlled_inv(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f16_hl(int32_t a_handle, _Float16 b_classical);
-int32_t cq_template_frem_f16_hl_controlled(int32_t ctrl_flag, int32_t a_handle, _Float16 b_classical);
-int32_t cq_template_frem_f16_hl_controlled_inv(int32_t ctrl_flag, int32_t a_handle, _Float16 b_classical);
-int32_t cq_template_frem_f16_hl_inv(int32_t a_handle, _Float16 b_classical);
-void cq_template_frem_f16_hl_unc(int32_t out_handle, int32_t a_handle, _Float16 b_classical);
-int32_t cq_template_frem_f16_inv(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f16_lh(_Float16 a_classical, int32_t b_handle);
-int32_t cq_template_frem_f16_lh_controlled(int32_t ctrl_flag, _Float16 a_classical, int32_t b_handle);
-int32_t cq_template_frem_f16_lh_controlled_inv(int32_t ctrl_flag, _Float16 a_classical, int32_t b_handle);
-int32_t cq_template_frem_f16_lh_inv(_Float16 a_classical, int32_t b_handle);
-void cq_template_frem_f16_lh_unc(int32_t out_handle, _Float16 a_classical, int32_t b_handle);
-void cq_template_frem_f16_unc(int32_t out_handle, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f32(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f32_controlled(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f32_controlled_inv(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f32_hl(int32_t a_handle, float b_classical);
-int32_t cq_template_frem_f32_hl_controlled(int32_t ctrl_flag, int32_t a_handle, float b_classical);
-int32_t cq_template_frem_f32_hl_controlled_inv(int32_t ctrl_flag, int32_t a_handle, float b_classical);
-int32_t cq_template_frem_f32_hl_inv(int32_t a_handle, float b_classical);
-void cq_template_frem_f32_hl_unc(int32_t out_handle, int32_t a_handle, float b_classical);
-int32_t cq_template_frem_f32_inv(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f32_lh(float a_classical, int32_t b_handle);
-int32_t cq_template_frem_f32_lh_controlled(int32_t ctrl_flag, float a_classical, int32_t b_handle);
-int32_t cq_template_frem_f32_lh_controlled_inv(int32_t ctrl_flag, float a_classical, int32_t b_handle);
-int32_t cq_template_frem_f32_lh_inv(float a_classical, int32_t b_handle);
-void cq_template_frem_f32_lh_unc(int32_t out_handle, float a_classical, int32_t b_handle);
-void cq_template_frem_f32_unc(int32_t out_handle, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f64(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f64_controlled(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f64_controlled_inv(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f64_hl(int32_t a_handle, double b_classical);
-int32_t cq_template_frem_f64_hl_controlled(int32_t ctrl_flag, int32_t a_handle, double b_classical);
-int32_t cq_template_frem_f64_hl_controlled_inv(int32_t ctrl_flag, int32_t a_handle, double b_classical);
-int32_t cq_template_frem_f64_hl_inv(int32_t a_handle, double b_classical);
-void cq_template_frem_f64_hl_unc(int32_t out_handle, int32_t a_handle, double b_classical);
-int32_t cq_template_frem_f64_inv(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f64_lh(double a_classical, int32_t b_handle);
-int32_t cq_template_frem_f64_lh_controlled(int32_t ctrl_flag, double a_classical, int32_t b_handle);
-int32_t cq_template_frem_f64_lh_controlled_inv(int32_t ctrl_flag, double a_classical, int32_t b_handle);
-int32_t cq_template_frem_f64_lh_inv(double a_classical, int32_t b_handle);
-void cq_template_frem_f64_lh_unc(int32_t out_handle, double a_classical, int32_t b_handle);
-void cq_template_frem_f64_unc(int32_t out_handle, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f80(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f80_controlled(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f80_controlled_inv(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f80_hl(int32_t a_handle, long double b_classical);
-int32_t cq_template_frem_f80_hl_controlled(int32_t ctrl_flag, int32_t a_handle, long double b_classical);
-int32_t cq_template_frem_f80_hl_controlled_inv(int32_t ctrl_flag, int32_t a_handle, long double b_classical);
-int32_t cq_template_frem_f80_hl_inv(int32_t a_handle, long double b_classical);
-void cq_template_frem_f80_hl_unc(int32_t out_handle, int32_t a_handle, long double b_classical);
-int32_t cq_template_frem_f80_inv(int32_t a_handle, int32_t b_handle);
-int32_t cq_template_frem_f80_lh(long double a_classical, int32_t b_handle);
-int32_t cq_template_frem_f80_lh_controlled(int32_t ctrl_flag, long double a_classical, int32_t b_handle);
-int32_t cq_template_frem_f80_lh_controlled_inv(int32_t ctrl_flag, long double a_classical, int32_t b_handle);
-int32_t cq_template_frem_f80_lh_inv(long double a_classical, int32_t b_handle);
-void cq_template_frem_f80_lh_unc(int32_t out_handle, long double a_classical, int32_t b_handle);
-void cq_template_frem_f80_unc(int32_t out_handle, int32_t a_handle, int32_t b_handle);
 int32_t cq_template_fsub_f16(int32_t a_handle, int32_t b_handle);
 int32_t cq_template_fsub_f16_controlled(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);
 int32_t cq_template_fsub_f16_controlled_inv(int32_t ctrl_flag, int32_t a_handle, int32_t b_handle);

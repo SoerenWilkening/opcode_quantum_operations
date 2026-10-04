@@ -57,7 +57,9 @@ cq_kernel_fn   cq_tpl_fcmp_kernel(cq_shim_fpred pred);
  * `frem` HAS NO ROW AND MUST NOT ACQUIRE ONE UNTIL IT HAS A KERNEL. It is the
  * fifth `fp_arith` binary opcode and there is no `CQ_SHIM_FOP_FREM` to index
  * with, which is what makes the omission a COMPILE error rather than a table
- * one enumerator short. */
+ * one enumerator short. (Since bd n4ut's 2026-10-04 re-vendor the yaml has no
+ * `frem` row at all — CQ_lang 61999c4a removed it — so `fp_arith` has four
+ * binary opcodes and all four are here.) */
 cq_kernel_fn   cq_tpl_fbin_kernel(cq_shim_fop op);
 
 /* M37's four CROSS-DOMAIN conversions and the two UNARY families, all in M13's

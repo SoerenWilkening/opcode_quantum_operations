@@ -12,13 +12,17 @@
  *   - the still-aborting rows that touch f64 carry a reason of their OWN,
  *     citing PRD-v2 §7.9: `frem` (no construction, §3.3) and `fpext`/`fptrunc`
  *     (need an f16/f32/f80 rail);
+ *     (`frem`'s class left this file at bd n4ut, 2026-10-04, with its symbols:
+ *     the re-vendored opcode_table.yaml has no `frem` row, so libcqops defines
+ *     no cq_template_frem_* and no body prints that sentence. Its 15 rows and
+ *     their declarations were removed; they could no longer link.)
  *   - every other `fp` row is at f16/f32/f80 and NAMES that width as outside
  *     v2's f64-only scope, an upstream dependency (PRD-v2 §1a, §6.2/§6.3).
  * The bucket of every row is unchanged; only the text moved.
  *
  * THE EXPECTED TEXT IS TYPED HERE, NOT IMPORTED from shim/gen_reasons.py: a
  * generator that printed a wrong width would agree with any oracle derived
- * from it. tests/test_gen_bodies.py sweeps all 804 `fp` bodies statically
+ * from it. tests/test_gen_bodies.py sweeps all 744 `fp` bodies statically
  * against its own independent transcription; this file is the runtime witness
  * for one or more symbols of every reason class, through the real
  * `cq_shim_unsupported`. The hand-written fp-CORE aborts in
@@ -36,9 +40,6 @@
 
 /* --- the reason texts, transcribed ------------------------------------------ */
 
-#define R_FREM "frem f64 stays an abort on liveness: the pinned Bennett "      \
-               "snapshot has no frem construction (no soft_frem) and the "     \
-               "corpus calls it zero times (PRD-v2 3.3, 7.9)"
 #define R_WIDEN(op, src, dst, w)                                              \
     op " " src " -> " dst " stays an abort: it needs an " w " rail, and v2 "  \
     "is f64-only, so no " w " rail can be allocated (PRD-v2 7.9)"
@@ -50,25 +51,7 @@
 
 /* --- the symbols ------------------------------------------------------------ */
 
-/* ALL FIFTEEN `frem_f64` SYMBOLS, one per ABI variant, `_inv` included: the
- * row has not landed, so its `_inv` is not a D14 row (gen_reasons' DECLINED
- * doctrine) and says the same sentence as its forward. */
 #define REASON_ROWS(X)                                                        \
-    X(frem_f64,                      (0, 0),          R_FREM)                 \
-    X(frem_f64_hl,                   (0, 0.0),        R_FREM)                 \
-    X(frem_f64_lh,                   (0.0, 0),        R_FREM)                 \
-    X(frem_f64_unc,                  (0, 0, 0),       R_FREM)                 \
-    X(frem_f64_hl_unc,               (0, 0, 0.0),     R_FREM)                 \
-    X(frem_f64_lh_unc,               (0, 0.0, 0),     R_FREM)                 \
-    X(frem_f64_controlled,           (0, 0, 0),       R_FREM)                 \
-    X(frem_f64_hl_controlled,        (0, 0, 0.0),     R_FREM)                 \
-    X(frem_f64_lh_controlled,        (0, 0.0, 0),     R_FREM)                 \
-    X(frem_f64_inv,                  (0, 0),          R_FREM)                 \
-    X(frem_f64_hl_inv,               (0, 0.0),        R_FREM)                 \
-    X(frem_f64_lh_inv,               (0.0, 0),        R_FREM)                 \
-    X(frem_f64_controlled_inv,       (0, 0, 0),       R_FREM)                 \
-    X(frem_f64_hl_controlled_inv,    (0, 0, 0.0),     R_FREM)                 \
-    X(frem_f64_lh_controlled_inv,    (0, 0.0, 0),     R_FREM)                 \
     /* fpext / fptrunc touching f64: the OTHER width is the rail it needs,  \
      * on either side of the arrow. */                                        \
     X(fpext_f32_to_f64,              (0),     R_WIDEN("fpext", "f32", "f64", "f32")) \
@@ -90,21 +73,6 @@
 
 /* The ABI's own declarations for the symbols above (the manifests in tests/abi/); a wrong
  * one is a link error or a `conflicting types`, never a silent mismatch. */
-int32_t cq_template_frem_f64(int32_t, int32_t);
-int32_t cq_template_frem_f64_hl(int32_t, double);
-int32_t cq_template_frem_f64_lh(double, int32_t);
-void    cq_template_frem_f64_unc(int32_t, int32_t, int32_t);
-void    cq_template_frem_f64_hl_unc(int32_t, int32_t, double);
-void    cq_template_frem_f64_lh_unc(int32_t, double, int32_t);
-int32_t cq_template_frem_f64_controlled(int32_t, int32_t, int32_t);
-int32_t cq_template_frem_f64_hl_controlled(int32_t, int32_t, double);
-int32_t cq_template_frem_f64_lh_controlled(int32_t, double, int32_t);
-int32_t cq_template_frem_f64_inv(int32_t, int32_t);
-int32_t cq_template_frem_f64_hl_inv(int32_t, double);
-int32_t cq_template_frem_f64_lh_inv(double, int32_t);
-int32_t cq_template_frem_f64_controlled_inv(int32_t, int32_t, int32_t);
-int32_t cq_template_frem_f64_hl_controlled_inv(int32_t, int32_t, double);
-int32_t cq_template_frem_f64_lh_controlled_inv(int32_t, double, int32_t);
 int32_t cq_template_fpext_f32_to_f64(int32_t);
 void    cq_template_fpext_f32_to_f64_unc(int32_t, int32_t);
 int32_t cq_template_fpext_f64_to_f80_inv(int32_t);
@@ -140,7 +108,7 @@ CQ_TEST(every_reason_class_prints_its_own_sentence_at_runtime)
 {
     char msg[768];
 
-    CHECK_EQ((int)N_ROWS, 29);
+    CHECK_EQ((int)N_ROWS, 14);
     for (size_t i = 0; i < N_ROWS; i++) {
         char want[768];
         const int aborted = cq_child_capture(CQ_CHILD_STDERR, ROWS[i].fn,

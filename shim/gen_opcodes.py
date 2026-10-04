@@ -1,5 +1,6 @@
 # shim/gen_opcodes.py — the FIRST expansion path: CQ_lang's
-# `opcode_table.yaml` (2479 symbols), expanded into gen_shim's `Row` model.
+# `opcode_table.yaml` (2419 symbols since bd n4ut's re-vendor; 2479 before),
+# expanded into gen_shim's `Row` model.
 #
 # THE RESERVE SEAM gen_shim.py RECORDED ON 2026-09-19 (bead 9ve.24), TAKEN
 # 2026-09-24 (bead 9ve.44) WHEN IT BIT. gen_shim.py stood at 292 counted lines

@@ -252,7 +252,7 @@ CQ_TEST(k8_narrow_widths)
 }
 
 /* i128 IS IN SCOPE AND IT IS NOT A COURTESY: `mul` ships at i128
- * (opcode_table.yaml:186), so K11's inner accumulator runs there and K8 must be
+ * (opcode_table.yaml:187), so K11's inner accumulator runs there and K8 must be
  * width-generic to 128 like every other kernel. Nothing here is packed — the
  * VALUES are two-word cq_ref_w on the reference side only (refmodel.h). */
 CQ_TEST(k8_wide_widths)

@@ -59,7 +59,7 @@ static void ds_i128_case(const cq_kd_spec *k, int want_q)
 
     printf("# %s W=128: 1 case at the all-quantum mask = %llu gate emissions "
            "over %d scratch qubits — %.1f s. i128 IS a shipped divrem width "
-           "(opcode_table.yaml:187-190)\n",
+           "(opcode_table.yaml:188-191)\n",
            k->name, (unsigned long long)sdiv_per_case(128, want_q),
            cq_sdivrem_region(128, want_q),
            (double)(clock() - t0) / CLOCKS_PER_SEC);

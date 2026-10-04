@@ -15,7 +15,8 @@
 # declarations, in milliseconds and with no toolchain. Every case here WRITES A
 # C PROGRAM, compiles it and — for three of the four — runs it, which is the
 # only way to make a claim about what a body DOES rather than what it says:
-#   * the whole grid compiles against CQ_lang's own 2479 declarations, which is
+#   * the whole grid compiles against CQ_lang's own 2419 opcode-grid
+#     declarations (2479 until bd n4ut's re-vendor), which is
 #     the check `nm` structurally cannot perform (C links a wrong signature
 #     silently, and it is what caught this module's one real defect);
 #   * a swapped `_lh` operand order is REFUSED by that compile, which is the

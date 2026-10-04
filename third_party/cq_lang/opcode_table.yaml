@@ -58,7 +58,8 @@
 # (`5<x` ⇒ `x>5`, CompareLowering.cpp / TemplateName.cpp), so compares have NO
 # `_lh` on ANY axis, exactly like the commutative binary ops (add/mul/and/or/xor).
 #
-# Acceptance count check (total == 2315). Baselines: 1562 (pre-f16) -> 1732 (f16,
+# Historical count through bd 3c6m.51: 2479. Removing unsupported frem's
+# 15 variants at four widths leaves 2419 declared templates. Baselines: 1562 (pre-f16) -> 1732 (f16,
 # Increment D) -> 2091 (i128 Tier-1 +215, 8rvn fcmp +144). bd 3c6m.4 adds ONE
 # long-double fp width f80 to EVERY fp row + the fp-WIDTH cast grid (NOT then the
 # cross-domain int<->fp casts — fenced in castInScope; f128 deferred, not shipped):
@@ -86,7 +87,7 @@
 #   addc/xorc/tape/qram (>64 fence) — the decline guards live in ArithLowering
 #   (i80 binary allow-set = and/lshr/or/shl) / CompareLowering / castInScope (i80 a
 #   zext DEST + trunc SOURCE only). i80 is NEVER a control-merged data value.
-#   binary_opcodes  == 18 (7 int_arith + 6 int_bitwise + 5 fp_arith). int rows
+#   binary_opcodes  == 17 (7 int_arith + 6 int_bitwise + 4 fp_arith). int rows
 #                          5 widths (+i128 on int_arith/bitwise; +i80 on the four
 #                          bitwise ops and/lshr/or/shl only), fp rows 4 widths
 #                          {f16,f32,f64,f80}.
@@ -172,7 +173,7 @@ predicates:
   icmp: [eq, ne, slt, sgt, sle, sge, ult, ugt, ule, uge]
   fcmp: [oeq, une, olt, ogt, ole, oge, one, ord, uno, ueq, ugt, uge, ult, ule]
 
-# -- Binary opcodes (18 = 7 int_arith + 6 int_bitwise + 5 fp_arith) -----------
+# -- Binary opcodes (17 = 7 int_arith + 6 int_bitwise + 4 fp_arith) -----------
 # Int widths: i1, i8, i16, i32, i64.  FP widths: f32, f64.
 # Commutative ops carry the qq/hl grid across the fwd, inv, controlled[_inv],
 # and (Phase 5) void unc axes. Non-commutative ops additionally carry the lh
@@ -195,13 +196,12 @@ binary_opcodes:
   - { opcode: shl,  family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128,i80], llvm_inst: "llvm::Instruction::Shl",  c_operators: ["<<","<<="],                        variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
   - { opcode: lshr, family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128,i80], llvm_inst: "llvm::Instruction::LShr", c_operators: [">>",">>="], signed_variant: true,  variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
   - { opcode: ashr, family: int_bitwise, widths: [i1,i8,i16,i32,i64,i128], llvm_inst: "llvm::Instruction::AShr", c_operators: [">>",">>="], signed_variant: true,  variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
-  # Floating-point arithmetic (5; fneg is unary). f80/f128 added bd 3c6m.4 (the
-  # `…l` math.h arithmetic + fmodl→frem x86_fp80).
+  # Floating-point arithmetic (4; fneg is unary). f80 was added bd 3c6m.4.
+  # frem was removed: no approved hardware route or Bennett.jl implementation.
   - { opcode: fadd, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FAdd", c_operators: ["+","+="], variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
   - { opcode: fsub, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FSub", c_operators: ["-","-="], variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
   - { opcode: fmul, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FMul", c_operators: ["*","*="], variants: [fwd_qq, fwd_hl, inv_qq, inv_hl, controlled_qq, controlled_hl, controlled_inv_qq, controlled_inv_hl, unc_qq, unc_hl] }
   - { opcode: fdiv, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FDiv", c_operators: ["/","/="], variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
-  - { opcode: frem, family: fp_arith,    widths: [f16,f32,f64,f80], llvm_inst: "llvm::Instruction::FRem", c_operators: ["%","%="], variants: [fwd_qq, fwd_hl, fwd_lh, inv_qq, inv_hl, inv_lh, controlled_qq, controlled_hl, controlled_lh, controlled_inv_qq, controlled_inv_hl, controlled_inv_lh, unc_qq, unc_hl, unc_lh] }
 
 # -- Unary opcodes (1: fneg) ---------------------------------------------------
 # PRD §"Floating-point arithmetic": "the only genuinely new unary opcode".

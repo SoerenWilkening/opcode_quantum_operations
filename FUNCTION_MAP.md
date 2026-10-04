@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7224
+**Indexed definitions:** 7165
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -45,15 +45,16 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _cqops_pin_one` | [44](cmake/CqopsIntrinsicPin.cmake:44) |
-| `function cqops_check_intrinsic_pin` | [85](cmake/CqopsIntrinsicPin.cmake:85) |
+| `function _cqops_pin_one` | [52](cmake/CqopsIntrinsicPin.cmake:52) |
+| `function cqops_check_intrinsic_pin` | [95](cmake/CqopsIntrinsicPin.cmake:95) |
+| `function cqops_check_opcode_pin` | [122](cmake/CqopsIntrinsicPin.cmake:122) |
 
 ## `cmake/CqopsLinkWitness.cmake`
 
 | Function | Line |
 |---|---:|
-| `macro cqops_r3_arm` | [94](cmake/CqopsLinkWitness.cmake:94) |
-| `function cqops_add_link_witness` | [118](cmake/CqopsLinkWitness.cmake:118) |
+| `macro cqops_r3_arm` | [99](cmake/CqopsLinkWitness.cmake:99) |
+| `function cqops_add_link_witness` | [123](cmake/CqopsLinkWitness.cmake:123) |
 
 ## `cmake/CqopsPython.cmake`
 
@@ -172,11 +173,11 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cqrt_ry_f32_controlled` | [204](shim/cq_runtime_v2.c:204) |
-| `cqrt_ry_f16_controlled` | [215](shim/cq_runtime_v2.c:215) |
-| `cqrt_ry_f80_controlled` | [219](shim/cq_runtime_v2.c:219) |
-| `cqrt_ry_f32_controlled_inv` | [228](shim/cq_runtime_v2.c:228) |
-| `cqrt_alloc_handle` | [263](shim/cq_runtime_v2.c:263) |
+| `cqrt_ry_f32_controlled` | [205](shim/cq_runtime_v2.c:205) |
+| `cqrt_ry_f16_controlled` | [216](shim/cq_runtime_v2.c:216) |
+| `cqrt_ry_f80_controlled` | [220](shim/cq_runtime_v2.c:220) |
+| `cqrt_ry_f32_controlled_inv` | [229](shim/cq_runtime_v2.c:229) |
+| `cqrt_alloc_handle` | [267](shim/cq_runtime_v2.c:267) |
 
 ## `shim/cq_shim.h`
 
@@ -290,20 +291,20 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_tpl_bin_kernel` | [47](shim/cq_template_dispatch.c:47) |
 | `cq_tpl_cmp_kernel` | [84](shim/cq_template_dispatch.c:84) |
 | `cq_tpl_fcmp_kernel` | [113](shim/cq_template_dispatch.c:113) |
-| `cq_tpl_fbin_kernel` | [143](shim/cq_template_dispatch.c:143) |
-| `cq_tpl_fma_kernel` | [166](shim/cq_template_dispatch.c:166) |
-| `cq_tpl_bin_name` | [186](shim/cq_template_dispatch.c:186) |
-| `cq_tpl_cmp_name` | [201](shim/cq_template_dispatch.c:201) |
-| `cq_tpl_fcmp_name` | [218](shim/cq_template_dispatch.c:218) |
-| `cq_tpl_fbin_name` | [238](shim/cq_template_dispatch.c:238) |
-| `cq_tpl_fma_name` | [252](shim/cq_template_dispatch.c:252) |
+| `cq_tpl_fbin_kernel` | [145](shim/cq_template_dispatch.c:145) |
+| `cq_tpl_fma_kernel` | [168](shim/cq_template_dispatch.c:168) |
+| `cq_tpl_bin_name` | [188](shim/cq_template_dispatch.c:188) |
+| `cq_tpl_cmp_name` | [203](shim/cq_template_dispatch.c:203) |
+| `cq_tpl_fcmp_name` | [220](shim/cq_template_dispatch.c:220) |
+| `cq_tpl_fbin_name` | [240](shim/cq_template_dispatch.c:240) |
+| `cq_tpl_fma_name` | [254](shim/cq_template_dispatch.c:254) |
 
 ## `shim/cq_template_dispatch.h`
 
 | Function | Line |
 |---|---:|
 | `void` | [33](shim/cq_template_dispatch.h:33) |
-| `void` | [140](shim/cq_template_dispatch.h:140) |
+| `void` | [142](shim/cq_template_dispatch.h:142) |
 
 ## `shim/cq_template_dispatch_funary.c`
 
@@ -429,11 +430,11 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `entry_family` | [80](shim/gen_bodies.py:80) |
 | `entry_key` | [95](shim/gen_bodies.py:95) |
-| `literal` | [232](shim/gen_bodies.py:232) |
-| `call_args` | [246](shim/gen_bodies.py:246) |
-| `wrapper` | [278](shim/gen_bodies.py:278) |
-| `abort` | [290](shim/gen_bodies.py:290) |
-| `body` | [301](shim/gen_bodies.py:301) |
+| `literal` | [236](shim/gen_bodies.py:236) |
+| `call_args` | [250](shim/gen_bodies.py:250) |
+| `wrapper` | [282](shim/gen_bodies.py:282) |
+| `abort` | [294](shim/gen_bodies.py:294) |
+| `body` | [305](shim/gen_bodies.py:305) |
 
 ## `shim/gen_intrinsics.py`
 
@@ -447,312 +448,252 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `expand_opcodes` | [21](shim/gen_opcodes.py:21) |
+| `expand_opcodes` | [22](shim/gen_opcodes.py:22) |
 
 ## `shim/gen_reasons.py`
 
 | Function | Line |
 |---|---:|
-| `fp_reason` | [69](shim/gen_reasons.py:69) |
-| `defer_reason` | [117](shim/gen_reasons.py:117) |
+| `fp_reason` | [74](shim/gen_reasons.py:74) |
+| `defer_reason` | [122](shim/gen_reasons.py:122) |
 
 ## `shim/gen_shim.py`
 
 | Function | Line |
 |---|---:|
-| `__init__` | [101](shim/gen_shim.py:101) |
-| `decl` | [105](shim/gen_shim.py:105) |
-| `variant_axes` | [125](shim/gen_shim.py:125) |
-| `suffix` | [136](shim/gen_shim.py:136) |
-| `signature` | [159](shim/gen_shim.py:159) |
-| `landed_key` | [262](shim/gen_shim.py:262) |
-| `bucket_of` | [274](shim/gen_shim.py:274) |
-| `_emitter` | [300](shim/gen_shim.py:300) |
-| `emit` | [301](shim/gen_shim.py:301) |
-| `expand` | [327](shim/gen_shim.py:327) |
-| `_is_fp` | [370](shim/gen_shim.py:370) |
-| `audit` | [374](shim/gen_shim.py:374) |
-| `render` | [421](shim/gen_shim.py:421) |
-| `files` | [441](shim/gen_shim.py:441) |
-| `load` | [447](shim/gen_shim.py:447) |
-| `main` | [452](shim/gen_shim.py:452) |
+| `__init__` | [102](shim/gen_shim.py:102) |
+| `decl` | [106](shim/gen_shim.py:106) |
+| `variant_axes` | [126](shim/gen_shim.py:126) |
+| `suffix` | [137](shim/gen_shim.py:137) |
+| `signature` | [160](shim/gen_shim.py:160) |
+| `landed_key` | [266](shim/gen_shim.py:266) |
+| `bucket_of` | [278](shim/gen_shim.py:278) |
+| `_emitter` | [304](shim/gen_shim.py:304) |
+| `emit` | [305](shim/gen_shim.py:305) |
+| `expand` | [331](shim/gen_shim.py:331) |
+| `_is_fp` | [379](shim/gen_shim.py:379) |
+| `audit` | [383](shim/gen_shim.py:383) |
+| `render` | [430](shim/gen_shim.py:430) |
+| `files` | [450](shim/gen_shim.py:450) |
+| `load` | [456](shim/gen_shim.py:456) |
+| `main` | [461](shim/gen_shim.py:461) |
 
 ## `shim/generated/cq_template_fp_arith.gen.c`
 
 | Function | Line |
 |---|---:|
-| `cq_template_fadd_f16` | [285](shim/generated/cq_template_fp_arith.gen.c:285) |
-| `cq_template_fadd_f16_controlled` | [291](shim/generated/cq_template_fp_arith.gen.c:291) |
-| `cq_template_fadd_f16_controlled_inv` | [298](shim/generated/cq_template_fp_arith.gen.c:298) |
-| `cq_template_fadd_f16_hl` | [305](shim/generated/cq_template_fp_arith.gen.c:305) |
-| `cq_template_fadd_f16_hl_controlled` | [311](shim/generated/cq_template_fp_arith.gen.c:311) |
-| `cq_template_fadd_f16_hl_controlled_inv` | [318](shim/generated/cq_template_fp_arith.gen.c:318) |
-| `cq_template_fadd_f16_hl_inv` | [325](shim/generated/cq_template_fp_arith.gen.c:325) |
-| `cq_template_fadd_f16_hl_unc` | [331](shim/generated/cq_template_fp_arith.gen.c:331) |
-| `cq_template_fadd_f16_inv` | [338](shim/generated/cq_template_fp_arith.gen.c:338) |
-| `cq_template_fadd_f16_unc` | [344](shim/generated/cq_template_fp_arith.gen.c:344) |
-| `cq_template_fadd_f32` | [351](shim/generated/cq_template_fp_arith.gen.c:351) |
-| `cq_template_fadd_f32_controlled` | [357](shim/generated/cq_template_fp_arith.gen.c:357) |
-| `cq_template_fadd_f32_controlled_inv` | [364](shim/generated/cq_template_fp_arith.gen.c:364) |
-| `cq_template_fadd_f32_hl` | [371](shim/generated/cq_template_fp_arith.gen.c:371) |
-| `cq_template_fadd_f32_hl_controlled` | [377](shim/generated/cq_template_fp_arith.gen.c:377) |
-| `cq_template_fadd_f32_hl_controlled_inv` | [384](shim/generated/cq_template_fp_arith.gen.c:384) |
-| `cq_template_fadd_f32_hl_inv` | [391](shim/generated/cq_template_fp_arith.gen.c:391) |
-| `cq_template_fadd_f32_hl_unc` | [397](shim/generated/cq_template_fp_arith.gen.c:397) |
-| `cq_template_fadd_f32_inv` | [404](shim/generated/cq_template_fp_arith.gen.c:404) |
-| `cq_template_fadd_f32_unc` | [410](shim/generated/cq_template_fp_arith.gen.c:410) |
-| `cq_template_fadd_f64` | [417](shim/generated/cq_template_fp_arith.gen.c:417) |
-| `cq_template_fadd_f64_controlled` | [421](shim/generated/cq_template_fp_arith.gen.c:421) |
-| `cq_template_fadd_f64_controlled_inv` | [425](shim/generated/cq_template_fp_arith.gen.c:425) |
-| `cq_template_fadd_f64_hl` | [432](shim/generated/cq_template_fp_arith.gen.c:432) |
-| `cq_template_fadd_f64_hl_controlled` | [436](shim/generated/cq_template_fp_arith.gen.c:436) |
-| `cq_template_fadd_f64_hl_controlled_inv` | [440](shim/generated/cq_template_fp_arith.gen.c:440) |
-| `cq_template_fadd_f64_hl_inv` | [447](shim/generated/cq_template_fp_arith.gen.c:447) |
-| `cq_template_fadd_f64_hl_unc` | [453](shim/generated/cq_template_fp_arith.gen.c:453) |
-| `cq_template_fadd_f64_inv` | [457](shim/generated/cq_template_fp_arith.gen.c:457) |
-| `cq_template_fadd_f64_unc` | [463](shim/generated/cq_template_fp_arith.gen.c:463) |
-| `cq_template_fadd_f80` | [467](shim/generated/cq_template_fp_arith.gen.c:467) |
-| `cq_template_fadd_f80_controlled` | [473](shim/generated/cq_template_fp_arith.gen.c:473) |
-| `cq_template_fadd_f80_controlled_inv` | [480](shim/generated/cq_template_fp_arith.gen.c:480) |
-| `cq_template_fadd_f80_hl` | [487](shim/generated/cq_template_fp_arith.gen.c:487) |
-| `cq_template_fadd_f80_hl_controlled` | [493](shim/generated/cq_template_fp_arith.gen.c:493) |
-| `cq_template_fadd_f80_hl_controlled_inv` | [500](shim/generated/cq_template_fp_arith.gen.c:500) |
-| `cq_template_fadd_f80_hl_inv` | [507](shim/generated/cq_template_fp_arith.gen.c:507) |
-| `cq_template_fadd_f80_hl_unc` | [513](shim/generated/cq_template_fp_arith.gen.c:513) |
-| `cq_template_fadd_f80_inv` | [520](shim/generated/cq_template_fp_arith.gen.c:520) |
-| `cq_template_fadd_f80_unc` | [526](shim/generated/cq_template_fp_arith.gen.c:526) |
-| `cq_template_fdiv_f16` | [533](shim/generated/cq_template_fp_arith.gen.c:533) |
-| `cq_template_fdiv_f16_controlled` | [539](shim/generated/cq_template_fp_arith.gen.c:539) |
-| `cq_template_fdiv_f16_controlled_inv` | [546](shim/generated/cq_template_fp_arith.gen.c:546) |
-| `cq_template_fdiv_f16_hl` | [553](shim/generated/cq_template_fp_arith.gen.c:553) |
-| `cq_template_fdiv_f16_hl_controlled` | [559](shim/generated/cq_template_fp_arith.gen.c:559) |
-| `cq_template_fdiv_f16_hl_controlled_inv` | [566](shim/generated/cq_template_fp_arith.gen.c:566) |
-| `cq_template_fdiv_f16_hl_inv` | [573](shim/generated/cq_template_fp_arith.gen.c:573) |
-| `cq_template_fdiv_f16_hl_unc` | [579](shim/generated/cq_template_fp_arith.gen.c:579) |
-| `cq_template_fdiv_f16_inv` | [586](shim/generated/cq_template_fp_arith.gen.c:586) |
-| `cq_template_fdiv_f16_lh` | [592](shim/generated/cq_template_fp_arith.gen.c:592) |
-| `cq_template_fdiv_f16_lh_controlled` | [598](shim/generated/cq_template_fp_arith.gen.c:598) |
-| `cq_template_fdiv_f16_lh_controlled_inv` | [605](shim/generated/cq_template_fp_arith.gen.c:605) |
-| `cq_template_fdiv_f16_lh_inv` | [612](shim/generated/cq_template_fp_arith.gen.c:612) |
-| `cq_template_fdiv_f16_lh_unc` | [618](shim/generated/cq_template_fp_arith.gen.c:618) |
-| `cq_template_fdiv_f16_unc` | [625](shim/generated/cq_template_fp_arith.gen.c:625) |
-| `cq_template_fdiv_f32` | [632](shim/generated/cq_template_fp_arith.gen.c:632) |
-| `cq_template_fdiv_f32_controlled` | [638](shim/generated/cq_template_fp_arith.gen.c:638) |
-| `cq_template_fdiv_f32_controlled_inv` | [645](shim/generated/cq_template_fp_arith.gen.c:645) |
-| `cq_template_fdiv_f32_hl` | [652](shim/generated/cq_template_fp_arith.gen.c:652) |
-| `cq_template_fdiv_f32_hl_controlled` | [658](shim/generated/cq_template_fp_arith.gen.c:658) |
-| `cq_template_fdiv_f32_hl_controlled_inv` | [665](shim/generated/cq_template_fp_arith.gen.c:665) |
-| `cq_template_fdiv_f32_hl_inv` | [672](shim/generated/cq_template_fp_arith.gen.c:672) |
-| `cq_template_fdiv_f32_hl_unc` | [678](shim/generated/cq_template_fp_arith.gen.c:678) |
-| `cq_template_fdiv_f32_inv` | [685](shim/generated/cq_template_fp_arith.gen.c:685) |
-| `cq_template_fdiv_f32_lh` | [691](shim/generated/cq_template_fp_arith.gen.c:691) |
-| `cq_template_fdiv_f32_lh_controlled` | [697](shim/generated/cq_template_fp_arith.gen.c:697) |
-| `cq_template_fdiv_f32_lh_controlled_inv` | [704](shim/generated/cq_template_fp_arith.gen.c:704) |
-| `cq_template_fdiv_f32_lh_inv` | [711](shim/generated/cq_template_fp_arith.gen.c:711) |
-| `cq_template_fdiv_f32_lh_unc` | [717](shim/generated/cq_template_fp_arith.gen.c:717) |
-| `cq_template_fdiv_f32_unc` | [724](shim/generated/cq_template_fp_arith.gen.c:724) |
-| `cq_template_fdiv_f64` | [731](shim/generated/cq_template_fp_arith.gen.c:731) |
-| `cq_template_fdiv_f64_controlled` | [735](shim/generated/cq_template_fp_arith.gen.c:735) |
-| `cq_template_fdiv_f64_controlled_inv` | [739](shim/generated/cq_template_fp_arith.gen.c:739) |
-| `cq_template_fdiv_f64_hl` | [746](shim/generated/cq_template_fp_arith.gen.c:746) |
-| `cq_template_fdiv_f64_hl_controlled` | [750](shim/generated/cq_template_fp_arith.gen.c:750) |
-| `cq_template_fdiv_f64_hl_controlled_inv` | [754](shim/generated/cq_template_fp_arith.gen.c:754) |
-| `cq_template_fdiv_f64_hl_inv` | [761](shim/generated/cq_template_fp_arith.gen.c:761) |
-| `cq_template_fdiv_f64_hl_unc` | [767](shim/generated/cq_template_fp_arith.gen.c:767) |
-| `cq_template_fdiv_f64_inv` | [771](shim/generated/cq_template_fp_arith.gen.c:771) |
-| `cq_template_fdiv_f64_lh` | [777](shim/generated/cq_template_fp_arith.gen.c:777) |
-| `cq_template_fdiv_f64_lh_controlled` | [781](shim/generated/cq_template_fp_arith.gen.c:781) |
-| `cq_template_fdiv_f64_lh_controlled_inv` | [785](shim/generated/cq_template_fp_arith.gen.c:785) |
-| `cq_template_fdiv_f64_lh_inv` | [792](shim/generated/cq_template_fp_arith.gen.c:792) |
-| `cq_template_fdiv_f64_lh_unc` | [798](shim/generated/cq_template_fp_arith.gen.c:798) |
-| `cq_template_fdiv_f64_unc` | [802](shim/generated/cq_template_fp_arith.gen.c:802) |
-| `cq_template_fdiv_f80` | [806](shim/generated/cq_template_fp_arith.gen.c:806) |
-| `cq_template_fdiv_f80_controlled` | [812](shim/generated/cq_template_fp_arith.gen.c:812) |
-| `cq_template_fdiv_f80_controlled_inv` | [819](shim/generated/cq_template_fp_arith.gen.c:819) |
-| `cq_template_fdiv_f80_hl` | [826](shim/generated/cq_template_fp_arith.gen.c:826) |
-| `cq_template_fdiv_f80_hl_controlled` | [832](shim/generated/cq_template_fp_arith.gen.c:832) |
-| `cq_template_fdiv_f80_hl_controlled_inv` | [839](shim/generated/cq_template_fp_arith.gen.c:839) |
-| `cq_template_fdiv_f80_hl_inv` | [846](shim/generated/cq_template_fp_arith.gen.c:846) |
-| `cq_template_fdiv_f80_hl_unc` | [852](shim/generated/cq_template_fp_arith.gen.c:852) |
-| `cq_template_fdiv_f80_inv` | [859](shim/generated/cq_template_fp_arith.gen.c:859) |
-| `cq_template_fdiv_f80_lh` | [865](shim/generated/cq_template_fp_arith.gen.c:865) |
-| `cq_template_fdiv_f80_lh_controlled` | [871](shim/generated/cq_template_fp_arith.gen.c:871) |
-| `cq_template_fdiv_f80_lh_controlled_inv` | [878](shim/generated/cq_template_fp_arith.gen.c:878) |
-| `cq_template_fdiv_f80_lh_inv` | [885](shim/generated/cq_template_fp_arith.gen.c:885) |
-| `cq_template_fdiv_f80_lh_unc` | [891](shim/generated/cq_template_fp_arith.gen.c:891) |
-| `cq_template_fdiv_f80_unc` | [898](shim/generated/cq_template_fp_arith.gen.c:898) |
-| `cq_template_fmul_f16` | [905](shim/generated/cq_template_fp_arith.gen.c:905) |
-| `cq_template_fmul_f16_controlled` | [911](shim/generated/cq_template_fp_arith.gen.c:911) |
-| `cq_template_fmul_f16_controlled_inv` | [918](shim/generated/cq_template_fp_arith.gen.c:918) |
-| `cq_template_fmul_f16_hl` | [925](shim/generated/cq_template_fp_arith.gen.c:925) |
-| `cq_template_fmul_f16_hl_controlled` | [931](shim/generated/cq_template_fp_arith.gen.c:931) |
-| `cq_template_fmul_f16_hl_controlled_inv` | [938](shim/generated/cq_template_fp_arith.gen.c:938) |
-| `cq_template_fmul_f16_hl_inv` | [945](shim/generated/cq_template_fp_arith.gen.c:945) |
-| `cq_template_fmul_f16_hl_unc` | [951](shim/generated/cq_template_fp_arith.gen.c:951) |
-| `cq_template_fmul_f16_inv` | [958](shim/generated/cq_template_fp_arith.gen.c:958) |
-| `cq_template_fmul_f16_unc` | [964](shim/generated/cq_template_fp_arith.gen.c:964) |
-| `cq_template_fmul_f32` | [971](shim/generated/cq_template_fp_arith.gen.c:971) |
-| `cq_template_fmul_f32_controlled` | [977](shim/generated/cq_template_fp_arith.gen.c:977) |
-| `cq_template_fmul_f32_controlled_inv` | [984](shim/generated/cq_template_fp_arith.gen.c:984) |
-| `cq_template_fmul_f32_hl` | [991](shim/generated/cq_template_fp_arith.gen.c:991) |
-| `cq_template_fmul_f32_hl_controlled` | [997](shim/generated/cq_template_fp_arith.gen.c:997) |
-| `cq_template_fmul_f32_hl_controlled_inv` | [1004](shim/generated/cq_template_fp_arith.gen.c:1004) |
-| `cq_template_fmul_f32_hl_inv` | [1011](shim/generated/cq_template_fp_arith.gen.c:1011) |
-| `cq_template_fmul_f32_hl_unc` | [1017](shim/generated/cq_template_fp_arith.gen.c:1017) |
-| `cq_template_fmul_f32_inv` | [1024](shim/generated/cq_template_fp_arith.gen.c:1024) |
-| `cq_template_fmul_f32_unc` | [1030](shim/generated/cq_template_fp_arith.gen.c:1030) |
-| `cq_template_fmul_f64` | [1037](shim/generated/cq_template_fp_arith.gen.c:1037) |
-| `cq_template_fmul_f64_controlled` | [1041](shim/generated/cq_template_fp_arith.gen.c:1041) |
-| `cq_template_fmul_f64_controlled_inv` | [1045](shim/generated/cq_template_fp_arith.gen.c:1045) |
-| `cq_template_fmul_f64_hl` | [1052](shim/generated/cq_template_fp_arith.gen.c:1052) |
-| `cq_template_fmul_f64_hl_controlled` | [1056](shim/generated/cq_template_fp_arith.gen.c:1056) |
-| `cq_template_fmul_f64_hl_controlled_inv` | [1060](shim/generated/cq_template_fp_arith.gen.c:1060) |
-| `cq_template_fmul_f64_hl_inv` | [1067](shim/generated/cq_template_fp_arith.gen.c:1067) |
-| `cq_template_fmul_f64_hl_unc` | [1073](shim/generated/cq_template_fp_arith.gen.c:1073) |
-| `cq_template_fmul_f64_inv` | [1077](shim/generated/cq_template_fp_arith.gen.c:1077) |
-| `cq_template_fmul_f64_unc` | [1083](shim/generated/cq_template_fp_arith.gen.c:1083) |
-| `cq_template_fmul_f80` | [1087](shim/generated/cq_template_fp_arith.gen.c:1087) |
-| `cq_template_fmul_f80_controlled` | [1093](shim/generated/cq_template_fp_arith.gen.c:1093) |
-| `cq_template_fmul_f80_controlled_inv` | [1100](shim/generated/cq_template_fp_arith.gen.c:1100) |
-| `cq_template_fmul_f80_hl` | [1107](shim/generated/cq_template_fp_arith.gen.c:1107) |
-| `cq_template_fmul_f80_hl_controlled` | [1113](shim/generated/cq_template_fp_arith.gen.c:1113) |
-| `cq_template_fmul_f80_hl_controlled_inv` | [1120](shim/generated/cq_template_fp_arith.gen.c:1120) |
-| `cq_template_fmul_f80_hl_inv` | [1127](shim/generated/cq_template_fp_arith.gen.c:1127) |
-| `cq_template_fmul_f80_hl_unc` | [1133](shim/generated/cq_template_fp_arith.gen.c:1133) |
-| `cq_template_fmul_f80_inv` | [1140](shim/generated/cq_template_fp_arith.gen.c:1140) |
-| `cq_template_fmul_f80_unc` | [1146](shim/generated/cq_template_fp_arith.gen.c:1146) |
-| `cq_template_fneg_f16` | [1153](shim/generated/cq_template_fp_arith.gen.c:1153) |
-| `cq_template_fneg_f16_inv` | [1158](shim/generated/cq_template_fp_arith.gen.c:1158) |
-| `cq_template_fneg_f16_unc` | [1163](shim/generated/cq_template_fp_arith.gen.c:1163) |
-| `cq_template_fneg_f32` | [1169](shim/generated/cq_template_fp_arith.gen.c:1169) |
-| `cq_template_fneg_f32_inv` | [1174](shim/generated/cq_template_fp_arith.gen.c:1174) |
-| `cq_template_fneg_f32_unc` | [1179](shim/generated/cq_template_fp_arith.gen.c:1179) |
-| `cq_template_fneg_f64` | [1185](shim/generated/cq_template_fp_arith.gen.c:1185) |
-| `cq_template_fneg_f64_inv` | [1189](shim/generated/cq_template_fp_arith.gen.c:1189) |
-| `cq_template_fneg_f64_unc` | [1194](shim/generated/cq_template_fp_arith.gen.c:1194) |
-| `cq_template_fneg_f80` | [1198](shim/generated/cq_template_fp_arith.gen.c:1198) |
-| `cq_template_fneg_f80_inv` | [1203](shim/generated/cq_template_fp_arith.gen.c:1203) |
-| `cq_template_fneg_f80_unc` | [1208](shim/generated/cq_template_fp_arith.gen.c:1208) |
-| `cq_template_frem_f16` | [1214](shim/generated/cq_template_fp_arith.gen.c:1214) |
-| `cq_template_frem_f16_controlled` | [1220](shim/generated/cq_template_fp_arith.gen.c:1220) |
-| `cq_template_frem_f16_controlled_inv` | [1227](shim/generated/cq_template_fp_arith.gen.c:1227) |
-| `cq_template_frem_f16_hl` | [1234](shim/generated/cq_template_fp_arith.gen.c:1234) |
-| `cq_template_frem_f16_hl_controlled` | [1240](shim/generated/cq_template_fp_arith.gen.c:1240) |
-| `cq_template_frem_f16_hl_controlled_inv` | [1247](shim/generated/cq_template_fp_arith.gen.c:1247) |
-| `cq_template_frem_f16_hl_inv` | [1254](shim/generated/cq_template_fp_arith.gen.c:1254) |
-| `cq_template_frem_f16_hl_unc` | [1260](shim/generated/cq_template_fp_arith.gen.c:1260) |
-| `cq_template_frem_f16_inv` | [1267](shim/generated/cq_template_fp_arith.gen.c:1267) |
-| `cq_template_frem_f16_lh` | [1273](shim/generated/cq_template_fp_arith.gen.c:1273) |
-| `cq_template_frem_f16_lh_controlled` | [1279](shim/generated/cq_template_fp_arith.gen.c:1279) |
-| `cq_template_frem_f16_lh_controlled_inv` | [1286](shim/generated/cq_template_fp_arith.gen.c:1286) |
-| `cq_template_frem_f16_lh_inv` | [1293](shim/generated/cq_template_fp_arith.gen.c:1293) |
-| `cq_template_frem_f16_lh_unc` | [1299](shim/generated/cq_template_fp_arith.gen.c:1299) |
-| `cq_template_frem_f16_unc` | [1306](shim/generated/cq_template_fp_arith.gen.c:1306) |
-| `cq_template_frem_f32` | [1313](shim/generated/cq_template_fp_arith.gen.c:1313) |
-| `cq_template_frem_f32_controlled` | [1319](shim/generated/cq_template_fp_arith.gen.c:1319) |
-| `cq_template_frem_f32_controlled_inv` | [1326](shim/generated/cq_template_fp_arith.gen.c:1326) |
-| `cq_template_frem_f32_hl` | [1333](shim/generated/cq_template_fp_arith.gen.c:1333) |
-| `cq_template_frem_f32_hl_controlled` | [1339](shim/generated/cq_template_fp_arith.gen.c:1339) |
-| `cq_template_frem_f32_hl_controlled_inv` | [1346](shim/generated/cq_template_fp_arith.gen.c:1346) |
-| `cq_template_frem_f32_hl_inv` | [1353](shim/generated/cq_template_fp_arith.gen.c:1353) |
-| `cq_template_frem_f32_hl_unc` | [1359](shim/generated/cq_template_fp_arith.gen.c:1359) |
-| `cq_template_frem_f32_inv` | [1366](shim/generated/cq_template_fp_arith.gen.c:1366) |
-| `cq_template_frem_f32_lh` | [1372](shim/generated/cq_template_fp_arith.gen.c:1372) |
-| `cq_template_frem_f32_lh_controlled` | [1378](shim/generated/cq_template_fp_arith.gen.c:1378) |
-| `cq_template_frem_f32_lh_controlled_inv` | [1385](shim/generated/cq_template_fp_arith.gen.c:1385) |
-| `cq_template_frem_f32_lh_inv` | [1392](shim/generated/cq_template_fp_arith.gen.c:1392) |
-| `cq_template_frem_f32_lh_unc` | [1398](shim/generated/cq_template_fp_arith.gen.c:1398) |
-| `cq_template_frem_f32_unc` | [1405](shim/generated/cq_template_fp_arith.gen.c:1405) |
-| `cq_template_frem_f64` | [1412](shim/generated/cq_template_fp_arith.gen.c:1412) |
-| `cq_template_frem_f64_controlled` | [1418](shim/generated/cq_template_fp_arith.gen.c:1418) |
-| `cq_template_frem_f64_controlled_inv` | [1425](shim/generated/cq_template_fp_arith.gen.c:1425) |
-| `cq_template_frem_f64_hl` | [1432](shim/generated/cq_template_fp_arith.gen.c:1432) |
-| `cq_template_frem_f64_hl_controlled` | [1438](shim/generated/cq_template_fp_arith.gen.c:1438) |
-| `cq_template_frem_f64_hl_controlled_inv` | [1445](shim/generated/cq_template_fp_arith.gen.c:1445) |
-| `cq_template_frem_f64_hl_inv` | [1452](shim/generated/cq_template_fp_arith.gen.c:1452) |
-| `cq_template_frem_f64_hl_unc` | [1458](shim/generated/cq_template_fp_arith.gen.c:1458) |
-| `cq_template_frem_f64_inv` | [1465](shim/generated/cq_template_fp_arith.gen.c:1465) |
-| `cq_template_frem_f64_lh` | [1471](shim/generated/cq_template_fp_arith.gen.c:1471) |
-| `cq_template_frem_f64_lh_controlled` | [1477](shim/generated/cq_template_fp_arith.gen.c:1477) |
-| `cq_template_frem_f64_lh_controlled_inv` | [1484](shim/generated/cq_template_fp_arith.gen.c:1484) |
-| `cq_template_frem_f64_lh_inv` | [1491](shim/generated/cq_template_fp_arith.gen.c:1491) |
-| `cq_template_frem_f64_lh_unc` | [1497](shim/generated/cq_template_fp_arith.gen.c:1497) |
-| `cq_template_frem_f64_unc` | [1504](shim/generated/cq_template_fp_arith.gen.c:1504) |
-| `cq_template_frem_f80` | [1511](shim/generated/cq_template_fp_arith.gen.c:1511) |
-| `cq_template_frem_f80_controlled` | [1517](shim/generated/cq_template_fp_arith.gen.c:1517) |
-| `cq_template_frem_f80_controlled_inv` | [1524](shim/generated/cq_template_fp_arith.gen.c:1524) |
-| `cq_template_frem_f80_hl` | [1531](shim/generated/cq_template_fp_arith.gen.c:1531) |
-| `cq_template_frem_f80_hl_controlled` | [1537](shim/generated/cq_template_fp_arith.gen.c:1537) |
-| `cq_template_frem_f80_hl_controlled_inv` | [1544](shim/generated/cq_template_fp_arith.gen.c:1544) |
-| `cq_template_frem_f80_hl_inv` | [1551](shim/generated/cq_template_fp_arith.gen.c:1551) |
-| `cq_template_frem_f80_hl_unc` | [1557](shim/generated/cq_template_fp_arith.gen.c:1557) |
-| `cq_template_frem_f80_inv` | [1564](shim/generated/cq_template_fp_arith.gen.c:1564) |
-| `cq_template_frem_f80_lh` | [1570](shim/generated/cq_template_fp_arith.gen.c:1570) |
-| `cq_template_frem_f80_lh_controlled` | [1576](shim/generated/cq_template_fp_arith.gen.c:1576) |
-| `cq_template_frem_f80_lh_controlled_inv` | [1583](shim/generated/cq_template_fp_arith.gen.c:1583) |
-| `cq_template_frem_f80_lh_inv` | [1590](shim/generated/cq_template_fp_arith.gen.c:1590) |
-| `cq_template_frem_f80_lh_unc` | [1596](shim/generated/cq_template_fp_arith.gen.c:1596) |
-| `cq_template_frem_f80_unc` | [1603](shim/generated/cq_template_fp_arith.gen.c:1603) |
-| `cq_template_fsub_f16` | [1610](shim/generated/cq_template_fp_arith.gen.c:1610) |
-| `cq_template_fsub_f16_controlled` | [1616](shim/generated/cq_template_fp_arith.gen.c:1616) |
-| `cq_template_fsub_f16_controlled_inv` | [1623](shim/generated/cq_template_fp_arith.gen.c:1623) |
-| `cq_template_fsub_f16_hl` | [1630](shim/generated/cq_template_fp_arith.gen.c:1630) |
-| `cq_template_fsub_f16_hl_controlled` | [1636](shim/generated/cq_template_fp_arith.gen.c:1636) |
-| `cq_template_fsub_f16_hl_controlled_inv` | [1643](shim/generated/cq_template_fp_arith.gen.c:1643) |
-| `cq_template_fsub_f16_hl_inv` | [1650](shim/generated/cq_template_fp_arith.gen.c:1650) |
-| `cq_template_fsub_f16_hl_unc` | [1656](shim/generated/cq_template_fp_arith.gen.c:1656) |
-| `cq_template_fsub_f16_inv` | [1663](shim/generated/cq_template_fp_arith.gen.c:1663) |
-| `cq_template_fsub_f16_lh` | [1669](shim/generated/cq_template_fp_arith.gen.c:1669) |
-| `cq_template_fsub_f16_lh_controlled` | [1675](shim/generated/cq_template_fp_arith.gen.c:1675) |
-| `cq_template_fsub_f16_lh_controlled_inv` | [1682](shim/generated/cq_template_fp_arith.gen.c:1682) |
-| `cq_template_fsub_f16_lh_inv` | [1689](shim/generated/cq_template_fp_arith.gen.c:1689) |
-| `cq_template_fsub_f16_lh_unc` | [1695](shim/generated/cq_template_fp_arith.gen.c:1695) |
-| `cq_template_fsub_f16_unc` | [1702](shim/generated/cq_template_fp_arith.gen.c:1702) |
-| `cq_template_fsub_f32` | [1709](shim/generated/cq_template_fp_arith.gen.c:1709) |
-| `cq_template_fsub_f32_controlled` | [1715](shim/generated/cq_template_fp_arith.gen.c:1715) |
-| `cq_template_fsub_f32_controlled_inv` | [1722](shim/generated/cq_template_fp_arith.gen.c:1722) |
-| `cq_template_fsub_f32_hl` | [1729](shim/generated/cq_template_fp_arith.gen.c:1729) |
-| `cq_template_fsub_f32_hl_controlled` | [1735](shim/generated/cq_template_fp_arith.gen.c:1735) |
-| `cq_template_fsub_f32_hl_controlled_inv` | [1742](shim/generated/cq_template_fp_arith.gen.c:1742) |
-| `cq_template_fsub_f32_hl_inv` | [1749](shim/generated/cq_template_fp_arith.gen.c:1749) |
-| `cq_template_fsub_f32_hl_unc` | [1755](shim/generated/cq_template_fp_arith.gen.c:1755) |
-| `cq_template_fsub_f32_inv` | [1762](shim/generated/cq_template_fp_arith.gen.c:1762) |
-| `cq_template_fsub_f32_lh` | [1768](shim/generated/cq_template_fp_arith.gen.c:1768) |
-| `cq_template_fsub_f32_lh_controlled` | [1774](shim/generated/cq_template_fp_arith.gen.c:1774) |
-| `cq_template_fsub_f32_lh_controlled_inv` | [1781](shim/generated/cq_template_fp_arith.gen.c:1781) |
-| `cq_template_fsub_f32_lh_inv` | [1788](shim/generated/cq_template_fp_arith.gen.c:1788) |
-| `cq_template_fsub_f32_lh_unc` | [1794](shim/generated/cq_template_fp_arith.gen.c:1794) |
-| `cq_template_fsub_f32_unc` | [1801](shim/generated/cq_template_fp_arith.gen.c:1801) |
-| `cq_template_fsub_f64` | [1808](shim/generated/cq_template_fp_arith.gen.c:1808) |
-| `cq_template_fsub_f64_controlled` | [1812](shim/generated/cq_template_fp_arith.gen.c:1812) |
-| `cq_template_fsub_f64_controlled_inv` | [1816](shim/generated/cq_template_fp_arith.gen.c:1816) |
-| `cq_template_fsub_f64_hl` | [1823](shim/generated/cq_template_fp_arith.gen.c:1823) |
-| `cq_template_fsub_f64_hl_controlled` | [1827](shim/generated/cq_template_fp_arith.gen.c:1827) |
-| `cq_template_fsub_f64_hl_controlled_inv` | [1831](shim/generated/cq_template_fp_arith.gen.c:1831) |
-| `cq_template_fsub_f64_hl_inv` | [1838](shim/generated/cq_template_fp_arith.gen.c:1838) |
-| `cq_template_fsub_f64_hl_unc` | [1844](shim/generated/cq_template_fp_arith.gen.c:1844) |
-| `cq_template_fsub_f64_inv` | [1848](shim/generated/cq_template_fp_arith.gen.c:1848) |
-| `cq_template_fsub_f64_lh` | [1854](shim/generated/cq_template_fp_arith.gen.c:1854) |
-| `cq_template_fsub_f64_lh_controlled` | [1858](shim/generated/cq_template_fp_arith.gen.c:1858) |
-| `cq_template_fsub_f64_lh_controlled_inv` | [1862](shim/generated/cq_template_fp_arith.gen.c:1862) |
-| `cq_template_fsub_f64_lh_inv` | [1869](shim/generated/cq_template_fp_arith.gen.c:1869) |
-| `cq_template_fsub_f64_lh_unc` | [1875](shim/generated/cq_template_fp_arith.gen.c:1875) |
-| `cq_template_fsub_f64_unc` | [1879](shim/generated/cq_template_fp_arith.gen.c:1879) |
-| `cq_template_fsub_f80` | [1883](shim/generated/cq_template_fp_arith.gen.c:1883) |
-| `cq_template_fsub_f80_controlled` | [1889](shim/generated/cq_template_fp_arith.gen.c:1889) |
-| `cq_template_fsub_f80_controlled_inv` | [1896](shim/generated/cq_template_fp_arith.gen.c:1896) |
-| `cq_template_fsub_f80_hl` | [1903](shim/generated/cq_template_fp_arith.gen.c:1903) |
-| `cq_template_fsub_f80_hl_controlled` | [1909](shim/generated/cq_template_fp_arith.gen.c:1909) |
-| `cq_template_fsub_f80_hl_controlled_inv` | [1916](shim/generated/cq_template_fp_arith.gen.c:1916) |
-| `cq_template_fsub_f80_hl_inv` | [1923](shim/generated/cq_template_fp_arith.gen.c:1923) |
-| `cq_template_fsub_f80_hl_unc` | [1929](shim/generated/cq_template_fp_arith.gen.c:1929) |
-| `cq_template_fsub_f80_inv` | [1936](shim/generated/cq_template_fp_arith.gen.c:1936) |
-| `cq_template_fsub_f80_lh` | [1942](shim/generated/cq_template_fp_arith.gen.c:1942) |
-| `cq_template_fsub_f80_lh_controlled` | [1948](shim/generated/cq_template_fp_arith.gen.c:1948) |
-| `cq_template_fsub_f80_lh_controlled_inv` | [1955](shim/generated/cq_template_fp_arith.gen.c:1955) |
-| `cq_template_fsub_f80_lh_inv` | [1962](shim/generated/cq_template_fp_arith.gen.c:1962) |
-| `cq_template_fsub_f80_lh_unc` | [1968](shim/generated/cq_template_fp_arith.gen.c:1968) |
-| `cq_template_fsub_f80_unc` | [1975](shim/generated/cq_template_fp_arith.gen.c:1975) |
+| `cq_template_fadd_f16` | [225](shim/generated/cq_template_fp_arith.gen.c:225) |
+| `cq_template_fadd_f16_controlled` | [231](shim/generated/cq_template_fp_arith.gen.c:231) |
+| `cq_template_fadd_f16_controlled_inv` | [238](shim/generated/cq_template_fp_arith.gen.c:238) |
+| `cq_template_fadd_f16_hl` | [245](shim/generated/cq_template_fp_arith.gen.c:245) |
+| `cq_template_fadd_f16_hl_controlled` | [251](shim/generated/cq_template_fp_arith.gen.c:251) |
+| `cq_template_fadd_f16_hl_controlled_inv` | [258](shim/generated/cq_template_fp_arith.gen.c:258) |
+| `cq_template_fadd_f16_hl_inv` | [265](shim/generated/cq_template_fp_arith.gen.c:265) |
+| `cq_template_fadd_f16_hl_unc` | [271](shim/generated/cq_template_fp_arith.gen.c:271) |
+| `cq_template_fadd_f16_inv` | [278](shim/generated/cq_template_fp_arith.gen.c:278) |
+| `cq_template_fadd_f16_unc` | [284](shim/generated/cq_template_fp_arith.gen.c:284) |
+| `cq_template_fadd_f32` | [291](shim/generated/cq_template_fp_arith.gen.c:291) |
+| `cq_template_fadd_f32_controlled` | [297](shim/generated/cq_template_fp_arith.gen.c:297) |
+| `cq_template_fadd_f32_controlled_inv` | [304](shim/generated/cq_template_fp_arith.gen.c:304) |
+| `cq_template_fadd_f32_hl` | [311](shim/generated/cq_template_fp_arith.gen.c:311) |
+| `cq_template_fadd_f32_hl_controlled` | [317](shim/generated/cq_template_fp_arith.gen.c:317) |
+| `cq_template_fadd_f32_hl_controlled_inv` | [324](shim/generated/cq_template_fp_arith.gen.c:324) |
+| `cq_template_fadd_f32_hl_inv` | [331](shim/generated/cq_template_fp_arith.gen.c:331) |
+| `cq_template_fadd_f32_hl_unc` | [337](shim/generated/cq_template_fp_arith.gen.c:337) |
+| `cq_template_fadd_f32_inv` | [344](shim/generated/cq_template_fp_arith.gen.c:344) |
+| `cq_template_fadd_f32_unc` | [350](shim/generated/cq_template_fp_arith.gen.c:350) |
+| `cq_template_fadd_f64` | [357](shim/generated/cq_template_fp_arith.gen.c:357) |
+| `cq_template_fadd_f64_controlled` | [361](shim/generated/cq_template_fp_arith.gen.c:361) |
+| `cq_template_fadd_f64_controlled_inv` | [365](shim/generated/cq_template_fp_arith.gen.c:365) |
+| `cq_template_fadd_f64_hl` | [372](shim/generated/cq_template_fp_arith.gen.c:372) |
+| `cq_template_fadd_f64_hl_controlled` | [376](shim/generated/cq_template_fp_arith.gen.c:376) |
+| `cq_template_fadd_f64_hl_controlled_inv` | [380](shim/generated/cq_template_fp_arith.gen.c:380) |
+| `cq_template_fadd_f64_hl_inv` | [387](shim/generated/cq_template_fp_arith.gen.c:387) |
+| `cq_template_fadd_f64_hl_unc` | [393](shim/generated/cq_template_fp_arith.gen.c:393) |
+| `cq_template_fadd_f64_inv` | [397](shim/generated/cq_template_fp_arith.gen.c:397) |
+| `cq_template_fadd_f64_unc` | [403](shim/generated/cq_template_fp_arith.gen.c:403) |
+| `cq_template_fadd_f80` | [407](shim/generated/cq_template_fp_arith.gen.c:407) |
+| `cq_template_fadd_f80_controlled` | [413](shim/generated/cq_template_fp_arith.gen.c:413) |
+| `cq_template_fadd_f80_controlled_inv` | [420](shim/generated/cq_template_fp_arith.gen.c:420) |
+| `cq_template_fadd_f80_hl` | [427](shim/generated/cq_template_fp_arith.gen.c:427) |
+| `cq_template_fadd_f80_hl_controlled` | [433](shim/generated/cq_template_fp_arith.gen.c:433) |
+| `cq_template_fadd_f80_hl_controlled_inv` | [440](shim/generated/cq_template_fp_arith.gen.c:440) |
+| `cq_template_fadd_f80_hl_inv` | [447](shim/generated/cq_template_fp_arith.gen.c:447) |
+| `cq_template_fadd_f80_hl_unc` | [453](shim/generated/cq_template_fp_arith.gen.c:453) |
+| `cq_template_fadd_f80_inv` | [460](shim/generated/cq_template_fp_arith.gen.c:460) |
+| `cq_template_fadd_f80_unc` | [466](shim/generated/cq_template_fp_arith.gen.c:466) |
+| `cq_template_fdiv_f16` | [473](shim/generated/cq_template_fp_arith.gen.c:473) |
+| `cq_template_fdiv_f16_controlled` | [479](shim/generated/cq_template_fp_arith.gen.c:479) |
+| `cq_template_fdiv_f16_controlled_inv` | [486](shim/generated/cq_template_fp_arith.gen.c:486) |
+| `cq_template_fdiv_f16_hl` | [493](shim/generated/cq_template_fp_arith.gen.c:493) |
+| `cq_template_fdiv_f16_hl_controlled` | [499](shim/generated/cq_template_fp_arith.gen.c:499) |
+| `cq_template_fdiv_f16_hl_controlled_inv` | [506](shim/generated/cq_template_fp_arith.gen.c:506) |
+| `cq_template_fdiv_f16_hl_inv` | [513](shim/generated/cq_template_fp_arith.gen.c:513) |
+| `cq_template_fdiv_f16_hl_unc` | [519](shim/generated/cq_template_fp_arith.gen.c:519) |
+| `cq_template_fdiv_f16_inv` | [526](shim/generated/cq_template_fp_arith.gen.c:526) |
+| `cq_template_fdiv_f16_lh` | [532](shim/generated/cq_template_fp_arith.gen.c:532) |
+| `cq_template_fdiv_f16_lh_controlled` | [538](shim/generated/cq_template_fp_arith.gen.c:538) |
+| `cq_template_fdiv_f16_lh_controlled_inv` | [545](shim/generated/cq_template_fp_arith.gen.c:545) |
+| `cq_template_fdiv_f16_lh_inv` | [552](shim/generated/cq_template_fp_arith.gen.c:552) |
+| `cq_template_fdiv_f16_lh_unc` | [558](shim/generated/cq_template_fp_arith.gen.c:558) |
+| `cq_template_fdiv_f16_unc` | [565](shim/generated/cq_template_fp_arith.gen.c:565) |
+| `cq_template_fdiv_f32` | [572](shim/generated/cq_template_fp_arith.gen.c:572) |
+| `cq_template_fdiv_f32_controlled` | [578](shim/generated/cq_template_fp_arith.gen.c:578) |
+| `cq_template_fdiv_f32_controlled_inv` | [585](shim/generated/cq_template_fp_arith.gen.c:585) |
+| `cq_template_fdiv_f32_hl` | [592](shim/generated/cq_template_fp_arith.gen.c:592) |
+| `cq_template_fdiv_f32_hl_controlled` | [598](shim/generated/cq_template_fp_arith.gen.c:598) |
+| `cq_template_fdiv_f32_hl_controlled_inv` | [605](shim/generated/cq_template_fp_arith.gen.c:605) |
+| `cq_template_fdiv_f32_hl_inv` | [612](shim/generated/cq_template_fp_arith.gen.c:612) |
+| `cq_template_fdiv_f32_hl_unc` | [618](shim/generated/cq_template_fp_arith.gen.c:618) |
+| `cq_template_fdiv_f32_inv` | [625](shim/generated/cq_template_fp_arith.gen.c:625) |
+| `cq_template_fdiv_f32_lh` | [631](shim/generated/cq_template_fp_arith.gen.c:631) |
+| `cq_template_fdiv_f32_lh_controlled` | [637](shim/generated/cq_template_fp_arith.gen.c:637) |
+| `cq_template_fdiv_f32_lh_controlled_inv` | [644](shim/generated/cq_template_fp_arith.gen.c:644) |
+| `cq_template_fdiv_f32_lh_inv` | [651](shim/generated/cq_template_fp_arith.gen.c:651) |
+| `cq_template_fdiv_f32_lh_unc` | [657](shim/generated/cq_template_fp_arith.gen.c:657) |
+| `cq_template_fdiv_f32_unc` | [664](shim/generated/cq_template_fp_arith.gen.c:664) |
+| `cq_template_fdiv_f64` | [671](shim/generated/cq_template_fp_arith.gen.c:671) |
+| `cq_template_fdiv_f64_controlled` | [675](shim/generated/cq_template_fp_arith.gen.c:675) |
+| `cq_template_fdiv_f64_controlled_inv` | [679](shim/generated/cq_template_fp_arith.gen.c:679) |
+| `cq_template_fdiv_f64_hl` | [686](shim/generated/cq_template_fp_arith.gen.c:686) |
+| `cq_template_fdiv_f64_hl_controlled` | [690](shim/generated/cq_template_fp_arith.gen.c:690) |
+| `cq_template_fdiv_f64_hl_controlled_inv` | [694](shim/generated/cq_template_fp_arith.gen.c:694) |
+| `cq_template_fdiv_f64_hl_inv` | [701](shim/generated/cq_template_fp_arith.gen.c:701) |
+| `cq_template_fdiv_f64_hl_unc` | [707](shim/generated/cq_template_fp_arith.gen.c:707) |
+| `cq_template_fdiv_f64_inv` | [711](shim/generated/cq_template_fp_arith.gen.c:711) |
+| `cq_template_fdiv_f64_lh` | [717](shim/generated/cq_template_fp_arith.gen.c:717) |
+| `cq_template_fdiv_f64_lh_controlled` | [721](shim/generated/cq_template_fp_arith.gen.c:721) |
+| `cq_template_fdiv_f64_lh_controlled_inv` | [725](shim/generated/cq_template_fp_arith.gen.c:725) |
+| `cq_template_fdiv_f64_lh_inv` | [732](shim/generated/cq_template_fp_arith.gen.c:732) |
+| `cq_template_fdiv_f64_lh_unc` | [738](shim/generated/cq_template_fp_arith.gen.c:738) |
+| `cq_template_fdiv_f64_unc` | [742](shim/generated/cq_template_fp_arith.gen.c:742) |
+| `cq_template_fdiv_f80` | [746](shim/generated/cq_template_fp_arith.gen.c:746) |
+| `cq_template_fdiv_f80_controlled` | [752](shim/generated/cq_template_fp_arith.gen.c:752) |
+| `cq_template_fdiv_f80_controlled_inv` | [759](shim/generated/cq_template_fp_arith.gen.c:759) |
+| `cq_template_fdiv_f80_hl` | [766](shim/generated/cq_template_fp_arith.gen.c:766) |
+| `cq_template_fdiv_f80_hl_controlled` | [772](shim/generated/cq_template_fp_arith.gen.c:772) |
+| `cq_template_fdiv_f80_hl_controlled_inv` | [779](shim/generated/cq_template_fp_arith.gen.c:779) |
+| `cq_template_fdiv_f80_hl_inv` | [786](shim/generated/cq_template_fp_arith.gen.c:786) |
+| `cq_template_fdiv_f80_hl_unc` | [792](shim/generated/cq_template_fp_arith.gen.c:792) |
+| `cq_template_fdiv_f80_inv` | [799](shim/generated/cq_template_fp_arith.gen.c:799) |
+| `cq_template_fdiv_f80_lh` | [805](shim/generated/cq_template_fp_arith.gen.c:805) |
+| `cq_template_fdiv_f80_lh_controlled` | [811](shim/generated/cq_template_fp_arith.gen.c:811) |
+| `cq_template_fdiv_f80_lh_controlled_inv` | [818](shim/generated/cq_template_fp_arith.gen.c:818) |
+| `cq_template_fdiv_f80_lh_inv` | [825](shim/generated/cq_template_fp_arith.gen.c:825) |
+| `cq_template_fdiv_f80_lh_unc` | [831](shim/generated/cq_template_fp_arith.gen.c:831) |
+| `cq_template_fdiv_f80_unc` | [838](shim/generated/cq_template_fp_arith.gen.c:838) |
+| `cq_template_fmul_f16` | [845](shim/generated/cq_template_fp_arith.gen.c:845) |
+| `cq_template_fmul_f16_controlled` | [851](shim/generated/cq_template_fp_arith.gen.c:851) |
+| `cq_template_fmul_f16_controlled_inv` | [858](shim/generated/cq_template_fp_arith.gen.c:858) |
+| `cq_template_fmul_f16_hl` | [865](shim/generated/cq_template_fp_arith.gen.c:865) |
+| `cq_template_fmul_f16_hl_controlled` | [871](shim/generated/cq_template_fp_arith.gen.c:871) |
+| `cq_template_fmul_f16_hl_controlled_inv` | [878](shim/generated/cq_template_fp_arith.gen.c:878) |
+| `cq_template_fmul_f16_hl_inv` | [885](shim/generated/cq_template_fp_arith.gen.c:885) |
+| `cq_template_fmul_f16_hl_unc` | [891](shim/generated/cq_template_fp_arith.gen.c:891) |
+| `cq_template_fmul_f16_inv` | [898](shim/generated/cq_template_fp_arith.gen.c:898) |
+| `cq_template_fmul_f16_unc` | [904](shim/generated/cq_template_fp_arith.gen.c:904) |
+| `cq_template_fmul_f32` | [911](shim/generated/cq_template_fp_arith.gen.c:911) |
+| `cq_template_fmul_f32_controlled` | [917](shim/generated/cq_template_fp_arith.gen.c:917) |
+| `cq_template_fmul_f32_controlled_inv` | [924](shim/generated/cq_template_fp_arith.gen.c:924) |
+| `cq_template_fmul_f32_hl` | [931](shim/generated/cq_template_fp_arith.gen.c:931) |
+| `cq_template_fmul_f32_hl_controlled` | [937](shim/generated/cq_template_fp_arith.gen.c:937) |
+| `cq_template_fmul_f32_hl_controlled_inv` | [944](shim/generated/cq_template_fp_arith.gen.c:944) |
+| `cq_template_fmul_f32_hl_inv` | [951](shim/generated/cq_template_fp_arith.gen.c:951) |
+| `cq_template_fmul_f32_hl_unc` | [957](shim/generated/cq_template_fp_arith.gen.c:957) |
+| `cq_template_fmul_f32_inv` | [964](shim/generated/cq_template_fp_arith.gen.c:964) |
+| `cq_template_fmul_f32_unc` | [970](shim/generated/cq_template_fp_arith.gen.c:970) |
+| `cq_template_fmul_f64` | [977](shim/generated/cq_template_fp_arith.gen.c:977) |
+| `cq_template_fmul_f64_controlled` | [981](shim/generated/cq_template_fp_arith.gen.c:981) |
+| `cq_template_fmul_f64_controlled_inv` | [985](shim/generated/cq_template_fp_arith.gen.c:985) |
+| `cq_template_fmul_f64_hl` | [992](shim/generated/cq_template_fp_arith.gen.c:992) |
+| `cq_template_fmul_f64_hl_controlled` | [996](shim/generated/cq_template_fp_arith.gen.c:996) |
+| `cq_template_fmul_f64_hl_controlled_inv` | [1000](shim/generated/cq_template_fp_arith.gen.c:1000) |
+| `cq_template_fmul_f64_hl_inv` | [1007](shim/generated/cq_template_fp_arith.gen.c:1007) |
+| `cq_template_fmul_f64_hl_unc` | [1013](shim/generated/cq_template_fp_arith.gen.c:1013) |
+| `cq_template_fmul_f64_inv` | [1017](shim/generated/cq_template_fp_arith.gen.c:1017) |
+| `cq_template_fmul_f64_unc` | [1023](shim/generated/cq_template_fp_arith.gen.c:1023) |
+| `cq_template_fmul_f80` | [1027](shim/generated/cq_template_fp_arith.gen.c:1027) |
+| `cq_template_fmul_f80_controlled` | [1033](shim/generated/cq_template_fp_arith.gen.c:1033) |
+| `cq_template_fmul_f80_controlled_inv` | [1040](shim/generated/cq_template_fp_arith.gen.c:1040) |
+| `cq_template_fmul_f80_hl` | [1047](shim/generated/cq_template_fp_arith.gen.c:1047) |
+| `cq_template_fmul_f80_hl_controlled` | [1053](shim/generated/cq_template_fp_arith.gen.c:1053) |
+| `cq_template_fmul_f80_hl_controlled_inv` | [1060](shim/generated/cq_template_fp_arith.gen.c:1060) |
+| `cq_template_fmul_f80_hl_inv` | [1067](shim/generated/cq_template_fp_arith.gen.c:1067) |
+| `cq_template_fmul_f80_hl_unc` | [1073](shim/generated/cq_template_fp_arith.gen.c:1073) |
+| `cq_template_fmul_f80_inv` | [1080](shim/generated/cq_template_fp_arith.gen.c:1080) |
+| `cq_template_fmul_f80_unc` | [1086](shim/generated/cq_template_fp_arith.gen.c:1086) |
+| `cq_template_fneg_f16` | [1093](shim/generated/cq_template_fp_arith.gen.c:1093) |
+| `cq_template_fneg_f16_inv` | [1098](shim/generated/cq_template_fp_arith.gen.c:1098) |
+| `cq_template_fneg_f16_unc` | [1103](shim/generated/cq_template_fp_arith.gen.c:1103) |
+| `cq_template_fneg_f32` | [1109](shim/generated/cq_template_fp_arith.gen.c:1109) |
+| `cq_template_fneg_f32_inv` | [1114](shim/generated/cq_template_fp_arith.gen.c:1114) |
+| `cq_template_fneg_f32_unc` | [1119](shim/generated/cq_template_fp_arith.gen.c:1119) |
+| `cq_template_fneg_f64` | [1125](shim/generated/cq_template_fp_arith.gen.c:1125) |
+| `cq_template_fneg_f64_inv` | [1129](shim/generated/cq_template_fp_arith.gen.c:1129) |
+| `cq_template_fneg_f64_unc` | [1134](shim/generated/cq_template_fp_arith.gen.c:1134) |
+| `cq_template_fneg_f80` | [1138](shim/generated/cq_template_fp_arith.gen.c:1138) |
+| `cq_template_fneg_f80_inv` | [1143](shim/generated/cq_template_fp_arith.gen.c:1143) |
+| `cq_template_fneg_f80_unc` | [1148](shim/generated/cq_template_fp_arith.gen.c:1148) |
+| `cq_template_fsub_f16` | [1154](shim/generated/cq_template_fp_arith.gen.c:1154) |
+| `cq_template_fsub_f16_controlled` | [1160](shim/generated/cq_template_fp_arith.gen.c:1160) |
+| `cq_template_fsub_f16_controlled_inv` | [1167](shim/generated/cq_template_fp_arith.gen.c:1167) |
+| `cq_template_fsub_f16_hl` | [1174](shim/generated/cq_template_fp_arith.gen.c:1174) |
+| `cq_template_fsub_f16_hl_controlled` | [1180](shim/generated/cq_template_fp_arith.gen.c:1180) |
+| `cq_template_fsub_f16_hl_controlled_inv` | [1187](shim/generated/cq_template_fp_arith.gen.c:1187) |
+| `cq_template_fsub_f16_hl_inv` | [1194](shim/generated/cq_template_fp_arith.gen.c:1194) |
+| `cq_template_fsub_f16_hl_unc` | [1200](shim/generated/cq_template_fp_arith.gen.c:1200) |
+| `cq_template_fsub_f16_inv` | [1207](shim/generated/cq_template_fp_arith.gen.c:1207) |
+| `cq_template_fsub_f16_lh` | [1213](shim/generated/cq_template_fp_arith.gen.c:1213) |
+| `cq_template_fsub_f16_lh_controlled` | [1219](shim/generated/cq_template_fp_arith.gen.c:1219) |
+| `cq_template_fsub_f16_lh_controlled_inv` | [1226](shim/generated/cq_template_fp_arith.gen.c:1226) |
+| `cq_template_fsub_f16_lh_inv` | [1233](shim/generated/cq_template_fp_arith.gen.c:1233) |
+| `cq_template_fsub_f16_lh_unc` | [1239](shim/generated/cq_template_fp_arith.gen.c:1239) |
+| `cq_template_fsub_f16_unc` | [1246](shim/generated/cq_template_fp_arith.gen.c:1246) |
+| `cq_template_fsub_f32` | [1253](shim/generated/cq_template_fp_arith.gen.c:1253) |
+| `cq_template_fsub_f32_controlled` | [1259](shim/generated/cq_template_fp_arith.gen.c:1259) |
+| `cq_template_fsub_f32_controlled_inv` | [1266](shim/generated/cq_template_fp_arith.gen.c:1266) |
+| `cq_template_fsub_f32_hl` | [1273](shim/generated/cq_template_fp_arith.gen.c:1273) |
+| `cq_template_fsub_f32_hl_controlled` | [1279](shim/generated/cq_template_fp_arith.gen.c:1279) |
+| `cq_template_fsub_f32_hl_controlled_inv` | [1286](shim/generated/cq_template_fp_arith.gen.c:1286) |
+| `cq_template_fsub_f32_hl_inv` | [1293](shim/generated/cq_template_fp_arith.gen.c:1293) |
+| `cq_template_fsub_f32_hl_unc` | [1299](shim/generated/cq_template_fp_arith.gen.c:1299) |
+| `cq_template_fsub_f32_inv` | [1306](shim/generated/cq_template_fp_arith.gen.c:1306) |
+| `cq_template_fsub_f32_lh` | [1312](shim/generated/cq_template_fp_arith.gen.c:1312) |
+| `cq_template_fsub_f32_lh_controlled` | [1318](shim/generated/cq_template_fp_arith.gen.c:1318) |
+| `cq_template_fsub_f32_lh_controlled_inv` | [1325](shim/generated/cq_template_fp_arith.gen.c:1325) |
+| `cq_template_fsub_f32_lh_inv` | [1332](shim/generated/cq_template_fp_arith.gen.c:1332) |
+| `cq_template_fsub_f32_lh_unc` | [1338](shim/generated/cq_template_fp_arith.gen.c:1338) |
+| `cq_template_fsub_f32_unc` | [1345](shim/generated/cq_template_fp_arith.gen.c:1345) |
+| `cq_template_fsub_f64` | [1352](shim/generated/cq_template_fp_arith.gen.c:1352) |
+| `cq_template_fsub_f64_controlled` | [1356](shim/generated/cq_template_fp_arith.gen.c:1356) |
+| `cq_template_fsub_f64_controlled_inv` | [1360](shim/generated/cq_template_fp_arith.gen.c:1360) |
+| `cq_template_fsub_f64_hl` | [1367](shim/generated/cq_template_fp_arith.gen.c:1367) |
+| `cq_template_fsub_f64_hl_controlled` | [1371](shim/generated/cq_template_fp_arith.gen.c:1371) |
+| `cq_template_fsub_f64_hl_controlled_inv` | [1375](shim/generated/cq_template_fp_arith.gen.c:1375) |
+| `cq_template_fsub_f64_hl_inv` | [1382](shim/generated/cq_template_fp_arith.gen.c:1382) |
+| `cq_template_fsub_f64_hl_unc` | [1388](shim/generated/cq_template_fp_arith.gen.c:1388) |
+| `cq_template_fsub_f64_inv` | [1392](shim/generated/cq_template_fp_arith.gen.c:1392) |
+| `cq_template_fsub_f64_lh` | [1398](shim/generated/cq_template_fp_arith.gen.c:1398) |
+| `cq_template_fsub_f64_lh_controlled` | [1402](shim/generated/cq_template_fp_arith.gen.c:1402) |
+| `cq_template_fsub_f64_lh_controlled_inv` | [1406](shim/generated/cq_template_fp_arith.gen.c:1406) |
+| `cq_template_fsub_f64_lh_inv` | [1413](shim/generated/cq_template_fp_arith.gen.c:1413) |
+| `cq_template_fsub_f64_lh_unc` | [1419](shim/generated/cq_template_fp_arith.gen.c:1419) |
+| `cq_template_fsub_f64_unc` | [1423](shim/generated/cq_template_fp_arith.gen.c:1423) |
+| `cq_template_fsub_f80` | [1427](shim/generated/cq_template_fp_arith.gen.c:1427) |
+| `cq_template_fsub_f80_controlled` | [1433](shim/generated/cq_template_fp_arith.gen.c:1433) |
+| `cq_template_fsub_f80_controlled_inv` | [1440](shim/generated/cq_template_fp_arith.gen.c:1440) |
+| `cq_template_fsub_f80_hl` | [1447](shim/generated/cq_template_fp_arith.gen.c:1447) |
+| `cq_template_fsub_f80_hl_controlled` | [1453](shim/generated/cq_template_fp_arith.gen.c:1453) |
+| `cq_template_fsub_f80_hl_controlled_inv` | [1460](shim/generated/cq_template_fp_arith.gen.c:1460) |
+| `cq_template_fsub_f80_hl_inv` | [1467](shim/generated/cq_template_fp_arith.gen.c:1467) |
+| `cq_template_fsub_f80_hl_unc` | [1473](shim/generated/cq_template_fp_arith.gen.c:1473) |
+| `cq_template_fsub_f80_inv` | [1480](shim/generated/cq_template_fp_arith.gen.c:1480) |
+| `cq_template_fsub_f80_lh` | [1486](shim/generated/cq_template_fp_arith.gen.c:1486) |
+| `cq_template_fsub_f80_lh_controlled` | [1492](shim/generated/cq_template_fp_arith.gen.c:1492) |
+| `cq_template_fsub_f80_lh_controlled_inv` | [1499](shim/generated/cq_template_fp_arith.gen.c:1499) |
+| `cq_template_fsub_f80_lh_inv` | [1506](shim/generated/cq_template_fp_arith.gen.c:1506) |
+| `cq_template_fsub_f80_lh_unc` | [1512](shim/generated/cq_template_fp_arith.gen.c:1512) |
+| `cq_template_fsub_f80_unc` | [1519](shim/generated/cq_template_fp_arith.gen.c:1519) |
 
 ## `shim/generated/cq_template_fp_compare.gen.c`
 
@@ -4814,8 +4755,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _ibits_pin` | [4046](tests/CMakeLists.txt:4046) |
-| `function _cqops_fround_death_ban` | [4267](tests/CMakeLists.txt:4267) |
+| `function _ibits_pin` | [4052](tests/CMakeLists.txt:4052) |
+| `function _cqops_fround_death_ban` | [4273](tests/CMakeLists.txt:4273) |
 
 ## `tests/package-consumer/main.c`
 
@@ -5128,24 +5069,24 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `check` | [98](tests/support/shimcheck.py:98) |
-| `diff_sets` | [103](tests/support/shimcheck.py:103) |
-| `manifest_yaml_sha` | [112](tests/support/shimcheck.py:112) |
-| `manifest_decls` | [120](tests/support/shimcheck.py:120) |
-| `is_fp` | [162](tests/support/shimcheck.py:162) |
-| `is_landed` | [166](tests/support/shimcheck.py:166) |
-| `is_declined` | [173](tests/support/shimcheck.py:173) |
-| `is_deferred_fp` | [180](tests/support/shimcheck.py:180) |
-| `generate` | [184](tests/support/shimcheck.py:184) |
-| `parse_definitions` | [194](tests/support/shimcheck.py:194) |
-| `read_dir` | [215](tests/support/shimcheck.py:215) |
-| `fp_reason_of` | [248](tests/support/shimcheck.py:248) |
-| `defer_reason_of` | [302](tests/support/shimcheck.py:302) |
-| `bucket_of_body` | [315](tests/support/shimcheck.py:315) |
-| `is_defer` | [344](tests/support/shimcheck.py:344) |
-| `run` | [348](tests/support/shimcheck.py:348) |
-| `abi_header` | [378](tests/support/shimcheck.py:378) |
-| `compile_gen` | [389](tests/support/shimcheck.py:389) |
+| `check` | [101](tests/support/shimcheck.py:101) |
+| `diff_sets` | [106](tests/support/shimcheck.py:106) |
+| `manifest_yaml_sha` | [115](tests/support/shimcheck.py:115) |
+| `manifest_decls` | [123](tests/support/shimcheck.py:123) |
+| `is_fp` | [165](tests/support/shimcheck.py:165) |
+| `is_landed` | [169](tests/support/shimcheck.py:169) |
+| `is_declined` | [176](tests/support/shimcheck.py:176) |
+| `is_deferred_fp` | [183](tests/support/shimcheck.py:183) |
+| `generate` | [187](tests/support/shimcheck.py:187) |
+| `parse_definitions` | [197](tests/support/shimcheck.py:197) |
+| `read_dir` | [218](tests/support/shimcheck.py:218) |
+| `fp_reason_of` | [256](tests/support/shimcheck.py:256) |
+| `defer_reason_of` | [310](tests/support/shimcheck.py:310) |
+| `bucket_of_body` | [323](tests/support/shimcheck.py:323) |
+| `is_defer` | [352](tests/support/shimcheck.py:352) |
+| `run` | [356](tests/support/shimcheck.py:356) |
+| `abi_header` | [386](tests/support/shimcheck.py:386) |
+| `compile_gen` | [397](tests/support/shimcheck.py:397) |
 
 ## `tests/test_angle.c`
 
@@ -5417,31 +5358,31 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `the_generated_bodies_compile_under_the_projects_own_flags` | [45](tests/test_gen_bodies_run.py:45) |
-| `a_signature_that_diverges_from_the_abi_is_caught` | [57](tests/test_gen_bodies_run.py:57) |
-| `swapped` | [66](tests/test_gen_bodies_run.py:66) |
-| `an_abort_body_really_aborts_with_prd_1s_message` | [101](tests/test_gen_bodies_run.py:101) |
-| `the_two_word_literal_round_trips_at_every_shipped_width` | [153](tests/test_gen_bodies_run.py:153) |
+| `the_generated_bodies_compile_under_the_projects_own_flags` | [46](tests/test_gen_bodies_run.py:46) |
+| `a_signature_that_diverges_from_the_abi_is_caught` | [58](tests/test_gen_bodies_run.py:58) |
+| `swapped` | [67](tests/test_gen_bodies_run.py:67) |
+| `an_abort_body_really_aborts_with_prd_1s_message` | [102](tests/test_gen_bodies_run.py:102) |
+| `the_two_word_literal_round_trips_at_every_shipped_width` | [154](tests/test_gen_bodies_run.py:154) |
 
 ## `tests/test_gen_shim.py`
 
 | Function | Line |
 |---|---:|
-| `buckets` | [74](tests/test_gen_shim.py:74) |
-| `the_manifest_is_the_expansion_of_the_pinned_yaml` | [81](tests/test_gen_shim.py:81) |
-| `the_emitted_symbol_set_equals_the_abi_in_both_directions` | [106](tests/test_gen_shim.py:106) |
-| `every_emitted_signature_matches_cq_langs_own_declaration` | [110](tests/test_gen_shim.py:110) |
-| `the_partition_is_1266_wrappers_678_inv_804_fp_and_132_deferred` | [119](tests/test_gen_shim.py:119) |
-| `the_domain_split_is_1102_610_120_164_68_and_12` | [138](tests/test_gen_shim.py:138) |
-| `the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family` | [159](tests/test_gen_shim.py:159) |
-| `the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family` | [168](tests/test_gen_shim.py:168) |
-| `the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed` | [173](tests/test_gen_shim.py:173) |
-| `the_three_declined_symbols_are_in_the_fp_bucket_with_their_own_reason` | [228](tests/test_gen_shim.py:228) |
-| `no_cqrt_rotation_symbol_appears_anywhere_in_the_emitted_shim` | [257](tests/test_gen_shim.py:257) |
-| `scan` | [273](tests/test_gen_shim.py:273) |
-| `the_shim_enums_match_the_opcodes_the_grid_reaches` | [287](tests/test_gen_shim.py:287) |
-| `every_family_gets_its_own_file_and_only_its_own_symbols` | [363](tests/test_gen_shim.py:363) |
-| `the_generated_files_on_disk_are_up_to_date` | [404](tests/test_gen_shim.py:404) |
+| `buckets` | [75](tests/test_gen_shim.py:75) |
+| `the_manifest_is_the_expansion_of_the_pinned_yaml` | [82](tests/test_gen_shim.py:82) |
+| `the_emitted_symbol_set_equals_the_abi_in_both_directions` | [109](tests/test_gen_shim.py:109) |
+| `every_emitted_signature_matches_cq_langs_own_declaration` | [113](tests/test_gen_shim.py:113) |
+| `the_partition_is_1266_wrappers_678_inv_744_fp_and_132_deferred` | [122](tests/test_gen_shim.py:122) |
+| `the_domain_split_is_1102_610_120_164_68_and_12` | [144](tests/test_gen_shim.py:144) |
+| `the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family` | [165](tests/test_gen_shim.py:165) |
+| `the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family` | [174](tests/test_gen_shim.py:174) |
+| `the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed` | [179](tests/test_gen_shim.py:179) |
+| `the_three_declined_symbols_are_in_the_fp_bucket_with_their_own_reason` | [239](tests/test_gen_shim.py:239) |
+| `no_cqrt_rotation_symbol_appears_anywhere_in_the_emitted_shim` | [268](tests/test_gen_shim.py:268) |
+| `scan` | [284](tests/test_gen_shim.py:284) |
+| `the_shim_enums_match_the_opcodes_the_grid_reaches` | [298](tests/test_gen_shim.py:298) |
+| `every_family_gets_its_own_file_and_only_its_own_symbols` | [374](tests/test_gen_shim.py:374) |
+| `the_generated_files_on_disk_are_up_to_date` | [415](tests/test_gen_shim.py:415) |
 
 ## `tests/test_gen_shim_provoked.py`
 
@@ -5453,8 +5394,8 @@ the definition (or the build-language declaration) in the listed file.
 | `the_composite_swap_that_really_does_abort_all_214_controlled_is_caught` | [122](tests/test_gen_shim_provoked.py:122) |
 | `a_single_wrapper_demoted_to_an_abort_turns_the_gate_red` | [146](tests/test_gen_shim_provoked.py:146) |
 | `a_family_width_that_has_not_landed_cannot_be_declared_live` | [157](tests/test_gen_shim_provoked.py:157) |
-| `the_check_mode_sees_a_tampered_file` | [228](tests/test_gen_shim_provoked.py:228) |
-| `run_check` | [231](tests/test_gen_shim_provoked.py:231) |
+| `the_check_mode_sees_a_tampered_file` | [230](tests/test_gen_shim_provoked.py:230) |
+| `run_check` | [233](tests/test_gen_shim_provoked.py:233) |
 
 ## `tests/test_goldens.c`
 
@@ -8898,24 +8839,24 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `uint64_t` | [92](tests/test_template_fbin.inc:92) |
-| `int32_t` | [93](tests/test_template_fbin.inc:93) |
-| `int32_t` | [94](tests/test_template_fbin.inc:94) |
-| `int32_t` | [95](tests/test_template_fbin.inc:95) |
-| `void` | [96](tests/test_template_fbin.inc:96) |
-| `void` | [97](tests/test_template_fbin.inc:97) |
-| `void` | [98](tests/test_template_fbin.inc:98) |
-| `popcount64` | [120](tests/test_template_fbin.inc:120) |
-| `every_fbin_f64_wrapper_agrees_with_its_kernels_own_eval (via CQ_TEST)` | [140](tests/test_template_fbin.inc:140) |
-| `the_fbin_literal_doors_carry_the_pattern_on_the_side_they_name (via CQ_TEST)` | [185](tests/test_template_fbin.inc:185) |
-| `an_fbin_f64_round_trip_on_wires_is_the_value_l2_and_the_pool (via CQ_TEST)` | [240](tests/test_template_fbin.inc:240) |
-| `an_fbin_f64_unc_on_a_poisoned_source_is_discharged_by_the_certificate (via CQ_TEST)` | [309](tests/test_template_fbin.inc:309) |
-| `an_fadd_unc_does_not_pair_with_an_add_i64_forward_on_the_same_handles (via CQ_TEST)` | [378](tests/test_template_fbin.inc:378) |
-| `a_controlled_fbin_call_obeys_row_zero_on_a_classical_flag (via CQ_TEST)` | [424](tests/test_template_fbin.inc:424) |
-| `a_quantum_flag_makes_the_classical_short_circuit_a_wire (via CQ_TEST)` | [470](tests/test_template_fbin.inc:470) |
-| `d7b_on_the_fp_doors_costs_exactly_two_w_cnots_over_an_unaliased_call (via CQ_TEST)` | [524](tests/test_template_fbin.inc:524) |
-| `void` | [594](tests/test_template_fbin.inc:594) |
-| `every_fbin_f64_inv_aborts_naming_itself_and_d14s_reason (via CQ_TEST)` | [600](tests/test_template_fbin.inc:600) |
+| `uint64_t` | [96](tests/test_template_fbin.inc:96) |
+| `int32_t` | [97](tests/test_template_fbin.inc:97) |
+| `int32_t` | [98](tests/test_template_fbin.inc:98) |
+| `int32_t` | [99](tests/test_template_fbin.inc:99) |
+| `void` | [100](tests/test_template_fbin.inc:100) |
+| `void` | [101](tests/test_template_fbin.inc:101) |
+| `void` | [102](tests/test_template_fbin.inc:102) |
+| `popcount64` | [124](tests/test_template_fbin.inc:124) |
+| `every_fbin_f64_wrapper_agrees_with_its_kernels_own_eval (via CQ_TEST)` | [144](tests/test_template_fbin.inc:144) |
+| `the_fbin_literal_doors_carry_the_pattern_on_the_side_they_name (via CQ_TEST)` | [189](tests/test_template_fbin.inc:189) |
+| `an_fbin_f64_round_trip_on_wires_is_the_value_l2_and_the_pool (via CQ_TEST)` | [244](tests/test_template_fbin.inc:244) |
+| `an_fbin_f64_unc_on_a_poisoned_source_is_discharged_by_the_certificate (via CQ_TEST)` | [313](tests/test_template_fbin.inc:313) |
+| `an_fadd_unc_does_not_pair_with_an_add_i64_forward_on_the_same_handles (via CQ_TEST)` | [382](tests/test_template_fbin.inc:382) |
+| `a_controlled_fbin_call_obeys_row_zero_on_a_classical_flag (via CQ_TEST)` | [428](tests/test_template_fbin.inc:428) |
+| `a_quantum_flag_makes_the_classical_short_circuit_a_wire (via CQ_TEST)` | [474](tests/test_template_fbin.inc:474) |
+| `d7b_on_the_fp_doors_costs_exactly_two_w_cnots_over_an_unaliased_call (via CQ_TEST)` | [528](tests/test_template_fbin.inc:528) |
+| `void` | [598](tests/test_template_fbin.inc:598) |
+| `every_fbin_f64_inv_aborts_naming_itself_and_d14s_reason (via CQ_TEST)` | [604](tests/test_template_fbin.inc:604) |
 
 ## `tests/test_template_fcmp.inc`
 
@@ -9180,10 +9121,10 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `sym` | [124](tests/test_template_reasons.c:124) |
-| `void` | [131](tests/test_template_reasons.c:131) |
-| `every_reason_class_prints_its_own_sentence_at_runtime (via CQ_TEST)` | [139](tests/test_template_reasons.c:139) |
-| `no_reason_class_prints_the_retired_fp_is_v2 (via CQ_TEST)` | [160](tests/test_template_reasons.c:160) |
+| `sym` | [92](tests/test_template_reasons.c:92) |
+| `void` | [99](tests/test_template_reasons.c:99) |
+| `every_reason_class_prints_its_own_sentence_at_runtime (via CQ_TEST)` | [107](tests/test_template_reasons.c:107) |
+| `no_reason_class_prints_the_retired_fp_is_v2 (via CQ_TEST)` | [128](tests/test_template_reasons.c:128) |
 
 ## `tests/test_template_width.inc`
 

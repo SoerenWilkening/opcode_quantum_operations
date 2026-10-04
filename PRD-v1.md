@@ -206,6 +206,14 @@ generated witnesses `cq_link_smoke.c` and `core_abi_link_check.py`):
 > f64 (eight symbols, four shapes × forward/`_unc`, no `_inv`, through `shim/cq_template_ternary.c`
 > and an eighth tag space) and `sqrt` at f64 (two, through the unary door). The 2479 above is the
 > OPCODE grid and every figure in this section still describes it.
+>
+> **AMENDED 2026-10-04 (bd n4ut) — THE GRID IS 2820.** The maintainer ruled *"Re-vendor,
+> authorized"* and `third_party/cq_lang/opcode_table.yaml` was re-copied from CQ_lang `4266c40d`
+> (sha256 `7307995f…`; `61999c4a` removed `frem`), recorded in a new `COMMIT.opcode`. The OPCODE grid
+> is **2419** and the surface **2820 = 2419 + 389 + 12**. All 60 removed symbols were fp aborts, so
+> the integer half is unchanged at 992 wrappers + 603 `_inv` aborts and only the fp-touching count
+> moves (884 → 824). Measured: **1266 wrappers + 678 `_inv` aborts + 744 fp aborts + 132 `defer`**.
+> The 2479 figures above stay as the record of the grid before this re-vendor.
 
 Beware when counting: **240** of the 884 fp-touching symbols are the cross-domain casts
 (`sitofp`, `uitofp`, `fptosi`, `fptoui`, `bitcast`), whose names carry *both* an integer and
@@ -2079,7 +2087,7 @@ and diffs — `make shim-check` / `cmake --build <dir> --target shim-check`, i.e
 > `CQOPS_UPDATE_GOLDENS=1`, and K12 offers a bigger version of the "shorten the inner loop"
 > mutant that left K11's entire L1/L2/L3/L5 sweep green. Build it before M19.
 >
-> **What D9 costs, stated plainly.** `divrem` ships at **i128** (`opcode_table.yaml:187-190`,
+> **What D9 costs, stated plainly.** `divrem` ships at **i128** (`opcode_table.yaml:188-191`,
 > full 15-variant grid including the bare `qq` shape — so this is not an `_hl`-only surface),
 > and one i128 `udiv` is **557,696 gates over 131,583 scratch qubits**: the largest object in
 > the v1 catalogue by 8×, and where D2's ceiling bites first. That failure is already loud —

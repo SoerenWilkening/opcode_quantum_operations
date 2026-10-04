@@ -21,7 +21,7 @@
  * genuinely LINEAR schedule exists at `13W + 3` qubits for `90W² − 3W` gates
  * (K12.md §4.1, filed as the v2 change). What FLAT costs is not softened
  * anywhere: `131,583` scratch qubits for one i128 `udiv`, against LINEAR's
- * `1,667`. `divrem` DOES ship at i128 (opcode_table.yaml:187-190, all four
+ * `1,667`. `divrem` DOES ship at i128 (opcode_table.yaml:188-191, all four
  * opcodes, the full 15-variant grid) and that is the largest object in the v1
  * catalogue by 8x. Where D2's pool ceiling bites, `cq_qubits_acquire` fails hard
  * naming the pool, which is correct behaviour and must not be softened here —

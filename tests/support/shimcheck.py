@@ -29,13 +29,15 @@ GENERATED = os.path.join(SHIM, "generated")
 # manifest against the opcode yaml would be red on a correct tree.
 SOURCES = (
     (os.path.join(ROOT, "third_party", "cq_lang", "opcode_table.yaml"),
-     os.path.join(ROOT, "tests", "abi", "cq_templates_abi.txt"), 2479),
+     os.path.join(ROOT, "tests", "abi", "cq_templates_abi.txt"), 2419),
     (os.path.join(ROOT, "third_party", "cq_lang", "intrinsic_table.yaml"),
      os.path.join(ROOT, "tests", "abi", "cq_intrinsic_templates_abi.txt"), 389),
     (os.path.join(ROOT, "third_party", "cq_lang", "libm_table.yaml"),
      os.path.join(ROOT, "tests", "abi", "cq_libm_templates_abi.txt"), 12),
 )
-N_GRID = sum(n for _, _, n in SOURCES)          # 2880
+# 2820 since bd n4ut's re-vendor of opcode_table.yaml (2026-10-04) removed
+# `frem`'s 60; 2880 = 2479 + 389 + 12 before it.
+N_GRID = sum(n for _, _, n in SOURCES)          # 2820
 
 YAML = SOURCES[0][0]
 MANIFEST = SOURCES[0][1]
@@ -43,7 +45,8 @@ MANIFEST = SOURCES[0][1]
 # A width token in a symbol NAME, which is how the fp/integer partition is
 # derived on the test side — from the ABI's own spelling, never from
 # gen_shim.bucket_of, whose input is the yaml's `widths` map. Two independent
-# routes to the same 884/1595, which is the point.
+# routes to the same 824/1595 (884/1595 until bd n4ut's re-vendor removed
+# `frem`'s 60 fp rows), which is the point.
 FP_WIDTH = re.compile(r"(?:^|_)(f16|f32|f64|f80)(?:_|$)")
 
 # THE LANDED fp ROWS, READ OFF THE NAME — the test side's INDEPENDENT route to
@@ -124,7 +127,7 @@ def manifest_decls():
     # proves is narrow enough to be worth stating exactly: sha256(the pinned
     # yaml) equals the sha CQ_lang's generator stamped into the header these
     # lines came from, so the manifest expands THE GRID WE SHIP. It proves
-    # nothing about the 2479 lines themselves — a hand-edited declaration would
+    # nothing about the declaration lines themselves — a hand-edited one would
     # pass it — which is why the count and uniqueness are checked here too, and
     # why the file says never to hand-edit one. Gating the LOAD is what makes
     # the R3 comparison honest: the L4 goldens' COMMIT check hard-errors before
@@ -230,6 +233,11 @@ def read_dir(directory):
 # it: f64 rows carry their own PRD-v2 7.9 reason (`frem`; `fpext`/`fptrunc`,
 # naming the other width's rail), and every other `fp` row names its
 # f16/f32/f80 width(s) as outside v2's f64-only scope.
+#
+# `frem`'s sentence is DORMANT since bd n4ut (2026-10-04): the re-vendored
+# opcode_table.yaml has no `frem` row, so no name reaches that branch. It is
+# kept as the independent twin of shim/gen_reasons.py's F64_REASON["frem"],
+# which the generator also keeps, so the two still agree if the row returns.
 RETIRED_FP_REASON = "fp is v2"
 FREM_F64_REASON = (
     "frem f64 stays an abort on liveness: the pinned Bennett snapshot has no "
@@ -376,10 +384,10 @@ def run(cases, argv=None):
 
 
 def abi_header(tmp):
-    # CQ_lang's 2479 declarations, verbatim, as a forcible -include. Putting
-    # them AHEAD of a .gen.c is what makes a signature divergence a
-    # `conflicting types` error instead of a silent link-time mismatch that
-    # `nm` cannot see.
+    # CQ_lang's 2419 opcode-grid declarations (2479 until bd n4ut), verbatim,
+    # as a forcible -include. Putting them AHEAD of a .gen.c is what makes a
+    # signature divergence a `conflicting types` error instead of a silent
+    # link-time mismatch that `nm` cannot see.
     p = os.path.join(tmp, "cq_templates_abi.h")
     open(p, "w").write("#include <stdbool.h>\n#include <stdint.h>\n" + "\n".join(
         l.rstrip("\n") for l in open(MANIFEST) if not l.startswith("#") and l.strip()))

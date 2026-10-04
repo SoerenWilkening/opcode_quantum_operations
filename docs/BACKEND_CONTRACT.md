@@ -96,6 +96,26 @@ are allowed.
 >   `0707dfd6`. It requires CQ_lang's regenerated provider manifest to equal
 >   `backend-manifest.json`, i.e. the same ABI id.
 
+> **Amended again 2026-10-04 (bd n4ut): the superset ended, and 3,000 =
+> 3,000.** The maintainer authorised the re-vendor that the amendment above
+> left open. `third_party/cq_lang/opcode_table.yaml` was re-copied from
+> CQ_lang `4266c40d` (sha256 `7307995f…`, the table `61999c4a` produced) and
+> recorded in a new `third_party/cq_lang/COMMIT.opcode`. `COMMIT`'s
+> `6245117d…` pin stays as history.
+>
+> - libcqops now defines 180 `cqrt_*` + 2,820 `cq_template_*` = **3,000**,
+>   exactly the set CQ_lang requires. The 60 `cq_template_frem_*` it
+>   provided as extras are gone. Every one of them was a loud abort, so no
+>   capability was lost.
+> - The ABI id is unchanged (`sha256:e1cc2bbc…`), because it is computed from
+>   CQ_lang's inputs and those did not move. `backend-manifest.json` was
+>   regenerated with `provider-manifest` at CQ_lang `ad2d4ec6`, whose
+>   `runtime/` and `tools/` are identical to `4266c40d`'s, and came out
+>   byte-identical.
+> - The figures above stay as written: `0707dfd6`'s 2,880 templates and
+>   3,060 required, and the superset period's 3,060 provided (bd 13zl to
+>   bd n4ut, both 2026-10-04).
+
 ### 1.2 Binary requirements
 
 A provider must:
@@ -347,7 +367,9 @@ tests are what establish that the symbols form a correct backend.
 
 If the new codebase already accepts a logical gate stream, it usually should not
 reimplement all 3,060 CQ ABI functions (3,000 since CQ_lang `61999c4a`;
-amended 2026-10-04, bd 13zl, see §1.1). Reuse libcqops and provide a `cq_sink`:
+amended 2026-10-04, bd 13zl, see §1.1; libcqops itself provides exactly those
+3,000 since the bd n4ut re-vendor the same day). Reuse libcqops and provide a
+`cq_sink`:
 
 ```c
 #include <cqops/cqops.h>

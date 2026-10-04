@@ -260,7 +260,7 @@ cq_ref_w cq_ref_w_sub(cq_ref_w a, cq_ref_w b, int W)
  * 2^32, so their sum is below 3·2^32 < 2^64.
  *
  * Only the LOW 128 bits are formed, and cq_ref_w_make then reduces to W — which
- * is right for every width because `mul` is same-width (opcode_table.yaml:186,
+ * is right for every width because `mul` is same-width (opcode_table.yaml:187,
  * no widening opcode anywhere in the table) and the high half is never
  * computed by the kernel either. */
 static void mul64(uint64_t x, uint64_t y, uint64_t *lo, uint64_t *hi)

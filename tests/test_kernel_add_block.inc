@@ -29,7 +29,7 @@
  * no consumer uses.
  */
 
-/* K6's shipped ladder (third_party/cq_lang/opcode_table.yaml:184). 64 is the
+/* K6's shipped ladder (third_party/cq_lang/opcode_table.yaml:185). 64 is the
  * width the fp port consumes; 1 is where `lower_add!`'s loop is empty and the
  * three-CNOT tail is the whole construction; 128 is the top shipped width and
  * the only one above the reference's 64-bit word seam. */

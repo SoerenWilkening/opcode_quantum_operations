@@ -73,7 +73,7 @@
 #include <stdio.h>
 #include <time.h>
 
-/* TWO-WORD, because `mul` ships at i128 (opcode_table.yaml:186) where the
+/* TWO-WORD, because `mul` ships at i128 (opcode_table.yaml:187) where the
  * one-word reference aborts. Rule 7's canonical shape all through, so no `call`
  * adapter and no `shape` are needed — K11 is the first kernel since K6/K7 that
  * departs from the contract in no way at all. */
@@ -134,7 +134,7 @@ static void check_counts(cq_gold *g, int W)
     cq_gold_check(g, "mul", "unc",     W, unc.x, unc.cx, unc.ccx);
 }
 
-/* The shipped ladder (i1, i8, i16, i32, i64, i128 — opcode_table.yaml:186) plus
+/* The shipped ladder (i1, i8, i16, i32, i64, i128 — opcode_table.yaml:187) plus
  * the narrow L1 sweep widths, so every width the sweep runs is also pinned.
  * (Read "the exhaustive L1 widths" until 2026-09-11, bd aei — the widths are the
  * same, but none has been exhaustive since 2026-08-21.) */
@@ -416,7 +416,7 @@ CQ_TEST(the_stream_is_a_palindrome_around_the_copyout)
 
 /* ---- W = 1: the delegation, and the trap. ------------------------------- */
 
-/* `mul` at i1 IS in the opcode table (opcode_table.yaml:186), and it is the one
+/* `mul` at i1 IS in the opcode table (opcode_table.yaml:187), and it is the one
  * width where the pinned construction is out of domain: `lower_add_cuccaro!`
  * delegates to the out-of-place `lower_add!` at W <= 1 (adder.jl:66) and stops
  * being an accumulator, and upstream's own test says the formulas do not apply

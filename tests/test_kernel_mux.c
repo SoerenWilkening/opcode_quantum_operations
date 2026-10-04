@@ -145,7 +145,7 @@ CQ_TEST(controlled)
 
     /* K10 has THREE sources and a one-bit `cond`, so this is the only place the
      * promotion meets an operand narrower than the result. i80 is excluded, as
-     * it is from the sweep: opcode_table.yaml:88 says i80 is never a
+     * it is from the sweep: opcode_table.yaml:89 says i80 is never a
      * control-merged data value, which is what a select's arms are. */
     static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };
 
@@ -161,7 +161,7 @@ CQ_TEST(controlled)
     CHECK(reached > 0u);
 }
 
-/* i80 IS EXCLUDED ON PURPOSE and i128 is not: opcode_table.yaml:88 says i80 "is
+/* i80 IS EXCLUDED ON PURPOSE and i128 is not: opcode_table.yaml:89 says i80 "is
  * NEVER a control-merged data value", which is precisely what a select's arms
  * are, while i128 is a shipped mux width and is swept here. Every width on this
  * ladder gets the same constant budget the narrow ones do — cq_kd_samples()

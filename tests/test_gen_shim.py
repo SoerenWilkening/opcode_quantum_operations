@@ -6,7 +6,8 @@
 # BUCKET PARTITION; tests/test_gen_bodies.py asserts what is between the braces.
 #
 # THE ORACLE IS NOT THIS FILE'S OWN READING OF THE NAMING RULES. tests/abi/
-# cq_templates_abi.txt is the 2479 declarations CQ_lang's own gen_templates.py
+# cq_templates_abi.txt is the 2419 declarations (2479 until bd n4ut's
+# re-vendor) CQ_lang's own gen_templates.py
 # produced from the SAME pinned yaml — a different program, so it cannot share
 # a transcription slip with shim/gen_shim.py. Re-expanding the rules here
 # instead would be the trap CLAUDE.md names: "an oracle that shares a constant
@@ -93,14 +94,16 @@ def the_manifest_is_the_expansion_of_the_pinned_yaml():
                  "  Re-extract from CQ_lang's regenerated header; do not edit "
                  "either." % (os.path.basename(manifest),
                               os.path.basename(yaml_path), sha, rec))
-    sc.check(len(ABI) == 2880,
-             "the three manifests hold %d declarations, expected 2880"
+    # 2820 SINCE bd n4ut (2026-10-04): the re-vendored opcode_table.yaml has
+    # no `frem`, so its manifest holds 2419 and not 2479 (2880 before).
+    sc.check(len(ABI) == 2820,
+             "the three manifests hold %d declarations, expected 2820"
              % len(ABI))
-    # AND THEY ARE PAIRWISE DISJOINT, which is what makes 2479 + 389 + 12 a
+    # AND THEY ARE PAIRWISE DISJOINT, which is what makes 2419 + 389 + 12 a
     # SUM rather than an upper bound. sc.manifest_decls asserts it on every
     # load; this restates it as the claim the grid's size rests on.
-    sc.check(sum(n for _, _, n in sc.SOURCES) == 2880,
-             "the three manifests' own counts do not sum to 2880")
+    sc.check(sum(n for _, _, n in sc.SOURCES) == 2820,
+             "the three manifests' own counts do not sum to 2820")
 
 
 def the_emitted_symbol_set_equals_the_abi_in_both_directions():
@@ -116,7 +119,7 @@ def every_emitted_signature_matches_cq_langs_own_declaration():
     sc.check(not bad, "%d signature mismatch(es):\n  %s" % (len(bad), "\n  ".join(bad[:3])))
 
 
-def the_partition_is_1266_wrappers_678_inv_804_fp_and_132_deferred():
+def the_partition_is_1266_wrappers_678_inv_744_fp_and_132_deferred():
     # 992 / 603 / 884 until PRD-v2's first fp family landed (2026-09-18), then
     # 1048 / 631 / 800, then 1112 / 668 / 699 at bead 9ve.36. Bead 9ve.24's
     # vendoring ADDS 401 symbols rather than moving any: 10 land as wrappers
@@ -129,10 +132,13 @@ def the_partition_is_1266_wrappers_678_inv_804_fp_and_132_deferred():
     # leaving 810.
     # BEAD s8g MOVES 6: `bitcast` f64 <-> i64's four fwd/unc rows to `wrapper`
     # and its two `_inv` rows to `inv`, leaving 804.
+    # BEAD n4ut (2026-10-04) REMOVES 60 AND MOVES NONE: the re-vendored
+    # opcode_table.yaml has no `frem`, whose 60 symbols were all `fp`,
+    # leaving 744.
     got = {k: len(v) for k, v in buckets(SHIPPED).items()}
-    sc.check(got == {"wrapper": 1266, "inv": 678, "fp": 804, "defer": 132},
+    sc.check(got == {"wrapper": 1266, "inv": 678, "fp": 744, "defer": 132},
              "PRD §1 + §15 D14 + PRD-v2 §1 + §6.1 partition: expected "
-             "1266/678/804/132, got %r" % got)
+             "1266/678/744/132, got %r" % got)
 
 
 def the_domain_split_is_1102_610_120_164_68_and_12():
@@ -214,7 +220,12 @@ def the_fp_abort_set_is_exactly_the_fp_touching_names_that_have_not_landed():
     # carries no `_f64` token at all. `fma`, `sqrt` and those eleven are ABSENT
     # from this census, which is the assertion that they LANDED.
     # `bitcast` LEFT THIS CENSUS AT bead s8g (its f64 <-> i64 pair landed).
-    sc.check(by_op == {"frem": 15, "uitofp": 3,
+    # `frem` LEFT IT AT bd n4ut (2026-10-04) BY LEAVING THE GRID: the
+    # re-vendored opcode_table.yaml has no `frem` row, so 45 became 21 and the
+    # `(family, width)` half above has no kernel-less `fp_arith` victim at
+    # f64 any more (`fneg` landed at 9ve.44). The cast half still has its
+    # three `uitofp i64` rows.
+    sc.check(by_op == {"uitofp": 3,
                        "fpext": 9, "fptrunc": 9},
              "the f64 symbols still aborting are not the expected census: %r"
              % by_op)
@@ -431,7 +442,7 @@ CASES = [
     the_manifest_is_the_expansion_of_the_pinned_yaml,
     the_emitted_symbol_set_equals_the_abi_in_both_directions,
     every_emitted_signature_matches_cq_langs_own_declaration,
-    the_partition_is_1266_wrappers_678_inv_804_fp_and_132_deferred,
+    the_partition_is_1266_wrappers_678_inv_744_fp_and_132_deferred,
     the_domain_split_is_1102_610_120_164_68_and_12,
     the_inv_abort_set_is_exactly_the_inv_names_of_every_live_family,
     the_wrapper_set_is_exactly_the_non_inv_names_of_every_live_family,

@@ -83,7 +83,8 @@
  * array in this library at i1 either — so the fp width is not what defers them.
  * This is NOT in tension with `bd 819`'s name rule ("a symbol is fp-touching
  * iff its name carries an f16/f32/f64/f80 token"): that rule partitions the
- * 2,479 `cq_template_*` names expanded from `opcode_table.yaml`, a different
+ * 2,419 `cq_template_*` names expanded from `opcode_table.yaml` (2,479 until
+ * bd n4ut's re-vendor), a different
  * population reached through a different header. `bd vxk`'s measured trap is
  * about FIXTURE attribution, not symbol attribution — 21 of the 33 fixtures
  * that reach qram before any fp call hit `cqrt_qram_alloc_f{32,64,80}` FIRST,
@@ -255,6 +256,9 @@ void cqrt_ry_f32_controlled_inv(int32_t ctrl, int32_t handle, double angle)
  * cq_intrinsic_templates.c, 6 in cq_libm_templates.c — and is never emitted by
  * the IR pass at all. Our 2,479 generated `.gen.c` bodies call it ZERO times,
  * which is why Step 23's own gate does not need it; it bites at Step 24.
+ * (2026-10-04, bd n4ut: the generated grid is 2,820 bodies — 2,880 from bead
+ * 9ve.24's vendoring until this re-vendor removed `frem`'s 60 — and measured
+ * today they still mention `cqrt_alloc_handle` zero times.)
  *
  * COST, measured: 149 fixtures abort at their first intrinsic template call,
  * 143 of which ALREADY die on fp, so the MARGINAL set is 6 — and none of the

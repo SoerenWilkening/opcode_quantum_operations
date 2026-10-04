@@ -89,7 +89,7 @@ static void dr_i128_case(const cq_kd_spec *k, int want_q)
 
     printf("# %s W=128: 1 case at the all-quantum mask = %llu gate emissions "
            "over %d scratch qubits — %.1f s. i128 IS a shipped divrem width "
-           "(opcode_table.yaml:187-190); the reference's word seam is carried "
+           "(opcode_table.yaml:188-191); the reference's word seam is carried "
            "without a circuit by l1s_oracle_agrees_with_the_hardware_divider\n",
            k->name, (unsigned long long)udiv_per_case(128, want_q),
            cq_divrem_region(128, want_q),
@@ -97,9 +97,9 @@ static void dr_i128_case(const cq_kd_spec *k, int want_q)
     fflush(stdout);
 }
 
-/* THE SHIPPED LADDER PLUS THE NARROW ONE. opcode_table.yaml:187-190 declares
- * all four opcodes at i1, i8, i16, i32, i64 and i128 — and NOT at i80 (:85,
- * :133-135), the mirror image of `icmp`'s fence. Rule 10's narrow L1 widths
+/* THE SHIPPED LADDER PLUS THE NARROW ONE. opcode_table.yaml:188-191 declares
+ * all four opcodes at i1, i8, i16, i32, i64 and i128 — and NOT at i80 (:86,
+ * :134-136), the mirror image of `icmp`'s fence. Rule 10's narrow L1 widths
  * {1,2,4} are extended with 3, K12.md §2.4b's named R8 witness. (Both headings
  * said "EXHAUSTIVE" until 2026-09-11, bd aei; the header above has recorded
  * since bd mmv that the budget is the shared constant at every width, so this

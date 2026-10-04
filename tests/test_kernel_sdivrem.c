@@ -26,7 +26,7 @@
  *   - THE UNREPRESENTABLE CASES ARE PINNED AND LABELLED INHERITED. `b = 0`,
  *     `typemin / -1`, and the whole of i1 — where the signed values are {0,-1}
  *     and `sdiv(-1,-1) = 1` has no encoding. i1 IS a shipped sdiv/srem width
- *     (opcode_table.yaml:187,189) and upstream never meets the case because it
+ *     (opcode_table.yaml:188,190) and upstream never meets the case because it
  *     widens to 64 first, so there is nothing to port and nothing to compare
  *     to: D3's deterministic-but-unspecified posture is the answer, and what
  *     the construction returns is written down here.
@@ -381,7 +381,7 @@ CQ_TEST(d3_signed_division_by_zero_and_the_unrepresentable_cases)
     pin(&SDIV, 4,   -8, -1,   -8, &m);
     pin(&SREM, 4,   -8, -1,    0, &m);
 
-    /* i1 IS a shipped sdiv/srem width (opcode_table.yaml:187,189) and NOTHING
+    /* i1 IS a shipped sdiv/srem width (opcode_table.yaml:188,190) and NOTHING
      * is representable there: the two values are {0,-1} and sdiv(-1,-1) = 1 has
      * no i1 encoding. Upstream never meets the case because it widens to 64
      * first, so there is nothing to port and nothing to compare against. What

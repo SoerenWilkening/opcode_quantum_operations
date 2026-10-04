@@ -63,7 +63,7 @@ Every row above and every headline count in §2 and §3 was re-run against CQ_la
 
 | Claim | Re-measured | Verdict |
 |---|---|---|
-| The pinned ABI mirror is current | `shasum -a 256` of our copy against `git show b1b1dc02:tools/opcode_table.yaml` | **CONFIRMED and extended** — still byte-identical, `6245117d…a3e82426`, now through `b1b1dc02`. No re-vendor owed. **Amended 2026-10-04 (bd 13zl):** CQ_lang `61999c4a` (2026-09-30) moved its table to `7307995f…` by removing `frem` (60 `cq_template_frem_*`). The maintainer ruled that our mirror **stays** at `6245117d…` (2,880 templates) and that `backend-manifest.json` claims a **superset**: CQ_lang requires 3,000 (ABI `e1cc2bbc…`), we provide 3,060, and the 60 extra are the `frem` rows. Re-vendoring (2,880 → 2,820) is a separate, tracked decision. See `docs/BACKEND_CONTRACT.md` §1.1 |
+| The pinned ABI mirror is current | `shasum -a 256` of our copy against `git show b1b1dc02:tools/opcode_table.yaml` | **CONFIRMED and extended** — still byte-identical, `6245117d…a3e82426`, now through `b1b1dc02`. No re-vendor owed. **Amended 2026-10-04 (bd 13zl):** CQ_lang `61999c4a` (2026-09-30) moved its table to `7307995f…` by removing `frem` (60 `cq_template_frem_*`). The maintainer ruled that our mirror **stays** at `6245117d…` (2,880 templates) and that `backend-manifest.json` claims a **superset**: CQ_lang requires 3,000 (ABI `e1cc2bbc…`), we provide 3,060, and the 60 extra are the `frem` rows. Re-vendoring (2,880 → 2,820) is a separate, tracked decision. See `docs/BACKEND_CONTRACT.md` §1.1. **Amended again 2026-10-04 (bd n4ut):** the maintainer ruled *"Re-vendor, authorized"*. `third_party/cq_lang/opcode_table.yaml` is now `7307995f…`, copied from CQ_lang `4266c40d` and recorded in a new `COMMIT.opcode` (`COMMIT`'s `6245117d…` pin stays as history). The grid is 2,820 templates and the superset ended: 3,000 required = 3,000 provided |
 | The core ABI has not drifted | `git log 170ede1..b1b1dc02 -- runtime/cq_runtime.h` | **CONFIRMED** — still **0** commits, now of **61** in the range (was 0 of 33). **Amended 2026-10-04 (bd 13zl):** `git log 170ede1..4266c40d -- runtime/cq_runtime.h` returns **3** commits of 373: `4b54f18a` (2026-09-20), `27fc9a62` and `18b3f5ff` (2026-10-01). All three change **comments only**; every changed line is a comment line. The 182 `cqrt_*` declarations are identical by name and signature, so the core ABI still has not drifted. `27fc9a62` is the normative QRAM-index text agreed with libcqops as bd `b6a`. The header's sha256 moved `f7c44636…` → `18f311dc…` |
 | `softfloat/` has 35 files | `ls` the pinned snapshot | **CONFIRMED** — 35, and **no file carries an `f16`/`f32`/`f80` name token** |
 | Zero fp opcodes the corpus calls are absent from Bennett | corpus families mapped onto `softfloat.jl`'s `export` list | **CONFIRMED** — and now checked the other way too: the export list carries **exactly 10** `fcmp` predicates and the four the grid adds are `ogt`/`oge`/`ugt`/`uge`, exactly as §3.3 says, and it carries **no `frem`** |
@@ -304,6 +304,12 @@ it, listing it as future work (`Bennett-VISION-PRD.md` Tier 2, *"Soft remainder 
 Those two facts cancel: **`frem` keeps the abort in v2 and costs nothing**, and this is the one place
 where an in-grid symbol is deliberately left behind on liveness. That is D23's test, applied a third
 time.
+
+> **Amended 2026-10-04 (bd n4ut): `frem` is no longer in the grid.** CQ_lang `61999c4a` (2026-09-30)
+> removed its row from `opcode_table.yaml` (*"no approved hardware route or Bennett.jl
+> implementation"*), and the maintainer-authorised re-vendor took that table. The 60 symbols above
+> are gone rather than aborting, so nothing in the grid is left behind on liveness any more. The
+> facts that decided it (zero corpus calls, no `soft_frem` upstream) stand as written.
 
 **Cost, from upstream's published table — and these are the figures §3.2's rider says to treat as
 order-of-magnitude:** *(2026-09-28, R14 / bead `9ns`: the magnitudes of record for OUR kernels are
@@ -656,6 +662,21 @@ set-identical to the archive in both directions. `tools/l6/run_slice_cqops.sh` a
 `tools/bitlevel/run.sh` no longer pass `cq_intrinsic_templates.c.o` and `cq_libm_templates.c.o` —
 once libcqops defines those symbols the loose objects are a duplicate-symbol hard error, which is
 why that edit had to land in the same commit.
+
+**AMENDED 2026-10-04 (bd n4ut): THE OPCODE TABLE WAS RE-VENDORED AND THE GRID IS 2,820.** The
+maintainer ruled *"Re-vendor, authorized"*. `third_party/cq_lang/opcode_table.yaml` was overwritten
+byte for byte from CQ_lang commit `4266c40d`'s `tools/opcode_table.yaml` (sha256 `7307995f…`, last
+touched by `61999c4a`, which removed `frem`). It is recorded in a THIRD record, `COMMIT.opcode`, on
+`COMMIT.intrinsics`'s model, and `cmake/CqopsIntrinsicPin.cmake` gained an arm that checks it.
+`COMMIT`'s `a6a92fe` / `6245117d…` pin is left as written, as history. The two tables this section
+vendored did not move. The surface is **2,820 = 2,419 + 389 + 12** (was 2,880 = 2,479 + 389 + 12)
+and the three sets are still pairwise disjoint. **MEASURED** with `python3 shim/gen_shim.py`:
+**2820 = 1266 wrappers + 678 `_inv` aborts + 744 fp aborts + 132 deferred**. By domain that is
+int 1102 / 610 / 120 and fp 164 / 68 / 744 / 12. Only `fp_abort` moved (804 → 744): every one of
+`frem`'s 60 symbols was an fp abort. The opcode grid's integer half is still D14's 992 + 603.
+`tests/abi/cq_templates_abi.txt` was re-extracted from CQ_lang's regenerated
+`runtime/cq_templates.h` at `4266c40d` (2,419 declarations), and the link witness is 2,820 rows.
+`backend-manifest.json` is no longer a superset claim: 3,000 required = 3,000 provided.
 
 ### 6.2–6.6 ~~Still open~~ Decided — decide each in a document, never in code
 
@@ -1018,7 +1039,9 @@ is a dozen `fma`s, on the order of 3M gates before Rule 2 doubles it.
   `soft_lrint` upstream and **zero** corpus calls; composable as `soft_round` then `soft_fptosi`
   the day a caller appears.
 - **`fpext`/`fptrunc`** — need an `f32` rail, which cannot exist (`cqrt_alloc_f32` aborts).
-- **`frem`** — §3.3, unchanged.
+- **`frem`** — §3.3, unchanged. *(Amended 2026-10-04, bd n4ut: no longer a resident. The
+  re-vendored `opcode_table.yaml` has no `frem` row, so its 15 `f64` symbols, and the 45 at
+  `f16`/`f32`/`f80`, left the grid. `shim/gen_reasons.py` keeps the sentence, but no body prints it.)*
 
 **Amended 2026-09-24 (bead `ar9`, the maintainer's decision):** each of these rows now prints its OWN reason — `frem` at `f64` (15) names the missing construction and zero corpus calls, the `f64`-touching `fpext`/`fptrunc` (18) name the rail that cannot be allocated — and the generic `"fp is v2"` is retired from the generated grid: an `f16`/`f32`/`f80` row prints that its width is outside v2's `f64`-only scope, an upstream dependency (§1a, §6.2/§6.3). Buckets unchanged; the reason tables live in `shim/gen_reasons.py`. The 28 hand-written fp-width core aborts in `shim/cq_runtime_v2.c` print the same per-width sentence (bead `9fe`, the same day); no body in the library prints `"fp is v2"`.
 - **`uitofp` from `i64` only** (decided 2026-09-18, bead `9ve.34`) — upstream has no `soft_uitofp`;

@@ -203,7 +203,7 @@ static void copyout(cq_ctx *ctx, void *env, int k)
  *
  * BIT-SERIAL, NOT PACKED, AND THAT IS I5 RATHER THAN TASTE. A `uint64_t sum`
  * here would cap the kernel at 64 bits — and add and sub ship at i128
- * (opcode_table.yaml:184) — while the whole reason there is no packed scalar
+ * (opcode_table.yaml:185) — while the whole reason there is no packed scalar
  * anywhere is that a width-generic loop over `cq_bit` costs nothing extra. */
 static void fold_constant(cq_ctx *ctx, cq_bit *dst, const cq_bit *a,
                           const cq_bit *b, int W, int invert_b)

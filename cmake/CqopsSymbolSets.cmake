@@ -51,8 +51,8 @@ endforeach()
 # THE `want` SET IS THE UNION OF ALL THREE MANIFESTS (PRD-v2 §6.1's vendoring,
 # bead 9ve.24). `MANIFEST` is a SEMICOLON-SEPARATED LIST now rather than one
 # path — cq_templates_abi.txt, cq_intrinsic_templates_abi.txt and
-# cq_libm_templates_abi.txt, 2479 + 389 + 12 = 2880 declarations, pairwise
-# disjoint.
+# cq_libm_templates_abi.txt, 2419 + 389 + 12 = 2820 declarations, pairwise
+# disjoint (2479 + 389 + 12 = 2880 until bd n4ut's re-vendor removed `frem`).
 #
 # AND THAT IS WHAT MAKES THE OUTWARD ARM MEAN SOMETHING AGAIN. This file's own
 # header records the measured case: adding `cq_template_lrint_f64_to_i64` — a

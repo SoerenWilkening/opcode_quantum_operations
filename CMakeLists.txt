@@ -137,10 +137,15 @@ cqops_check_free_pairing_pin()
 
 # R3 for the VENDORED INTRINSIC AND LIBM TABLES (PRD-v2 §6.1, bead 9ve.24).
 # Same shape, applied twice: shim/gen_shim.py now EXPANDS those two yamls into
-# 401 of the 2,880 symbols the archive defines, so their bytes are exactly as
-# load-bearing as opcode_table.yaml's — which has had CqopsLinkWitness.cmake's
-# R3 arm behind it since Step 22.
+# 401 of the 2,820 symbols the archive defines (2,880 until bd n4ut), so their
+# bytes are exactly as load-bearing as opcode_table.yaml's — which has had
+# CqopsLinkWitness.cmake's R3 arm behind it since Step 22.
 cqops_check_intrinsic_pin()
+
+# AND opcode_table.yaml ITSELF, against its LIVE record COMMIT.opcode (bd n4ut,
+# 2026-10-04: re-vendored at CQ_lang 4266c40d, sha256 7307995f…). COMMIT's own
+# 6245117d… line is history and is deliberately NOT checked. See the module.
+cqops_check_opcode_pin()
 
 enable_testing()
 
@@ -677,7 +682,8 @@ add_library(cqops STATIC
     # checklist item 16 names it. LOC-exempt by extension (tools/check_loc.sh
     # skips *.gen.c), not by location.
     #
-    # 2479 symbols across ten families. READ THE SPLIT FROM shim/gen_shim.py's
+    # 2419 symbols across ten families (2479 until bd n4ut's 2026-10-04
+    # re-vendor removed `frem`'s 60). READ THE SPLIT FROM shim/gen_shim.py's
     # EXPECTED, not from here: it was 992 integer wrappers / 603 integer _inv
     # aborts (PRD §15 D14) / 884 fp aborts (PRD §1) until PRD-v2's first fp
     # family landed on 2026-09-18, and it moves again with every entry added to
@@ -695,8 +701,9 @@ add_library(cqops STATIC
     shim/generated/cq_template_reinterpret.gen.c
     # PRD-v2 §6.1's vendoring (bead 9ve.24, 2026-09-19): three MORE families,
     # from third_party/cq_lang/intrinsic_table.yaml (389 symbols) and
-    # libm_table.yaml (12). 2479 + 389 + 12 = 2880, the whole cq_template_*
-    # link surface, and the three sets are pairwise DISJOINT. Listed
+    # libm_table.yaml (12). 2419 + 389 + 12 = 2820 since bd n4ut (2479 +
+    # 389 + 12 = 2880 at the vendoring), the whole cq_template_* link
+    # surface, and the three sets are pairwise DISJOINT. Listed
     # explicitly for the reason above — a glob does not re-run when a family
     # file DISAPPEARS.
     shim/generated/cq_template_intrinsic_fp.gen.c

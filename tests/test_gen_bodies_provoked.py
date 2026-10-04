@@ -242,6 +242,18 @@ def a_landed_key_that_sweeps_a_kernel_less_opcode_in_is_refused():
     # opcode; K27 "Not ported"), `fshl` at i32 (a `rotate` row, `ENTRY`'s
     # `shift_intrinsic` family, no entry point — bead 9ve.29.3) and `lrint`
     # (libm, no entry point — PRD-v2 7.9).
+    #
+    # `frem` LEFT THIS LIST AT bd n4ut (2026-10-04) BECAUSE IT LEFT THE GRID.
+    # The re-vendored opcode_table.yaml (7307995f…, CQ_lang 61999c4a) has no
+    # `frem` row, and with `fneg` landed `fp_arith` at f64 has no kernel-less
+    # opcode left: measured, every fp binary opcode the grid still spells has
+    # a `SELECTOR["fbinary"]` entry, so that table has no refusal left to
+    # provoke. ITS fp SLOT GOES TO `fpext` at f64, the fp row
+    # `SELECTOR["cast"]` refuses: `fp_width` is two opcodes and neither has a
+    # kernel (PRD-v2 7.9). Measured in a scratch tree: with an `fpext` row in
+    # that table this case goes red on `cq_template_fpext_f64_to_f80`, whose
+    # body would call `cq_shim_cast(CQ_SHIM_CAST_FPEXT, …)`, an enumerator
+    # that does not exist.
     rows = gen_shim.expand(gen_shim.load(sc.YAML)[0])
     itab = gen_shim.load(sc.SOURCES[1][0])[0]
     ltab = gen_shim.load(sc.SOURCES[2][0])[0]
@@ -249,7 +261,7 @@ def a_landed_key_that_sweeps_a_kernel_less_opcode_in_is_refused():
         itab, gen_shim._emitter(rows, itab["widths"]))
     gen_shim.gen_intrinsics.expand_libm(
         ltab, gen_shim._emitter(rows, ltab["widths"]))
-    for opcode, table in (("frem", "frem"), ("uadd_sat", "uadd_sat"),
+    for opcode, table in (("fpext", "fpext"), ("uadd_sat", "uadd_sat"),
                           ("fshl", "shift_intrinsic"), ("lrint", "libm")):
         w = "i32" if opcode in ("uadd_sat", "fshl") else "f64"
         victims = [r for r in rows

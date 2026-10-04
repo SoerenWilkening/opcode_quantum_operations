@@ -355,9 +355,9 @@ CQ_TEST(the_classical_fold_writes_a_real_gate_into_a_quantum_dst)
  *
  * Bounded at W <= 64 for the obvious reason, and that costs nothing on the
  * signed surface: above 64 `icmp` ships only at i80, whose entire role is
- * x86_fp80 bit-pattern extraction (opcode_table.yaml:133-135 — i80 carries
+ * x86_fp80 bit-pattern extraction (opcode_table.yaml:134-136 — i80 carries
  * "EXACTLY the extraction ops (and / icmp / lshr ...)", and i128 declines icmp
- * outright at :124). The two-word path there is exercised by the sweep,
+ * outright at :125). The two-word path there is exercised by the sweep,
  * against cq_ref_icmp. */
 CQ_TEST(the_signed_oracle_agrees_with_plain_c_on_sign_extended_values)
 {

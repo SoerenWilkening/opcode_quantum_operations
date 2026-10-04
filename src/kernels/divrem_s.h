@@ -67,7 +67,7 @@
  * the signed values are `{0, -1}` and NOTHING is representable — `sdiv(-1,-1)`
  * is 1, which has no i1 encoding — and upstream never meets the case, because
  * it widens to 64 first. i1 IS a shipped sdiv/srem width
- * (opcode_table.yaml:187,189), so what the construction returns is pinned and
+ * (opcode_table.yaml:188,190), so what the construction returns is pinned and
  * documented as inherited, exactly as the `b = 0` row is. */
 void cq_kernel_sdiv(cq_ctx *ctx, cq_bit *dst,
                     const cq_bit *a, const cq_bit *b, int W);

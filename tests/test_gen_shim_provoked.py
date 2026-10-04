@@ -110,7 +110,7 @@ def each_of_the_twenty_same_size_transpositions_turns_the_gate_red():
              "controlled_qq <-> controlled_inv_qq at 86 is not among the 20")
     for a, b, n in pairs:
         defs = _rerender(swap=((a,), (b,)))
-        sc.check(len(defs) == 2880, "%s<->%s changed the symbol COUNT" % (a, b))
+        sc.check(len(defs) == 2820, "%s<->%s changed the symbol COUNT" % (a, b))
         reds = _reds(defs)
         sc.check(len(reds) == 2,
                  "%s <-> %s (%d each) left the gate GREEN — only %d of 2 set "
@@ -188,12 +188,12 @@ def a_family_width_that_has_not_landed_cannot_be_declared_live():
     # possible version of the defect and the one no refusal can catch. A `qq`
     # row has NO classical operand, so the macro guard above never sees it:
     # `cq_template_fcmp_oeq_f32` promoted to a wrapper emits a syntactically
-    # perfect `cq_shim_fcmp_qq(CQ_SHIM_FPRED_OEQ, 32, …)`, keeps the 2479-name
+    # perfect `cq_shim_fcmp_qq(CQ_SHIM_FPRED_OEQ, 32, …)`, keeps the 2419-name
     # set, keeps every signature, and dispatches a 32-bit operand into a kernel
     # that hard-errors on anything but 64. Only the SET sees it, and it names it.
     victim = "cq_template_fcmp_oeq_f32"
     defs = _rerender(promote=victim)
-    sc.check(len(defs) == 2880, "promoting %s changed the symbol COUNT" % victim)
+    sc.check(len(defs) == 2820, "promoting %s changed the symbol COUNT" % victim)
     reds = _reds(defs)
     sc.check(len(reds) == 1,
              "promoting %s turned %d of the 2 set assertions red; expected the "
@@ -205,7 +205,9 @@ def a_family_width_that_has_not_landed_cannot_be_declared_live():
     # `fadd` by a `(family, width)` key — IS gen_bodies' FAILURE and is
     # provoked in tests/test_gen_bodies_provoked.py, at the two tables that
     # refuse it. It is named here and not duplicated: two copies of one
-    # provocation means a deleted one keeps passing.
+    # provocation means a deleted one keeps passing. (Since bd n4ut the
+    # `fp_arith` half has no victim: `frem` left the re-vendored yaml and
+    # `fneg` landed at 9ve.44. That file's other three refusals still run.)
 
     # (4) AND THE CAST KEY, ONE STEP FINER AGAIN. `uitofp i64 -> f64` is bead
     # 9ve.34's REFUSED row; its four siblings ship. A key of `(opcode, width)`
@@ -216,7 +218,7 @@ def a_family_width_that_has_not_landed_cannot_be_declared_live():
     # u >= 2^63 negative. Only the SET sees it, and it names it.
     victim = "cq_template_uitofp_i64_to_f64"
     defs = _rerender(land={("uitofp", "i64", "f64")})
-    sc.check(len(defs) == 2880, "landing %s changed the symbol COUNT" % victim)
+    sc.check(len(defs) == 2820, "landing %s changed the symbol COUNT" % victim)
     reds = _reds(defs)
     sc.check(len(reds) == 2,
              "landing %s left %d of the 2 set assertions red; expected both "

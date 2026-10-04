@@ -40,7 +40,8 @@ printf "clang %s\npass %s\ncc %s\n" "$(echo "$t1 - $t0" | bc)" \
 # shellcheck disable=SC2086
 # The two CQ_lang stub objects are gone from this line for the reason
 # tools/l6/run_slice_cqops.sh states at length (PRD-v2 §6.1, bead 9ve.24):
-# libcqops defines all 2,880 cq_template_* symbols now, so passing them as well
+# libcqops defines all 2,820 cq_template_* symbols now (2,880 until bd n4ut),
+# so passing them as well
 # is a duplicate-symbol hard error.
 "$LINKCC" $LDX "$OUT.o" "$OUT.residue.o" "$OUT.probe.o" \
          "$CQOPS" $LDLIBS -Wl,-map,"$OUT.map" -o "$OUT.bin" 2>> "$OUT.link"

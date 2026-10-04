@@ -2939,6 +2939,12 @@ endif()
 ## and the 60 extra are the cq_template_frem_* that 61999c4a removed. `check`
 ## allows extra symbols. The status message below said "<CQ_lang 0707dfd6
 ## checkout>" until this amendment.
+##
+## AMENDED AGAIN 2026-10-04 (bd n4ut): THE SUPERSET ENDED. The maintainer
+## authorised the re-vendor; third_party/cq_lang/opcode_table.yaml is now
+## 7307995f… (CQ_lang 4266c40d, recorded in COMMIT.opcode), the grid is 2,820
+## templates, and this archive provides exactly the 3,000 CQ_lang requires:
+## 3,000 = 3,000. The ABI id in backend-manifest.json is unchanged.
 if(CQOPS_CQLANG_DIR AND CQOPS_PY3
    AND EXISTS "${CQOPS_CQLANG_DIR}/tools/backend_contract.py"
    AND EXISTS "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/cmake_install.cmake")
@@ -4490,6 +4496,8 @@ set_tests_properties(test_template_bitcast_death.a_bitcast_that_widens_is_refuse
 ## (shim/gen_reasons.py). Buckets unchanged. One symbol or more per reason
 ## class is forked and its stderr compared byte for byte against text typed in
 ## the test; the static sweep of all 804 is tests/test_gen_bodies.py's.
+## AMENDED 2026-10-04 (bd n4ut): 744 since the opcode_table.yaml re-vendor
+## removed `frem`, and with it the `frem` reason class and its 15 forked rows.
 add_cqops_test(test_template_reasons)
 
 ## 9ve.39 — D15's twin identity over a template call's LITERAL LANES. The

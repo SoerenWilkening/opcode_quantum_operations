@@ -128,8 +128,10 @@ cq_kernel_fn cq_tpl_fcmp_kernel(cq_shim_fpred pred)
     return K[pred];
 }
 
-/* THE fp ARITHMETIC ROW ORDER IS `opcode_table.yaml:200-204`'s OWN — fadd,
- * fsub, fmul, fdiv — with `frem` absent because it has no kernel. Unlike the
+/* THE fp ARITHMETIC ROW ORDER IS `opcode_table.yaml:201-204`'s OWN — fadd,
+ * fsub, fmul, fdiv — with `frem` absent because it has no kernel (and, since
+ * bd n4ut's re-vendor at CQ_lang 4266c40d, no yaml row either: it was
+ * `:200-204` with `frem` at `:204` before). Unlike the
  * predicate tables above, the names here coincide with the enumerators, so a
  * transposition is a visible swap rather than a silent renumbering; the reason
  * to write it out row by row anyway is the `_Static_assert`, which is what makes

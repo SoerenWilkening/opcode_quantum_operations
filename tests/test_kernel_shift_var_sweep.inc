@@ -34,8 +34,8 @@
  * in a width-generic kernel, and this suite's ladder is not the standard one.
  */
 
-/* THE SHIPPED LADDER. shl and lshr carry i80 (opcode_table.yaml:195-196) and
- * i128; ashr carries i128 but NOT i80 (:197) — the i80 binary allow-set is
+/* THE SHIPPED LADDER. shl and lshr carry i80 (opcode_table.yaml:196-197) and
+ * i128; ashr carries i128 but NOT i80 (:198) — the i80 binary allow-set is
  * exactly and/lshr/or/shl (:88), so sweeping ashr there would be testing a
  * symbol CQ_lang never emits. */
 static void sweep_dir(int dir)

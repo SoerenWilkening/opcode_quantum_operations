@@ -51,7 +51,7 @@
 
 typedef cq_ref_w (*wide_ref)(cq_ref_w, cq_ref_w, int);
 
-/* TWO-WORD, because add and sub ship at i128 (opcode_table.yaml:184-185) and
+/* TWO-WORD, because add and sub ship at i128 (opcode_table.yaml:185-186) and
  * a one-word reference aborts above 64. There is NO one-word sibling: it could
  * only ever be crossed against this pair below 64, where the two are provably
  * the same expression. The real cross-check is the bit-serial ripple at the
@@ -70,7 +70,7 @@ static const cq_kd_spec SUB = { "sub", cq_kernel_sub, NULL, NULL, NULL, refn_sub
  * width for both opcodes, it is the only one where the reference's 64-bit seam
  * is exercised, and the standard ladder stops at 64 because that is where a
  * one-word value model stopped. i80 is deliberately absent — the opcode table
- * excludes it from add/sub explicitly (opcode_table.yaml:85). */
+ * excludes it from add/sub explicitly (opcode_table.yaml:86). */
 static void sweep(const cq_kd_spec *k)
 {
     cq_kd_sweep(k);
@@ -104,7 +104,7 @@ CQ_TEST(controlled)
     /* THE FIRST SANDWICH USERS UNDER THE AXIS, so this is where the composition
      * is exercised at scale: I6's extent, the region fingerprint,
      * CQ_ZERO_BY_PALINDROME and §9's promotion in one call. i80 is excluded from
-     * add and sub (opcode_table.yaml:85), as it is from the sweep. */
+     * add and sub (opcode_table.yaml:86), as it is from the sweep. */
     static const int widths[] = { 1, 2, 3, 4, 5, 8, 16, 32, 64, 128 };
 
     cq_kd_for_each_region("add/sub", add_narrow);

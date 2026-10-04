@@ -31,7 +31,7 @@ scratch, so a dirty ancilla is a **silent miscompile, not a leak** (NORTH_STAR Â
 | Path | What |
 |---|---|
 | `third_party/bennett/` | Bennett.jl snapshot, pin in `COMMIT` (SHA on its `commit:` line, not the first line) + `.provenance/MANIFEST.txt`. No `.git`: `git log` there reports the *parent* repo |
-| `third_party/cq_lang/` | `opcode_table.yaml` (pin `COMMIT`), plus `intrinsic_table.yaml` + `libm_table.yaml` (pin `COMMIT.intrinsics`, since `9ve.24`). CQ_lang itself is unpinned; the **yaml sha256s** (configure-time hard errors) prove the grid. `cq_template_*` grid = **2880 = 2479 + 389 + 12** |
+| `third_party/cq_lang/` | `opcode_table.yaml` (pin `COMMIT.opcode`, since `n4ut`; `COMMIT` is its earlier pin, kept as history), plus `intrinsic_table.yaml` + `libm_table.yaml` (pin `COMMIT.intrinsics`, since `9ve.24`). CQ_lang itself is unpinned; the **yaml sha256s** (configure-time hard errors) prove the grid. `cq_template_*` grid = **2820 = 2419 + 389 + 12** |
 | `third_party/cq_free_pairing/` | CQ_lang's `free_pairing_check.py`, the analysis D15's certificate is PORTED from. sha256 pinned at configure. **Reading material only â€” never run it or build it** |
 | `docs/constructions/K01..K12.md`, `BASELINES.md` | Ported construction specs with gate-count formulas in `W` |
 | `docs/cqrt_census.txt` | The real `cqrt_*` census (173 symbols) |
@@ -249,7 +249,7 @@ Also settled: i80 **in** scope; K11 uses Cuccaro (deliberate); `cqrt_h` was an o
 ```bash
 make configure            # both configs; uses Ninja if on PATH (switching generator needs `make clean`)
 make lint                 # tools/check_loc.sh (Rule 12) + tools/check_cites.sh + function map
-make shim-check           # regenerate the 2880-symbol grid from the pinned yamls and diff; hard-fails without PyYAML
+make shim-check           # regenerate the 2820-symbol grid from the pinned yamls and diff; hard-fails without PyYAML
 make test                 # lint + shim-check + both configurations
 
 ctest --test-dir build-debug   -j 6 --output-on-failure

@@ -32,6 +32,11 @@ The CQ checkout must be at commit
 > from its pinned `opcode_table.yaml` `6245117d…` grid. The 60 extra are the
 > `cq_template_frem_*` that CQ_lang `61999c4a` removed. See
 > [the backend contract](BACKEND_CONTRACT.md) §1.1.
+>
+> **Amended again 2026-10-04 (bd n4ut).** The superset ended. The pinned
+> `opcode_table.yaml` was re-vendored at `7307995f…` (CQ_lang `4266c40d`), and
+> libcqops now provides exactly the 3,000 symbols CQ_lang requires: 3,000 =
+> 3,000. The ABI id the installer checks is unchanged.
 
 If `--cq-dir` is omitted, the
 installer uses `CQ_LANG_DIR`, then a sibling checkout named `CQ_lang`. It

@@ -266,7 +266,7 @@ static void copyout(cq_ctx *ctx, void *env, int i)
  * a cheap one.
  *
  * COLUMN-WISE, WITH NO ARRAY AND NO PACKED SCALAR. I5 forbids a `uint64_t
- * product` here — `mul` ships at i128 (opcode_table.yaml:186), where one would
+ * product` here — `mul` ships at i128 (opcode_table.yaml:187), where one would
  * silently truncate — and a W-bit temporary array would need a VLA or a malloc
  * for a kernel that is otherwise allocation-free. Column i of the schoolbook
  * product is Σ_{k≤i} a[k]·b[i−k] plus the carry out of column i−1; the low bit

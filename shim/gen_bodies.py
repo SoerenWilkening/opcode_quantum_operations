@@ -168,7 +168,11 @@ ENTRY = {
 # Those are enumerators that do not exist, so the defect would surface as a C
 # compile error in a GENERATED file — three steps too late, and in a file whose
 # header says never to edit it — rather than as a generator refusal naming the
-# symbol.
+# symbol. (Since bd n4ut's re-vendor no `frem` row exists for this to stop;
+# `fpext`/`fptrunc` under "cast" are the fp refusals left, provoked in
+# tests/test_gen_bodies_provoked.py. Measured there: given a row, `fpext`
+# renders `CQ_SHIM_CAST_FPEXT`, not the `CQ_SHIM_FCAST_` spelling above,
+# because `fp_width` reaches the integer cast door.)
 SELECTOR = {
     # The four integer min/max (M42, bead 9ve.44) ride the integer binary
     # door: same shapes (`qq`/`hl` and their `_unc`), same D7b, same literal

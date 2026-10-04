@@ -19,7 +19,8 @@
 # (2026-09-18, bead 9ve.28); the live figures are EXPECTED below and the
 # arithmetic of the move is in LANDED's own comment. Do not quote a number from
 # this paragraph — quote EXPECTED, which the audit enforces.
-#   2479 cq_template_* from opcode_table.yaml
+#   2419 cq_template_* from opcode_table.yaml (2479 until bd n4ut's
+#        2026-10-04 re-vendor at CQ_lang 4266c40d removed `frem`'s 60)
 #   = wrapper  thin WRAPPERS (integer, plus every LANDED fp family-width)
 #   + inv      `_inv` ABORT bodies   (D14: _inv is f-inverse, and f-inverse does
 #                                     not exist for and/or/udiv/trunc or ANY
@@ -190,6 +191,9 @@ def signature(kind, shape, axis, ctype):
 # `CQ_SHIM_FOP_FREM`, an enumerator that does not exist, and for `fneg` a
 # `KeyError` out of `gen_bodies.ENTRY`. The finer key is also STRICTLY more
 # conservative: it can only ever land fewer rows than the coarse one.
+# (`fp_arith` is FIVE opcodes since bd n4ut's re-vendor: CQ_lang 61999c4a
+# deleted `frem`'s row, and `fneg` landed at bead 9ve.44. The finer key stays,
+# for the cast pairs below and for the next opcode without a kernel.)
 #
 # A CAST'S KEY NAMES BOTH WIDTHS, `(opcode, from, to)`, which is the same
 # tightening one step further. `uitofp i64 -> f64` is the row it exists for:
@@ -347,7 +351,7 @@ def expand(table):
 # is what a reader and a reviewer actually need, and it is what the bead reports.
 BUCKETS = ("wrapper", "inv", "fp", "defer")
 
-EXPECTED = {"total": 2880, "wrapper": 1266, "inv": 678, "fp": 804,
+EXPECTED = {"total": 2820, "wrapper": 1266, "inv": 678, "fp": 744,
             "defer": 132}
 # SEVEN POPULATIONS, AND THE THREE NEW ONES ARE WHAT MAKES THE VENDORING
 # VISIBLE. `int_defer` is the integer intrinsics that still abort (since bead
@@ -362,8 +366,13 @@ EXPECTED = {"total": 2880, "wrapper": 1266, "inv": 678, "fp": 804,
 # `fneg_f64_inv`). `int_inv` is therefore no longer the opcode grid's 603.
 # BEAD s8g MOVED 6: the f64 <-> i64 bitcast pair's four fwd/unc rows to
 # `fp_wrapper` and its two `_inv` rows to `fp_inv` (D14), out of `fp_abort`.
+# BEAD n4ut REMOVED 60 AND MOVED NONE: the re-vendored opcode_table.yaml
+# (7307995f…, CQ_lang 61999c4a) has no `frem` row, and all 60 of its symbols —
+# f16/f32/f64/f80 x 15 variants, `_inv` included, since `frem` never landed —
+# were `fp_abort`. 2880 -> 2820 and 804 -> 744; no other figure moves, so the
+# opcode grid's integer half is still D14's 992 wrappers + 603 `_inv`.
 EXPECTED_BY_DOMAIN = {"int_wrapper": 1102, "int_inv": 610, "int_defer": 120,
-                      "fp_wrapper": 164, "fp_inv": 68, "fp_abort": 804,
+                      "fp_wrapper": 164, "fp_inv": 68, "fp_abort": 744,
                       "fp_defer": 12}
 
 

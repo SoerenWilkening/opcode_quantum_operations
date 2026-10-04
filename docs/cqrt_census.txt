@@ -31,6 +31,12 @@ Headline numbers (all independently corroborated inside CQ_lang)
 
   Of the 2479: purely-integer 1595, fp-touching 884.
 
+  [AMENDED 2026-10-04 (bd n4ut): opcode_table.yaml was RE-VENDORED at CQ_lang
+   4266c40d, sha256 7307995f..., recorded in third_party/cq_lang/COMMIT.opcode.
+   The opcode grid is now 2419 (purely-integer 1595, fp-touching 824) and the
+   TOTAL link surface 2820. The figures above are this census's 2026-08-14
+   record and stand as written. See F8.]
+
   APPENDED 2026-08-22, AFTER THIS CENSUS WAS WRITTEN. Of the 1595 purely-integer:
   992 thin wrappers + 603 `cq_template_*_inv` ABORT bodies (PRD §15 D14, resolved
   2026-08-21 — `_inv` is f-inverse, and f-inverse does not exist for and / or /
@@ -647,6 +653,12 @@ E5. NOT ADDRESSED by this census, still open: Step 0.5 blocker 2 (`_unc` vs
 PART F — THE 1455 / 1474 / 1732 QUESTION, RESOLVED
 ================================================================================
 
+[2026-10-04, bd n4ut: every opcode_table.yaml line number in F1-F3 refers to the
+ 6245117d... bytes this census was written against (see the header). The
+ re-vendored file (7307995f...) shifted lines 62-203 by +1 and rewrote line 61:
+ F2's :61-62 text is now at :62-63 (re-worded), F3's :76-84 and :126-141 are
+ :77-85 and :127-142. The numbers below are left as written. See F8.]
+
 F0. METHOD. Three independent counting routes, which agree.
 
   ROUTE 1 — direct count of the shipped header (ground truth):
@@ -774,6 +786,7 @@ F2. WHERE 1732 CAME FROM — a stale comment, two of them.
          2333  1455   878   2026-07-06  p119.7 fp<->int bitcast       <-- PRD's 2333
          2439  1555   884   2026-07-15  3c6m.51 Inc 1 (i80 extract)
          2479  1595   884   2026-07-15  3c6m.51 Inc 2 (i80 insert)    <-- CURRENT
+                                                (until 2026-10-04; see F8)
 
     1732 was the TOTAL on 2026-06-20, eight revisions and 747 symbols ago.
     VERDICT: 1732 is real but long stale. It is a total, never an integer count.
@@ -929,6 +942,44 @@ F7. GRAND TOTAL OF THE LINK SURFACE
     This is exactly why Step 23's gate reads "no undefined cq_template_* FROM THE
     OPCODE GRID" and not "nm shows no undefined cq_template_*": the unqualified
     form cannot pass while 401 symbols come from CQ_lang's own archives.
+
+    [Both totals above are dated. Since bead 9ve.24 (2026-09-19) libcqops
+     resolves the whole cq_template_* surface itself, and since bd n4ut
+     (2026-10-04) that surface is 2820. See F8.]
+
+F8. AMENDED 2026-10-04 (bd n4ut) — THE OPCODE GRID IS 2419, THE SURFACE 2820
+
+    The maintainer ruled "Re-vendor, authorized". third_party/cq_lang/
+    opcode_table.yaml was overwritten byte for byte from CQ_lang commit
+    4266c40d (sha256 7307995f9cc69bec91d601b65a3da19bda74d49392585fe0775f198cfd6f8322,
+    29875 bytes, 489 lines), last touched by 61999c4a (2026-09-30, "Reject
+    unsupported native frem and retire trace templates"). Its record is the
+    new third_party/cq_lang/COMMIT.opcode. third_party/cq_lang/COMMIT and this
+    census's header still name a6a92fe and 6245117d..., and both stay as the
+    record of the bytes vendored on 2026-08-14.
+
+    WHAT MOVED: F1's frem row (4 widths x 15 variants = 60) is gone, and
+    nothing else is. Re-counted three ways, as in F0:
+      ROUTE 1  runtime/cq_templates.h at 4266c40d (banner 7307995f...):
+               2419 declarations, the old header's 2479 minus exactly the 60
+               cq_template_frem_*, in the same order
+      ROUTE 2  shim/gen_shim.py's expansion of the vendored yaml: 2419 rows
+               from opcode_table.yaml
+      ROUTE 3  CQ_lang's own tools/gen_templates.py at 4266c40d, run from a
+               scratch copy over the vendored yamls: its cq_link_smoke.c says
+               "tools/opcode_table.yaml — 2419 symbols" and returns
+               cq_link_smoke_count == 2820UL
+    So binary_opcodes is 17 (the yaml's own comment says so) and:
+
+        purely-integer  1595   (unchanged: 992 wrappers + 603 _inv aborts)
+        fp-touching      824   (884 - 60)
+                        ----
+                        2419
+        + intrinsic 389 + libm 12 = 2820, pairwise disjoint
+
+    `cq_template_*_inv` totals 891 (915 - frem's 24).
+    libcqops' measured partition (python3 shim/gen_shim.py): 2820 = 1266
+    wrappers + 678 _inv aborts + 744 fp aborts + 132 deferred.
 
 
 ================================================================================

@@ -284,7 +284,7 @@ CQ_TEST(the_blocks_stream_is_the_kernels_forward_half_gate_for_gate)
  * its own to emit. Return `W² + 2W = 3` from one and 0 from the other and the
  * consumer's later blocks all sit at the wrong offset.
  *
- * i1 IS A SHIPPED WIDTH (opcode_table.yaml:186), so this is not hypothetical. */
+ * i1 IS A SHIPPED WIDTH (opcode_table.yaml:187), so this is not hypothetical. */
 CQ_TEST(at_w1_the_block_has_no_region_and_no_steps)
 {
     CHECK_EQ(cq_mul_region(1), 0);

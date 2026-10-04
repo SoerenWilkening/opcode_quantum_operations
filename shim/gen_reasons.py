@@ -41,6 +41,11 @@ DECLINED = {
 #   frem     no construction: the pinned snapshot has no `soft_frem` (its only
 #            `frem` is extract/errors.jl's opcode-name table) and the corpus
 #            calls it zero times, so it stays an abort on LIVENESS (§3.3).
+#            NO ROW REACHES IT since bd n4ut (2026-10-04): the re-vendored
+#            opcode_table.yaml (7307995f…, CQ_lang 61999c4a) has no `frem`, so
+#            no body prints it. KEPT because the generator does not require
+#            its removal; deleting it would make a returning `frem` f64 row
+#            stop at the SystemExit below until someone writes its reason.
 #   fpext /  every one of these rows ALSO touches f16/f32/f80, and needs a
 #   fptrunc  rail at that width, which v2's f64-only scope cannot mint. The
 #            text names no `cqrt_*` symbol: M27 emits none, by test.

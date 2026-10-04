@@ -20,7 +20,8 @@
 #
 # THE CURRENT LINK LINE (PRD-v2 §6.1, bead 9ve.24) IS:
 #   s2.o  l6_residue.o  libcqops.a  [libcqops dependencies]
-# libcqops defines all 2,880 cq_template_* symbols. No CQ_lang template object
+# libcqops defines all 2,820 cq_template_* symbols (2,880 until bd n4ut's
+# 2026-10-04 re-vendor removed `frem`). No CQ_lang template object
 # is extracted or linked; `libcq_runtime.a` is absent too. The link map below
 # checks that no CQ_lang archive supplied an object.
 #
@@ -120,7 +121,7 @@ set -f
 # `ctpop`, `bswap`, `fshl` or `fma` needed CQ_lang's own trace-only bodies —
 # whose minting arms call `cqrt_alloc_handle`, which PRD §15 D16 makes a loud
 # abort. §6.1's decision was to OWN those symbols; the archive now defines all
-# 2,880, so passing the stub objects as well is a DUPLICATE-SYMBOL hard error.
+# 2,820, so passing the stub objects as well is a DUPLICATE-SYMBOL hard error.
 # Loud, at the link stage, and the good failure mode — but it has to go in the
 # same commit as the definitions, which is why this edit is not optional.
 #

@@ -38,7 +38,7 @@
  * `cq_kernel_addacc`, exactly as M12's barrel consumes `cq_mux_step`.
  *
  * THERE IS NO HIGH HALF TO LEAK, and that is structural rather than a slice.
- * CQ_lang's `mul` is same-width (opcode_table.yaml:186, no `mul_wide`, no
+ * CQ_lang's `mul` is same-width (opcode_table.yaml:187, no `mul_wide`, no
  * `umulh`), so we instantiate `result_width = W`, where multiplier.jl:26's
  * `dest > result_width && break` drops every partial-product Toffoli of weight
  * >= W before it is emitted and the accumulator emits no carry-out
@@ -196,7 +196,7 @@ typedef struct {
  * that is a delegation to K2 and not a construction of the consumer's (Rule 1).
  * Returning `W² + 2W = 3` here instead would hand a caller three qubits the
  * construction never touches; aborting would break a width-generic loop at the
- * one width the ABI does ship (opcode_table.yaml:186). */
+ * one width the ABI does ship (opcode_table.yaml:187). */
 int cq_mul_region(int W);
 
 /* ONE GATE OF THE COMPUTE HALF, `u` in [0, cq_mul_steps(W)).

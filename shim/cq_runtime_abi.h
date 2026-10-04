@@ -3,7 +3,8 @@
  * WHY A HEADER OF OUR OWN RATHER THAN CQ_lang's. Nothing in this repository
  * includes anything from the CQ_lang tree, and Step 22 already answered the
  * same question the same way for the OTHER frozen ABI: `tests/abi/
- * cq_templates_abi.txt` vendors CQ_lang's 2479 `cq_template_*` declarations
+ * cq_templates_abi.txt` vendors CQ_lang's 2419 `cq_template_*` declarations
+ * (2479 until bd n4ut's 2026-10-04 re-vendor of the opcode table)
  * rather than reading them live, because CQ_lang is UNPINNED — its HEAD has
  * already moved past `third_party/cq_lang/COMMIT`. This is the `cqrt_*` half
  * of that posture. It is under `shim/` and not under `tests/abi/` because the

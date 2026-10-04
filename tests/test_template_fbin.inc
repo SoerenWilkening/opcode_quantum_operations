@@ -7,7 +7,11 @@
  * had a kernel, so both kept their `"fp is v2"` abort (text retired by bead ar9) (`fneg` landed at bead
  * 9ve.44 through the UNARY door; see tests/test_template_fmisc.c). A `LANDED` key of `(family, width)` would have
  * taken all six together; the key is `(opcode, width)` for exactly this
- * reason, and `tests/test_gen_bodies_provoked.py` provokes the coarse version.
+ * reason, and `tests/test_gen_bodies_provoked.py` provoked the coarse version.
+ * (AMENDED 2026-10-04, bd n4ut: the re-vendored opcode_table.yaml has no
+ * `frem` row — CQ_lang 61999c4a removed it — so `fp_arith` is these four
+ * binary opcodes plus `fneg`, and the coarse key has no kernel-less victim
+ * left at f64; that provocation's fp slot moved to `fpext`.)
  *
  * WHY THE VALUE CLAIMS RIDE THE ALL-CLASSICAL MASK. It is not a shortcut: the
  * §3 fold table dispatches on a bit's KIND and never on a qubit's VALUE (D6),
@@ -82,7 +86,7 @@ int32_t cq_template_fdiv_f64_hl_controlled_inv(int32_t, int32_t, double);
 int32_t cq_template_fdiv_f64_lh_controlled_inv(int32_t, double, int32_t);
 
 /* The four rows. `fwd_lh`/`unc_lh` are NULL on `fadd` and `fmul`, which is the
- * ABI's own shape and not an omission: `opcode_table.yaml:200,202` give those
+ * ABI's own shape and not an omission: `opcode_table.yaml:201,203` give those
  * two ten variants and the non-commutative pair fifteen, exactly as the
  * commutative integer opcodes have no `_lh` either. A row that invented one
  * would be a phantom symbol and a link error. */

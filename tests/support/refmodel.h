@@ -57,7 +57,7 @@ uint64_t cq_ref_xor(uint64_t a, uint64_t b, int W);
 uint64_t cq_ref_and(uint64_t a, uint64_t b, int W);
 uint64_t cq_ref_or (uint64_t a, uint64_t b, int W);
 
-/* K6 and K7 have NO one-word form. They ship at i128 (opcode_table.yaml:184),
+/* K6 and K7 have NO one-word form. They ship at i128 (opcode_table.yaml:185),
  * so the two-word pair below is the oracle, and a one-word sibling would only
  * ever be compared to it below 64 — where the two are provably the same
  * expression. See the note in refmodel.c; do not add one. */
@@ -116,14 +116,14 @@ cq_ref_w cq_ref_w_lshr(cq_ref_w a, int k, int W);
 cq_ref_w cq_ref_w_ashr(cq_ref_w a, int k, int W);
 
 /* K6, K7, width-generic to 128 — THE model L1 drives for add and sub, because
- * both ship at i128 (opcode_table.yaml:184-185) where the one-word pair
+ * both ship at i128 (opcode_table.yaml:185-186) where the one-word pair
  * aborts. Word arithmetic with an explicit carry across the 64-bit seam, not a
  * bit-serial ripple: the kernel under test IS a ripple-carry circuit, and a
  * reference that shared its recurrence would share its mistakes. */
 cq_ref_w cq_ref_w_add(cq_ref_w a, cq_ref_w b, int W);
 cq_ref_w cq_ref_w_sub(cq_ref_w a, cq_ref_w b, int W);
 
-/* K11, width-generic to 128 — `mul` ships at i128 (opcode_table.yaml:186), and
+/* K11, width-generic to 128 — `mul` ships at i128 (opcode_table.yaml:187), and
  * i128 is the only width where a reference's 64-bit seam is exercised at all.
  * SAME-WIDTH: only the low W bits of the product exist, here and in the kernel,
  * because there is no widening-multiply opcode in the table.
@@ -154,7 +154,7 @@ typedef enum {
 
 int cq_ref_icmp(cq_icmp_pred p, cq_ref_w a, cq_ref_w b, int W);
 
-/* K12, width-generic to 128 — `divrem` ships at i128 (opcode_table.yaml:187-190,
+/* K12, width-generic to 128 — `divrem` ships at i128 (opcode_table.yaml:188-191,
  * all four opcodes, the full 15-variant grid).
  *
  * SHIFT-SUBTRACT OVER cq_ref_w_sub, WHICH DOES SHARE THE KERNEL'S RECURRENCE,

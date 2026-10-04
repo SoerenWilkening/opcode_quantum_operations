@@ -130,7 +130,7 @@ typedef enum {
 } cq_shim_fpred;
 
 /* `opcode_table.yaml`'s `fp_arith` BINARY opcodes that reach a wrapper, in the
- * yaml's own order (`:200-204`).
+ * yaml's own order (`:201-204` since bd n4ut's re-vendor; `:200-204` before).
  *
  * TWO OF THAT FAMILY'S SIX OPCODES ARE ABSENT AND THE ABSENCE IS THE POINT.
  * `frem` is a `fp_arith` binary row with no kernel and keeps its fp abort —
@@ -140,6 +140,9 @@ typedef enum {
  * That is why `gen_shim.LANDED`'s key is `(opcode, width)` and not
  * `(family, width)` — a family-grained key would take all six together, which
  * for `frem` means a live wrapper dispatching an opcode no table has a row for.
+ * (AMENDED 2026-10-04, bd n4ut: the re-vendored yaml has no `frem` row —
+ * CQ_lang 61999c4a removed it — so the family is five opcodes, the four
+ * binary ones are `:201-204` rather than `:200-204`, and none is absent here.)
  *
  * A SEPARATE PREFIX FROM `CQ_SHIM_OP_`, on `cq_shim_fpred`'s ground: an fp
  * `fadd` and an integer `add` are different operations over different kernels,
@@ -269,7 +272,7 @@ void cq_shim_fcmp_hl_unc(cq_shim_fpred pred, int bits, int32_t out_handle, int32
 /* fp ARITHMETIC (PRD-v2 §5 / §7.15, bead 9ve.36): the SAME nine shapes as the
  * integer binary family over the SAME handle boundary, at `bits == 64` and
  * nothing else. Unlike the compares, `fp_arith` DOES carry the `_lh` shape and
- * DOES carry the §9 controlled axis — `opcode_table.yaml:201,203` give `fsub`
+ * DOES carry the §9 controlled axis — `opcode_table.yaml:202,204` give `fsub`
  * and `fdiv` fifteen variants each — which is exactly the difference
  * `shim/cq_template_fp.c`'s recorded COMPARE<->ARITHMETIC seam turns on.
  *

@@ -29,7 +29,7 @@
  * WIDTHS ARE ENUMERATED, NEVER SAMPLED — that is the axis that actually catches
  * faults here, because the kernel is width-generic over reg->width with no width
  * switch (I5, Rule 3). The ladder is the shipped one plus the narrow widths:
- * opcode_table.yaml:186 declares `mul` at i1, i8, i16, i32, i64 and i128 — no
+ * opcode_table.yaml:187 declares `mul` at i1, i8, i16, i32, i64 and i128 — no
  * i80, and no widening variant anywhere in the table — extended with 2, 3, 4
  * and 5 for Rule 10's narrow L1 widths and risk R8's named witnesses (W = 3 and
  * W = 5), exactly as kernelsweep.c does. It is NOT cq_kd_sweep's standard

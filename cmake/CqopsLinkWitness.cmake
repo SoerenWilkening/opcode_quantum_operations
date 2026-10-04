@@ -79,6 +79,11 @@
 # the checkout — is what proves a manifest is the expansion of the grid we
 # ship. Re-pinning turns this red LOUDLY instead of silently witnessing the new
 # grid against the old ABI.
+# (bd n4ut, 2026-10-04: the opcode yaml DID move — re-vendored at CQ_lang
+# 4266c40d, recorded in third_party/cq_lang/COMMIT.opcode — and this arm is
+# what forced tests/abi/cq_templates_abi.txt's re-extraction. The yaml is
+# also checked against its record now, by CqopsIntrinsicPin.cmake's
+# `cqops_check_opcode_pin`, which runs first and cannot see a stale manifest.)
 #
 # A MACRO BECAUSE THERE ARE THREE PAIRS NOW AND NINE WAYS TO PAIR THEM
 # (PRD-v2 §6.1's vendoring, bead 9ve.24). A copy-and-pasted arm that checked
@@ -120,7 +125,9 @@ function(cqops_add_link_witness)
     set(_yaml     ${CMAKE_SOURCE_DIR}/third_party/cq_lang/opcode_table.yaml)
     set(_abi      ${CMAKE_SOURCE_DIR}/shim/cq_runtime_abi.h)
     # PRD-v2 §6.1's two vendored tables (bead 9ve.24). THREE MANIFESTS AND
-    # THREE YAMLS: the grid is 2,880 and no one manifest can witness it.
+    # THREE YAMLS: the grid is 2,820 (2,880 until bd n4ut's 2026-10-04
+    # re-vendor of opcode_table.yaml removed `frem`) and no one manifest can
+    # witness it.
     set(_imanifest ${CMAKE_SOURCE_DIR}/tests/abi/cq_intrinsic_templates_abi.txt)
     set(_iyaml     ${CMAKE_SOURCE_DIR}/third_party/cq_lang/intrinsic_table.yaml)
     set(_lmanifest ${CMAKE_SOURCE_DIR}/tests/abi/cq_libm_templates_abi.txt)
@@ -136,7 +143,7 @@ function(cqops_add_link_witness)
     cqops_r3_arm("${_imanifest}" "${_iyaml}")
     cqops_r3_arm("${_lmanifest}" "${_lyaml}")
 
-    # --- Table 1: the 2880 grid symbols, DECLARED FROM THE MANIFESTS' OWN
+    # --- Table 1: the 2820 grid symbols, DECLARED FROM THE MANIFESTS' OWN
     # BYTES. Emitting CQ_lang's declarations verbatim rather than re-deriving
     # them is what keeps this an independent oracle: a re-expansion here would
     # share every transcription slip shim/gen_shim.py made — and since the
@@ -225,7 +232,7 @@ _Static_assert(sizeof cq_link_smoke_templates / sizeof *cq_link_smoke_templates
 _Static_assert(sizeof cq_link_smoke_cqrt / sizeof *cq_link_smoke_cqrt
                == CQ_LINK_C_ROWS,
                \"every cqrt_* libcqops defines\");
-_Static_assert(CQ_LINK_T_ROWS == 2880, \"PRD 1 + PRD-v2 6.1: 2479 + 389 + 12\");
+_Static_assert(CQ_LINK_T_ROWS == 2820, \"PRD 1 + PRD-v2 6.1 + bd n4ut: 2419 + 389 + 12\");
 _Static_assert(CQ_LINK_C_ROWS == 180,  \"PRD 15 D16: 182 minus the two cqrt_h*\");
 
 /* THE READ IS INDEXED BY A RUNTIME VALUE, and that is the whole difference
