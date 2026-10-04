@@ -26,8 +26,10 @@
  *
  * WHY THE WHOLE PROGRAM IS NOT RUN THROUGH THIS SINK. `qec_n_logical` is a HARD
  * ceiling (D20) and the shipped configs carry 1..10 logical qubits, while §12's
- * W = 8 oracle peaks near a hundred; one logical Toffoli at d = 3 is 562,564
- * physical gates. NORTH_STAR condition 4 asks for a gate stream and a
+ * W = 8 oracle peaks near a hundred; one logical Toffoli at d = 3 is 385,317
+ * physical gates (re-measured 2026-10-04 at QEC d96d259 and pinned in
+ * test_sink_qec, bd 65q; 562,564 when D20 measured it on 2026-08-28, which still
+ * reproduces at QEC 1e3c315 — the library moved). NORTH_STAR condition 4 asks for a gate stream and a
  * classical-mode value, not a fault-tolerant run — condition 5 was the qec one
  * and was met at Step 26. So this file feeds the SINK the alphabet, which is
  * exactly the composition the two halves need and costs milliseconds.

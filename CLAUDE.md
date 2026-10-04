@@ -264,8 +264,11 @@ CQOPS_UPDATE_GOLDENS=1 ctest --test-dir build-release -R kernel
 
 Timings and test counts spread 4–5× run-to-run — **never quote one; re-measure** (`bd 97s`).
 C11, `-Wall -Wextra -Werror -Wconversion`, `-ffp-contract=off` (reproducible angle
-classification — don't remove). Ordinary suites run every case regardless of argv; death
-binaries take a case name as `argv[1]`.
+classification — don't remove). A bare ordinary suite runs every case; a `CQ_TEST_MAIN_ARGV`
+suite also takes `--case`/`--skip`/`--shard I/K` (`tests/support/harness.h`; anything else
+exits 2), which `add_cqops_test(... SPLIT ...)` uses to spread one binary over several ctest
+entries — select them all with `-R '^name(\.|$)'` (`bd 5mqp`). Death binaries take a case
+name as `argv[1]`.
 
 **Toolchain probes** (never pinned): `cmake/CqopsDebugToolchain.cmake` runs before `project()`
 and switches Debug to an ASan-capable compiler (Apple clang 17 here SIGILLs before `main` under

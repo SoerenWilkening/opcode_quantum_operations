@@ -25,6 +25,10 @@
  *      and forbids it here — a `cq_sink` never sees a handle, a width or an
  *      opcode name, and a non-conformant line inside an opted-in trace is a
  *      FATAL parse error for the viewer, not a degraded render.
+ *
+ * AND ONE THING ONLY THIS SUITE CAN RE-CHECK (bd 65q): D20's per-gate physical
+ * costs. They are a property of the QEC revision as much as of the config, so
+ * the pin prints the revision CMake configured against.
  */
 
 #include "sink_qec.h"
@@ -105,10 +109,14 @@ static int stage_labels(const char *path, char out[][8], int cap)
  * recorder of ours: what is under test is that the call arrived, and a mock
  * would only prove that our vtable calls our vtable.
  *
- * A CCX AT d = 3 IS 562,564 PHYSICAL GATES against a CX's 1,830, and that gap
- * is the whole of D20's scope note — it is magic-state distillation, not a
- * defect, and it is why a Toffoli-free region at small width is inspectable
- * through the QEC repo's drawer and anything with Toffolis is not. */
+ * A CCX AT d = 3 IS 385,317 PHYSICAL GATES against a CX's 546 — re-measured
+ * 2026-10-04 at QEC d96d259 and PINNED in the case after this one. Until then
+ * this comment said 562,564 against 1,830: D20's 2026-08-28 measurement, which
+ * still reproduces at QEC 1e3c315, so the library moved and neither pair was
+ * wrong at its own revision. The gap is the whole of D20's scope note — it is
+ * magic-state distillation, not a defect, and it is why a Toffoli-free region
+ * at small width is inspectable through the QEC repo's drawer and anything
+ * with Toffolis is not. THIS case asserts only the ordering. */
 CQ_TEST(the_four_direct_entries_reach_their_qec_counterparts)
 {
     qec_ctx *c = bind(NULL);
@@ -137,6 +145,81 @@ CQ_TEST(the_four_direct_entries_reach_their_qec_counterparts)
     CHECK(qec_count(c, QEC_GATE_MZ) > 0u);
 
     unbind();
+}
+
+/* -------------------------------------------------------------------------
+ * D20's two absolutes, pinned (bd 65q, maintainer ruling 2026-10-04).
+ * ------------------------------------------------------------------------- */
+
+/* Handed down by tests/CMakeLists.txt, which records why they name what was
+ * CONFIGURED and not what was linked. Absent means the registration changed,
+ * which must not degrade into an "unknown" that looks like a reading. */
+#if !defined(CQOPS_QEC_HEAD) || !defined(CQOPS_QEC_DIRTY)
+#error "test_sink_qec needs CQOPS_QEC_HEAD and CQOPS_QEC_DIRTY from tests/CMakeLists.txt"
+#endif
+
+/* D20's own method, which is the QEC repo's `trace` driver's "Total gates"
+ * line minus the trace: a FRESH context from the named config, ONE logical
+ * gate, qec_total. */
+static uint64_t d20_direct_cost(int toffoli)
+{
+    qec_ctx *d = qec_create(CQOPS_QEC_TEST_CONFIG);
+    if (!d) {
+        cq_h_fail(__FILE__, __LINE__, "qec_create refused %s", CQOPS_QEC_TEST_CONFIG);
+        return 0;
+    }
+    CHECK_EQ(toffoli ? qec_ccx(d, 0, 1, 2) : qec_cx(d, 0, 1), 0);
+    uint64_t n = qec_total(d);
+    qec_destroy(d);
+    return n;
+}
+
+/* The same quantity through OUR sink: a fresh bind per gate, so the CX is not
+ * charged for a patch an earlier gate already paid for. */
+static uint64_t d20_sink_cost(int toffoli)
+{
+    qec_ctx *c = bind(NULL);
+    CHECK_EQ(qec_distance(c), 3u);
+    const cq_sink *s = cq_sink_active();
+    if (toffoli) cq_sink_ccx(s, 0, 1, 2);
+    else         cq_sink_cx(s, 0, 1);
+    uint64_t n = qec_total(c);
+    unbind();
+    return n;
+}
+
+/* THE DELIBERATE OPPOSITE OF test_grover_qec's CHOICE for its T count, which
+ * stays unpinned so a QEC re-tune cannot redden it. Prose quotes THESE two
+ * numbers as facts, so going red when the QEC repo re-tunes is the purpose.
+ *
+ * RED HERE IS A QEC CHANGE TO RE-MEASURE, NOT A NUMBER TO RE-TYPE: re-run the
+ * trace driver on the same config, amend D20 (and every echo bd 65q tagged)
+ * with the date and QEC sha, and only then move the literals. They are
+ * literals rather than a golden so CQOPS_UPDATE_GOLDENS cannot bless a drift,
+ * and the sibling pair checked before them reads no constant: it fails if the
+ * sink adds or drops anything the library does not, which no QEC revision
+ * excuses.
+ *
+ * The literals: 546 and 385,317, re-measured 2026-10-04 at QEC d96d259 by the
+ * trace driver (the checkout's own binary, and a clean export of that commit)
+ * and by this case. D20's 2026-08-28 pair was 1,830 and 562,564, and still
+ * reproduces at QEC 1e3c315 — the library moved, and the pin is what would
+ * have said so. */
+CQ_TEST(d20s_per_gate_physical_costs_are_pinned_at_d3)
+{
+    printf("# D20 pin: QEC HEAD %s as configured (%d porcelain line(s) under "
+           "qec/), config %s\n", CQOPS_QEC_HEAD, CQOPS_QEC_DIRTY, CQOPS_QEC_TEST_CONFIG);
+
+    uint64_t cx  = d20_sink_cost(0);
+    uint64_t ccx = d20_sink_cost(1);
+    printf("# D20 pin: one logical CX = %llu, one logical CCX = %llu physical gates\n",
+           (unsigned long long)cx, (unsigned long long)ccx);
+
+    CHECK_EQ(cx,  d20_direct_cost(0));
+    CHECK_EQ(ccx, d20_direct_cost(1));
+
+    CHECK_EQ(cx,  546);
+    CHECK_EQ(ccx, 385317);
 }
 
 /* THE CASE D19 ASKS FOR BY NAME. Two arms, and the second is the sharper one.
@@ -325,6 +408,7 @@ CQ_TEST(only_a_clean_teardown_renames_the_partial_trace)
 
 CQ_TEST_MAIN(
     CQ_CASE(the_four_direct_entries_reach_their_qec_counterparts),
+    CQ_CASE(d20s_per_gate_physical_costs_are_pinned_at_d3),
     CQ_CASE(the_ry_conjugation_is_emitted_in_the_reverse_of_the_matrix_product),
     CQ_CASE(section_7s_folding_rows_cost_no_t_gates_and_a_general_angle_does),
     CQ_CASE(the_install_hook_sets_both_pool_modes_from_the_config),

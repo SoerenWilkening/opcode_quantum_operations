@@ -58,9 +58,31 @@ import re
 DEFERRED = re.compile(r"^cqops: (\S+) not implemented \((.*)\)", re.M)
 STRAND = re.compile(r"strand", re.I)
 
+# THE HOUSE SHAPE, read off the die helpers rather than guessed (bd p2y5,
+# 2026-10-04): every one in src/ and shim/ prints `libcqops: FATAL: <layer>:`
+# and then calls abort(). D15 §3's `libcqops: STRANDED:` line is NOT one -- a
+# strand is reported and the program continues, by design -- and must not match.
+FATAL = re.compile(r"libcqops: FATAL:")
+# A SANITIZER REPORT. With abort_on_error off, ASan, LSan and UBSan end in
+# `_exit(exitcode)` -- rc 1, no signal (cmake/CqopsTest.cmake measured a
+# use-after-free under abort_on_error=0 at rc 1) -- and neither the L6 ctest
+# entry nor a hand run sets ASAN_OPTIONS, so a Debug archive's report can
+# arrive below 128. UBSan's own report line is `runtime error:`.
+SANITIZER = re.compile(r"(?:Address|Leak|Thread|Memory|UndefinedBehavior)"
+                       r"Sanitizer|runtime error:")
+# 126 and 127 are the shell's and the loader's own codes for "found but not
+# executable" and "not found" (a missing shared library is 127 on glibc), so
+# the runner's own failure to start the binary can never read as program data.
+EXIT_STATUS_MAX = 125
+
+# THE GATE'S GREEN CLASSES, ONE LIST (PRD §15 D18), and the gate is written
+# against it FAIL-CLOSED: BUILD_FAIL, ABORT, RUN_FAIL, PROVENANCE and any class
+# nobody has ruled on yet are red. Of the three only OK counts toward --min-ok.
+GATE_GREEN = ("OK", "DEFERRED", "EXIT_STATUS")
+
 
 def classify(ran, rc, err, prov):
-    """LINK / RUN / ABORT, plus the v1-deferred row.
+    """LINK / RUN / ABORT, plus the v1-deferred row and the program's status.
 
     `ran` is False when the fixture never reached stage 4 -- a front-end,
     lowering or LINK failure, which is a different fact from "it ran and
@@ -77,7 +99,35 @@ def classify(ran, rc, err, prov):
         return "DEFERRED"        # a v1 boundary, loud and by design
     if rc >= 128:
         return "ABORT"
+    if exit_status(rc, err):
+        return "EXIT_STATUS"
     return "RUN_FAIL"
+
+
+def exit_status(rc, err):
+    """A NONZERO STATUS THE PROGRAM CHOSE (bd p2y5, ruled 2026-10-04).
+
+    No libcqops fail path exits with a status: every one ends in abort(), so
+    it lands on rc >= 128 above. src/, include/ and shim/ (generated bodies
+    included) call no exit(), _Exit(), quick_exit(), signal(), sigaction(),
+    raise() or longjmp(), and their one atexit() handler, src/sink_qec.c's
+    teardown, exits nothing -- ASSERTED, not assumed, by tests/test_l6_report.py,
+    which also pins every stderr prefix the library prints. So a status in
+    1..125 with no fatal and no sanitizer text is the fixture's own `main`
+    returning a value -- e2e-slice-condtree-classical-leaf returns a sum of
+    cq_measure results. Anything failing a test below stays RUN_FAIL, the
+    stricter class, and the ABORT and DEFERRED arms above are untouched.
+    """
+    return (1 <= rc <= EXIT_STATUS_MAX and not FATAL.search(err)
+            and not SANITIZER.search(err))
+
+
+def exit_status_lines(rows):
+    """Every EXIT_STATUS row, with its rc, for the summary. It is green and it
+    is NOT OK, so it is listed rather than left inside a count."""
+    return [f"  EXIT_STATUS rc={r['rc']:<4d} {r['name']}  (ran to the end; the "
+            f"status is the program's own value, not counted toward --min-ok)"
+            for r in rows if r["verdict"] == "EXIT_STATUS"]
 
 
 RESIDUE_FIELDS = ("stranded_dirty", "stranded_unproven", "frees_dirty",

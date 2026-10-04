@@ -103,20 +103,44 @@ endfunction()
 ## WILL_FAIL. See _cqops_sanitizer_env above for the measurement, the CI run,
 ## and what the option costs.
 ##
+## SPLIT spreads ONE binary's cases over several CTest entries (bd 5mqp,
+## 2026-10-04) so that `ctest -j` can run them side by side. The binary must be
+## a CQ_TEST_MAIN_ARGV suite (tests/support/harness.h has the grammar). Each
+## token is a CASE NAME, optionally `/K`:
+##
+##   <case>      registers <name>.<case>, running `<name> --case <case>`
+##   <case>/K    registers <name>.<case>.0ofK .. <name>.<case>.(K-1)ofK, each
+##               `--case <case> --shard I/K`: L1's sampler draws every sample
+##               and each entry runs the s % K == I slice, so the K entries run
+##               the unsharded case's samples exactly once between them
+##
+## and the base entry <name> then runs `--skip <case>` for every listed case.
+## THE CASE LIST STAYS IN THE C FILE: a case added there lands in the base
+## entry with no CMake edit, and a listed name the binary does not hold makes
+## BOTH its own entry and the base entry refuse at run time (exit 2), so a
+## rename cannot silently drop a case. A bare run of the binary still runs
+## everything, which is what `--update-goldens` by hand relies on. SPLIT
+## with WILL_FAIL, a K outside 1..1000 or a second `/` is a FATAL_ERROR.
+##
 ## ANY OTHER TOKEN IS A CONFIGURE-TIME FATAL_ERROR THAT NAMES IT (`bd awt`,
 ## 2026-09-28), the same guard as add_cqops_death_test's: a misspelt option
 ## would otherwise land in ARG_UNPARSED_ARGUMENTS and be ignored. A token after
 ## SOURCES is still read as a source file, and fails as a missing one.
 
 function(add_cqops_test name)
-    cmake_parse_arguments(ARG "WILL_FAIL;LEAK_EXIT_NOT_ABORT" "" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARG "WILL_FAIL;LEAK_EXIT_NOT_ABORT" ""
+                          "SOURCES;SPLIT" ${ARGN})
 
     if(ARG_UNPARSED_ARGUMENTS)
         list(JOIN ARG_UNPARSED_ARGUMENTS " " bad)
         message(FATAL_ERROR "add_cqops_test(${name}): unrecognised argument(s) "
-                "'${bad}' — only WILL_FAIL, LEAK_EXIT_NOT_ABORT and SOURCES are "
-                "parsed, and an unparsed token would otherwise be dropped "
-                "silently (bd awt)")
+                "'${bad}' — only WILL_FAIL, LEAK_EXIT_NOT_ABORT, SOURCES and "
+                "SPLIT are parsed, and an unparsed token would otherwise be "
+                "dropped silently (bd awt)")
+    endif()
+    if(ARG_SPLIT AND ARG_WILL_FAIL)
+        message(FATAL_ERROR "add_cqops_test(${name}): SPLIT with WILL_FAIL — a "
+                "negative binary has one verdict, not one per case (bd 5mqp)")
     endif()
 
     add_executable(${name} "${CMAKE_CURRENT_SOURCE_DIR}/${name}.c" ${ARG_SOURCES})
@@ -128,14 +152,40 @@ function(add_cqops_test name)
         cqops_build_flags
     )
 
-    add_test(NAME ${name} COMMAND ${name})
+    set(entries ${name})
+    set(base_args "")
+    foreach(spec IN LISTS ARG_SPLIT)
+        string(REPLACE "/" ";" parts "${spec}")
+        list(LENGTH parts nparts)
+        list(GET parts 0 case)
+        list(APPEND base_args --skip ${case})
+        if(nparts EQUAL 1)
+            add_test(NAME ${name}.${case} COMMAND ${name} --case ${case})
+            list(APPEND entries ${name}.${case})
+            continue()
+        endif()
+        list(GET parts -1 k)
+        if(NOT nparts EQUAL 2 OR NOT k MATCHES "^[1-9][0-9]*$" OR k GREATER 1000)
+            message(FATAL_ERROR "add_cqops_test(${name}): SPLIT token "
+                    "'${spec}' — want <case> or <case>/K with 1 <= K <= 1000 "
+                    "(bd 5mqp)")
+        endif()
+        math(EXPR last "${k} - 1")
+        foreach(i RANGE 0 ${last})
+            add_test(NAME ${name}.${case}.${i}of${k}
+                     COMMAND ${name} --case ${case} --shard ${i}/${k})
+            list(APPEND entries ${name}.${case}.${i}of${k})
+        endforeach()
+    endforeach()
+    add_test(NAME ${name} COMMAND ${name} ${base_args})
 
     if(ARG_LEAK_EXIT_NOT_ABORT)
         _cqops_sanitizer_env(sanitizer_env LEAK_EXIT_NOT_ABORT)
     else()
         _cqops_sanitizer_env(sanitizer_env)
     endif()
-    set_tests_properties(${name} PROPERTIES ENVIRONMENT "${sanitizer_env}")
+    ## ONE call for every entry, so no entry can miss the sanitizer options.
+    set_tests_properties(${entries} PROPERTIES ENVIRONMENT "${sanitizer_env}")
 
     if(ARG_WILL_FAIL)
         set_tests_properties(${name} PROPERTIES WILL_FAIL TRUE)

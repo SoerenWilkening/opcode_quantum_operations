@@ -36,6 +36,12 @@ written as ordinary C, runs end to end.
                                                    ← C_quantum_error_correction
 ```
 
+> **Amended 2026-10-04 (bd 13zl).** The top box's `a = cq_theta(a, 0.5)` is the value form
+> that CQ_lang retired at `ec284441` (2026-10-04) and no longer compiles. The spelling today
+> is `int a = 3; cq_theta(&a, 0.5);`, an in-place void expression. The diagram is kept as
+> written. Nothing below the top box moved: stage 1 still emits the same `@cq_theta_<sfx>`
+> calls, and the frozen `cqrt_*` / `cq_template_*` declarations did not change in that commit.
+
 We own exactly one box. Above us the compiler decides *what* to compute and *when to
 uncompute*; below us the QEC library decides *how many physical qubits a logical CX
 costs*. We decide only: **which reversible gates realise this opcode, on which qubits.**
@@ -164,7 +170,9 @@ buildable at all.
    rather than up-to-phase — which is what makes point 4 reachable through this sink at
    all, since `cqrt_h` is an over-declaration and Grover-from-rotations is forced. And
    **what is VISIBLE through the QEC repo's drawer is bounded by Toffoli count**: at
-   d = 3 one logical `CX` is 1,830 physical gates and one `CCX` is 562,564, so a
+   d = 3 one logical `CX` is 546 physical gates and one `CCX` is 385,317 (re-measured
+   2026-10-04 at QEC `d96d259`, `bd 65q`; 1,830 and 562,564 when D20 measured them on
+   2026-08-28, a pair that still reproduces at QEC `1e3c315` — the library moved), so a
    Toffoli-free region at small width is genuinely inspectable and anything carrying
    Toffolis is not. That is fault tolerance, not a defect in either library, and it is
    the honest scope of this condition.

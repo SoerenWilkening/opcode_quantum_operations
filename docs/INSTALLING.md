@@ -18,7 +18,22 @@ python3 tools/install_cqops.py \
 ```
 
 The CQ checkout must be at commit
-`0707dfd69e88bb76572ce518a10447823e7a5f14`. If `--cq-dir` is omitted, the
+`0707dfd69e88bb76572ce518a10447823e7a5f14`.
+
+> **Amended 2026-10-04 (bd 13zl).** The installer no longer pins a CQ_lang
+> commit. It runs CQ_lang's own `tools/backend_contract.py provider-manifest`
+> against the checkout and requires the result to equal this repository's
+> `backend-manifest.json`, whose ABI id is
+> `sha256:e1cc2bbcfb92143c0da24d58d2d7589709b426bf40eeb6489f3f599c8ae20f0d`
+> (CQ_lang `61999c4a` onward; regenerated at `4266c40d`). Any CQ_lang commit
+> with that ABI id is accepted, and any other is refused before anything is
+> built. This is a superset claim. CQ_lang requires 3,000 symbols (ABI
+> `e1cc2bbc…`, `opcode_table.yaml` `7307995f…`), and libcqops provides 3,060
+> from its pinned `opcode_table.yaml` `6245117d…` grid. The 60 extra are the
+> `cq_template_frem_*` that CQ_lang `61999c4a` removed. See
+> [the backend contract](BACKEND_CONTRACT.md) §1.1.
+
+If `--cq-dir` is omitted, the
 installer uses `CQ_LANG_DIR`, then a sibling checkout named `CQ_lang`. It
 configures and builds libcqops, runs every local test plus CQ's L7 integration,
 the installed-package consumer, and the backend-contract check, installs it,

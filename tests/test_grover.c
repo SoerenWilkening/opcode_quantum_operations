@@ -122,7 +122,15 @@ typedef struct {
  * computed and its flag is consumed only by that phase, so classically it moves
  * nothing — but it is written out rather than elided, because the point of the
  * reference is to be the same PROGRAM, independently derived, not the same
- * shortcut. */
+ * shortcut.
+ *
+ * AMENDED 2026-10-04 (bd 13zl): `cq_theta(v, pi)` above and `cq_theta(x, pi)`
+ * in the two comments below are PRD §12's value-form spelling and are kept as
+ * written. CQ_lang `ec284441` (2026-10-04) retired that form, and the source
+ * spelling today is `cq_theta(&x, pi);`, which rotates x in place, so the
+ * expression `x = cq_theta(x, pi)` no longer compiles. The operation is the
+ * same one, so nothing in this reference moves: Ry(π) on every bit of the rail,
+ * which reaches this file as `cqrt_ry_i8(x, theta)`. */
 static uint8_t ref_grover(int iters)
 {
     uint8_t x = 0u;

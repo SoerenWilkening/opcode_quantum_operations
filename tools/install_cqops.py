@@ -12,7 +12,14 @@ import tempfile
 from pathlib import Path
 
 
-CQ_CONTRACT_COMMIT = "0707dfd69e88bb76572ce518a10447823e7a5f14"
+# THE CONTRACT IS THE ABI ID, NOT A CQ_lang COMMIT (amended 2026-10-04, bd
+# 13zl). Until then this file pinned
+#     CQ_CONTRACT_COMMIT = "0707dfd69e88bb76572ce518a10447823e7a5f14"
+# and refused any other CQ_lang HEAD, which failed on every later commit,
+# including the comment-only ones that leave the ABI id where it was.
+# check_manifest() is the gate now: CQ_lang's own backend_contract.py
+# regenerates the provider manifest from the checkout and it must equal
+# backend-manifest.json, i.e. the same cq_backend_abi.
 
 
 def source_root() -> Path:
@@ -43,10 +50,7 @@ def cq_checkout(args: argparse.Namespace, root: Path) -> Path:
             f"CQ_lang contract tool not found at {tool}; pass --cq-dir"
         )
     head = output(["git", "rev-parse", "HEAD"], cwd=cq_dir)
-    if head != CQ_CONTRACT_COMMIT:
-        raise RuntimeError(
-            f"CQ_lang is {head}, expected contract commit {CQ_CONTRACT_COMMIT}"
-        )
+    print(f"CQ_lang {head} at {cq_dir}", flush=True)
     cq_build = cq_dir / args.cq_build
     if not (cq_build / "cmake_install.cmake").is_file():
         raise RuntimeError(
@@ -75,7 +79,9 @@ def check_manifest(root: Path, cq_dir: Path) -> None:
         actual = json.loads(generated.read_text())
         if actual != expected:
             raise RuntimeError(
-                "backend-manifest.json differs from CQ_lang's generated manifest"
+                "backend-manifest.json differs from CQ_lang's generated manifest: "
+                f"it names {expected.get('cq_backend_abi')!r}, CQ_lang at "
+                f"{cq_dir} requires {actual.get('cq_backend_abi')!r}"
             )
 
 

@@ -413,6 +413,7 @@ CQ_TEST(cq_pc_indices_are_free_sees_an_index_that_did_not_come_back)
  * the broken-kernel idiom and CQ_TEST are all it borrows from here. */
 #include "test_kerneldrv_anchors.inc"
 #include "test_kerneldrv_third.inc"   /* bd 9ve.40: the third source's mask */
+#include "test_kerneldrv_shard.inc"   /* bd 5mqp: --shard partitions the run */
 
 CQ_TEST_MAIN(
     CQ_CASE(the_driver_accepts_a_correct_kernel),
@@ -430,5 +431,6 @@ CQ_TEST_MAIN(
     CQ_CASE(an_unnamed_operand_is_still_drawn_and_not_zero_filled),
     CQ_CASE(anchors_sit_inside_the_budget_and_never_on_top_of_it),
     CQ_CASE(the_f64_anchor_constants_are_what_they_claim),
-    CQ_CASE(a_third_source_draws_its_own_mask)
+    CQ_CASE(a_third_source_draws_its_own_mask),
+    CQ_CASE(the_shards_partition_the_unsharded_samples_one_for_one)
 )

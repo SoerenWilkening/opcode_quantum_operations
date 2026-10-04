@@ -482,6 +482,42 @@ if(CQOPS_HAVE_QEC)
             CQOPS_QEC_TEST_CONFIG="${CQOPS_QEC_DIR}/examples/config_ccx.json")
     endforeach()
 
+    ## D20's PER-GATE PIN NAMES THE QEC REVISION IT RAN AT (bd 65q, maintainer
+    ## ruling 2026-10-04). A physical gate count is a property of the pair (QEC
+    ## revision, config) and this repo pins neither, so `test_sink_qec`'s
+    ## d20s_per_gate_physical_costs_are_pinned_at_d3 prints both. The library
+    ## exposes no revision of its own, so this reads the checkout's git HEAD and
+    ## its dirt (porcelain lines under qec/ only) AT CONFIGURE TIME — which is
+    ## what was CONFIGURED, NOT PROVEN TO BE WHAT WAS LINKED: libqec.a may have
+    ## been built from another revision or from the dirty tree, may have been
+    ## rebuilt since, and a later QEC commit does not re-run this configure.
+    ## `--no-optional-locks` because the checkout is another session's working
+    ## tree, and a plain `git status` may take its index.lock to refresh it.
+    set(_qec_head "unknown")
+    set(_qec_dirt -1)
+    find_package(Git QUIET)
+    if(GIT_FOUND)
+        execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${CQOPS_QEC_DIR}" rev-parse HEAD
+                        RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_QUIET
+                        OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(_rc EQUAL 0)
+            set(_qec_head "${_out}")
+            execute_process(COMMAND "${GIT_EXECUTABLE}" --no-optional-locks
+                                    -C "${CQOPS_QEC_DIR}" status --porcelain -- .
+                            RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_QUIET)
+            if(_rc EQUAL 0)
+                ## Count newlines rather than split on them: a list split would
+                ## also split on a `;` inside a path.
+                string(REGEX REPLACE "[^\n]" "" _nl "${_out}")
+                string(LENGTH "${_nl}" _qec_dirt)
+            endif()
+        endif()
+    endif()
+    target_compile_definitions(test_sink_qec PRIVATE
+        CQOPS_QEC_HEAD="${_qec_head}" CQOPS_QEC_DIRTY=${_qec_dirt})
+    message(STATUS "cqops: D20's per-gate pin configured against QEC ${_qec_head} "
+                   "(${_qec_dirt} porcelain line(s) under qec/)")
+
     ## WHICH LAYER REFUSED. All four of M25's hard errors share one die and one
     ## "qec sink:" prefix, so the exit code cannot tell them apart — and three of
     ## the four are one edit away from being caught by a neighbouring guard.
@@ -557,6 +593,7 @@ endif()
 ## this landed, risk R6 ("someone asserts unc == forward") had no detector
 ## anywhere in the tree.
 add_cqops_test(test_unc)          # Step 21 — PRD §10, R6, and bd 2cf measured
+add_cqops_test(test_unc_axes)     # bd 4jj — the axis composed with M12's route and §9's region
 
 ## WHICH LAYER ABORTED, the seventh instance. M07's cq_reg_free and M03's
 ## cq_qubits_release both guard "this qubit is not provably |0>", and plan §0
@@ -889,6 +926,7 @@ set_tests_properties(test_kernel_bitwise_death.dst_aliases_a_quantum_source
 add_cqops_death_test(test_kernel_step11_death CASES
     a_quantum_shift_amount
     a_quantum_bit_above_the_stages_is_fine
+    a_shift_amount_drifted_between_forward_and_uncompute
     a_shift_dst_overlaps_its_source
     a_widening_cast_that_narrows
     a_narrowing_cast_that_widens
@@ -899,9 +937,30 @@ add_cqops_death_test(test_kernel_step11_death CASES
 ## WHICH LAYER ABORTED. The shift-amount guard is M11's own; nothing beneath it
 ## would speak for a CLASSICAL amount, but for a quantum one M05's distinctness
 ## assert could — in Debug. Pinning the message keeps the case honest.
+##
+## AND SO COULD bit.h's, WHICH THIS BLOCK DID NOT NAME UNTIL 2026-10-04 (bd 4jj).
+## Measured: neuter the guard in cq_shift_amount (`if (0 && ...)`) and Release
+## goes red — the call returns — while DEBUG STAYS GREEN, because the very next
+## line, `cq_bit_value(b[i])`, trips CQ_BIT_ASSERT on the qubit lane inside the
+## armed window. So in Debug this case did not see its own guard deleted.
+## `Assertion` rather than the `Assertion failed` this file spells elsewhere:
+## that is Apple libc's banner, and glibc — the CI box — prints
+## "Assertion `cond' failed.", which `Assertion failed` does not match.
 set_tests_properties(test_kernel_step11_death.a_quantum_shift_amount
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "§3 distinctness")
+                     "§3 distinctness;Assertion")
+
+## bd 4jj (b): THE SAME GUARD, REACHED ACROSS THE UNCOMPUTE AXIS — a forward
+## with a classical amount, a general Ry pair on an amount lane, then the same
+## call again. Inside the armed window only M11's own die() may speak; every
+## other layer that window can reach is named, so that an abort from the D7a
+## overlap guard, the emitter, the shadow or bit.h's Debug assert (the block
+## above has the measurement) cannot pass for it. The rotation runs before the
+## window arms, but `rotate:` is listed for the mutant that moves it inside.
+## One block for this test: set_tests_properties overwrites.
+set_tests_properties(test_kernel_step11_death.a_shift_amount_drifted_between_forward_and_uncompute
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "§3 distinctness;D7a;width is not positive;emit:;shadow:;rotate:;Assertion;UndefinedBehaviorSanitizer")
 
 ## M14, Step 12. ONE CASE PER ENTRY POINT — the only thing M07's, M08's and
 ## M09's own suites cannot prove is that `cq_kernel_add` and `cq_kernel_sub`
@@ -1685,6 +1744,34 @@ add_cqops_test(test_harness_negative WILL_FAIL)
 ## cq_h_take_failures goes back to zeroing the per-case tally. Measured: red
 ## before the fix (the binary exited 0), green after (exit 1).
 add_cqops_test(test_harness_negative_window WILL_FAIL)
+
+## CASE SELECTION, END TO END (bd 5mqp). tests/test_skeleton.c asserts the
+## parse in-process; this binary asserts the two things it cannot see — that
+## CQ_TEST_MAIN_ARGV hands argv to the selection at all, and that SPLIT's
+## entries each run exactly their own slice. Every entry must run at least one
+## case (a zero selection exits 2), and each FAIL_REGULAR_EXPRESSION names the
+## cases it must NOT run, so an entry runs exactly its own. gamma prints the
+## shard it saw, which is how each shard entry pins its `I/K`.
+add_cqops_test(test_harness_select SPLIT beta gamma/2)
+set_tests_properties(test_harness_select PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "- beta;- gamma")
+set_tests_properties(test_harness_select.beta PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "- alpha;- gamma")
+set_tests_properties(test_harness_select.gamma.0of2 PROPERTIES
+                     FAIL_REGULAR_EXPRESSION
+                     "- alpha;- beta;gamma under shard [^0];gamma under shard [0-9]+/[^2]")
+set_tests_properties(test_harness_select.gamma.1of2 PROPERTIES
+                     FAIL_REGULAR_EXPRESSION
+                     "- alpha;- beta;gamma under shard [^1];gamma under shard [0-9]+/[^2]")
+
+## And the refusal, through the real main: a NAME the table does not hold must
+## exit non-zero. If CQ_TEST_MAIN_ARGV stopped passing argv, all three cases
+## would run, the binary would exit 0, and this entry would go red.
+add_test(NAME test_harness_select.an_unknown_case_is_refused
+         COMMAND test_harness_select --case no_such_case)
+_cqops_sanitizer_env(cqops_select_env)
+set_tests_properties(test_harness_select.an_unknown_case_is_refused PROPERTIES
+                     ENVIRONMENT "${cqops_select_env}" WILL_FAIL TRUE)
 
 ## The same argument for LEAK DETECTION (`bd kfi`). detect_leaks=1 is not a
 ## compile flag — it is a string in the ENVIRONMENT property that
@@ -2670,9 +2757,19 @@ if(CQOPS_PY)
     ##   test_gen_bodies_provoked ...and the provocations for the text half
     ##   test_gen_bodies_abort    ...and the ABORT bucket's claims (bead 6y9,
     ##                            the `WRAPPER <-> ABORT claims` seam)
+    ##
+    ## A SEVENTH SINCE 2026-10-04 (bd p2y5), and it is NOT a split:
+    ##
+    ##   test_l6_report           tools/l6/l6_report.py's verdict on synthetic
+    ##                            inputs — EXIT_STATUS and its RUN_FAIL
+    ##                            neighbours — plus the scan of src/, include/
+    ##                            and shim/ that the class's premise rests on.
+    ##                            It needs no PyYAML; it rides this loop so it
+    ##                            is registered, gated and CI-checked exactly
+    ##                            as its six neighbours are.
     foreach(pysuite test_gen_shim test_gen_shim_provoked
                     test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked
-                    test_gen_bodies_abort)
+                    test_gen_bodies_abort test_l6_report)
         add_test(NAME ${pysuite}
                  COMMAND ${CQOPS_PY} "${CMAKE_CURRENT_SOURCE_DIR}/${pysuite}.py"
                  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
@@ -2832,6 +2929,16 @@ endif()
 ## CQ_lang 0707dfd6's installed-backend contract. This is deliberately an
 ## installed-tree test: the build-tree alias can be healthy while an export is
 ## missing a dependency, include directory or canonical target name.
+##
+## AMENDED 2026-10-04 (bd 13zl): the contract is the ABI id in
+## backend-manifest.json, now sha256:e1cc2bbc… (CQ_lang 61999c4a onward,
+## regenerated at 4266c40d with CQ_lang's own `provider-manifest`), no longer
+## 0707dfd6's sha256:f9debf77…. It is a SUPERSET claim: CQ_lang requires 3,000
+## symbols (ABI e1cc2bbc…, opcode_table.yaml 7307995f…); this archive provides
+## 3,060 from the pinned third_party/cq_lang/opcode_table.yaml 6245117d… grid,
+## and the 60 extra are the cq_template_frem_* that 61999c4a removed. `check`
+## allows extra symbols. The status message below said "<CQ_lang 0707dfd6
+## checkout>" until this amendment.
 if(CQOPS_CQLANG_DIR AND CQOPS_PY3
    AND EXISTS "${CQOPS_CQLANG_DIR}/tools/backend_contract.py"
    AND EXISTS "${CQOPS_CQLANG_DIR}/${CQOPS_CQLANG_BUILD}/cmake_install.cmake")
@@ -2855,7 +2962,8 @@ if(CQOPS_CQLANG_DIR AND CQOPS_PY3
     set_tests_properties(package_install_cqbackend PROPERTIES TIMEOUT 300)
 else()
     message(STATUS "cqops: installed CQBackend package test not registered — "
-                   "configure with -DCQOPS_CQLANG_DIR=<CQ_lang 0707dfd6 checkout> "
+                   "configure with -DCQOPS_CQLANG_DIR=<a CQ_lang checkout whose "
+                   "backend ABI id matches backend-manifest.json> "
                    "whose build tree has been configured")
 endif()
 
@@ -2994,10 +3102,27 @@ add_cqops_test(test_kernel_fmul)
 ## three-source signature and §7.12's anchors.
 ##
 ## THIS IS THE SLOWEST SUITE IN THE PROJECT AND §7.13 SAYS SO IN ADVANCE:
-## 241,083 compute-half slots, twice per call under Rule 2, times a forced
-## anchor block of 53 triples at three mask rows. The wall clock is not a
+## 241,083 compute-half slots, twice per call under Rule 2, times §7.12's
+## FIXED 32-case circuit budget — 8 representative anchors at three mask rows
+## (24) plus all-classical, all-quantum and six random. The wall clock is not a
 ## reason to cut the budget.
-add_cqops_test(test_kernel_fma)
+##
+## CORRECTED 2026-10-04 (bd 5mqp): this read "a forced anchor block of 53
+## triples at three mask rows" — true when written (2026-09-19, the 167-case
+## anchor floor K20.md's landing banner records) and stale since 8675871
+## (2026-09-22) amended §7.12 to a fixed circuit sample, which corrected
+## fmul's comment above and missed this one. 53 (FP64_PAIRS' 25 + FA_TRIPLES'
+## 28) is now the CLASSICAL table, checked in full by
+## the_classical_row_agrees_with_the_oracle_on_every_anchor.
+##
+## SPLIT ACROSS SIX ENTRIES (bd 5mqp) because it was the whole Debug critical
+## path under -j: test_kernel_fma (every other case), test_kernel_fma.controlled
+## and test_kernel_fma.l1_sweep.{0..3}of4, which partition the 32 samples by
+## s % 4 with the same seed and the same draws — slots 0 and 2-9 are the
+## all-classical L5 short-circuit, so the interleave puts five or six circuit
+## cases in each shard. Select all six with `-R '^test_kernel_fma(\.|$)'`;
+## `^test_kernel_fma$` is now the remainder alone.
+add_cqops_test(test_kernel_fma SPLIT controlled l1_sweep/4)
 
 ## M39's fail-loud paths. THREE SOURCES MAKE SIX ALIASING PAIRS WHERE TWO MAKE
 ## ONE, and each is driven separately because a guard written for the arity-2

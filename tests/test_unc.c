@@ -84,6 +84,10 @@
  * .inc headers: `the CONTRACT` against `the CONSEQUENCES`
  * (test_unc_contract.inc), and `the AXIS's COST` as its own subject
  * (test_unc_asym.inc, which carries the round-trip driver nothing else needs).
+ *
+ * AND A THIRD, AS A SEPARATE BINARY (bd 4jj, 2026-10-04): the axis COMPOSED
+ * with another — M12's route change and §9's region — is tests/test_unc_axes.c,
+ * because this file stood at 294 lines and its case list is code.
  */
 
 #include "support/harness.h"
@@ -192,15 +196,29 @@ static int ux_holds(const cq_ctx *ctx, int32_t h, uint32_t q)
  *   M17 mux         three sources
  *   M11 shift_const the amount is constrained classical — and a DRIFTED amount
  *                   is a hard error (cq_shift_amount), which is PRD §10's
- *                   asymmetry turning into an abort() in one kernel; bd 8gp
- *   M12 shift_var   fits `ux_fn` exactly, and is deferred rather than absent:
- *                   its drift is a ROUTE CHANGE, not a delta — the forward
- *                   takes the classical short-circuit and the uncompute opens
- *                   a sandwich the forward never opened. bd 8gp
+ *                   asymmetry turning into an abort() in one kernel. Reachable
+ *                   only by a DIRECT kernel call, since the shim sends every
+ *                   shift to M12; the death is tests/test_kernel_step11_death.
+ *                   c's `a_shift_amount_drifted_between_forward_and_uncompute`
+ *   M12 shift_var   fits `ux_fn` exactly, and is driven ELSEWHERE rather than
+ *                   here: its drift is a ROUTE CHANGE, not a delta — the
+ *                   forward takes the classical short-circuit and the uncompute
+ *                   opens a sandwich the forward never opened — which is
+ *                   tests/test_unc_axes_route.inc's subject. It stays out of
+ *                   UX_K because the per-lane cases in test_unc_asym.inc assume
+ *                   the kernel reads every lane of `b`, and the barrel reads
+ *                   only the low ceil(log2 W)
  *   M20 sdiv/srem   fit `ux_fn` exactly; the unsigned pair below carries the
  *                   same loop, so they add width rather than shape
  *   M15 addacc      not a Rule 7 kernel at all, and its EXCLUSION is a claim:
  *                   `an_accumulate_is_not_its_own_uncompute`
+ *
+ * Both shift rows cited "bd 8gp" until 2026-10-04 — a bead that never existed;
+ * the Step 21 commit filed these follow-ons as bd 4jj, which is also where §9's
+ * region composing with this axis went (tests/test_unc_axes_region.inc). The
+ * enumeration is exact for the catalogue as Step 21 found it; kernels landed
+ * since — M42's min/max, which fit `ux_fn`, ibits, and v2's fp kernels — are
+ * not enumerated here.
  *
  * `pred` is K9's departure as well as its reference: `dst` is one bit and `W`
  * is the OPERAND width (src/kernels/cmp.h), so a harness that passed the dst

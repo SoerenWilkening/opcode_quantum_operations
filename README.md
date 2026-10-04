@@ -10,6 +10,16 @@ measurement); it does not store a circuit or run a statevector simulation.
 - Python 3; and
 - a CQ_lang checkout at the backend-contract commit
   `0707dfd69e88bb76572ce518a10447823e7a5f14`.
+  **Amended 2026-10-04 (bd 13zl):** the requirement is now a CQ_lang checkout
+  whose backend ABI id equals the one in [`backend-manifest.json`](backend-manifest.json),
+  `sha256:e1cc2bbcfb92143c0da24d58d2d7589709b426bf40eeb6489f3f599c8ae20f0d`
+  (CQ_lang `61999c4a` onward; regenerated at `4266c40d`), not one commit.
+  `tools/install_cqops.py` checks that id through CQ_lang's own
+  `tools/backend_contract.py`. The manifest is a superset claim. CQ_lang
+  requires 3,000 symbols (ABI `e1cc2bbc…`, `opcode_table.yaml` `7307995f…`).
+  libcqops provides 3,060 from its pinned `opcode_table.yaml` `6245117d…`
+  grid, and the 60 extra are the `cq_template_frem_*` that CQ_lang `61999c4a`
+  removed. See [`docs/BACKEND_CONTRACT.md`](docs/BACKEND_CONTRACT.md) §1.1.
 
 The CQ checkout must already have a configured build directory (normally
 `build/`). An optional QEC sink can be enabled with a built QEC checkout; see

@@ -63,8 +63,8 @@ Every row above and every headline count in §2 and §3 was re-run against CQ_la
 
 | Claim | Re-measured | Verdict |
 |---|---|---|
-| The pinned ABI mirror is current | `shasum -a 256` of our copy against `git show b1b1dc02:tools/opcode_table.yaml` | **CONFIRMED and extended** — still byte-identical, `6245117d…a3e82426`, now through `b1b1dc02`. No re-vendor owed |
-| The core ABI has not drifted | `git log 170ede1..b1b1dc02 -- runtime/cq_runtime.h` | **CONFIRMED** — still **0** commits, now of **61** in the range (was 0 of 33) |
+| The pinned ABI mirror is current | `shasum -a 256` of our copy against `git show b1b1dc02:tools/opcode_table.yaml` | **CONFIRMED and extended** — still byte-identical, `6245117d…a3e82426`, now through `b1b1dc02`. No re-vendor owed. **Amended 2026-10-04 (bd 13zl):** CQ_lang `61999c4a` (2026-09-30) moved its table to `7307995f…` by removing `frem` (60 `cq_template_frem_*`). The maintainer ruled that our mirror **stays** at `6245117d…` (2,880 templates) and that `backend-manifest.json` claims a **superset**: CQ_lang requires 3,000 (ABI `e1cc2bbc…`), we provide 3,060, and the 60 extra are the `frem` rows. Re-vendoring (2,880 → 2,820) is a separate, tracked decision. See `docs/BACKEND_CONTRACT.md` §1.1 |
+| The core ABI has not drifted | `git log 170ede1..b1b1dc02 -- runtime/cq_runtime.h` | **CONFIRMED** — still **0** commits, now of **61** in the range (was 0 of 33). **Amended 2026-10-04 (bd 13zl):** `git log 170ede1..4266c40d -- runtime/cq_runtime.h` returns **3** commits of 373: `4b54f18a` (2026-09-20), `27fc9a62` and `18b3f5ff` (2026-10-01). All three change **comments only**; every changed line is a comment line. The 182 `cqrt_*` declarations are identical by name and signature, so the core ABI still has not drifted. `27fc9a62` is the normative QRAM-index text agreed with libcqops as bd `b6a`. The header's sha256 moved `f7c44636…` → `18f311dc…` |
 | `softfloat/` has 35 files | `ls` the pinned snapshot | **CONFIRMED** — 35, and **no file carries an `f16`/`f32`/`f80` name token** |
 | Zero fp opcodes the corpus calls are absent from Bennett | corpus families mapped onto `softfloat.jl`'s `export` list | **CONFIRMED** — and now checked the other way too: the export list carries **exactly 10** `fcmp` predicates and the four the grid adds are `ogt`/`oge`/`ugt`/`uge`, exactly as §3.3 says, and it carries **no `frem`** |
 | The grid partition `992 + 603 + 884 = 2479` | Step 22's name rule over our own `shim/generated/*.gen.c` | **CONFIRMED exactly**, all four numbers |
@@ -421,7 +421,12 @@ second and decisive reason `f32` is out** — see the box below. Two riders v1 d
 **Condition 5 is unreachable and the arithmetic is short.** D20 measured the shipped QEC configs
 carrying `n_logical ∈ {1, 3, 4, 6, 7}`, and raising it raises the code distance. One `f64` `fadd`
 needs **29,949** ancillae — four orders of magnitude past it — and at `d = 3` one logical `CCX` is
-562,564 physical gates, so `fadd`'s 12,488 Toffolis are ~7.0 × 10⁹ physical gates. **This is fault
+385,317 physical gates, so `fadd`'s 12,488 Toffolis are ~4.8 × 10⁹ physical gates *(re-measured
+2026-10-04 at QEC `d96d259`, `bd 65q`, and pinned by an opt-in case in `tests/test_sink_qec.c`; until
+then this read 562,564 and ~7.0 × 10⁹ — D20's 2026-08-28 measurement, which still reproduces at QEC
+`1e3c315`, so the library moved and the old figure was right at its revision. The 12,488 is
+upstream's `soft_fadd` row, not a golden of ours; our own `fadd` golden is 21,664 Toffoli forward,
+≈ 8.3 × 10⁹)*. **This is fault
 tolerance, not a defect in either library**, and it is the same honest scope D20 already recorded for
 v1 one width down. **Do not read it as v2 failing condition 5**: condition 5 was met at Step 26 and
 is a claim about the *route*, which is unchanged. What is bounded is which programs are inspectable

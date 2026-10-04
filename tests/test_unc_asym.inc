@@ -143,7 +143,25 @@ typedef struct {
     uint32_t   dst_qubits;    /* wires dst owns at the end                   */
     size_t     n_drift;       /* the perturbation's own gates                */
     cq_rec     drift[UX_DRIFT_CAP];
+    int        unc_palindrome; /* -1: no sandwich; else cq_mock_is_palindrome */
 } ux_rt;
+
+/* THE COPY-OUT'S LENGTH, or 0 for the three kernels with no sandwich — read
+ * off each construction, not measured: W CX for the five arithmetic kernels,
+ * and for K9 one CX plus the `lower_not1!` X on exactly the five predicates
+ * src/kernels/cmp.c inverts (eq, ult, ugt, slt, sgt). A wrong entry here makes
+ * the palindrome check below FAIL, never pass: the length is part of the
+ * claim. */
+static size_t ux_copyout_len(const ux_kernel *k, int W)
+{
+    if (!strcmp(k->name, "xor") || !strcmp(k->name, "and") ||
+        !strcmp(k->name, "or"))
+        return 0u;
+    if (k->pred == UX_NOT_A_COMPARE) return (size_t)W;
+    return (k->pred == CQ_ICMP_EQ  || k->pred == CQ_ICMP_ULT ||
+            k->pred == CQ_ICMP_UGT || k->pred == CQ_ICMP_SLT ||
+            k->pred == CQ_ICMP_SGT) ? 2u : 1u;
+}
 
 /* Forward, perturb lane `j` of source `b`, uncompute. `qa` is `a`'s mask —
  * `~0ull` for the ordinary fixture, `0` for the all-classical row, which is a
@@ -261,6 +279,21 @@ static void ux_round_trip(const ux_kernel *k, int W, uint64_t va, uint64_t vb,
     r->unc.cx  = cq_mock_count_op(&f.mock, CQ_OP_CX);
     r->unc.ccx = cq_mock_count_op(&f.mock, CQ_OP_CCX);
     r->minted_unc = cq_pc_take(&f.ctx).minted - s2.minted;
+
+    /* THE ORDERED PALINDROME OVER THE UNCOMPUTE ITSELF (bd 4jj, deferred
+     * item). The head is derived from the total around the known copy-out;
+     * the predicate's own length check makes a wrong derivation a failure. */
+    {
+        const size_t mid = ux_copyout_len(k, W);
+
+        r->unc_palindrome = -1;
+        if (mid) {
+            r->unc_palindrome = 0;
+            if (r->n_unc > mid && (r->n_unc - mid) % 2u == 0u)
+                r->unc_palindrome =
+                    cq_mock_is_palindrome(&f.mock, (r->n_unc - mid) / 2u, mid);
+        }
+    }
 
     if (stream) {
         *n_stream = r->n_unc;
@@ -496,6 +529,7 @@ CQ_TEST(the_same_drift_without_the_poison_emits_the_identical_stream)
 {
     static cq_rec s_ry[UX_STREAM_CAP], s_cx[UX_STREAM_CAP];
     const uint64_t va = 0xBu, vb = 0x6u;
+    int sandwiched = 0;
 
     for (int ki = 0; ki < UX_N_K; ki++) {
         const ux_kernel *k = &UX_K[ki];
@@ -550,6 +584,25 @@ CQ_TEST(the_same_drift_without_the_poison_emits_the_identical_stream)
                 CHECK_EQ(cx.dst, 0u);
                 CHECK(!ry.dst_determinate);
 
+                /* AND THE ORDER, ON THE POISONED STREAM ITSELF (bd 4jj's
+                 * deferred item). This is the one surface where the scratch
+                 * release has no backstop: sandwich.c releases with the
+                 * CQ_ZERO_BY_PALINDROME literal, cq_shadow_retire's Release
+                 * check fires only on a DETERMINATE non-zero, and every
+                 * scratch wire downstream of the drifted lane is poisoned. A
+                 * reverse half that did not mirror the forward half would
+                 * leave them dirty and nothing would speak — so the ordered
+                 * palindrome is PRD §10's only detector with teeth here. */
+                if (ry.unc_palindrome != -1) {
+                    sandwiched++;
+                    if (ry.unc_palindrome != 1)
+                        cq_h_fail(__FILE__, __LINE__,
+                                  "%s W=%d lane %d: the Ry route's uncompute "
+                                  "(%zu gates) is not [head][%zu copy-out]"
+                                  "[head reversed]", k->name, W, j, n_ry,
+                                  ux_copyout_len(k, W));
+                }
+
                 /* AND WHAT IT COSTS: bd 2cf. Identical circuits, and only one
                  * of the two rails can be freed. */
                 CHECK_EQ(cx.clean, 1);
@@ -563,6 +616,11 @@ CQ_TEST(the_same_drift_without_the_poison_emits_the_identical_stream)
                               k->name, W, j);
             }
     }
+
+    /* Fifteen of the eighteen are sandwiched (all but xor/and/or), at every
+     * (W, lane) of the sweep — a floor, so a table edit that dropped them from
+     * the palindrome check is a failure rather than a quieter green. */
+    CHECK_EQ(sandwiched, (UX_N_K - 3) * (2 + 3 + 4 + 5));
 }
 
 /* THE CONTROL FOR THE CAUSE. Materialisation is not what costs; losing a

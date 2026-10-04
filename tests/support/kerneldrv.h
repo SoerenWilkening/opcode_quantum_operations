@@ -251,7 +251,12 @@ int cq_kd_samples(void);
  * oracles. NOTHING IS DROPPED SILENTLY: the printed `#` line names A, T, the
  * number of anchor cases dropped and how many random draws are left, and
  * CQOPS_L1_SAMPLES can raise or lower the fixed budget for an explicit deep or
- * bisect run. */
+ * bisect run.
+ *
+ * UNDER THE HARNESS'S `--shard I/K` (bd 5mqp) every slot is still DRAWN and
+ * only slot s with cq_h_shard_owns(s) runs its circuit, so K shards partition
+ * exactly the unsharded run; a sharded run prints one more `#` line saying
+ * which slots it ran. This is the ONLY function that consults the shard. */
 void cq_kd_sample_at(const cq_kd_spec *k, int W);
 
 /* The whole L1-L3 sweep for one kernel: cq_kd_sample_at over the standard

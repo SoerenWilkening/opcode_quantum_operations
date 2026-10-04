@@ -3,7 +3,8 @@
 
 Runs every CQ_lang e2e fixture through `run_slice_cqops.sh` — CQ_lang's own
 front end and lowering pass, linked against libcqops instead of CQ_lang's
-trace-only runtime stub — and reports LINK / RUN / ABORT per fixture.
+trace-only runtime stub — and reports LINK / RUN / ABORT per fixture, plus
+the program's own nonzero status as EXIT_STATUS (bd p2y5, 2026-10-04).
 
 THE GATE IS PRD 15 D18: THE FIXTURES LINK, RUN, AND DO NOT ABORT. There is no
 diff and there must never be one; read the header of run_slice_cqops.sh for the
@@ -40,8 +41,9 @@ import argparse, json, os, subprocess, sys
 # and it covers a bare `python3 tools/l6/l6_run.py` too.
 sys.dont_write_bytecode = True
 
-from l6_report import (DEFERRED, STRAND, classify, first_error, first_line,
-                       read, residue, residue_summary, residue_totals)
+from l6_report import (DEFERRED, GATE_GREEN, STRAND, classify,
+                       exit_status_lines, first_error, first_line, read,
+                       residue, residue_summary, residue_totals)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RUNNER = os.path.join(HERE, "run_slice_cqops.sh")
@@ -159,6 +161,8 @@ def main():
     print("\n--- L6 summary ---")
     for k in sorted(counts):
         print(f"  {k:11s} {counts[k]}")
+    for line in exit_status_lines(rows):
+        print(line)
     print(residue_summary(rows))
     if a.json:
         json.dump(dict(cq_revision=cq_revision(a.cqlang), archive=archive,
@@ -172,11 +176,13 @@ def main():
     # reaching a v1-deferred symbol aborts loudly and BY DESIGN (PRD §1). What is
     # red is a fixture that failed to build or link, ran and aborted for a reason
     # we do not own, or linked against a CQ_lang archive.
-    bad = sum(counts.get(k, 0)
-              for k in ("BUILD_FAIL", "ABORT", "RUN_FAIL", "PROVENANCE"))
+    # `EXIT_STATUS` IS GREEN AND IS NOT OK (bd p2y5, 2026-10-04): the program
+    # ran to its end and chose a nonzero status, which D18 does not forbid, but
+    # it is not a clean completion either, so the floor below reads `OK` alone.
+    bad = sum(n for k, n in counts.items() if k not in GATE_GREEN)
     ok = counts.get("OK", 0)
     for r in rows:
-        if r["verdict"] not in ("OK", "DEFERRED"):
+        if r["verdict"] not in GATE_GREEN:
             print(f"  L6 FAILURE {r['verdict']:11s} {r['name']}  "
                   f"rc={r['rc']}  {r['err'] or r['link']}")
     if ok < a.min_ok:

@@ -52,10 +52,11 @@
  * register-free `void cq_phi(double)` in its place, with **deliberately no
  * migration shim** (its own `bd test_C_libtooling-3qlq` Inc 1). `cq_theta` is
  * UNCHANGED and still takes two arguments, so this is one intrinsic changing
- * shape, not an API break. THE EDIT HERE IS UPSTREAM'S OWN, COPIED: CQ_lang
- * migrated `tests/e2e/slice_control_seq_grover.c` the same way and says so in
- * its first line — Rule 1's habit applied to CQ_lang, which is the source of
- * record for what CQ_lang accepts.
+ * shape, not an API break. [True on 2026-09-10; `cq_theta` itself changed
+ * shape on 2026-10-04 — see the next block.] THE EDIT HERE IS UPSTREAM'S
+ * OWN, COPIED: CQ_lang migrated `tests/e2e/slice_control_seq_grover.c` the
+ * same way and says so in its first line — Rule 1's habit applied to CQ_lang,
+ * which is the source of record for what CQ_lang accepts.
  *
  * `cq_phi(θ)` now means "multiply the amplitude of the CURRENT BRANCH by
  * e^{iθ}". Under a tainted condition it lowers by KICKBACK: the compare mints
@@ -76,6 +77,29 @@
  *
  * `tests/test_grover.c` already drove the frozen ABI this way, at
  * `cqrt_rz_i1(hit, M_PI)`, since Step 25. This file has caught up with it.
+ *
+ * ─── WHY `cq_theta` TAKES `&x` (`bd 13zl`, migrated 2026-10-04) ────────────
+ *
+ * Until 2026-10-04 both rotations were spelled `x = cq_theta(x, θ);`, and that
+ * is a COMPILE ERROR against the current `include/CQ.h` (`indirection requires
+ * pointer operand`). CQ_lang `ec284441` (its `bd test_C_libtooling-1501`) made
+ * `cq_theta` IN PLACE ONLY: `cq_theta(&x, θ)` is a void expression that
+ * expands to `*(px) = cq_theta_<sfx>(*(px), θ)`, the `_Generic` keyed on the
+ * POINTER type, and it removed the `cq_ry` statement macro. That is the retired
+ * value form exactly, so the edit is upstream's own, copied once more: CQ_lang
+ * migrated `tests/e2e/slice_control_seq_grover.c` the same way in the same
+ * commit. `px` is evaluated twice and a side-effecting `px` is a compile error;
+ * `&x` has no side effect, and `unsigned char *` selects `cq_theta_ui8`, the
+ * entry `unsigned char` selected before.
+ *
+ * Nothing here is an ABI change: `cq_theta` is CQ_lang's FRONT-END surface and
+ * never reaches libcqops, which sees `cqrt_ry_i8` (the backend contract's
+ * `cqrt_*` and `cq_template_*` declarations did not move in `ec284441`).
+ * Measured 2026-10-04: this file's stage-1 IR (`clang -O1 -include CQ.h`, the
+ * shared runner's stage 1) under the new spelling and CQ_lang HEAD `4266c40d`'s
+ * header is byte-identical, apart from the ModuleID and source_filename lines,
+ * to the old spelling under `ec284441^`'s header; and L7 at `4266c40d` reports
+ * the same quantum mix as the 2026-09-10 figures below.
  *
  * ─── WHY `off` IS VOLATILE ─────────────────────────────────────────────────
  *
@@ -129,7 +153,7 @@ int main(int argc, char **argv)
 
     (void)argv;
 
-    x = cq_theta(x, theta);                 /* S  : |0…0> → uniform          */
+    cq_theta(&x, theta);                    /* S  : |0…0> → uniform          */
     x += off;
 
     if (x == 42u) {                         /* O  : mark the target          */
@@ -137,7 +161,7 @@ int main(int argc, char **argv)
     }
 
     x -= off;                               /* S† : un-prepare               */
-    x = cq_theta(x, -theta);
+    cq_theta(&x, -theta);
 
     if (x == 0) {                           /* R0 : reflect about |0>        */
         cq_phi(M_PI);

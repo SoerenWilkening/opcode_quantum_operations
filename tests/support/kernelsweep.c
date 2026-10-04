@@ -63,6 +63,14 @@
  * a fixed representative subset for circuit execution and keep the complete
  * semantic table in cheap classical/oracle cases. This is what prevents a
  * growing anchor table from turning the sampler back into an enumeration.
+ *
+ * SHARDING SPLITS THE BUDGET ACROSS PROCESSES; IT NEVER CHANGES IT (bd 5mqp,
+ * 2026-10-04). Under the harness's `--shard I/K` this function still draws all
+ * N slots with the same seed and runs the circuit only for slot s with
+ * s % K == I, so the K shards of one case run the unsharded set exactly once
+ * between them. It exists because fma's 32 circuit cases were the whole Debug
+ * critical path under `ctest -j` (bd 5mqp); the budget, the seed and the
+ * schedule above are untouched, and a shard prints which slots it ran.
  */
 
 #include "support/kerneldrv.h"
@@ -238,6 +246,7 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
      * contract as written, and slot 0 must stay all-classical for L5. */
     cq_bk_rng rng_c;
     cq_bk_rng_init(&rng_c, seed ^ 0x7468697264ull);   /* "third" */
+    int ran = 0;                     /* the slots this run's shard executed */
 
     for (int s = 0; s < n; s++) {
         cq_ref_w v[CQ_KD_MAX_SRC];
@@ -292,6 +301,13 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
                       "%s W=%d: the anchor provider refused index %d of the %d "
                       "it declared at this width", k->name, W, anch, n_anch);
 
+        /* THE SHARD SKIPS THE CIRCUIT, NEVER THE DRAW (bd 5mqp). Everything
+         * above — both RNG streams, the anchor overwrite — has already run for
+         * slot s, so the sequence every later slot sees is the unsharded one
+         * and K shards partition exactly the unsharded run's samples. A skip
+         * placed any earlier would re-seed the tail of the run by omission. */
+        if (!cq_h_shard_owns(s)) continue;
+        ran++;
         cq_kd_case_q3(k, W, v, &pairs[p], q_third);
     }
 
@@ -311,6 +327,15 @@ void cq_kd_sample_at(const cq_kd_spec *k, int W)
                "§7.12\n",
                k->name, W, n, have, want, n_anch, N_ANCHOR_ROWS, want - have,
                room - have, np, (unsigned long long)seed);
+
+    /* An unsharded run prints nothing more, so its log is unchanged. */
+    int shard_i;
+    const int shard_k = cq_h_shard(&shard_i);
+    if (shard_k != 1)
+        printf("# %s W=%3d SHARD %d/%d: RAN %d of the %d cases above (slot s "
+               "iff s %% %d == %d); all %d were DRAWN, so the %d shards run "
+               "each exactly once (bd 5mqp)\n", k->name, W, shard_i, shard_k,
+               ran, n, shard_k, shard_i, n, shard_k);
     fflush(stdout);
 }
 

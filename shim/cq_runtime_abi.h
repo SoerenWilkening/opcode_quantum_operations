@@ -43,6 +43,20 @@
  *                   and produced zero `conflicting types`; a negative control
  *                   (one parameter widened from int8_t to int16_t) produced one.
  *                   So this is a verified copy, not a transcription.
+ *   AMENDED 2026-10-04 (bd 13zl), a re-check, not a re-vendor (no byte of
+ *   this file's declarations moved, so the four lines above stay as the record
+ *   of the 2026-09-10 vendor):
+ *     source sha256 now          : 18f311dcc8ee175782cbd9661fbf24b96ebe7b503301715599189abfb8bc1738
+ *     last commit to that file   : 18b3f5ff5fe5d2867b6664119e3ce45c838de88e (2026-10-01)
+ *     CQ_lang HEAD when re-checked : 4266c40ddc24bc538e75eda5d80598c46cda851f (2026-10-04)
+ *   Since `170ede1`, three commits touched the source, all in COMMENTS ONLY
+ *   (every changed line is a comment line): `4b54f18a` (2026-09-20, the
+ *   `cqrt_free` prose), `27fc9a62` (2026-10-01, the QRAM index-width preamble
+ *   agreed with libcqops as bd b6a) and `18b3f5ff` (2026-10-01, one sentence
+ *   of that preamble). This file's 182 declarations equal CQ HEAD's 182 by
+ *   name and by comment-stripped signature, and the verification above re-ran
+ *   at `4266c40d` with the same result: zero `conflicting types` together with
+ *   the source header, and exactly one for the same int8_t -> int16_t control.
  *
  * WHAT GUARDS THE COPY, exactly, because the first draft of this paragraph
  * claimed more than the tree delivered. `tests/test_runtime_abi.inc` compares

@@ -18,6 +18,17 @@ the whole difference is the four-deep add chain. argc > 1 is CLASSICAL mode
 (θ = π folds every Ry to a bit flip): both must print (~X + 4·~Y) mod 2^W.
 
 usage: gen_fixture.py W > addchain_W.cq.c
+
+AMENDED 2026-10-04 (bd 13zl): the taint is spelled in place, `cq_theta(&v, θ)`,
+because CQ_lang ec284441 retired the value form `v = cq_theta(v, θ)`. A bit is
+seeded first and then rotated (`bool a0 = BIT(X0, 0); cq_theta(&a0, θ);`).
+Measured in scratch, emitting old against ec284441^'s CQ.h and new against
+CQ_lang 4266c40d's, at W in {8,16,32,64}, -O0/-O1/-O2 and both values of
+BITLEVEL and CHAIN: the stage-1 IR is identical, apart from the module-name
+lines, in 40 of 48 cells. The 8 that differ are exactly -O0 with BITLEVEL=1,
+where the seed's extra store is visible without mem2reg. There the pass
+declines BOTH spellings with the same diagnostic ("tainted value stored to
+memory"), so the experiment's outcome does not move.
 """
 import sys
 
@@ -47,9 +58,9 @@ def emit(w):
     p("int main(int argc, char **argv)\n{")
     p("    double theta = (argc > 1) ? M_PI : M_PI / 2.0;")
     p(f"    {t} x = X0, y1 = Y0, y2 = Y0, y3 = Y0, y4 = Y0, s, u, v, w;")
-    p("    (void)argv;\n    x  = cq_theta(x, theta);\n    y1 = cq_theta(y1, theta);")
+    p("    (void)argv;\n    cq_theta(&x, theta);\n    cq_theta(&y1, theta);")
     p("#if CHAIN\n    y2 = y1; y3 = y1; y4 = y1;\n#else")
-    p("    y2 = cq_theta(y2, theta);\n    y3 = cq_theta(y3, theta);\n    y4 = cq_theta(y4, theta);\n#endif")
+    p("    cq_theta(&y2, theta);\n    cq_theta(&y3, theta);\n    cq_theta(&y4, theta);\n#endif")
     p(f"    s = ({t})(x + y1);\n    u = ({t})(s + y2);\n    v = ({t})(u + y3);\n    w = ({t})(v + y4);")
     p('    printf("addchain -> %llu\\n", (unsigned long long)cq_measure(w));\n    return 0;\n}')
     p("#else")
@@ -59,7 +70,7 @@ def emit(w):
 
     def taint(pfx, const):
         for i in range(w):
-            p(f"    bool {pfx}{i} = cq_theta(BIT({const}, {i}), theta);")
+            p(f"    bool {pfx}{i} = BIT({const}, {i}); cq_theta(&{pfx}{i}, theta);")
 
     def add(a, b, s):
         # K6's five-gate order per lane; the top lane produces no carry-out.

@@ -25,6 +25,8 @@
 #include "bit.h"
 #include "ctx.h"
 #include "reg.h"
+#include "rotate.h"
+#include "shadow.h"
 #include "support/bitkinds.h"
 #include "support/death.h"
 
@@ -77,6 +79,54 @@ static void a_quantum_bit_above_the_stages_is_fine(void)
      * harness treats a case that returns as a failure, so this one has to say
      * so itself and exit cleanly. */
     cq_death_skip("a quantum bit above the read stages is accepted, as intended");
+}
+
+/* THE SAME GUARD, REACHED ACROSS THE UNCOMPUTE AXIS (bd 4jj (b)). The case
+ * above mints the amount QUANTUM, so its forward is the call that aborts. Here
+ * the amount is CLASSICAL at the forward — a legal M11 call, W-k = 5 CX — and
+ * a general Ry pair on a lane M11 reads (bit 0; S = 3) materialises it before
+ * the same call runs again as the uncompute. PRD §10's asymmetry, which in
+ * every other kernel is a larger circuit, is a hard error here, because the
+ * amount is constrained classical and a materialised lane has no classical
+ * value to read.
+ *
+ * IT ADDS NO GUARD. It reaches the identical die() in cq_shift_amount, so
+ * deleting that check turns both cases red — in Debug only because both
+ * regexes name bit.h's CQ_BIT_ASSERT, which otherwise aborts one line later
+ * inside the same window (tests/CMakeLists.txt has the measurement) — and no
+ * plausible M11 mutant turns this one red alone. What it pins is the
+ * COMPOSITION — that the asymmetry arrives at M11 as an abort rather than as a
+ * larger circuit — which was stated nowhere. It differs from the case above in exactly one respect: the lane was
+ * classical when the forward ran, and became a wire through a rotation, so it
+ * is POISONED here where the case above's bitkinds qubit has a known shadow.
+ *
+ * AND IT IS REACHABLE ONLY BY A DIRECT KERNEL CALL. The shim routes every
+ * shift to M12 (cq_tpl_bin_kernel, shim/cq_template_dispatch.c), whose barrel
+ * re-scans the amount on every call and, finding a wire, takes the sandwich —
+ * tests/test_unc_axes_route.inc is that route. The preconditions are REQUIRED
+ * rather than CHECKed: a CHECK in a death case is a silent no-op. */
+static void a_shift_amount_drifted_between_forward_and_uncompute(void)
+{
+    setup();
+    int32_t ha = cq_bk_reg(&g_ctx, 8u, 0xFFu, 0xFFu);
+    int32_t hb = cq_bk_reg(&g_ctx, 8u, 0x03u, 0x00u);   /* classical: k = 3 */
+    int32_t hd = cq_reg_alloc_zero(&g_ctx.regs, 8u);
+    cq_bit *bb = cq_reg_bits(&g_ctx.regs, hb);
+
+    cq_kernel_shl(&g_ctx, cq_reg_bits(&g_ctx.regs, hd),
+                  cq_reg_cbits(&g_ctx.regs, ha),
+                  cq_reg_cbits(&g_ctx.regs, hb), 8);
+    CQ_DEATH_REQUIRE(cq_reg_owned_qubits(&g_ctx.regs, hd) == 5u);
+
+    cq_rotate_ry_bit(&g_ctx, &bb[0],  0.7);    /* CQ_ANGLE_GENERAL: the one */
+    cq_rotate_ry_bit(&g_ctx, &bb[0], -0.7);    /* §7 cell that materialises */
+    CQ_DEATH_REQUIRE(cq_bit_is_qubit(bb[0]));
+    CQ_DEATH_REQUIRE(cq_shadow_get(&g_ctx.shadow,
+                                   cq_bit_qindex(bb[0])).unknown != 0u);
+
+    CQ_EXPECT_ABORT(cq_kernel_shl(&g_ctx, cq_reg_bits(&g_ctx.regs, hd),
+                                  cq_reg_cbits(&g_ctx.regs, ha),
+                                  cq_reg_cbits(&g_ctx.regs, hb), 8));
 }
 
 static void a_shift_dst_overlaps_its_source(void)
@@ -142,6 +192,7 @@ static void a_cast_dst_overlaps_its_source(void)
 CQ_DEATH_MAIN(
     CQ_DEATH_CASE(a_quantum_shift_amount),
     CQ_DEATH_CASE(a_quantum_bit_above_the_stages_is_fine),
+    CQ_DEATH_CASE(a_shift_amount_drifted_between_forward_and_uncompute),
     CQ_DEATH_CASE(a_shift_dst_overlaps_its_source),
     CQ_DEATH_CASE(a_widening_cast_that_narrows),
     CQ_DEATH_CASE(a_narrowing_cast_that_widens),

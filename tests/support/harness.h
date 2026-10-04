@@ -38,8 +38,9 @@ int cq_h_run(const cq_test_case *cases, size_t n);
 int cq_h_streq(const char *a, const char *b);
 
 /* Command-line flags, for the suites that have a mode as well as a verdict —
- * at present only L4's golden regeneration. Recorded by CQ_TEST_MAIN_ARGV and
- * absent otherwise, so a suite built on plain CQ_TEST_MAIN sees no flags.
+ * L4's golden regeneration, and since bd 5mqp the case selection below.
+ * Recorded by CQ_TEST_MAIN_ARGV and absent otherwise, so a suite built on
+ * plain CQ_TEST_MAIN sees no flags.
  *
  * NOTE WHAT THIS CANNOT REACH. CTest does not forward trailing arguments to a
  * test executable, so `ctest -- --update-goldens` (as plan §4 prints it) never
@@ -48,6 +49,45 @@ int cq_h_streq(const char *a, const char *b);
  * both. */
 void cq_h_args(int argc, char **argv);
 int  cq_h_flag(const char *name);
+
+/* CASE SELECTION AND SAMPLE SHARDING (bd 5mqp, 2026-10-04) — so ONE binary's
+ * case list can be spread over several CTest entries. Only a suite built on
+ * CQ_TEST_MAIN_ARGV reads argv at all; a plain CQ_TEST_MAIN suite is
+ * `main(void)` and is untouched. The whole grammar:
+ *
+ *   (no argument)     EVERY case, in order. A bare run means the whole suite,
+ *                     and its output is byte for byte what it was before.
+ *   --case NAME       only the named case(s); repeatable.
+ *   --skip NAME       every case but the named one(s); repeatable.
+ *   --shard I/K       L1's sampler runs sample s iff s % K == I, 0 <= I < K
+ *                     (cq_kd_sample_at, kerneldrv.h). It still DRAWS every
+ *                     sample, so the K shards of one case run each sample of
+ *                     the unsharded run exactly once, with the same seed and
+ *                     the same draws. No other case is affected by it.
+ *   --update-goldens  goldens.c's regeneration flag, as before.
+ *
+ * ANYTHING ELSE REFUSES THE RUN BEFORE ANY CASE STARTS — `# harness: refused`
+ * and exit 2: an unrecognised argument, a NAME the case table does not hold,
+ * --case and --skip together, a malformed, out-of-range or repeated --shard,
+ * and a selection that leaves NO case to run. Every one of those would
+ * otherwise be a run that covers less than its CTest name says, and the last
+ * is the green-and-vacuous zero selection tools/ctest_names.sh documents.
+ * Until 2026-10-04 an ARGV suite ignored every argument but the golden flag.
+ * The CTest side is add_cqops_test's SPLIT (cmake/CqopsTest.cmake), and
+ * tests/test_skeleton.c and test_harness_select are the self-tests.
+ *
+ * cq_h_select is the parse alone, for the self-test: it fills run[0..n-1]
+ * (1 = run) and installs the shard, and returns 0, or returns 2 having
+ * installed nothing. It prints its refusal unless cq_h_mute is on. */
+int  cq_h_select(const cq_test_case *cases, size_t n, int argc, char **argv,
+                 unsigned char *run);
+int  cq_h_run_argv(const cq_test_case *cases, size_t n, int argc, char **argv);
+
+/* The installed shard: returns K and writes I through `index` (if non-NULL);
+ * 1 and 0 unless --shard said otherwise. cq_h_shard_owns(s) is THE predicate
+ * — s % K == I — and nothing else spells it. */
+int  cq_h_shard(int *index);
+int  cq_h_shard_owns(long s);
 
 /* FALSIFIABILITY. An assertion nobody has ever seen fail is an assertion
  * nobody has tested, and this project has now measured that twice: a CHECK
@@ -151,13 +191,13 @@ int  cq_h_failures_now(void);
 
 /* The same, for a suite that reads a flag. Separate rather than universal so
  * that `main(void)` stays the default shape and no suite acquires an argv it
- * does not use. */
+ * does not use. Since bd 5mqp it also takes the selection grammar above. */
 #define CQ_TEST_MAIN_ARGV(...)                                                \
     int main(int argc, char **argv)                                           \
     {                                                                         \
         static const cq_test_case cq_cases_[] = { __VA_ARGS__ };              \
-        cq_h_args(argc, argv);                                                \
-        return cq_h_run(cq_cases_, sizeof cq_cases_ / sizeof cq_cases_[0]);   \
+        return cq_h_run_argv(cq_cases_, sizeof cq_cases_ / sizeof cq_cases_[0], \
+                             argc, argv);                                     \
     }
 
 #endif /* CQOPS_TEST_HARNESS_H */

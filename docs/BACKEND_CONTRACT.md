@@ -26,6 +26,10 @@ implemented by this repository, that revision is:
 0707dfd69e88bb76572ce518a10447823e7a5f14
 ```
 
+(Amended 2026-10-04, bd 13zl: the contract this repository implements is now
+named by its ABI id, not by that revision. See the amendment at the end of this
+section.)
+
 The authoritative inputs are supplied by that CQ tree or installation:
 
 ```text
@@ -62,6 +66,35 @@ At commit `0707dfd6`, the required surface is:
 `cqrt_h` and `cqrt_h_controlled` are declared but deliberately excluded because
 the lowering pass cannot emit them. Additional provider-specific public symbols
 are allowed.
+
+> **Amended 2026-10-04 (bd 13zl): the contract moved, and libcqops implements
+> it as a SUPERSET.** The values above are kept as the record of `0707dfd6`,
+> where the ABI id was
+> `sha256:f9debf7770db72aa35b65e5a9649f8d3be4475a0dcb99a680ae0fc96527a5ebd`.
+>
+> - CQ_lang `61999c4a` (2026-09-30, "Reject unsupported native frem and retire
+>   trace templates") removed the 60 `cq_template_frem_*` declarations (`frem`
+>   at f16, f32, f64 and f80, 15 variants each). Its `opcode_table.yaml` moved
+>   from sha256 `6245117d…` to `7307995f…`.
+> - From that commit on, `describe` reports 180 `cqrt_*` + 2,820
+>   `cq_template_*` = **3,000 required symbols**, ABI id
+>   `sha256:e1cc2bbcfb92143c0da24d58d2d7589709b426bf40eeb6489f3f599c8ae20f0d`.
+>   `backend-manifest.json` was regenerated with `provider-manifest` at CQ_lang
+>   `4266c40d`, the HEAD on 2026-10-04.
+> - No `cqrt_*` or `cq_template_*` declaration changed between `61999c4a` and
+>   `4266c40d`. Three later commits (`4b54f18a`, `27fc9a62`, `18b3f5ff`) touched
+>   `runtime/cq_runtime.h` in comments only. `27fc9a62` is the normative QRAM
+>   index text agreed with libcqops as bd b6a, and comments do not enter the
+>   ABI id.
+> - **libcqops provides 3,060:** its vendored grid stays at
+>   `third_party/cq_lang/opcode_table.yaml` sha256 `6245117d…` (2,880
+>   templates), so the 60 extra symbols it defines are exactly the
+>   `cq_template_frem_*` that CQ_lang no longer declares. Extra symbols are
+>   allowed (above), and `check` passes against the archive. Re-vendoring the
+>   table (2,880 → 2,820) is a separate, tracked decision.
+> - `tools/install_cqops.py` no longer requires CQ_lang HEAD to equal
+>   `0707dfd6`. It requires CQ_lang's regenerated provider manifest to equal
+>   `backend-manifest.json`, i.e. the same ABI id.
 
 ### 1.2 Binary requirements
 
@@ -313,7 +346,8 @@ tests are what establish that the symbols form a correct backend.
 ## 2. Using a different sink below libcqops
 
 If the new codebase already accepts a logical gate stream, it usually should not
-reimplement all 3,060 CQ ABI functions. Reuse libcqops and provide a `cq_sink`:
+reimplement all 3,060 CQ ABI functions (3,000 since CQ_lang `61999c4a`;
+amended 2026-10-04, bd 13zl, see §1.1). Reuse libcqops and provide a `cq_sink`:
 
 ```c
 #include <cqops/cqops.h>

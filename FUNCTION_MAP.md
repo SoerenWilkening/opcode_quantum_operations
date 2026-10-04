@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7155
+**Indexed definitions:** 7224
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -82,10 +82,10 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `function _cqops_sanitizer_env` | [69](cmake/CqopsTest.cmake:69) |
-| `function add_cqops_test` | [111](cmake/CqopsTest.cmake:111) |
-| `function add_cqops_death_test` | [178](cmake/CqopsTest.cmake:178) |
-| `function _cqops_death_tripwire` | [256](cmake/CqopsTest.cmake:256) |
-| `function cqops_death_arm_sanitizer_tripwire` | [279](cmake/CqopsTest.cmake:279) |
+| `function add_cqops_test` | [130](cmake/CqopsTest.cmake:130) |
+| `function add_cqops_death_test` | [228](cmake/CqopsTest.cmake:228) |
+| `function _cqops_death_tripwire` | [306](cmake/CqopsTest.cmake:306) |
+| `function cqops_death_arm_sanitizer_tripwire` | [329](cmake/CqopsTest.cmake:329) |
 
 ## `include/cqops/cqops.h`
 
@@ -4814,8 +4814,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _ibits_pin` | [3921](tests/CMakeLists.txt:3921) |
-| `function _cqops_fround_death_ban` | [4142](tests/CMakeLists.txt:4142) |
+| `function _ibits_pin` | [4046](tests/CMakeLists.txt:4046) |
+| `function _cqops_fround_death_ban` | [4267](tests/CMakeLists.txt:4267) |
 
 ## `tests/package-consumer/main.c`
 
@@ -4946,14 +4946,21 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_h_streq` | [34](tests/support/harness.c:34) |
-| `cq_h_mute` | [44](tests/support/harness.c:44) |
-| `cq_h_take_failures` | [49](tests/support/harness.c:49) |
-| `cq_h_failures_now` | [62](tests/support/harness.c:62) |
-| `cq_h_fail` | [67](tests/support/harness.c:67) |
-| `cq_h_run` | [89](tests/support/harness.c:89) |
-| `cq_h_args` | [132](tests/support/harness.c:132) |
-| `cq_h_flag` | [138](tests/support/harness.c:138) |
+| `cq_h_streq` | [35](tests/support/harness.c:35) |
+| `cq_h_mute` | [45](tests/support/harness.c:45) |
+| `cq_h_take_failures` | [50](tests/support/harness.c:50) |
+| `cq_h_failures_now` | [63](tests/support/harness.c:63) |
+| `cq_h_fail` | [68](tests/support/harness.c:68) |
+| `cq_h_shard` | [95](tests/support/harness.c:95) |
+| `cq_h_shard_owns` | [101](tests/support/harness.c:101) |
+| `run_cases` | [108](tests/support/harness.c:108) |
+| `cq_h_run` | [154](tests/support/harness.c:154) |
+| `cq_h_args` | [164](tests/support/harness.c:164) |
+| `cq_h_flag` | [170](tests/support/harness.c:170) |
+| `refuse` | [180](tests/support/harness.c:180) |
+| `parse_shard` | [191](tests/support/harness.c:191) |
+| `cq_h_select` | [206](tests/support/harness.c:206) |
+| `cq_h_run_argv` | [256](tests/support/harness.c:256) |
 
 ## `tests/support/harness.h`
 
@@ -5000,7 +5007,7 @@ the definition (or the build-language declaration) in the listed file.
 | `void` | [171](tests/support/kerneldrv.h:171) |
 | `cq_ref_w` | [177](tests/support/kerneldrv.h:177) |
 | `uint64_t` | [180](tests/support/kerneldrv.h:180) |
-| `void` | [307](tests/support/kerneldrv.h:307) |
+| `void` | [312](tests/support/kerneldrv.h:312) |
 
 ## `tests/support/kernelmeasure.c`
 
@@ -5014,14 +5021,14 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `budget_cache` | [95](tests/support/kernelsweep.c:95) |
-| `cq_kd_samples` | [106](tests/support/kernelsweep.c:106) |
-| `seed_for` | [116](tests/support/kernelsweep.c:116) |
-| `pairs_for` | [127](tests/support/kernelsweep.c:127) |
-| `row_by_name` | [160](tests/support/kernelsweep.c:160) |
-| `cq_kd_sample_at` | [181](tests/support/kernelsweep.c:181) |
-| `cq_kd_sweep_at` | [332](tests/support/kernelsweep.c:332) |
-| `cq_kd_sweep` | [337](tests/support/kernelsweep.c:337) |
+| `budget_cache` | [103](tests/support/kernelsweep.c:103) |
+| `cq_kd_samples` | [114](tests/support/kernelsweep.c:114) |
+| `seed_for` | [124](tests/support/kernelsweep.c:124) |
+| `pairs_for` | [135](tests/support/kernelsweep.c:135) |
+| `row_by_name` | [168](tests/support/kernelsweep.c:168) |
+| `cq_kd_sample_at` | [189](tests/support/kernelsweep.c:189) |
+| `cq_kd_sweep_at` | [357](tests/support/kernelsweep.c:357) |
+| `cq_kd_sweep` | [362](tests/support/kernelsweep.c:362) |
 
 ## `tests/support/mock_sink.c`
 
@@ -5492,26 +5499,26 @@ the definition (or the build-language declaration) in the listed file.
 | `s_ry` | [84](tests/test_grover.c:84) |
 | `s_rz` | [90](tests/test_grover.c:90) |
 | `s_mz` | [96](tests/test_grover.c:96) |
-| `ref_grover` | [126](tests/test_grover.c:126) |
-| `grover_program` | [154](tests/test_grover.c:154) |
-| `run_grover` | [196](tests/test_grover.c:196) |
-| `classical_mode_returns_what_plain_c_computes (via CQ_TEST)` | [230](tests/test_grover.c:230) |
-| `classical_mode_costs_zero_gates_and_zero_qubits (via CQ_TEST)` | [254](tests/test_grover.c:254) |
-| `quantum_mode_builds_the_circuit_classical_mode_folds_away (via CQ_TEST)` | [269](tests/test_grover.c:269) |
-| `the_oracle_workspace_is_reclaimed_on_a_rotation_tainted_rail (via CQ_TEST)` | [302](tests/test_grover.c:302) |
-| `quantum_mode_counts_are_pinned_and_the_counter_sink_agrees (via CQ_TEST)` | [338](tests/test_grover.c:338) |
-| `the_per_iteration_cost_is_constant_and_the_rotations_are_closed_form (via CQ_TEST)` | [423](tests/test_grover.c:423) |
-| `the_rotation_alphabet_is_exactly_ry_half_pi_and_rz_pi (via CQ_TEST)` | [463](tests/test_grover.c:463) |
+| `ref_grover` | [134](tests/test_grover.c:134) |
+| `grover_program` | [162](tests/test_grover.c:162) |
+| `run_grover` | [204](tests/test_grover.c:204) |
+| `classical_mode_returns_what_plain_c_computes (via CQ_TEST)` | [238](tests/test_grover.c:238) |
+| `classical_mode_costs_zero_gates_and_zero_qubits (via CQ_TEST)` | [262](tests/test_grover.c:262) |
+| `quantum_mode_builds_the_circuit_classical_mode_folds_away (via CQ_TEST)` | [277](tests/test_grover.c:277) |
+| `the_oracle_workspace_is_reclaimed_on_a_rotation_tainted_rail (via CQ_TEST)` | [310](tests/test_grover.c:310) |
+| `quantum_mode_counts_are_pinned_and_the_counter_sink_agrees (via CQ_TEST)` | [346](tests/test_grover.c:346) |
+| `the_per_iteration_cost_is_constant_and_the_rotations_are_closed_form (via CQ_TEST)` | [431](tests/test_grover.c:431) |
+| `the_rotation_alphabet_is_exactly_ry_half_pi_and_rz_pi (via CQ_TEST)` | [471](tests/test_grover.c:471) |
 
 ## `tests/test_grover_qec.c`
 
 | Function | Line |
 |---|---:|
-| `bind` | [57](tests/test_grover_qec.c:57) |
-| `unbind` | [73](tests/test_grover_qec.c:73) |
-| `the_rotation_alphabet_grovers_program_emits_costs_no_t_gates (via CQ_TEST)` | [93](tests/test_grover_qec.c:93) |
-| `a_rotation_outside_that_alphabet_is_not_free_so_the_counter_is_alive (via CQ_TEST)` | [126](tests/test_grover_qec.c:126) |
-| `the_toffoli_is_the_only_thing_in_the_program_that_costs_t (via CQ_TEST)` | [152](tests/test_grover_qec.c:152) |
+| `bind` | [59](tests/test_grover_qec.c:59) |
+| `unbind` | [75](tests/test_grover_qec.c:75) |
+| `the_rotation_alphabet_grovers_program_emits_costs_no_t_gates (via CQ_TEST)` | [95](tests/test_grover_qec.c:95) |
+| `a_rotation_outside_that_alphabet_is_not_free_so_the_counter_is_alive (via CQ_TEST)` | [128](tests/test_grover_qec.c:128) |
+| `the_toffoli_is_the_only_thing_in_the_program_that_costs_t (via CQ_TEST)` | [154](tests/test_grover_qec.c:154) |
 
 ## `tests/test_harness_negative.c`
 
@@ -5525,6 +5532,14 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `a_failing_check_survives_a_provocation_window_opened_after_it (via CQ_TEST)` | [62](tests/test_harness_negative_window.c:62) |
 | `main` | [77](tests/test_harness_negative_window.c:77) |
+
+## `tests/test_harness_select.c`
+
+| Function | Line |
+|---|---:|
+| `alpha (via CQ_TEST)` | [19](tests/test_harness_select.c:19) |
+| `beta (via CQ_TEST)` | [21](tests/test_harness_select.c:21) |
+| `gamma (via CQ_TEST)` | [23](tests/test_harness_select.c:23) |
 
 ## `tests/test_kernel_add.c`
 
@@ -7661,14 +7676,15 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `setup` | [34](tests/test_kernel_step11_death.c:34) |
-| `a_quantum_shift_amount` | [48](tests/test_kernel_step11_death.c:48) |
-| `a_quantum_bit_above_the_stages_is_fine` | [65](tests/test_kernel_step11_death.c:65) |
-| `a_shift_dst_overlaps_its_source` | [82](tests/test_kernel_step11_death.c:82) |
-| `a_widening_cast_that_narrows` | [98](tests/test_kernel_step11_death.c:98) |
-| `a_narrowing_cast_that_widens` | [108](tests/test_kernel_step11_death.c:108) |
-| `a_sign_extension_that_narrows` | [118](tests/test_kernel_step11_death.c:118) |
-| `a_cast_dst_overlaps_its_source` | [131](tests/test_kernel_step11_death.c:131) |
+| `setup` | [36](tests/test_kernel_step11_death.c:36) |
+| `a_quantum_shift_amount` | [50](tests/test_kernel_step11_death.c:50) |
+| `a_quantum_bit_above_the_stages_is_fine` | [67](tests/test_kernel_step11_death.c:67) |
+| `a_shift_amount_drifted_between_forward_and_uncompute` | [108](tests/test_kernel_step11_death.c:108) |
+| `a_shift_dst_overlaps_its_source` | [132](tests/test_kernel_step11_death.c:132) |
+| `a_widening_cast_that_narrows` | [148](tests/test_kernel_step11_death.c:148) |
+| `a_narrowing_cast_that_widens` | [158](tests/test_kernel_step11_death.c:158) |
+| `a_sign_extension_that_narrows` | [168](tests/test_kernel_step11_death.c:168) |
+| `a_cast_dst_overlaps_its_source` | [181](tests/test_kernel_step11_death.c:181) |
 
 ## `tests/test_kernel_step14_death.c`
 
@@ -7736,6 +7752,18 @@ the definition (or the build-language declaration) in the listed file.
 | `anchors_sit_inside_the_budget_and_never_on_top_of_it (via CQ_TEST)` | [290](tests/test_kerneldrv_anchors.inc:290) |
 | `the_f64_anchor_constants_are_what_they_claim (via CQ_TEST)` | [321](tests/test_kerneldrv_anchors.inc:321) |
 
+## `tests/test_kerneldrv_shard.inc`
+
+| Function | Line |
+|---|---:|
+| `shard_call` | [32](tests/test_kerneldrv_shard.inc:32) |
+| `shard_ref` | [44](tests/test_kerneldrv_shard.inc:44) |
+| `shard_anchors` | [54](tests/test_kerneldrv_shard.inc:54) |
+| `shard_shape` | [63](tests/test_kerneldrv_shard.inc:63) |
+| `shard_install` | [71](tests/test_kerneldrv_shard.inc:71) |
+| `shard_run` | [80](tests/test_kerneldrv_shard.inc:80) |
+| `the_shards_partition_the_unsharded_samples_one_for_one (via CQ_TEST)` | [91](tests/test_kerneldrv_shard.inc:91) |
+
 ## `tests/test_kerneldrv_third.inc`
 
 | Function | Line |
@@ -7745,6 +7773,23 @@ the definition (or the build-language declaration) in the listed file.
 | `third_ref` | [44](tests/test_kerneldrv_third.inc:44) |
 | `third_shape` | [50](tests/test_kerneldrv_third.inc:50) |
 | `a_third_source_draws_its_own_mask (via CQ_TEST)` | [56](tests/test_kerneldrv_third.inc:56) |
+
+## `tests/test_l6_report.py`
+
+| Function | Line |
+|---|---:|
+| `run` | [59](tests/test_l6_report.py:59) |
+| `a_nonzero_status_with_no_marker_is_exit_status` | [63](tests/test_l6_report.py:63) |
+| `a_strand_report_alone_does_not_disqualify` | [71](tests/test_l6_report.py:71) |
+| `a_libcqops_fatal_stays_run_fail` | [78](tests/test_l6_report.py:78) |
+| `a_sanitizer_report_stays_run_fail` | [84](tests/test_l6_report.py:84) |
+| `the_shell_reserved_and_unreadable_statuses_stay_run_fail` | [94](tests/test_l6_report.py:94) |
+| `abort_deferred_build_provenance_and_ok_are_unchanged` | [102](tests/test_l6_report.py:102) |
+| `the_gate_is_green_on_exactly_three_classes` | [114](tests/test_l6_report.py:114) |
+| `every_exit_status_row_is_listed_with_its_rc` | [121](tests/test_l6_report.py:121) |
+| `c_text` | [133](tests/test_l6_report.py:133) |
+| `the_library_has_no_status_exit_and_no_signal_handling` | [152](tests/test_l6_report.py:152) |
+| `every_library_stderr_prefix_is_one_the_classifier_knows` | [166](tests/test_l6_report.py:166) |
 
 ## `tests/test_lsan_negative.c`
 
@@ -8661,15 +8706,18 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `bind` | [51](tests/test_sink_qec.c:51) |
-| `unbind` | [68](tests/test_sink_qec.c:68) |
-| `stage_labels` | [79](tests/test_sink_qec.c:79) |
-| `the_four_direct_entries_reach_their_qec_counterparts (via CQ_TEST)` | [112](tests/test_sink_qec.c:112) |
-| `the_ry_conjugation_is_emitted_in_the_reverse_of_the_matrix_product (via CQ_TEST)` | [153](tests/test_sink_qec.c:153) |
-| `section_7s_folding_rows_cost_no_t_gates_and_a_general_angle_does (via CQ_TEST)` | [202](tests/test_sink_qec.c:202) |
-| `the_install_hook_sets_both_pool_modes_from_the_config (via CQ_TEST)` | [225](tests/test_sink_qec.c:225) |
-| `the_sink_writes_no_text_of_its_own_into_the_trace (via CQ_TEST)` | [251](tests/test_sink_qec.c:251) |
-| `only_a_clean_teardown_renames_the_partial_trace (via CQ_TEST)` | [299](tests/test_sink_qec.c:299) |
+| `bind` | [55](tests/test_sink_qec.c:55) |
+| `unbind` | [72](tests/test_sink_qec.c:72) |
+| `stage_labels` | [83](tests/test_sink_qec.c:83) |
+| `the_four_direct_entries_reach_their_qec_counterparts (via CQ_TEST)` | [120](tests/test_sink_qec.c:120) |
+| `d20_direct_cost` | [164](tests/test_sink_qec.c:164) |
+| `d20_sink_cost` | [179](tests/test_sink_qec.c:179) |
+| `d20s_per_gate_physical_costs_are_pinned_at_d3 (via CQ_TEST)` | [208](tests/test_sink_qec.c:208) |
+| `the_ry_conjugation_is_emitted_in_the_reverse_of_the_matrix_product (via CQ_TEST)` | [236](tests/test_sink_qec.c:236) |
+| `section_7s_folding_rows_cost_no_t_gates_and_a_general_angle_does (via CQ_TEST)` | [285](tests/test_sink_qec.c:285) |
+| `the_install_hook_sets_both_pool_modes_from_the_config (via CQ_TEST)` | [308](tests/test_sink_qec.c:308) |
+| `the_sink_writes_no_text_of_its_own_into_the_trace (via CQ_TEST)` | [334](tests/test_sink_qec.c:334) |
+| `only_a_clean_teardown_renames_the_partial_trace (via CQ_TEST)` | [382](tests/test_sink_qec.c:382) |
 
 ## `tests/test_sink_qec_angle.c`
 
@@ -8715,12 +8763,15 @@ the definition (or the build-language declaration) in the listed file.
 | `library_links_and_reports_its_version (via CQ_TEST)` | [26](tests/test_skeleton.c:26) |
 | `check_macros_pass_on_truth (via CQ_TEST)` | [39](tests/test_skeleton.c:39) |
 | `a_provocation_window_counts_only_what_happens_inside_it (via CQ_TEST)` | [64](tests/test_skeleton.c:64) |
-| `debug_invariants_track_the_configuration (via CQ_TEST)` | [97](tests/test_skeleton.c:97) |
-| `sanitizer_coverage_is_what_the_build_claims (via CQ_TEST)` | [126](tests/test_skeleton.c:126) |
-| `cq_env_has_detect_leaks` | [153](tests/test_skeleton.c:153) |
-| `leak_detection_is_what_the_build_claims (via CQ_TEST)` | [159](tests/test_skeleton.c:159) |
-| `fp_host_is_what_the_build_claims (via CQ_TEST)` | [190](tests/test_skeleton.c:190) |
-| `the_fp_host_check_can_fail_and_names_the_rounding_arm (via CQ_TEST)` | [221](tests/test_skeleton.c:221) |
+| `sel_nop` | [102](tests/test_skeleton.c:102) |
+| `sel` | [108](tests/test_skeleton.c:108) |
+| `case_selection_runs_its_slice_and_refuses_what_it_cannot_honour (via CQ_TEST)` | [124](tests/test_skeleton.c:124) |
+| `debug_invariants_track_the_configuration (via CQ_TEST)` | [202](tests/test_skeleton.c:202) |
+| `sanitizer_coverage_is_what_the_build_claims (via CQ_TEST)` | [231](tests/test_skeleton.c:231) |
+| `cq_env_has_detect_leaks` | [258](tests/test_skeleton.c:258) |
+| `leak_detection_is_what_the_build_claims (via CQ_TEST)` | [264](tests/test_skeleton.c:264) |
+| `fp_host_is_what_the_build_claims (via CQ_TEST)` | [295](tests/test_skeleton.c:295) |
+| `the_fp_host_check_can_fail_and_names_the_rounding_arm (via CQ_TEST)` | [326](tests/test_skeleton.c:326) |
 
 ## `tests/test_template.c`
 
@@ -9145,31 +9196,77 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `ux_open` | [124](tests/test_unc.c:124) |
-| `ux_close` | [139](tests/test_unc.c:139) |
-| `ux_read` | [148](tests/test_unc.c:148) |
-| `ux_holds` | [173](tests/test_unc.c:173) |
-| `void` | [208](tests/test_unc.c:208) |
-| `ux_wdst` | [252](tests/test_unc.c:252) |
-| `ux_ref` | [261](tests/test_unc.c:261) |
-| `the_uncompute_is_what_makes_the_free_legal (via CQ_TEST)` | [290](tests/test_unc.c:290) |
-| `an_uncompute_outside_the_forwards_region_does_not_cancel (via CQ_TEST)` | [405](tests/test_unc.c:405) |
-| `every_golden_pins_a_second_pass_beside_its_forward (via CQ_TEST)` | [497](tests/test_unc.c:497) |
+| `ux_open` | [128](tests/test_unc.c:128) |
+| `ux_close` | [143](tests/test_unc.c:143) |
+| `ux_read` | [152](tests/test_unc.c:152) |
+| `ux_holds` | [177](tests/test_unc.c:177) |
+| `void` | [226](tests/test_unc.c:226) |
+| `ux_wdst` | [270](tests/test_unc.c:270) |
+| `ux_ref` | [279](tests/test_unc.c:279) |
+| `the_uncompute_is_what_makes_the_free_legal (via CQ_TEST)` | [308](tests/test_unc.c:308) |
+| `an_uncompute_outside_the_forwards_region_does_not_cancel (via CQ_TEST)` | [423](tests/test_unc.c:423) |
+| `every_golden_pins_a_second_pass_beside_its_forward (via CQ_TEST)` | [515](tests/test_unc.c:515) |
 
 ## `tests/test_unc_asym.inc`
 
 | Function | Line |
 |---|---:|
-| `ux_round_trip` | [152](tests/test_unc_asym.inc:152) |
-| `ux_check_ry_pair` | [294](tests/test_unc_asym.inc:294) |
-| `an_uncompute_after_a_general_ry_on_a_source_emits_more_gates (via CQ_TEST)` | [381](tests/test_unc_asym.inc:381) |
-| `the_delta_depends_on_which_lane_drifted_not_only_on_the_kernel (via CQ_TEST)` | [456](tests/test_unc_asym.inc:456) |
-| `the_same_drift_without_the_poison_emits_the_identical_stream (via CQ_TEST)` | [495](tests/test_unc_asym.inc:495) |
-| `only_a_classical_zero_lane_costs_the_uncompute_anything (via CQ_TEST)` | [592](tests/test_unc_asym.inc:592) |
-| `an_uncompute_costs_what_a_forward_at_the_same_representation_costs (via CQ_TEST)` | [653](tests/test_unc_asym.inc:653) |
-| `an_all_classical_forward_is_free_and_its_uncompute_is_not (via CQ_TEST)` | [707](tests/test_unc_asym.inc:707) |
-| `no_rz_at_any_angle_can_cause_the_drift (via CQ_TEST)` | [773](tests/test_unc_asym.inc:773) |
-| `the_all_quantum_mask_is_the_fixed_point_the_goldens_are_pinned_at (via CQ_TEST)` | [827](tests/test_unc_asym.inc:827) |
+| `ux_copyout_len` | [155](tests/test_unc_asym.inc:155) |
+| `ux_round_trip` | [170](tests/test_unc_asym.inc:170) |
+| `ux_check_ry_pair` | [327](tests/test_unc_asym.inc:327) |
+| `an_uncompute_after_a_general_ry_on_a_source_emits_more_gates (via CQ_TEST)` | [414](tests/test_unc_asym.inc:414) |
+| `the_delta_depends_on_which_lane_drifted_not_only_on_the_kernel (via CQ_TEST)` | [489](tests/test_unc_asym.inc:489) |
+| `the_same_drift_without_the_poison_emits_the_identical_stream (via CQ_TEST)` | [528](tests/test_unc_asym.inc:528) |
+| `only_a_classical_zero_lane_costs_the_uncompute_anything (via CQ_TEST)` | [650](tests/test_unc_asym.inc:650) |
+| `an_uncompute_costs_what_a_forward_at_the_same_representation_costs (via CQ_TEST)` | [711](tests/test_unc_asym.inc:711) |
+| `an_all_classical_forward_is_free_and_its_uncompute_is_not (via CQ_TEST)` | [765](tests/test_unc_asym.inc:765) |
+| `no_rz_at_any_angle_can_cause_the_drift (via CQ_TEST)` | [831](tests/test_unc_asym.inc:831) |
+| `the_all_quantum_mask_is_the_fixed_point_the_goldens_are_pinned_at (via CQ_TEST)` | [885](tests/test_unc_asym.inc:885) |
+
+## `tests/test_unc_axes.c`
+
+| Function | Line |
+|---|---:|
+| `ax_open` | [88](tests/test_unc_axes.c:88) |
+| `ax_close` | [97](tests/test_unc_axes.c:97) |
+| `ax_read` | [106](tests/test_unc_axes.c:106) |
+| `ax_tuple_of` | [130](tests/test_unc_axes.c:130) |
+| `ax_total` | [140](tests/test_unc_axes.c:140) |
+| `ax_drift` | [152](tests/test_unc_axes.c:152) |
+| `ax_check_ry_window` | [173](tests/test_unc_axes.c:173) |
+| `ax_keep_stream` | [193](tests/test_unc_axes.c:193) |
+| `ax_first_diff` | [209](tests/test_unc_axes.c:209) |
+| `ax_free_l3` | [222](tests/test_unc_axes.c:222) |
+
+## `tests/test_unc_axes_region.inc`
+
+| Function | Line |
+|---|---:|
+| `ax_ctl_is_q` | [63](tests/test_unc_axes_region.inc:63) |
+| `ax_ctl_on` | [64](tests/test_unc_axes_region.inc:64) |
+| `ax_ctl_reg` | [70](tests/test_unc_axes_region.inc:70) |
+| `ax_push` | [86](tests/test_unc_axes_region.inc:86) |
+| `ax_pop` | [91](tests/test_unc_axes_region.inc:91) |
+| `ax_add` | [96](tests/test_unc_axes_region.inc:96) |
+| `ax_predict` | [110](tests/test_unc_axes_region.inc:110) |
+| `ax_region_round_trip` | [137](tests/test_unc_axes_region.inc:137) |
+| `ax_region_fresh` | [216](tests/test_unc_axes_region.inc:216) |
+| `ax_region_check` | [237](tests/test_unc_axes_region.inc:237) |
+| `a_drifted_uncompute_inside_its_own_region (via CQ_TEST)` | [322](tests/test_unc_axes_region.inc:322) |
+| `a_drift_inside_a_region_happens_only_if_the_region_runs (via CQ_TEST)` | [328](tests/test_unc_axes_region.inc:328) |
+| `nested_regions_across_the_pair_gate_the_drift_and_the_kernel_apart (via CQ_TEST)` | [334](tests/test_unc_axes_region.inc:334) |
+
+## `tests/test_unc_axes_route.inc`
+
+| Function | Line |
+|---|---:|
+| `uint64_t` | [40](tests/test_unc_axes_route.inc:40) |
+| `ax_stages` | [59](tests/test_unc_axes_route.inc:59) |
+| `ax_shift_round_trip` | [84](tests/test_unc_axes_route.inc:84) |
+| `ax_shift_fresh` | [163](tests/test_unc_axes_route.inc:163) |
+| `ax_shift_common` | [183](tests/test_unc_axes_route.inc:183) |
+| `a_drift_on_an_amount_lane_the_barrel_reads_changes_the_route (via CQ_TEST)` | [214](tests/test_unc_axes_route.inc:214) |
+| `a_drift_on_an_amount_lane_the_barrel_never_reads_changes_nothing (via CQ_TEST)` | [300](tests/test_unc_axes_route.inc:300) |
 
 ## `tests/test_unc_contract.inc`
 
@@ -9204,10 +9301,10 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `expect` | [30](tools/bitlevel/gen_fixture.py:30) |
-| `emit` | [35](tools/bitlevel/gen_fixture.py:35) |
-| `taint` | [60](tools/bitlevel/gen_fixture.py:60) |
-| `add` | [64](tools/bitlevel/gen_fixture.py:64) |
+| `expect` | [41](tools/bitlevel/gen_fixture.py:41) |
+| `emit` | [46](tools/bitlevel/gen_fixture.py:46) |
+| `taint` | [71](tools/bitlevel/gen_fixture.py:71) |
+| `add` | [75](tools/bitlevel/gen_fixture.py:75) |
 
 ## `tools/bitlevel/pool_probe.c`
 
@@ -9255,26 +9352,28 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `source_root` | [18](tools/install_cqops.py:18) |
-| `run` | [22](tools/install_cqops.py:22) |
-| `output` | [27](tools/install_cqops.py:27) |
-| `cq_checkout` | [33](tools/install_cqops.py:33) |
-| `check_manifest` | [58](tools/install_cqops.py:58) |
-| `check_qec` | [82](tools/install_cqops.py:82) |
-| `parse_args` | [100](tools/install_cqops.py:100) |
-| `main` | [123](tools/install_cqops.py:123) |
+| `source_root` | [25](tools/install_cqops.py:25) |
+| `run` | [29](tools/install_cqops.py:29) |
+| `output` | [34](tools/install_cqops.py:34) |
+| `cq_checkout` | [40](tools/install_cqops.py:40) |
+| `check_manifest` | [62](tools/install_cqops.py:62) |
+| `check_qec` | [88](tools/install_cqops.py:88) |
+| `parse_args` | [106](tools/install_cqops.py:106) |
+| `main` | [129](tools/install_cqops.py:129) |
 
 ## `tools/l6/l6_report.py`
 
 | Function | Line |
 |---|---:|
-| `classify` | [62](tools/l6/l6_report.py:62) |
-| `residue` | [87](tools/l6/l6_report.py:87) |
-| `residue_totals` | [112](tools/l6/l6_report.py:112) |
-| `residue_summary` | [121](tools/l6/l6_report.py:121) |
-| `read` | [167](tools/l6/l6_report.py:167) |
-| `first_line` | [175](tools/l6/l6_report.py:175) |
-| `first_error` | [182](tools/l6/l6_report.py:182) |
+| `classify` | [84](tools/l6/l6_report.py:84) |
+| `exit_status` | [107](tools/l6/l6_report.py:107) |
+| `exit_status_lines` | [125](tools/l6/l6_report.py:125) |
+| `residue` | [137](tools/l6/l6_report.py:137) |
+| `residue_totals` | [162](tools/l6/l6_report.py:162) |
+| `residue_summary` | [171](tools/l6/l6_report.py:171) |
+| `read` | [217](tools/l6/l6_report.py:217) |
+| `first_line` | [225](tools/l6/l6_report.py:225) |
+| `first_error` | [232](tools/l6/l6_report.py:232) |
 
 ## `tools/l6/l6_residue.c`
 
@@ -9286,15 +9385,15 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_revision` | [50](tools/l6/l6_run.py:50) |
-| `fixtures` | [58](tools/l6/l6_run.py:58) |
-| `main` | [80](tools/l6/l6_run.py:80) |
+| `cq_revision` | [52](tools/l6/l6_run.py:52) |
+| `fixtures` | [60](tools/l6/l6_run.py:60) |
+| `main` | [82](tools/l6/l6_run.py:82) |
 
 ## `tools/l7/grover.cq.c`
 
 | Function | Line |
 |---|---:|
-| `main` | [124](tools/l7/grover.cq.c:124) |
+| `main` | [148](tools/l7/grover.cq.c:148) |
 
 ## `tools/l7/l7_run.py`
 

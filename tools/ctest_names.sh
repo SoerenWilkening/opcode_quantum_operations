@@ -31,7 +31,10 @@
 #
 # Read the NAMES, not the total: a stray case shows up as a binary nobody meant
 # to select. The binary is the part of a name before its first `.`; a name with
-# no `.` is its own binary. Death-case binaries are the only dotted names today.
+# no `.` is its own binary. Death-case binaries were the only dotted names until
+# 2026-10-04, when add_cqops_test's SPLIT (bd 5mqp) began registering
+# `binary.case` and `binary.case.IofK` entries for an ordinary suite; the part
+# before the first `.` is still the binary, so the grouping is unchanged.
 #
 # POSIX sh + awk, like check_loc.sh and check_cites.sh. Deliberately defines no
 # shell function, so tools/function_map.py has nothing to index here.

@@ -94,6 +94,111 @@ CQ_TEST(a_provocation_window_counts_only_what_happens_inside_it)
     CHECK_EQ(after_pass, base);
 }
 
+/* CASE SELECTION, THE PARSE ALONE (bd 5mqp), against a three-case table. The
+ * real main is test_harness_select's job; this is where every refusal in
+ * harness.h's grammar is FED A BROKEN ARGV and seen to refuse, and where the
+ * shard predicate is seen to partition. Muted only so a green log is not full
+ * of "# harness: refused" lines; no CHECK runs inside the mute. */
+static void sel_nop(void) {}
+
+static const cq_test_case SEL_T[] = {
+    { "a", sel_nop }, { "b", sel_nop }, { "c", sel_nop }
+};
+
+static int sel(char *got, char **argv)
+{
+    unsigned char run[3] = { 7, 7, 7 };
+    int argc = 0, rc;
+
+    while (argv[argc] != NULL) argc++;
+    cq_h_mute(1);
+    rc = cq_h_select(SEL_T, 3, argc, argv, run);
+    cq_h_mute(0);
+    for (int i = 0; i < 3; i++) got[i] = (char)('0' + run[i]);
+    got[3] = '\0';
+    return rc;
+}
+
+#define SEL(...) sel(got, (char *[]){ "t", __VA_ARGS__, NULL })
+
+CQ_TEST(case_selection_runs_its_slice_and_refuses_what_it_cannot_honour)
+{
+    /* EACH ROW IS THE ONE THAT SEES ITS GUARD GO, and several exist because a
+     * shorter spelling is caught by a NEIGHBOURING guard instead: a bare
+     * `--bogus` dies on "no operand", `--case nosuch` on the empty selection,
+     * `1/` and `0/0` on I < K. So the unknown flag carries an operand, the
+     * unknown name is also asked of --skip, and `1/+4` is what the
+     * digit-after-the-slash check alone refuses. */
+    static char *const BAD[][7] = {
+        { "--bogus", "a" },                  { "-case", "a" },
+        { "b" },                             { "--shard" },
+        { "--case" },                        { "--case", "nosuch" },
+        { "--skip", "nosuch" },              { "--case", "a", "--skip", "b" },
+        { "--skip", "a", "--case", "b" },
+        { "--skip", "a", "--skip", "b", "--skip", "c" },
+        { "--shard", "3/3" },  { "--shard", "0/0" },  { "--shard", "-1/4" },
+        { "--shard", "1" },    { "--shard", "1/4x" }, { "--shard", "1/1001" },
+        { "--shard", " 1/4" }, { "--shard", "1/+4" }, { "--shard", "1/" },
+        { "--shard", "0/2", "--shard", "1/2" },
+    };
+    char got[4], spec[16];
+    int i, k;
+
+    /* What it must honour. A bare argv is the whole table and shard 0/1. */
+    CHECK_EQ(sel(got, (char *[]){ "t", NULL }), 0);       CHECK_STR_EQ(got, "111");
+    k = cq_h_shard(&i);
+    CHECK_EQ(k, 1);
+    CHECK_EQ(i, 0);
+    CHECK_EQ(SEL("--case", "b"), 0);                      CHECK_STR_EQ(got, "010");
+    CHECK_EQ(SEL("--case", "c", "--case", "a"), 0);       CHECK_STR_EQ(got, "101");
+    CHECK_EQ(SEL("--skip", "b"), 0);                      CHECK_STR_EQ(got, "101");
+    CHECK_EQ(SEL("--update-goldens", "--skip", "a", "--skip", "c"), 0);
+    CHECK_STR_EQ(got, "010");
+    CHECK_EQ(SEL("--case", "a", "--shard", "2/3"), 0);    CHECK_STR_EQ(got, "100");
+    k = cq_h_shard(&i);
+    CHECK_EQ(k, 3);
+    CHECK_EQ(i, 2);
+
+    /* What it must refuse, each with exit code 2 — and having INSTALLED
+     * NOTHING, so the 2/3 above must survive every one of them. */
+    for (size_t b = 0; b < sizeof BAD / sizeof BAD[0]; b++) {
+        char *argv[8] = { "t" };
+        int argc = 1;
+
+        while (argc < 8 && BAD[b][argc - 1] != NULL) {
+            argv[argc] = BAD[b][argc - 1];
+            argc++;
+        }
+        if (sel(got, argv) != 2)
+            cq_h_fail(__FILE__, __LINE__, "argv row %zu (%s ...) was honoured; "
+                      "it must be refused", b, BAD[b][0]);
+    }
+    k = cq_h_shard(&i);
+    CHECK_EQ(k, 3);
+    CHECK_EQ(i, 2);
+
+    /* THE PARTITION: under every I/K, each sample index is owned by exactly
+     * one I. This is the property the fma shard entries' coverage rests on. */
+    for (k = 1; k <= 5; k++)
+        for (long s = 0; s < 40; s++) {
+            int owners = 0;
+
+            for (i = 0; i < k; i++) {
+                snprintf(spec, sizeof spec, "%d/%d", i, k);
+                CHECK_EQ(SEL("--shard", spec), 0);
+                owners += cq_h_shard_owns(s);
+            }
+            if (owners != 1)
+                cq_h_fail(__FILE__, __LINE__, "sample %ld has %d owners "
+                          "among the %d shards", s, owners, k);
+        }
+    CHECK(!cq_h_shard_owns(-1));
+
+    /* Back to the default, so nothing after this case runs sharded. */
+    CHECK_EQ(sel(got, (char *[]){ "t", NULL }), 0);
+    CHECK_EQ(cq_h_shard(NULL), 1);
+}
+
 CQ_TEST(debug_invariants_track_the_configuration)
 {
     /* Both configurations are legal; what is asserted is that the flag says
@@ -252,6 +357,7 @@ CQ_TEST_MAIN(
     CQ_CASE(library_links_and_reports_its_version),
     CQ_CASE(check_macros_pass_on_truth),
     CQ_CASE(a_provocation_window_counts_only_what_happens_inside_it),
+    CQ_CASE(case_selection_runs_its_slice_and_refuses_what_it_cannot_honour),
     CQ_CASE(debug_invariants_track_the_configuration),
     CQ_CASE(sanitizer_coverage_is_what_the_build_claims),
     CQ_CASE(leak_detection_is_what_the_build_claims),
