@@ -2359,6 +2359,11 @@ and diffs — `make shim-check` / `cmake --build <dir> --target shim-check`, i.e
 > The grid expansion is PyYAML over `opcode_table.yaml` applying `:39-44`'s rules with the
 > `predicates` sets and the cast pair lists; it totals **2479 = 1595 int + 884 fp**, which is
 > the cross-check that it is faithful to §1's published partition.
+> **[AMENDED 2026-10-05, `bd 3s9b`: `:39-44` is the wrong span for the WHOLE grid — it holds
+> only the `_inv` forms (`:39-41`) and the controlled forms (`:42-44`), which is exactly what
+> the 915 `_inv` count above needs. The 2479 expansion also applies the forward forms
+> (`:36-38`) and the `_unc` forms and axis (`:47-59`): the full naming convention is
+> `:35-59`, lines the `bd n4ut` re-vendor did not move.]**
 
 > ### D12 — a diagonal rotation does not poison, and that keeps the shadow exact
 >
