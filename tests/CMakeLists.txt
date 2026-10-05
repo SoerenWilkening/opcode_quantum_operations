@@ -1035,6 +1035,8 @@ set_tests_properties(test_kernel_add_death.add_steps_called_directly_with_a_zero
 ## prepends them under cmake_language(DEFER), and the composed list is read back
 ## from build-*/tests/CTestTestfile.cmake rather than assumed. The guard's own
 ## message is "kernel: add: step index outside …" and matches none of them.
+## SUPERSEDED by bd qi4m (2026-10-05): the tripwire now names `Assertion` as
+## well; this list's token is kept on purpose, as a second copy.
 set_tests_properties(test_kernel_add_death.add_step_index_past_the_end
                      test_kernel_add_death.add_step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
@@ -1142,6 +1144,8 @@ set_tests_properties(test_kernel_cmp_death.slt_steps_zero_width
 ## same function, plus assert()'s banner — the third abort source, which the
 ## auto-prepended sanitizer tripwire does not name. The tripwire itself is
 ## PREPENDED by cqops_death_arm_sanitizer_tripwire and must not be added here.
+## SUPERSEDED by bd qi4m (2026-10-05): the tripwire now names `Assertion` as
+## well; this list's token is kept on purpose, as a second copy.
 set_tests_properties(test_kernel_cmp_death.slt_step_index_high
                      test_kernel_cmp_death.slt_step_index_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
@@ -2102,6 +2106,10 @@ set_tests_properties(test_kernel_fpfield_death.class_block_region_is_one_bit_sho
 ## kill them — Release because an out-of-range view returns normally, Debug
 ## because ASan sees the read past the rail and its banner is already in the
 ## tripwire.
+##
+## SUPERSEDED by bd qi4m (2026-10-05): the tripwire now names `Assertion` too
+## (cmake/CqopsTest.cmake has the measurement), so heading (3)'s "DOES NOT
+## COVER IT" is history. This list's token is kept on purpose, as a second copy.
 set_tests_properties(test_kernel_fpfield_death.pack_of_a_quantum_lane
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "Assertion;scratch:;emit:;reg:;shadow:;qubit pool:")
@@ -2133,6 +2141,7 @@ add_cqops_death_test(test_kernel_fcmp_death CASES
     a_program_of_no_rows
     a_body_appended_past_the_buffer
     a_body_id_outside_the_three
+    a_program_past_the_maps_capacity
     a_row_with_an_unknown_op
     a_row_with_an_unknown_operand_code
     a_one_bit_operand_that_is_not_a_row
@@ -2205,6 +2214,16 @@ set_tests_properties(test_kernel_fcmp_death.a_row_with_an_unknown_op
                      test_kernel_fcmp_death.eval_of_an_unknown_predicate
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "scratch:;fpclass:;eq: step index outside;ult: step index outside;sub: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion")
+
+## (4a) THE PREFIX MAP'S CAPACITY (2026-10-05, bd ifoy (e)). fcmp_step.c's
+## memoised map never evicts, so the program past CQ_FCMP_MAX_PROGRAMS must
+## abort naming the map. With that refusal deleted the build writes past the
+## map's static array: in Debug ASan's report is an abort INSIDE the window
+## (abort_on_error=1) and would satisfy the case, so the sanitizers are pinned
+## absent, with check_program's and the op vocabulary's sentences.
+set_tests_properties(test_kernel_fcmp_death.a_program_past_the_maps_capacity
+                     PROPERTIES FAIL_REGULAR_EXPRESSION
+                     "AddressSanitizer;UndefinedBehaviorSanitizer;Assertion;fcmp: the program is empty;fcmp: unknown op")
 
 ## (5) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations;
 ## D7b is LEGAL at the handle boundary and a hard error here, because reaching
@@ -3715,6 +3734,10 @@ set_tests_properties(test_kernel_fdiv_death.a_block_with_no_operand_a
 ## array, so EVERY read of the table goes through `cq_fdiv_row_at` and 392 of
 ## the 478 rows are materialised from a template, where an unrebased relative
 ## code arrives as an index of 4096 or 8192.
+## [AMENDED 2026-10-05, bd ifoy (b): the rows are now materialised ONCE into
+## an immutable static table in fdiv.c; no array is exported, every read goes
+## through `cq_fdiv_row_at` or `cq_fdiv_row_ref`, and they share this one
+## range refusal — which now also keeps a read off the end of that table.]
 set_tests_properties(test_kernel_fdiv_death.arity_of_an_unknown_op
                      test_kernel_fdiv_death.row_at_outside_the_program
                      test_kernel_fdiv_death.width_at_outside_the_program

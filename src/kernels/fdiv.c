@@ -268,6 +268,21 @@ _Static_assert(sizeof PRE / sizeof PRE[0] == (size_t)FR_N_PRE,
  * mutable state would desynchronise the two halves. `cq_fdiv_row_at` is a pure
  * function of `i`.
  *
+ * AMENDED 2026-10-05 — THE ROW HALF OF THAT IS OVERRULED BY THE MAINTAINER
+ * (bd ifoy (b), "Allow immutable table"); the VIEW half stands. The ROWS are
+ * now materialised ONCE, on first use, into the static table behind
+ * `program()` below and are never written again. Ground: a row is a pure
+ * function of `i` alone — `materialise()` reads only PRE, ITER, POST and `i`,
+ * never an operand, a context, an offset or the call order — so a table filled
+ * once and then only read returns, at every call and in either half of the
+ * sandwich, exactly the row re-materialising would, and a desynchronisation
+ * would need a write after initialisation; there is none. It holds operand
+ * REFERENCES (row indices and negative codes), never bits, offsets or gates:
+ * program, not circuit state, with the same standing as fdiv_step.c's
+ * build-once `cq_fd_map_get`. What is still rebuilt from the step index on
+ * every call is `r_in(t)` the VIEW — the 64 `cq_bit` lanes fdiv_operand.c
+ * assembles per step, which bd ifoy (a) kept uncached.
+ *
  * THE DROPPED TOP LANE. `r << 1` discards `rsel_t[63]`, which fdiv.jl:16-21's
  * invariant makes provably zero and which the two-bit shadow cannot prove. It
  * stays in the region until the sandwich reverse — do NOT free anything inside
@@ -430,11 +445,11 @@ static short rebase(short s, int t)
     return s;                            /* a negative code or a PRE row */
 }
 
-void cq_fdiv_row_at(int i, cq_fdiv_row *out)
+/* Row `i`, built from the three tables. A PURE FUNCTION OF `i`: it reads PRE,
+ * ITER, POST and `i` and nothing else, which is the whole ground of the
+ * build-once table below. Only `program()` calls it. */
+static void materialise(int i, cq_fdiv_row *out)
 {
-    if (out == NULL || i < 0 || i >= FR_N_ROWS)
-        cq_kernel_die("fdiv: a row index outside the program");
-
     if (i < FR_N_PRE)      { *out = PRE[i]; return; }
     if (i >= FR_POST_BASE) { *out = POST[i - FR_POST_BASE]; return; }
 
@@ -447,6 +462,42 @@ void cq_fdiv_row_at(int i, cq_fdiv_row *out)
         out->s1 = rebase(out->s1, t);
         out->s2 = rebase(out->s2, t);
     }
+}
+
+/* THE 478 ROWS, MATERIALISED ONCE AND IMMUTABLE AFTER THAT (bd ifoy (b); see
+ * the amendment above the ITER table). Written only inside the one-shot fill
+ * and handed out only as `const`. The library is single-threaded — there is
+ * no thread anywhere in it — so a plain one-shot flag is the whole of the
+ * initialisation (fma_step.c's `cq_fu_map_get`, fdiv_step.c's
+ * `cq_fd_map_get`). */
+static const cq_fdiv_row *program(void)
+{
+    static cq_fdiv_row rows[FR_N_ROWS];
+    static int ready;
+
+    if (!ready) {
+        for (int i = 0; i < FR_N_ROWS; i++) materialise(i, &rows[i]);
+        ready = 1;
+    }
+    return rows;
+}
+
+/* THE ONE RANGE REFUSAL, shared by both accessors and run BEFORE the table is
+ * touched: an unrebased template code (4096, 8192) or any other index outside
+ * the program is a hard error in both configurations, never a read past the
+ * end of `rows`. */
+const cq_fdiv_row *cq_fdiv_row_ref(int i)
+{
+    if (i < 0 || i >= FR_N_ROWS)
+        cq_kernel_die("fdiv: a row index outside the program");
+    return &program()[i];
+}
+
+void cq_fdiv_row_at(int i, cq_fdiv_row *out)
+{
+    if (out == NULL)
+        cq_kernel_die("fdiv: a row index outside the program");
+    *out = *cq_fdiv_row_ref(i);
 }
 
 /* A `switch` WITH EVERY CASE NAMED AND A DYING `default:`, because using
@@ -520,12 +571,10 @@ int cq_fdiv_row_width(const cq_fdiv_row *rows, int n, int i)
 
 int cq_fdiv_width_at(int i)
 {
-    cq_fdiv_row r, p;
+    const cq_fdiv_row *r = cq_fdiv_row_ref(i);
 
-    cq_fdiv_row_at(i, &r);
-    if (r.op != CQ_FDOP_OUT) return width_of(&r, CQ_FDOP_N_OP);
-    if (r.s0 < 0 || r.s0 >= i)
+    if (r->op != CQ_FDOP_OUT) return width_of(r, CQ_FDOP_N_OP);
+    if (r->s0 < 0 || r->s0 >= i)
         cq_kernel_die("fdiv: a projection of a row that is not earlier");
-    cq_fdiv_row_at(r.s0, &p);
-    return width_of(&r, p.op);
+    return width_of(r, cq_fdiv_row_ref(r->s0)->op);
 }

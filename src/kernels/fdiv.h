@@ -254,8 +254,25 @@ int cq_fdiv_post_base_row(void);
  * configurations. This is the only way to read the table: there is no shared
  * `cq_fdiv_row *` array, because 392 of the 478 rows are instantiated from one
  * template and materialising them would be mutable state the library has no
- * business holding (Rule 13). */
+ * business holding (Rule 13).
+ *
+ * AMENDED 2026-10-05 — OVERRULED BY THE MAINTAINER (bd ifoy (b), "Allow
+ * immutable table"). fdiv.c now materialises all 478 rows ONCE, on first use,
+ * into one static table that is NEVER WRITTEN AFTER THAT INITIALISATION, and
+ * both accessors read from it. Why that is not the state Rule 13 forbids: a
+ * row is a pure function of `i` alone (no operand, no context, no offset, no
+ * call order), so the table holds exactly what re-materialising would return
+ * at every call and cannot desynchronise the sandwich's two halves; and it
+ * holds operand REFERENCES — program, not circuit state — as fdiv_step.c's
+ * build-once `cq_fd_map_get` holds layout. No array is exported: every read
+ * still goes through an accessor, and the out-of-range refusal is one check
+ * shared by both. */
 void cq_fdiv_row_at(int i, cq_fdiv_row *out);
+
+/* The same row as a `const` pointer into the immutable table, for the step
+ * machine's per-slot reads (no copy). Same refusal, same message: this is
+ * where `cq_fdiv_row_at`'s range check lives. */
+const cq_fdiv_row *cq_fdiv_row_ref(int i);
 
 /* The ITERATION TEMPLATE itself, with its operand references UNREBASED — the
  * relative codes fdiv.c documents. Exposed so a test can assert that every one
@@ -276,7 +293,9 @@ int cq_fdiv_row_width(const cq_fdiv_row *rows, int n, int i);
 /* The same for row `i` OF THE SHIPPED PROGRAM, which has no `cq_fdiv_row *` to
  * pass. One implementation behind both: the array form exists so a death case
  * can drive a malformed table, and this one is what the operand resolver and
- * the well-formedness case use. */
+ * the well-formedness case use. [AMENDED 2026-10-05, bd ifoy (b): the shipped
+ * rows now sit in fdiv.c's immutable build-once table, but no array is
+ * exported, so this still reads them one row at a time.] */
 int cq_fdiv_width_at(int i);
 
 /* --- The block. ---------------------------------------------------------- */

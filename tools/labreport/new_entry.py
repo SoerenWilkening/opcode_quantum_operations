@@ -31,6 +31,17 @@ without its flags is not a figure at all. CLAUDE.md's Session Completion rule 3
 already requires an instrument AND a configuration of every hand-written figure;
 the generated header was carrying the instrument alone.
 
+AMENDED 2026-10-05 (bd 5u7m). "The four opt-in suites" above is kept as written
+and was an undercount WHEN written, not a later drift: at 454afa4, the commit
+that wrote it, seven registrations were opt-in -- l6_cqlang_fixtures and
+l7_grover_cqlang behind CQOPS_CQLANG_DIR; test_sink_qec, test_sink_qec_death,
+test_shim_trace, test_shim_trace_death and test_grover_qec behind
+CQOPS_QEC_DIR. 8675871 (2026-09-22) added backend_contract_cq and
+package_install_cqbackend behind CQOPS_CQLANG_DIR. The same words are in entry 8
+(committed first), beside "the configure log states in four STATUS lines": four
+was the STATUS lines, not the registrations. The CODE never counted suites: OPTIN names the two FLAGS, so a suite added
+behind either changes nothing here; only a third opt-in flag would.
+
 A tree that cannot be counted SAYS SO and names the reason -- it never prints a
 plausible number, and it never requires the tree to exist.
 
@@ -102,7 +113,12 @@ def tree_note(tree, want_type):
     Reported per tree because the two may disagree, and `(missing)` because a
     tree configured against a path that has since gone away still holds the
     CTestTestfile.cmake from when it resolved -- which is how entry 8's row came
-    to name four suites nothing in that session could have run."""
+    to name four suites nothing in that session could have run.
+
+    AMENDED 2026-10-05 (bd 5u7m): seven, not four. 359 - 348 = 11 ctest
+    entries, which is what the seven opt-in registrations at entry 8's 7e44bfe
+    expand to (their two death binaries carry 4 + 2 cases). See the module
+    docstring's amendment."""
     c = cache(tree)
     bits = []
     got = c.get("CMAKE_BUILD_TYPE", "")

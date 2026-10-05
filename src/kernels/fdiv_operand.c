@@ -83,12 +83,11 @@ static uint64_t const_of(int s)
 static const cq_bit *out64(const cq_fdiv_block *k, const cq_fd_map *m,
                            const cq_fdiv_row *r, cq_bit *buf)
 {
-    cq_fdiv_row p;
     uint32_t o = cq_fd_off(m, r->s0);
     int w = r->s1;
+    const cq_fdiv_row *p = cq_fdiv_row_ref(r->s0);
 
-    cq_fdiv_row_at(r->s0, &p);
-    switch (p.op) {
+    switch (p->op) {
     case CQ_FDOP_NORM52: {
         cq_norm52_block b = FD_N52(k, o);
 
@@ -105,7 +104,7 @@ static const cq_bit *out64(const cq_fdiv_block *k, const cq_fd_map *m,
         {
             cq_bit s0[CQ_FD_W], s1[CQ_FD_W];
 
-            b.result_sign = cq_fd_op64(k, m, p.s2, s0, s1);
+            b.result_sign = cq_fd_op64(k, m, p->s2, s0, s1);
             cq_subnorm_flushed(&b, buf);
             return buf;
         } }
@@ -124,16 +123,16 @@ static const cq_bit *out64(const cq_fdiv_block *k, const cq_fd_map *m,
 const cq_bit *cq_fd_val64(const cq_fdiv_block *k, const cq_fd_map *m, int i,
                           cq_bit *buf)
 {
-    cq_fdiv_row r;
+    const cq_fdiv_row *r;
 
     if (i < 0 || i >= cq_fdiv_n_rows())
         cq_kernel_die("fdiv: an operand names a row outside the program");
     if (cq_fdiv_width_at(i) != W64)
         cq_kernel_die("fdiv: a 64-lane operand names a row of another width");
 
-    cq_fdiv_row_at(i, &r);
-    if (r.op == CQ_FDOP_OUT) return out64(k, m, &r, buf);
-    if (r.op == CQ_FDOP_SUB)
+    r = cq_fdiv_row_ref(i);
+    if (r->op == CQ_FDOP_OUT) return out64(k, m, r, buf);
+    if (r->op == CQ_FDOP_SUB)
         return cq_fd_sp(k, cq_fd_off(m, i) + (uint32_t)W64, (uint32_t)W64);
     return cq_fd_sp(k, cq_fd_off(m, i), (uint32_t)W64);
 }
@@ -150,7 +149,7 @@ const cq_bit *cq_fd_val64(const cq_fdiv_block *k, const cq_fd_map *m, int i,
  * detector: the read succeeds, the gate is plausible and the value is wrong. */
 const cq_bit *cq_fd_flag_of(const cq_fdiv_block *k, const cq_fd_map *m, int i)
 {
-    cq_fdiv_row r;
+    const cq_fdiv_row *r;
     uint32_t o;
 
     if (i < 0 || i >= cq_fdiv_n_rows())
@@ -158,33 +157,32 @@ const cq_bit *cq_fd_flag_of(const cq_fdiv_block *k, const cq_fd_map *m, int i)
     if (cq_fdiv_width_at(i) != 1)
         cq_kernel_die("fdiv: a one-bit operand names a row of another width");
 
-    cq_fdiv_row_at(i, &r);
+    r = cq_fdiv_row_ref(i);
     o = cq_fd_off(m, i);
-    if (r.op == CQ_FDOP_CLASS) {
+    if (r->op == CQ_FDOP_CLASS) {
         cq_fp_class_block c;
 
-        c.a = NULL; c.scr = k->scr; c.off = o; c.cls = (cq_fp_class)r.s1;
+        c.a = NULL; c.scr = k->scr; c.off = o; c.cls = (cq_fp_class)r->s1;
         return cq_fp_class_flag(&c);
     }
-    if (r.op == CQ_FDOP_OUT) {
-        cq_fdiv_row p;
-        uint32_t po = cq_fd_off(m, r.s0);
+    if (r->op == CQ_FDOP_OUT) {
+        uint32_t po = cq_fd_off(m, r->s0);
+        const cq_fdiv_row *p = cq_fdiv_row_ref(r->s0);
 
-        cq_fdiv_row_at(r.s0, &p);
-        if (p.op == CQ_FDOP_SUBNORM) {
+        if (p->op == CQ_FDOP_SUBNORM) {
             cq_subnorm_block b = FD_SUB(k, po);
 
-            return (r.s1 == CQ_FD_OUT_SUBNORMAL) ? cq_subnorm_flag(&b)
-                                                 : cq_subnorm_ftz(&b);
+            return (r->s1 == CQ_FD_OUT_SUBNORMAL) ? cq_subnorm_flag(&b)
+                                                  : cq_subnorm_ftz(&b);
         }
         {
             cq_round_block b = FD_RND(k, po);
 
-            return (r.s1 == CQ_FD_OUT_EXPOVF) ? cq_round_exp_overflow(&b)
-                                              : cq_round_exp_overflow_aft(&b);
+            return (r->s1 == CQ_FD_OUT_EXPOVF) ? cq_round_exp_overflow(&b)
+                                               : cq_round_exp_overflow_aft(&b);
         }
     }
-    if (r.op == CQ_FDOP_EQ) {
+    if (r->op == CQ_FDOP_EQ) {
         cq_eq_block e;
 
         e.a = NULL; e.b = NULL; e.W = W64;
@@ -194,7 +192,7 @@ const cq_bit *cq_fd_flag_of(const cq_fdiv_block *k, const cq_fd_map *m, int i)
     }
     /* `carry[W]` IS `a >=u b` (cmp.h), and carry starts one vector in. THE
      * LOOP READS IT UNNEGATED, because fdiv.jl:93 says `>=`. */
-    if (r.op == CQ_FDOP_ULT)
+    if (r->op == CQ_FDOP_ULT)
         return cq_fd_sp(k, o + (uint32_t)(2 * W64), 1u);
     return cq_fd_sp(k, o, 1u);            /* not1, and1, or1 sit at rel 0 */
 }
@@ -215,13 +213,12 @@ int cq_fd_view_collapse(int s, int *shift, uint64_t *mask)
     *shift = 0;
     *mask  = ~UINT64_C(0);
     while (s >= 0 && s < n) {
-        cq_fdiv_row r;
+        const cq_fdiv_row *r = cq_fdiv_row_ref(s);
 
-        cq_fdiv_row_at(s, &r);
-        if (r.op != CQ_FDOP_VIEW) break;
-        *mask   = shr64(r.mask, *shift) & *mask;
-        *shift += r.shift;
-        s       = r.s0;
+        if (r->op != CQ_FDOP_VIEW) break;
+        *mask   = shr64(r->mask, *shift) & *mask;
+        *shift += r->shift;
+        s       = r->s0;
         if (++guard > n) cq_kernel_die("fdiv: a view chain does not terminate");
     }
     return s;
@@ -253,10 +250,7 @@ const cq_bit *cq_fd_op64(const cq_fdiv_block *k, const cq_fd_map *m, int s,
                          cq_bit *buf, cq_bit *tmp)
 {
     if (s >= 0 && s < cq_fdiv_n_rows()) {
-        cq_fdiv_row r;
-
-        cq_fdiv_row_at(s, &r);
-        if (r.op == CQ_FDOP_VIEW) {
+        if (cq_fdiv_row_ref(s)->op == CQ_FDOP_VIEW) {
             int shift;
             uint64_t mask;
             int b = cq_fd_view_collapse(s, &shift, &mask);

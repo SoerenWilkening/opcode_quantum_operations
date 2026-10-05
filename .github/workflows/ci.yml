@@ -34,7 +34,10 @@
 # behind -DCQOPS_CQLANG_DIR= and -DCQOPS_QEC_DIR=; this repository neither pins
 # nor can build CQ_lang or the QEC library, so a CI job cannot make those links
 # and must not look as though it did. Their ABSENCE is asserted rather than
-# assumed — see the "opt-in suites" step.
+# assumed — see the "opt-in suites" step. The same holds for CQ_lang's
+# installed-backend pair (backend_contract_cq, package_install_cqbackend), also
+# opt-in behind -DCQOPS_CQLANG_DIR=: this paragraph did not name it, and no
+# step checked its absence, until bd 5u7m, 2026-10-05.
 
 name: CI
 
@@ -173,16 +176,20 @@ jobs:
 
       # THE OPT-IN SUITES ARE ABSENT, AND CMAKE SAYS SO — assert that it did.
       #
-      # This job cannot build CQ_lang or the QEC library, so L6, L7 §12(1) and
+      # This job cannot build CQ_lang or the QEC library, so L6, L7 §12(1),
+      # CQ_lang's installed-backend pair (backend_contract_cq and
+      # package_install_cqbackend, one STATUS line for both) and
       # every suite behind tests/CMakeLists.txt's `if(CQOPS_HAVE_QEC)` blocks
       # (the QEC sink's, L7's T-count arm, M26's trace annotations) are not
       # registered here. That is correct and is
       # not what this step is for. It is for the OTHER failure: a future change
       # that drops one of these registrations outright, or inverts a guard so it
       # can never fire, would be invisible on a runner where the suite never ran
-      # anyway. Pinning the four STATUS lines makes the shape of the opt-in part
+      # anyway. Pinning their STATUS lines makes the shape of the opt-in part
       # of what CI checks, so "not registered here" stays a decision with a
-      # reason printed next to it rather than an accident.
+      # reason printed next to it rather than an accident. (This said "the
+      # four STATUS lines" until bd 5u7m, 2026-10-05, which pinned the
+      # installed-backend pair's line as a fifth. It names no count now.)
       - name: The opt-in suites are absent, and the configure log says so
         run: |
           set -euo pipefail
@@ -191,6 +198,7 @@ jobs:
             "L6 (Step 24) not registered"
             "L7's T-count arm not registered"
             "Grover through cqc and link it against this archive"
+            "installed CQBackend package test not registered"
           )
           fail=0
           for s in "${expected[@]}"; do
@@ -217,7 +225,10 @@ jobs:
       #            that registered one would be claiming a link it never made.
       #            test_shim_trace and test_shim_trace_death (QEC-gated, bd
       #            76r) joined the list at bd cwiy, 2026-10-05; a leak of
-      #            either was invisible here until then.
+      #            either was invisible here until then. So did
+      #            backend_contract_cq and package_install_cqbackend
+      #            (CQ_lang-gated: the installed-backend block) at bd 5u7m,
+      #            the same day, on the same evidence.
       - name: ctest -N (Debug) — registrations
         run: |
           set -euo pipefail
@@ -233,6 +244,9 @@ jobs:
           # Same shape for `test_shim_trace`, a prefix of `test_shim_trace_death`:
           # the anchor stops the first matching the second's cases, so each
           # is named, and neither matches the unconditional `test_shim_*`.
+          # No unconditional registration starts with backend_contract_cq or
+          # package_install_cqbackend (checked at bd 5u7m), so the anchor is
+          # there for uniformity and for the next name that does.
           pin='^ *Test +#[0-9]+: *'
           fail=0
           # EVERY PYTHON SUITE BY NAME — this list mirrors the `pysuite` loop in
@@ -260,7 +274,8 @@ jobs:
           done
           for t in l6_cqlang_fixtures l7_grover_cqlang test_grover_qec \
                    test_sink_qec test_sink_qec_death \
-                   test_shim_trace test_shim_trace_death; do
+                   test_shim_trace test_shim_trace_death \
+                   backend_contract_cq package_install_cqbackend; do
               if grep -qE "${pin}${t}(\.|\$)" ctest-N-debug.txt; then
                   echo "CI: $t IS registered — this job cannot have made that link"; fail=1
               fi
@@ -310,7 +325,8 @@ jobs:
           done
           for t in test_lsan_negative l6_cqlang_fixtures l7_grover_cqlang \
                    test_grover_qec test_sink_qec test_sink_qec_death \
-                   test_shim_trace test_shim_trace_death; do
+                   test_shim_trace test_shim_trace_death \
+                   backend_contract_cq package_install_cqbackend; do
               if grep -qE "${pin}${t}(\.|\$)" ctest-N-release.txt; then
                   echo "CI: $t IS registered in Release, and must not be"; fail=1
               fi

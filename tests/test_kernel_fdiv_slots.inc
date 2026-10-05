@@ -179,7 +179,10 @@ static int fd_width_or_refuse(const cq_fdiv_row *rows, int n, int i, int s)
 /* The shipped program has no `cq_fdiv_row *` (fdiv.h), so `rows == NULL`
  * materialises it through `cq_fdiv_row_at` — every index in range, which is
  * the one input that accessor dies on — into a buffer bounded by fdiv.c's
- * own `_Static_assert`s: PRE and POST are each at most CQ_FDIV_MAX_SEG. */
+ * own `_Static_assert`s: PRE and POST are each at most CQ_FDIV_MAX_SEG.
+ * [AMENDED 2026-10-05, bd ifoy (b): fdiv.c now holds the rows in an
+ * immutable build-once table but still exports no array, so this copy
+ * stays.] */
 enum { FD_SCAN_MAX = 2 * CQ_FDIV_MAX_SEG
                      + CQ_FDIV_N_ITERS * CQ_FDIV_ITER_ROWS };
 

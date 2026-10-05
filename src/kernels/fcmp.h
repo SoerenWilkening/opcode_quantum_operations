@@ -122,6 +122,16 @@ typedef struct {
  * the buffer fails loudly rather than overrunning a caller's stack array. */
 enum { CQ_FCMP_MAX_ROWS = 48 };
 
+/* How many DISTINCT programs one process may run through the step machine
+ * (2026-10-05, bd ifoy (e)). fcmp_step.c memoises each program's layout once
+ * and NEVER evicts, so one program past this is a hard error in both
+ * configurations — never a silent reuse of another program's layout. The
+ * library's only source of programs is cq_fcmp_program, whose fourteen
+ * predicates resolve to TEN callee programs (fcmp_pred.c and fmisc_step.c are
+ * its only callers in src/); the rest is headroom for a test's hand-built
+ * ones. Pinned here so a death case can name it. */
+enum { CQ_FCMP_MAX_PROGRAMS = 16 };
+
 /* The three ordered cores, for a consumer that composes them (fcmp_pred.c is
  * the only one today). Writes the body's rows into `out`, with every internal
  * row reference shifted by `base`; returns the row count. `cq_fcmp_body_flag`

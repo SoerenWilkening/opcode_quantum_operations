@@ -46,6 +46,13 @@
  *                   shipped one. The tracked .json configs under qec/examples/
  *                   carry {1,2,3,4,6,7,10} at QEC 1e3c315 (D20's revision) and
  *                   {1,2,3,4,6,7,10,16,36} at a07968b; §15 D20 records both.]
+ *                   [Amended 2026-10-05, bd urzt: the "79 scratch qubits" above
+ *                   is K12's REMAINDER TAPE, W²+2W−1 — one component of the
+ *                   region, not the region; bd j75 corrected the same figure in
+ *                   §15 D20 on 2026-09-10. The region is D9(a)'s FLAT
+ *                   8W²+4W−1: cq_divrem_region(8, 1) returns 543 (535 without
+ *                   the quotient), and udiv peaks at 551 once dst is
+ *                   materialised — tests/test_kernel_divrem.c pins both.]
  *   No recycling  = the trace contract's "every index belongs to at most one
  *                   register" (qec/docs/HOST_LANGUAGE_HANDOFF.md §3). Purely a
  *                   DISPLAY-model constraint: the qec patch is genuinely back at

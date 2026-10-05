@@ -150,7 +150,12 @@ static void release_of_a_stranded_index(void)
  * the case goes red. The masking layer exists in ONE CONFIGURATION ONLY (the
  * Step 15 finding), so a battery run only in Debug would report this guard as
  * untested. Do not add a Debug-only assert here to "make it symmetric" — that
- * would delete the Release detector. */
+ * would delete the Release detector.
+ *
+ * SUPERSEDED IN DEBUG by bd qi4m (2026-10-05): the death tripwire now names
+ * `Assertion`, so that Debug pass becomes "Regex=[Assertion]" and Debug kills
+ * the mutant too — measured in Debug on macOS and on glibc, for this case and
+ * release_of_an_unminted_index alike. The advice above still stands. */
 static void strand_of_an_unminted_index(void)
 {
     cq_qubit_pool p;

@@ -37,10 +37,16 @@
  * initialisation a consumer can forget, and a forgotten bind is a silent wrong
  * circuit rather than a failure.
  *
- * THE PREFIX-OFFSET WALK IS DONE ONCE PER STEP AND NOT ONCE PER LOOKUP. A row
- * reference resolves to a span, and a span needs the sum of every earlier
- * row's region; doing that per operand would make the step O(n^2) in a program
- * of up to 42 rows driven up to 7,253 times per call.
+ * THE PREFIX-OFFSET WALK IS DONE ONCE PER PROGRAM, NOT ONCE PER STEP AND NOT
+ * ONCE PER LOOKUP. A row reference resolves to a span, and a span needs the
+ * sum of every earlier row's region; doing that per operand would make the
+ * step O(n^2) in a program of up to 42 rows driven up to 7,253 times per call.
+ * Until 2026-10-05 (bd ifoy, item (e)) the walk ran once per STEP, which still
+ * re-asked every sibling module every row's cost on every slot — the cost bd
+ * y65c measured as most of the fp suites' time and removed from fpround, fma,
+ * ibits and fadd. It is now `map_of`'s memoised prefix map plus a binary
+ * search; the map holds layout only (see the note at it), so the rule above
+ * about VIEWS AND CONSTANTS is untouched.
  */
 
 #include "kernels/fcmp.h"
@@ -51,6 +57,8 @@
 #include "kernels/fpclass.h"
 #include "kernels/kernel.h"
 #include "kernels/mux.h"
+
+#include <string.h>
 
 enum { W64 = CQ_FP64_W };
 
@@ -105,28 +113,113 @@ static void check_program(const cq_fcmp_row *rows, int n)
                       "CQ_FCMP_MAX_ROWS");
 }
 
-uint32_t cq_fcmp_region(const cq_fcmp_row *rows, int n)
+/* --- The prefix map, built once per program (2026-10-05, bd ifoy (e)). --- */
+
+/* y65c's cq_fpr_map_get one module over, with ONE DIFFERENCE THIS MODULE'S API
+ * FORCES. A program here is not a compile-time table with an id: it is rows a
+ * CALLER wrote into its own buffer (fcmp_pred.c, fmisc_step.c, the tests), so
+ * the key is the PROGRAM TEXT — `n` and every row, compared in full — and
+ * never the caller's pointer, which a stack buffer hands to a different
+ * program on the next call. The map holds TABLE LAYOUT ONLY: base-RELATIVE
+ * region offsets, slot boundaries and the region total — a pure function of
+ * the key and of the siblings' published costs at W=64, never an operand, a
+ * span, a view or circuit state, and independent of both the step index and
+ * `k->off`. Recomputing it at any moment gives the same answer, so
+ * cq_sandwich's index reversal cannot desynchronise it. Rule 13's argument is
+ * a-395-row-flat-table-needs-the-memoised-prefix-map's. The library is
+ * single-threaded, so no entry is shared mid-build.
+ *
+ * NO EVICTION: CQ_FCMP_MAX_PROGRAMS distinct programs, and the next one is a
+ * hard error in both configurations naming this map (fcmp.h says why sixteen
+ * is enough). A full table never reuses an entry, so no program can ever be
+ * served another's layout, and an entry, once built, never moves.
+ *
+ * THE KEY HAS ONE DETECTOR, AND IT HAD TO BE WRITTEN: every program
+ * cq_fcmp_program builds differs in length from every other, so a key cut to
+ * the length, or to the caller's pointer, passed every other case — measured.
+ * two_programs_of_one_length_each_get_their_own_layout
+ * (tests/test_kernel_fcmp_spans.inc) alternates two hand-built programs of
+ * one length through one reused buffer. */
+_Static_assert(CQ_FCMP_MAX_PROGRAMS >= CQ_FCMP_N_PRED,
+               "the map must hold every predicate's program at once; there "
+               "are ten distinct ones and fourteen predicates");
+
+typedef struct {
+    cq_fcmp_row rows[CQ_FCMP_MAX_ROWS];       /* the key: the program text   */
+    int         n;                            /* 0 = empty: check_program
+                                                 refuses n <= 0, so it never
+                                                 matches                      */
+    uint32_t    rel[CQ_FCMP_MAX_ROWS];        /* RELATIVE to the block's base */
+    int         step0[CQ_FCMP_MAX_ROWS + 1];  /* [n] is the slot total        */
+    uint32_t    region;
+} fc_map;
+
+_Static_assert(sizeof(cq_fcmp_row) == 4 * sizeof(short),
+               "map_of compares programs with memcmp, which is a comparison "
+               "of the rows only while a row has no padding bytes");
+
+static int same_program(const fc_map *m, const cq_fcmp_row *rows, int n)
 {
+    return m->n == n && memcmp(m->rows, rows, (size_t)n * sizeof *rows) == 0;
+}
+
+static const fc_map *map_of(const cq_fcmp_row *rows, int n)
+{
+    static fc_map maps[CQ_FCMP_MAX_PROGRAMS];
+    static int used = 0, last = 0;
+    fc_map *m;
     uint32_t bits = 0u;
+    int slots = 0;
 
     check_program(rows, n);
-    for (int i = 0; i < n; i++) bits += row_region(&rows[i]);
-    return bits;
+    if (same_program(&maps[last], rows, n)) return &maps[last];
+    for (int j = 0; j < used; j++)
+        if (same_program(&maps[j], rows, n)) { last = j; return &maps[j]; }
+
+    if (used >= CQ_FCMP_MAX_PROGRAMS)
+        cq_kernel_die("fcmp: the prefix map is full: a program past "
+                      "CQ_FCMP_MAX_PROGRAMS distinct ones in one process");
+    last = used;
+    m = &maps[used++];
+    m->n = 0;                    /* an aborted build must never match */
+    for (int i = 0; i < n; i++) {
+        m->rows[i]  = rows[i];
+        m->rel[i]   = bits;
+        m->step0[i] = slots;
+        bits  += row_region(&rows[i]);
+        slots += row_steps(&rows[i]);
+    }
+    m->step0[n] = slots;
+    m->region   = bits;
+    m->n        = n;
+    return m;
+}
+
+uint32_t cq_fcmp_region(const cq_fcmp_row *rows, int n)
+{
+    return map_of(rows, n)->region;
 }
 
 int cq_fcmp_steps(const cq_fcmp_row *rows, int n)
 {
-    int slots = 0;
+    const fc_map *m = map_of(rows, n);
 
-    check_program(rows, n);
-    for (int i = 0; i < n; i++) slots += row_steps(&rows[i]);
-    return slots;
+    return m->step0[m->n];
 }
 
 /* --- The step machine. --------------------------------------------------- */
 
-/* `at` is ABSOLUTE inside the region: the prefix walk in `offsets` has already
- * added `k->off`, which is the one place this block's base is applied. */
+/* THE ONE PLACE `k->off` IS APPLIED. The map is base-relative and every span
+ * below is reached through this, so a dropped `off` stays a single-line
+ * mutation that only a second program in one region sees
+ * (two_programs_in_one_region_do_not_collide). */
+static uint32_t row_off(const cq_fcmp_block *k, const fc_map *map, int i)
+{
+    return k->off + map->rel[i];
+}
+
+/* `at` is ABSOLUTE inside the region: `row_off` has already added `k->off`,
+ * which is the one place this block's base is applied. */
 static cq_bit *span(const cq_fcmp_block *k, uint32_t at, uint32_t len)
 {
     return cq_scratch_span(k->scr, at, len);
@@ -136,31 +229,22 @@ static cq_bit *span(const cq_fcmp_block *k, uint32_t at, uint32_t len)
  * out-of-region span aborts in M08 naming the REGION rather than the consumer
  * that mis-sized its offset, and the two-programs-in-one-region shape then has
  * no diagnostic of its own. Hard error in both configurations. */
-static void check_region(const cq_fcmp_block *k)
+static void check_region(const cq_fcmp_block *k, const fc_map *m)
 {
     if (k->scr == NULL) cq_kernel_die("fcmp: the block has no region");
-    if ((uint64_t)k->off + cq_fcmp_region(k->rows, k->n_rows)
-        > (uint64_t)cq_scratch_size(k->scr))
+    if ((uint64_t)k->off + m->region > (uint64_t)cq_scratch_size(k->scr))
         cq_kernel_die("fcmp: the block's region does not fit at its offset");
-}
-
-static void offsets(const cq_fcmp_block *k, uint32_t *off)
-{
-    uint32_t o = k->off;
-
-    for (int i = 0; i < k->n_rows; i++) {
-        off[i] = o;
-        o += row_region(&k->rows[i]);
-    }
 }
 
 /* Row `i`'s answer, as a one-bit span inside the caller's region. Read through
  * the owning module's accessor wherever there is one: `cq_eq_flag` is
  * `orr[W-2]` in general and `diff[0]` at W == 1, and a consumer spelling that
  * rule inline reads `orr[-1]` at the bottom of the ladder (cmp.h). */
-static const cq_bit *flag_of(const cq_fcmp_block *k, const uint32_t *off, int i)
+static const cq_bit *flag_of(const cq_fcmp_block *k, const fc_map *map,
+                            int i)
 {
     const cq_fcmp_row *r;
+    uint32_t o;
 
     /* A 1-BIT OPERAND MUST BE A ROW OF THIS PROGRAM, AND NOTHING BELOW M36
      * KNOWS THAT. `op64` refuses an operand code it does not recognise; this
@@ -173,27 +257,28 @@ static const cq_bit *flag_of(const cq_fcmp_block *k, const uint32_t *off, int i)
         cq_kernel_die("fcmp: a 1-bit operand is not a row of this program");
 
     r = &k->rows[i];
+    o = row_off(k, map, i);
 
     if (r->op == CQ_FCOP_CLASS_NAN) {
         cq_fp_class_block c;
 
-        c.a = k->a; c.scr = k->scr; c.off = off[i]; c.cls = CQ_FP_IS_NAN;
+        c.a = k->a; c.scr = k->scr; c.off = o; c.cls = CQ_FP_IS_NAN;
         return cq_fp_class_flag(&c);
     }
     if (r->op == CQ_FCOP_EQ) {
         cq_eq_block e;
 
         e.a = NULL; e.b = NULL; e.W = W64;
-        e.diff = span(k, off[i], (uint32_t)W64);
-        e.orr  = span(k, off[i] + (uint32_t)W64, (uint32_t)W64 - 1u);
+        e.diff = span(k, o, (uint32_t)W64);
+        e.orr  = span(k, o + (uint32_t)W64, (uint32_t)W64 - 1u);
         return cq_eq_flag(&e);
     }
     /* `carry[W]` IS `a >=u b` (cmp.h), and carry starts one vector in. */
-    if (r->op == CQ_FCOP_ULT) return span(k, off[i] + (uint32_t)(2 * W64), 1u);
+    if (r->op == CQ_FCOP_ULT) return span(k, o + (uint32_t)(2 * W64), 1u);
     /* `d` is the difference and lies between `nb` and `c` (add.h). */
-    if (r->op == CQ_FCOP_SUB)  return span(k, off[i] + (uint32_t)W64, 1u);
+    if (r->op == CQ_FCOP_SUB)  return span(k, o + (uint32_t)W64, 1u);
     /* mux `r`, and every bitwise row's single output bit, sit at rel 0. */
-    return span(k, off[i], 1u);
+    return span(k, o, 1u);
 }
 
 /* A 64-lane block operand. Every arm but the first two costs ZERO gates and
@@ -202,7 +287,7 @@ static const cq_bit *flag_of(const cq_fcmp_block *k, const uint32_t *off, int i)
  * the constants are `const cq_bit` spans. A row reference arrives as the
  * Julia type's width — one wire zero-extended to 64 — which is what `UInt64(1)
  * - soft_fcmp_oeq(a, b)` (fcmp.jl:102) subtracts from. */
-static const cq_bit *op64(const cq_fcmp_block *k, const uint32_t *off, int s,
+static const cq_bit *op64(const cq_fcmp_block *k, const fc_map *map, int s,
                           cq_bit *buf)
 {
     switch (s) {
@@ -217,29 +302,29 @@ static const cq_bit *op64(const cq_fcmp_block *k, const uint32_t *off, int s,
     default: break;
     }
     if (s < 0) cq_kernel_die("fcmp: unknown 64-lane operand code");
-    cq_fp_view(flag_of(k, off, s), 0, 1, buf);
+    cq_fp_view(flag_of(k, map, s), 0, 1, buf);
     return buf;
 }
 
-static void emit_row(cq_ctx *ctx, const cq_fcmp_block *k, const uint32_t *off,
+static void emit_row(cq_ctx *ctx, const cq_fcmp_block *k, const fc_map *map,
                      int i, int u)
 {
     const cq_fcmp_row *r = &k->rows[i];
     cq_bit v0[CQ_FP64_W], v1[CQ_FP64_W];
-    uint32_t o = off[i];
+    uint32_t o = row_off(k, map, i);
 
     switch (r->op) {
     case CQ_FCOP_CLASS_NAN: {
         cq_fp_class_block c;
 
-        c.a = op64(k, off, r->s0, v0);
+        c.a = op64(k, map, r->s0, v0);
         c.scr = k->scr; c.off = o; c.cls = CQ_FP_IS_NAN;
         cq_fp_class_step(ctx, &c, u);
         return; }
     case CQ_FCOP_EQ: {
         cq_eq_block e;
 
-        e.a = op64(k, off, r->s0, v0); e.b = op64(k, off, r->s1, v1);
+        e.a = op64(k, map, r->s0, v0); e.b = op64(k, map, r->s1, v1);
         e.diff = span(k, o, (uint32_t)W64);
         e.orr  = span(k, o + (uint32_t)W64, (uint32_t)W64 - 1u);
         e.W = W64;
@@ -248,7 +333,7 @@ static void emit_row(cq_ctx *ctx, const cq_fcmp_block *k, const uint32_t *off,
     case CQ_FCOP_ULT: {
         cq_ult_block c;
 
-        c.a = op64(k, off, r->s0, v0); c.b = op64(k, off, r->s1, v1);
+        c.a = op64(k, map, r->s0, v0); c.b = op64(k, map, r->s1, v1);
         c.nb    = span(k, o,                            (uint32_t)W64);
         c.carry = span(k, o + (uint32_t)W64,            (uint32_t)W64 + 1u);
         c.axnb  = span(k, o + (uint32_t)(2 * W64 + 1),  (uint32_t)W64);
@@ -258,7 +343,7 @@ static void emit_row(cq_ctx *ctx, const cq_fcmp_block *k, const uint32_t *off,
     case CQ_FCOP_SUB: {
         cq_sub_block s;
 
-        s.a = op64(k, off, r->s0, v0); s.b = op64(k, off, r->s1, v1);
+        s.a = op64(k, map, r->s0, v0); s.b = op64(k, map, r->s1, v1);
         s.nb = span(k, o,                          (uint32_t)W64);
         s.d  = span(k, o + (uint32_t)W64,          (uint32_t)W64);
         s.c  = span(k, o + (uint32_t)(2 * W64),    (uint32_t)W64);
@@ -268,58 +353,65 @@ static void emit_row(cq_ctx *ctx, const cq_fcmp_block *k, const uint32_t *off,
     case CQ_FCOP_MUX: {
         cq_mux_block m;
 
-        m.cond = flag_of(k, off, r->s0);
-        m.t    = flag_of(k, off, r->s1);
-        m.f    = flag_of(k, off, r->s2);
+        m.cond = flag_of(k, map, r->s0);
+        m.t    = flag_of(k, map, r->s1);
+        m.f    = flag_of(k, map, r->s2);
         m.r    = span(k, o,      1u);
         m.d    = span(k, o + 1u, 1u);
         cq_mux_step(ctx, &m, u);
         return; }
     case CQ_FCOP_NOT1:
         /* arith.jl:476, in order: CNOT(w[1], r[1]) then NOT(r[1]). */
-        if (u == 0) cq_emit_cx(ctx, flag_of(k, off, r->s0), span(k, o, 1u));
+        if (u == 0) cq_emit_cx(ctx, flag_of(k, map, r->s0), span(k, o, 1u));
         else        cq_emit_x (ctx,                         span(k, o, 1u));
         return;
     case CQ_FCOP_AND1:
         /* arith.jl:270's one Toffoli per lane, at one lane. */
-        cq_emit_ccx(ctx, flag_of(k, off, r->s0), flag_of(k, off, r->s1),
+        cq_emit_ccx(ctx, flag_of(k, map, r->s0), flag_of(k, map, r->s1),
                     span(k, o, 1u));
         return;
     default:
         /* arith.jl:276-278, in order: CNOT(a), CNOT(b), Toffoli(a, b). */
-        if (u == 0)      cq_emit_cx(ctx, flag_of(k, off, r->s0), span(k, o, 1u));
-        else if (u == 1) cq_emit_cx(ctx, flag_of(k, off, r->s1), span(k, o, 1u));
-        else             cq_emit_ccx(ctx, flag_of(k, off, r->s0),
-                                     flag_of(k, off, r->s1), span(k, o, 1u));
+        if (u == 0)      cq_emit_cx(ctx, flag_of(k, map, r->s0), span(k, o, 1u));
+        else if (u == 1) cq_emit_cx(ctx, flag_of(k, map, r->s1), span(k, o, 1u));
+        else             cq_emit_ccx(ctx, flag_of(k, map, r->s0),
+                                     flag_of(k, map, r->s1), span(k, o, 1u));
         return;
     }
 }
 
+/* A BINARY SEARCH OVER THE MEMOISED MAP for the LAST row whose `step0 <= u`.
+ * Every op here owns at least one slot, so `step0` is strictly increasing
+ * today; the last-match spelling is still the one fpround and fma use, so a
+ * zero-slot row added later cannot land the search on a zero-width row. The
+ * fall-off refusal is the old linear walk's, at the same place — the slot is
+ * past the end of the row the search found — and keeps its message, which
+ * tests/CMakeLists.txt pins absent from step_index_past_the_end so that case
+ * stays a claim about the range check above it. */
 void cq_fcmp_step(cq_ctx *ctx, const cq_fcmp_block *k, int u)
 {
-    uint32_t off[CQ_FCMP_MAX_ROWS];
+    const fc_map *map = map_of(k->rows, k->n_rows);
+    int lo = 0, hi = map->n - 1, i = 0;
 
-    check_program(k->rows, k->n_rows);
-    if (u < 0 || u >= cq_fcmp_steps(k->rows, k->n_rows))
+    if (u < 0 || u >= map->step0[map->n])
         cq_kernel_die("fcmp: step index outside [0, cq_fcmp_steps(rows, n))");
-    check_region(k);
-    offsets(k, off);
+    check_region(k, map);
 
-    for (int i = 0; i < k->n_rows; i++) {
-        int n = row_steps(&k->rows[i]);
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
 
-        if (u < n) { emit_row(ctx, k, off, i, u); return; }
-        u -= n;
+        if (map->step0[mid] <= u) { i = mid; lo = mid + 1; }
+        else                      { hi = mid - 1; }
     }
-    cq_kernel_die("fcmp: the step dispatch fell off the end of the program");
+    if (u >= map->step0[i + 1])
+        cq_kernel_die("fcmp: the step dispatch fell off the end of the program");
+    emit_row(ctx, k, map, i, u - map->step0[i]);
 }
 
 const cq_bit *cq_fcmp_flag(const cq_fcmp_block *k)
 {
-    uint32_t off[CQ_FCMP_MAX_ROWS];
+    const fc_map *map = map_of(k->rows, k->n_rows);
 
-    check_program(k->rows, k->n_rows);
-    check_region(k);
-    offsets(k, off);
-    return flag_of(k, off, k->n_rows - 1);
+    check_region(k, map);
+    return flag_of(k, map, k->n_rows - 1);
 }

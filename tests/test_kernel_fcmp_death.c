@@ -28,6 +28,10 @@
  *                        check one layer in. Both pinned absent.
  *   check_program        A program of no rows, or one longer than the buffer.
  *                        Nothing below M36 knows what a program is.
+ *   the prefix map       A program past CQ_FCMP_MAX_PROGRAMS distinct ones
+ *                        (2026-10-05). Nothing below M36 knows the map; with
+ *                        the refusal deleted the write runs off a static array,
+ *                        which ASan answers in Debug — pinned absent.
  *   the vocabulary       An unknown op and an unknown operand code. Release
  *                        would otherwise read past a table or hand a wild
  *                        pointer to the emitter.
@@ -207,6 +211,34 @@ static void a_body_id_outside_the_three(void)
     CQ_EXPECT_ABORT((void)cq_fcmp_body((cq_fcmp_body_id)7, 0, rows));
 }
 
+/* ---- The prefix map's capacity (2026-10-05, bd ifoy (e)). -------------- */
+
+/* THE MAP NEVER EVICTS, SO A PROGRAM PAST ITS CAPACITY MUST ABORT RATHER THAN
+ * BE SERVED ANOTHER PROGRAM'S LAYOUT. One death case per process means the
+ * map starts empty; CQ_FCMP_MAX_PROGRAMS programs of `and` rows, distinct by
+ * LENGTH, fill it — each REQUIRED to answer, so an abort before the last one
+ * fails the fixture instead of passing the case — and one more must die. The
+ * map reads only each row's cost, so the operands need not make sense, and
+ * `lower_and!` is one slot at one lane (arith.jl:268-272), so a program of
+ * `n` of them is `n` slots — which is also each program getting its own. */
+_Static_assert(CQ_FCMP_MAX_PROGRAMS + 1 <= CQ_FCMP_MAX_ROWS,
+               "the overflowing program must be a legal length, or "
+               "check_program answers instead of the map");
+
+static void a_program_past_the_maps_capacity(void)
+{
+    cq_fcmp_row rows[CQ_FCMP_MAX_ROWS];
+
+    setup();
+    for (int i = 0; i < CQ_FCMP_MAX_ROWS; i++) {
+        rows[i].op = CQ_FCOP_AND1;
+        rows[i].s0 = 0; rows[i].s1 = 0; rows[i].s2 = 0;
+    }
+    for (int n = 1; n <= CQ_FCMP_MAX_PROGRAMS; n++)
+        CQ_DEATH_REQUIRE(cq_fcmp_steps(rows, n) == n);
+    CQ_EXPECT_ABORT((void)cq_fcmp_steps(rows, CQ_FCMP_MAX_PROGRAMS + 1));
+}
+
 /* ---- The row vocabulary. ------------------------------------------------ */
 
 static void a_row_with_an_unknown_op(void)
@@ -339,6 +371,7 @@ CQ_DEATH_MAIN(
     CQ_DEATH_CASE(a_program_of_no_rows),
     CQ_DEATH_CASE(a_body_appended_past_the_buffer),
     CQ_DEATH_CASE(a_body_id_outside_the_three),
+    CQ_DEATH_CASE(a_program_past_the_maps_capacity),
     CQ_DEATH_CASE(a_row_with_an_unknown_op),
     CQ_DEATH_CASE(a_row_with_an_unknown_operand_code),
     CQ_DEATH_CASE(a_one_bit_operand_that_is_not_a_row),

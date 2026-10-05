@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7182
+**Indexed definitions:** 7191
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -85,8 +85,8 @@ the definition (or the build-language declaration) in the listed file.
 | `function _cqops_sanitizer_env` | [69](cmake/CqopsTest.cmake:69) |
 | `function add_cqops_test` | [130](cmake/CqopsTest.cmake:130) |
 | `function add_cqops_death_test` | [228](cmake/CqopsTest.cmake:228) |
-| `function _cqops_death_tripwire` | [306](cmake/CqopsTest.cmake:306) |
-| `function cqops_death_arm_sanitizer_tripwire` | [329](cmake/CqopsTest.cmake:329) |
+| `function _cqops_death_tripwire` | [329](cmake/CqopsTest.cmake:329) |
+| `function cqops_death_arm_sanitizer_tripwire` | [352](cmake/CqopsTest.cmake:352) |
 
 ## `include/cqops/cqops.h`
 
@@ -3709,22 +3709,24 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `row_steps` | [67](src/kernels/fcmp_step.c:67) |
-| `row_region` | [89](src/kernels/fcmp_step.c:89) |
-| `return` | [93](src/kernels/fcmp_step.c:93) |
-| `return` | [94](src/kernels/fcmp_step.c:94) |
-| `return` | [95](src/kernels/fcmp_step.c:95) |
-| `check_program` | [101](src/kernels/fcmp_step.c:101) |
-| `cq_fcmp_region` | [108](src/kernels/fcmp_step.c:108) |
-| `cq_fcmp_steps` | [117](src/kernels/fcmp_step.c:117) |
-| `span` | [130](src/kernels/fcmp_step.c:130) |
-| `check_region` | [139](src/kernels/fcmp_step.c:139) |
-| `offsets` | [147](src/kernels/fcmp_step.c:147) |
-| `flag_of` | [161](src/kernels/fcmp_step.c:161) |
-| `op64` | [205](src/kernels/fcmp_step.c:205) |
-| `emit_row` | [224](src/kernels/fcmp_step.c:224) |
-| `cq_fcmp_step` | [298](src/kernels/fcmp_step.c:298) |
-| `cq_fcmp_flag` | [317](src/kernels/fcmp_step.c:317) |
+| `row_steps` | [75](src/kernels/fcmp_step.c:75) |
+| `row_region` | [97](src/kernels/fcmp_step.c:97) |
+| `return` | [101](src/kernels/fcmp_step.c:101) |
+| `return` | [102](src/kernels/fcmp_step.c:102) |
+| `return` | [103](src/kernels/fcmp_step.c:103) |
+| `check_program` | [109](src/kernels/fcmp_step.c:109) |
+| `same_program` | [161](src/kernels/fcmp_step.c:161) |
+| `map_of` | [166](src/kernels/fcmp_step.c:166) |
+| `cq_fcmp_region` | [198](src/kernels/fcmp_step.c:198) |
+| `cq_fcmp_steps` | [203](src/kernels/fcmp_step.c:203) |
+| `row_off` | [216](src/kernels/fcmp_step.c:216) |
+| `span` | [223](src/kernels/fcmp_step.c:223) |
+| `check_region` | [232](src/kernels/fcmp_step.c:232) |
+| `flag_of` | [243](src/kernels/fcmp_step.c:243) |
+| `op64` | [290](src/kernels/fcmp_step.c:290) |
+| `emit_row` | [309](src/kernels/fcmp_step.c:309) |
+| `cq_fcmp_step` | [391](src/kernels/fcmp_step.c:391) |
+| `cq_fcmp_flag` | [411](src/kernels/fcmp_step.c:411) |
 
 ## `src/kernels/fconv.c`
 
@@ -3809,18 +3811,21 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_fdiv_n_rows` | [410](src/kernels/fdiv.c:410) |
-| `cq_fdiv_loop_base_row` | [411](src/kernels/fdiv.c:411) |
-| `cq_fdiv_post_base_row` | [412](src/kernels/fdiv.c:412) |
-| `cq_fdiv_iter_template` | [414](src/kernels/fdiv.c:414) |
-| `rebase` | [422](src/kernels/fdiv.c:422) |
-| `return` | [425](src/kernels/fdiv.c:425) |
-| `return` | [427](src/kernels/fdiv.c:427) |
-| `cq_fdiv_row_at` | [433](src/kernels/fdiv.c:433) |
-| `cq_fdiv_arity` | [455](src/kernels/fdiv.c:455) |
-| `width_of` | [483](src/kernels/fdiv.c:483) |
-| `cq_fdiv_row_width` | [507](src/kernels/fdiv.c:507) |
-| `cq_fdiv_width_at` | [521](src/kernels/fdiv.c:521) |
+| `cq_fdiv_n_rows` | [425](src/kernels/fdiv.c:425) |
+| `cq_fdiv_loop_base_row` | [426](src/kernels/fdiv.c:426) |
+| `cq_fdiv_post_base_row` | [427](src/kernels/fdiv.c:427) |
+| `cq_fdiv_iter_template` | [429](src/kernels/fdiv.c:429) |
+| `rebase` | [437](src/kernels/fdiv.c:437) |
+| `return` | [440](src/kernels/fdiv.c:440) |
+| `return` | [442](src/kernels/fdiv.c:442) |
+| `materialise` | [451](src/kernels/fdiv.c:451) |
+| `program` | [473](src/kernels/fdiv.c:473) |
+| `cq_fdiv_row_ref` | [489](src/kernels/fdiv.c:489) |
+| `cq_fdiv_row_at` | [496](src/kernels/fdiv.c:496) |
+| `cq_fdiv_arity` | [506](src/kernels/fdiv.c:506) |
+| `width_of` | [534](src/kernels/fdiv.c:534) |
+| `cq_fdiv_row_width` | [558](src/kernels/fdiv.c:558) |
+| `cq_fdiv_width_at` | [572](src/kernels/fdiv.c:572) |
 
 ## `src/kernels/fdiv_emit.c`
 
@@ -3847,13 +3852,13 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `const_of` | [57](src/kernels/fdiv_operand.c:57) |
 | `out64` | [83](src/kernels/fdiv_operand.c:83) |
-| `cq_fd_val64` | [124](src/kernels/fdiv_operand.c:124) |
-| `cq_fd_flag_of` | [151](src/kernels/fdiv_operand.c:151) |
-| `shr64` | [204](src/kernels/fdiv_operand.c:204) |
-| `cq_fd_view_collapse` | [211](src/kernels/fdiv_operand.c:211) |
-| `cq_fd_view_fill` | [230](src/kernels/fdiv_operand.c:230) |
-| `base64` | [236](src/kernels/fdiv_operand.c:236) |
-| `cq_fd_op64` | [252](src/kernels/fdiv_operand.c:252) |
+| `cq_fd_val64` | [123](src/kernels/fdiv_operand.c:123) |
+| `cq_fd_flag_of` | [150](src/kernels/fdiv_operand.c:150) |
+| `shr64` | [202](src/kernels/fdiv_operand.c:202) |
+| `cq_fd_view_collapse` | [209](src/kernels/fdiv_operand.c:209) |
+| `cq_fd_view_fill` | [227](src/kernels/fdiv_operand.c:227) |
+| `base64` | [233](src/kernels/fdiv_operand.c:233) |
+| `cq_fd_op64` | [249](src/kernels/fdiv_operand.c:249) |
 
 ## `src/kernels/fdiv_step.c`
 
@@ -4743,7 +4748,7 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `int` | [137](src/sink_qec.h:137) |
+| `int` | [144](src/sink_qec.h:144) |
 
 ## `src/sink_qec_angle.c`
 
@@ -4767,8 +4772,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _ibits_pin` | [4089](tests/CMakeLists.txt:4089) |
-| `function _cqops_fround_death_ban` | [4311](tests/CMakeLists.txt:4311) |
+| `function _ibits_pin` | [4112](tests/CMakeLists.txt:4112) |
+| `function _cqops_fround_death_ban` | [4334](tests/CMakeLists.txt:4334) |
 
 ## `tests/package-consumer/main.c`
 
@@ -5289,12 +5294,13 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `lines` | [67](tests/test_cqlang_drivers.py:67) |
-| `drive` | [71](tests/test_cqlang_drivers.py:71) |
-| `both_drivers_refuse_a_missing_cqlang` | [97](tests/test_cqlang_drivers.py:97) |
-| `every_git_call_into_cqlang_skips_optional_locks` | [105](tests/test_cqlang_drivers.py:105) |
-| `a_run_that_straddles_a_commit_records_both_and_flags_it` | [116](tests/test_cqlang_drivers.py:116) |
-| `a_run_that_does_not_straddle_is_not_flagged` | [132](tests/test_cqlang_drivers.py:132) |
+| `lines` | [87](tests/test_cqlang_drivers.py:87) |
+| `fake_bin` | [91](tests/test_cqlang_drivers.py:91) |
+| `drive` | [105](tests/test_cqlang_drivers.py:105) |
+| `both_drivers_refuse_a_missing_cqlang` | [125](tests/test_cqlang_drivers.py:125) |
+| `every_git_call_into_cqlang_skips_optional_locks` | [133](tests/test_cqlang_drivers.py:133) |
+| `a_run_that_straddles_a_commit_records_both_and_flags_it` | [144](tests/test_cqlang_drivers.py:144) |
+| `a_run_that_does_not_straddle_is_not_flagged` | [160](tests/test_cqlang_drivers.py:160) |
 
 ## `tests/test_emit_death.c`
 
@@ -6058,29 +6064,30 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `setup` | [63](tests/test_kernel_fcmp_death.c:63) |
-| `rail` | [71](tests/test_kernel_fcmp_death.c:71) |
-| `one_bit_dst` | [78](tests/test_kernel_fcmp_death.c:78) |
-| `oeq_width_is_not_64` | [85](tests/test_kernel_fcmp_death.c:85) |
-| `ule_width_is_not_64` | [93](tests/test_kernel_fcmp_death.c:93) |
-| `block` | [105](tests/test_kernel_fcmp_death.c:105) |
-| `step_index_past_the_end` | [122](tests/test_kernel_fcmp_death.c:122) |
-| `step_index_is_negative` | [131](tests/test_kernel_fcmp_death.c:131) |
-| `block_region_is_one_bit_short` | [142](tests/test_kernel_fcmp_death.c:142) |
-| `block_offset_runs_off_the_region` | [154](tests/test_kernel_fcmp_death.c:154) |
-| `flag_of_a_program_that_does_not_fit` | [163](tests/test_kernel_fcmp_death.c:163) |
-| `a_block_with_no_region` | [172](tests/test_kernel_fcmp_death.c:172) |
-| `a_program_of_no_rows` | [184](tests/test_kernel_fcmp_death.c:184) |
-| `a_body_appended_past_the_buffer` | [193](tests/test_kernel_fcmp_death.c:193) |
-| `a_body_id_outside_the_three` | [202](tests/test_kernel_fcmp_death.c:202) |
-| `a_row_with_an_unknown_op` | [212](tests/test_kernel_fcmp_death.c:212) |
-| `a_row_with_an_unknown_operand_code` | [225](tests/test_kernel_fcmp_death.c:225) |
-| `a_one_bit_operand_that_is_not_a_row` | [252](tests/test_kernel_fcmp_death.c:252) |
-| `callee_of_an_unknown_predicate` | [277](tests/test_kernel_fcmp_death.c:277) |
-| `program_of_an_unknown_predicate` | [283](tests/test_kernel_fcmp_death.c:283) |
-| `eval_of_an_unknown_predicate` | [291](tests/test_kernel_fcmp_death.c:291) |
-| `oeq_dst_aliases_its_first_source` | [303](tests/test_kernel_fcmp_death.c:303) |
-| `olt_sources_alias_each_other` | [320](tests/test_kernel_fcmp_death.c:320) |
+| `setup` | [67](tests/test_kernel_fcmp_death.c:67) |
+| `rail` | [75](tests/test_kernel_fcmp_death.c:75) |
+| `one_bit_dst` | [82](tests/test_kernel_fcmp_death.c:82) |
+| `oeq_width_is_not_64` | [89](tests/test_kernel_fcmp_death.c:89) |
+| `ule_width_is_not_64` | [97](tests/test_kernel_fcmp_death.c:97) |
+| `block` | [109](tests/test_kernel_fcmp_death.c:109) |
+| `step_index_past_the_end` | [126](tests/test_kernel_fcmp_death.c:126) |
+| `step_index_is_negative` | [135](tests/test_kernel_fcmp_death.c:135) |
+| `block_region_is_one_bit_short` | [146](tests/test_kernel_fcmp_death.c:146) |
+| `block_offset_runs_off_the_region` | [158](tests/test_kernel_fcmp_death.c:158) |
+| `flag_of_a_program_that_does_not_fit` | [167](tests/test_kernel_fcmp_death.c:167) |
+| `a_block_with_no_region` | [176](tests/test_kernel_fcmp_death.c:176) |
+| `a_program_of_no_rows` | [188](tests/test_kernel_fcmp_death.c:188) |
+| `a_body_appended_past_the_buffer` | [197](tests/test_kernel_fcmp_death.c:197) |
+| `a_body_id_outside_the_three` | [206](tests/test_kernel_fcmp_death.c:206) |
+| `a_program_past_the_maps_capacity` | [228](tests/test_kernel_fcmp_death.c:228) |
+| `a_row_with_an_unknown_op` | [244](tests/test_kernel_fcmp_death.c:244) |
+| `a_row_with_an_unknown_operand_code` | [257](tests/test_kernel_fcmp_death.c:257) |
+| `a_one_bit_operand_that_is_not_a_row` | [284](tests/test_kernel_fcmp_death.c:284) |
+| `callee_of_an_unknown_predicate` | [309](tests/test_kernel_fcmp_death.c:309) |
+| `program_of_an_unknown_predicate` | [315](tests/test_kernel_fcmp_death.c:315) |
+| `eval_of_an_unknown_predicate` | [323](tests/test_kernel_fcmp_death.c:323) |
+| `oeq_dst_aliases_its_first_source` | [335](tests/test_kernel_fcmp_death.c:335) |
+| `olt_sources_alias_each_other` | [352](tests/test_kernel_fcmp_death.c:352) |
 
 ## `tests/test_kernel_fcmp_pred.inc`
 
@@ -6120,10 +6127,12 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `the_programs_spans_are_pairwise_disjoint (via CQ_TEST)` | [32](tests/test_kernel_fcmp_spans.inc:32) |
-| `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [104](tests/test_kernel_fcmp_spans.inc:104) |
-| `fc_wire_value` | [155](tests/test_kernel_fcmp_spans.inc:155) |
-| `two_programs_in_one_region_do_not_collide (via CQ_TEST)` | [165](tests/test_kernel_fcmp_spans.inc:165) |
+| `the_programs_spans_are_pairwise_disjoint (via CQ_TEST)` | [34](tests/test_kernel_fcmp_spans.inc:34) |
+| `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [106](tests/test_kernel_fcmp_spans.inc:106) |
+| `fc_wire_value` | [158](tests/test_kernel_fcmp_spans.inc:158) |
+| `two_programs_in_one_region_do_not_collide (via CQ_TEST)` | [168](tests/test_kernel_fcmp_spans.inc:168) |
+| `fc_load` | [313](tests/test_kernel_fcmp_spans.inc:313) |
+| `two_programs_of_one_length_each_get_their_own_layout (via CQ_TEST)` | [323](tests/test_kernel_fcmp_spans.inc:323) |
 
 ## `tests/test_kernel_fconv.c`
 
@@ -6289,25 +6298,25 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `setup` | [78](tests/test_kernel_fdiv_death.c:78) |
-| `region` | [93](tests/test_kernel_fdiv_death.c:93) |
-| `block` | [99](tests/test_kernel_fdiv_death.c:99) |
-| `width_is_not_64` | [109](tests/test_kernel_fdiv_death.c:109) |
-| `width_is_128` | [115](tests/test_kernel_fdiv_death.c:115) |
-| `step_index_past_the_end` | [123](tests/test_kernel_fdiv_death.c:123) |
-| `step_index_is_negative` | [133](tests/test_kernel_fdiv_death.c:133) |
-| `block_region_is_one_bit_short` | [145](tests/test_kernel_fdiv_death.c:145) |
-| `block_offset_runs_off_the_region` | [155](tests/test_kernel_fdiv_death.c:155) |
-| `result_of_a_program_that_does_not_fit` | [165](tests/test_kernel_fdiv_death.c:165) |
-| `a_block_with_no_region` | [175](tests/test_kernel_fdiv_death.c:175) |
-| `a_block_with_no_operand_a` | [186](tests/test_kernel_fdiv_death.c:186) |
-| `arity_of_an_unknown_op` | [199](tests/test_kernel_fdiv_death.c:199) |
-| `row_at_outside_the_program` | [209](tests/test_kernel_fdiv_death.c:209) |
-| `width_at_outside_the_program` | [217](tests/test_kernel_fdiv_death.c:217) |
-| `a_projection_of_a_row_that_is_not_earlier` | [225](tests/test_kernel_fdiv_death.c:225) |
-| `a_projection_of_a_row_that_returns_no_tuple` | [236](tests/test_kernel_fdiv_death.c:236) |
-| `dst_aliases_its_first_source` | [250](tests/test_kernel_fdiv_death.c:250) |
-| `sources_alias_each_other` | [256](tests/test_kernel_fdiv_death.c:256) |
+| `setup` | [84](tests/test_kernel_fdiv_death.c:84) |
+| `region` | [99](tests/test_kernel_fdiv_death.c:99) |
+| `block` | [105](tests/test_kernel_fdiv_death.c:105) |
+| `width_is_not_64` | [115](tests/test_kernel_fdiv_death.c:115) |
+| `width_is_128` | [121](tests/test_kernel_fdiv_death.c:121) |
+| `step_index_past_the_end` | [129](tests/test_kernel_fdiv_death.c:129) |
+| `step_index_is_negative` | [139](tests/test_kernel_fdiv_death.c:139) |
+| `block_region_is_one_bit_short` | [151](tests/test_kernel_fdiv_death.c:151) |
+| `block_offset_runs_off_the_region` | [161](tests/test_kernel_fdiv_death.c:161) |
+| `result_of_a_program_that_does_not_fit` | [171](tests/test_kernel_fdiv_death.c:171) |
+| `a_block_with_no_region` | [181](tests/test_kernel_fdiv_death.c:181) |
+| `a_block_with_no_operand_a` | [192](tests/test_kernel_fdiv_death.c:192) |
+| `arity_of_an_unknown_op` | [205](tests/test_kernel_fdiv_death.c:205) |
+| `row_at_outside_the_program` | [218](tests/test_kernel_fdiv_death.c:218) |
+| `width_at_outside_the_program` | [226](tests/test_kernel_fdiv_death.c:226) |
+| `a_projection_of_a_row_that_is_not_earlier` | [234](tests/test_kernel_fdiv_death.c:234) |
+| `a_projection_of_a_row_that_returns_no_tuple` | [245](tests/test_kernel_fdiv_death.c:245) |
+| `dst_aliases_its_first_source` | [259](tests/test_kernel_fdiv_death.c:259) |
+| `sources_alias_each_other` | [265](tests/test_kernel_fdiv_death.c:265) |
 
 ## `tests/test_kernel_fdiv_scan.inc`
 
@@ -6338,15 +6347,15 @@ the definition (or the build-language declaration) in the listed file.
 | `fd_ref_row_region` | [86](tests/test_kernel_fdiv_slots.inc:86) |
 | `fd_count` | [123](tests/test_kernel_fdiv_slots.inc:123) |
 | `fd_width_or_refuse` | [165](tests/test_kernel_fdiv_slots.inc:165) |
-| `fd_bool_operand_faults` | [186](tests/test_kernel_fdiv_slots.inc:186) |
-| `the_bool_operand_scan_reports_rather_than_aborts (via CQ_TEST)` | [235](tests/test_kernel_fdiv_slots.inc:235) |
-| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [252](tests/test_kernel_fdiv_slots.inc:252) |
-| `every_iteration_is_the_template_at_a_distinct_offset (via CQ_TEST)` | [407](tests/test_kernel_fdiv_slots.inc:407) |
-| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [483](tests/test_kernel_fdiv_slots.inc:483) |
-| `fd_slots` | [537](tests/test_kernel_fdiv_slots.inc:537) |
-| `fd_region` | [556](tests/test_kernel_fdiv_slots.inc:556) |
-| `return` | [558](tests/test_kernel_fdiv_slots.inc:558) |
-| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [574](tests/test_kernel_fdiv_slots.inc:574) |
+| `fd_bool_operand_faults` | [189](tests/test_kernel_fdiv_slots.inc:189) |
+| `the_bool_operand_scan_reports_rather_than_aborts (via CQ_TEST)` | [238](tests/test_kernel_fdiv_slots.inc:238) |
+| `the_program_is_the_source_line_for_line (via CQ_TEST)` | [255](tests/test_kernel_fdiv_slots.inc:255) |
+| `every_iteration_is_the_template_at_a_distinct_offset (via CQ_TEST)` | [410](tests/test_kernel_fdiv_slots.inc:410) |
+| `the_blocks_cost_what_their_modules_say_they_cost (via CQ_TEST)` | [486](tests/test_kernel_fdiv_slots.inc:486) |
+| `fd_slots` | [540](tests/test_kernel_fdiv_slots.inc:540) |
+| `fd_region` | [559](tests/test_kernel_fdiv_slots.inc:559) |
+| `return` | [561](tests/test_kernel_fdiv_slots.inc:561) |
+| `the_program_is_the_sum_of_its_blocks (via CQ_TEST)` | [577](tests/test_kernel_fdiv_slots.inc:577) |
 
 ## `tests/test_kernel_fdiv_spans.inc`
 
@@ -7792,12 +7801,12 @@ the definition (or the build-language declaration) in the listed file.
 | `double_release` | [92](tests/test_qubits_death.c:92) |
 | `double_strand` | [112](tests/test_qubits_death.c:112) |
 | `release_of_a_stranded_index` | [129](tests/test_qubits_death.c:129) |
-| `strand_of_an_unminted_index` | [154](tests/test_qubits_death.c:154) |
-| `strand_of_a_freed_index` | [166](tests/test_qubits_death.c:166) |
-| `release_of_a_retired_index` | [183](tests/test_qubits_death.c:183) |
-| `strand_of_a_retired_index` | [197](tests/test_qubits_death.c:197) |
-| `recycling_disabled_with_a_non_empty_free_list` | [212](tests/test_qubits_death.c:212) |
-| `ceiling_exceeded_because_nothing_is_recycled` | [225](tests/test_qubits_death.c:225) |
+| `strand_of_an_unminted_index` | [159](tests/test_qubits_death.c:159) |
+| `strand_of_a_freed_index` | [171](tests/test_qubits_death.c:171) |
+| `release_of_a_retired_index` | [188](tests/test_qubits_death.c:188) |
+| `strand_of_a_retired_index` | [202](tests/test_qubits_death.c:202) |
+| `recycling_disabled_with_a_non_empty_free_list` | [217](tests/test_qubits_death.c:217) |
+| `ceiling_exceeded_because_nothing_is_recycled` | [230](tests/test_qubits_death.c:230) |
 
 ## `tests/test_qubits_retire.inc`
 
@@ -9391,16 +9400,16 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `sh` | [47](tools/labreport/new_entry.py:47) |
-| `tex` | [52](tools/labreport/new_entry.py:52) |
-| `entries` | [60](tools/labreport/new_entry.py:60) |
-| `last_to_sha` | [66](tools/labreport/new_entry.py:66) |
-| `path_tex` | [81](tools/labreport/new_entry.py:81) |
-| `cache` | [88](tools/labreport/new_entry.py:88) |
-| `tree_note` | [99](tools/labreport/new_entry.py:99) |
-| `ctest_count` | [119](tools/labreport/new_entry.py:119) |
-| `beads` | [138](tools/labreport/new_entry.py:138) |
-| `main` | [148](tools/labreport/new_entry.py:148) |
+| `sh` | [58](tools/labreport/new_entry.py:58) |
+| `tex` | [63](tools/labreport/new_entry.py:63) |
+| `entries` | [71](tools/labreport/new_entry.py:71) |
+| `last_to_sha` | [77](tools/labreport/new_entry.py:77) |
+| `path_tex` | [92](tools/labreport/new_entry.py:92) |
+| `cache` | [99](tools/labreport/new_entry.py:99) |
+| `tree_note` | [110](tools/labreport/new_entry.py:110) |
+| `ctest_count` | [135](tools/labreport/new_entry.py:135) |
+| `beads` | [154](tools/labreport/new_entry.py:154) |
+| `main` | [164](tools/labreport/new_entry.py:164) |
 
 ## `tools/labreport/probe_scratch.c`
 

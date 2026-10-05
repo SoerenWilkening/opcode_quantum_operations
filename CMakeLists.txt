@@ -176,6 +176,29 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     cqops_select_leak_check(CQOPS_LSAN_ENABLED)
 endif()
 
+## DEBUG IS BUILT AT -O1, NOT AT THE COMPILER'S DEFAULT -O0 (bd ifoy, 2026-10-05,
+## maintainer ruling "measure, switch if green"). -O1 is the level ASan's own
+## documentation recommends; -g and -fno-omit-frame-pointer stay, so reports
+## keep their stacks. Measured on the eight fp/ibits pole binaries, Homebrew
+## clang 22.1.5 + ASan/UBSan, instructions retired (`/usr/bin/time -l`, the
+## load-independent measure — bd 7s60): 2,657 G at -O0 -> 1,144 G at -O1
+## (0.31-0.49x per binary), user time 829 s -> 331 s; the whole Debug suite,
+## every death case and both negative self-tests green at -O1.
+##
+## AN EXPLICIT -O WINS. Target options follow CMAKE_C_FLAGS[_DEBUG] on the
+## compile line and the last -O wins, so -O1 is added only when neither names an
+## -O level — `-DCMAKE_C_FLAGS_DEBUG="-O0 -g"` still gets -O0. Release and the
+## configure-time probes never see this.
+set(CQOPS_DEBUG_OPT "")
+if(NOT "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_DEBUG}" MATCHES "(^|[ \t])-O")
+    set(CQOPS_DEBUG_OPT "$<$<CONFIG:Debug>:-O1>")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(STATUS "cqops: Debug optimisation -O1 (bd ifoy)")
+    endif()
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "cqops: Debug optimisation as named in CMAKE_C_FLAGS[_DEBUG]")
+endif()
+
 ## -ffp-contract=off is NOT a style choice and NOT an optimisation setting: it
 ## makes M21's classification a function of the ANGLE rather than of the host.
 ## Measured at Step 18 — `a*b + c` may be contracted into one fused multiply-add
@@ -196,6 +219,7 @@ target_compile_options(cqops_build_flags INTERFACE
     -Wall -Wextra -Werror -Wconversion
     -ffp-contract=off
     $<$<CONFIG:Debug>:-fno-omit-frame-pointer;-g>
+    ${CQOPS_DEBUG_OPT}
     ${CQOPS_SANITIZER_FLAGS}
 )
 

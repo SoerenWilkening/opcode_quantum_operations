@@ -284,10 +284,11 @@ exit-code check; express discriminators negatively via `FAIL_REGULAR_EXPRESSION`
 
 **Death tests:** use `add_cqops_death_test(name CASES ...)` + `CQ_EXPECT_ABORT`, never
 `WILL_FAIL` (it can't invert a crash). A `CHECK` inside a death case is a silent no-op — use
-`CQ_DEATH_REQUIRE`. A sanitizer's own `abort()` satisfies the window, so pin
-`UndefinedBehaviorSanitizer` in `FAIL_REGULAR_EXPRESSION`; a Debug `assert()` is a third
-abort source — pin `Assertion`, never `Assertion failed` (Apple's banner only; glibc's
-doesn't contain it — `bd hcvb`). Death cases aren't leak-checked (`_Exit`).
+`CQ_DEATH_REQUIRE`. A sanitizer's `abort()` or a Debug `assert()` satisfies the window, so
+`add_cqops_death_test`'s tripwire puts `UndefinedBehaviorSanitizer`, `AddressSanitizer` and
+`Assertion` in every case's `FAIL_REGULAR_EXPRESSION` (`Assertion` since 2026-10-05,
+`bd qi4m`; never `Assertion failed`, Apple's banner only — `bd hcvb`). The hand-written
+`Assertion` tokens stay, a deliberate second copy. Death cases aren't leak-checked (`_Exit`).
 `test_harness_negative` must keep failing.
 
 **Platform:** libm is found and linked PUBLIC (macOS hides its absence). Tests get
@@ -300,7 +301,8 @@ error); set it per case in C, never via ctest `ENVIRONMENT`.
 
 **CI** (`.github/workflows/ci.yml`, ubuntu, clang only) runs Debug with
 `-DCQOPS_SANITIZERS=ON -DCQOPS_LEAK_CHECK=ON -DCQOPS_PYTHON=ON` so nothing degrades quietly, and
-asserts the opt-in suites (L6, L7 §12(1), QEC sinks) are **not** registered. Lint's file count
+asserts every opt-in suite (all behind `CQOPS_CQLANG_DIR` or `CQOPS_QEC_DIR`, each named in
+both absent loops, plus their configure STATUS lines) is **not** registered. Lint's file count
 is box-local (filesystem walk, deliberately not `git ls-files`).
 
 **Opt-in harnesses** (not in `make test`; this repo neither pins nor builds CQ_lang):

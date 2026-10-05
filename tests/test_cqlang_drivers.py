@@ -21,6 +21,18 @@
 #      every later one, which is what a commit landing mid-run looks like.
 #   4. A run that does not straddle is not flagged.
 #
+# ONE FAKE FILE PER PROCESS, NOT THREE PER drive() (bd ifoy (f), 2026-10-05).
+# On this box the FIRST exec of a freshly written file waits ~0.4 s on Apple's
+# XprotectService (its CPU, not ours; the Avast agent barely moves), measured
+# at load 4 against ~11 ms for a re-exec, ~18 ms for a symlink or hard link in
+# a fresh dir to an already-exec'd file, ~13 ms for `/bin/sh <fresh file>`.
+# Writing git/ctest/bash afresh per drive() paid it 15 times a run: ~7 s at
+# load 4, 36-1014 s at load 15-130; one file per process: 3 s at load 11,
+# 5-13 s at load 34-305 (interleaved with the old ones). So the fake
+# is ONE script, written once, reached through three symlinks whose name it
+# dispatches on. Each drive() still gets its own $FAKE_DIR: every bit of state
+# (git.log, log.n, ctest.json, bash.log) lives there, none in the script.
+#
 # NEXT SEAM: none recorded — well under Rule 12's limit.
 
 import json
@@ -40,21 +52,29 @@ DRIVERS = {"l6": os.path.join(ROOT, "tools", "l6", "l6_run.py"),
 SHA1, SHA2 = "1" * 40, "2" * 40
 FULL = ["--cqlang", "{cq}", "--out", "{out}", "--json", "{json}"]
 
-# Every invocation is logged, one argv per line, BEFORE anything else runs.
-FAKE_GIT = r'''#!/bin/sh
-printf '%s\n' "$*" >> "$FAKE_DIR/git.log"
-case " $* " in
-  *" log "*)
-    n=$(/bin/cat "$FAKE_DIR/log.n" 2>/dev/null || echo 0)
-    n=$((n + 1))
-    echo "$n" > "$FAKE_DIR/log.n"
-    if [ "$n" -eq 1 ]; then echo "$FAKE_SHA1 2026-10-04"
-    else echo "$FAKE_SHA2 2026-10-04"; fi ;;
+# git: every invocation is logged, one argv per line, BEFORE anything else
+# runs. ctest: `exec`, so a missing ctest.json still exits non-zero. A name
+# with no arm is a loud 127, never a silent pass.
+FAKE = r'''#!/bin/sh
+case "${0##*/}" in
+  git)
+    printf '%s\n' "$*" >> "$FAKE_DIR/git.log"
+    case " $* " in
+      *" log "*)
+        n=$(/bin/cat "$FAKE_DIR/log.n" 2>/dev/null || echo 0)
+        n=$((n + 1))
+        echo "$n" > "$FAKE_DIR/log.n"
+        if [ "$n" -eq 1 ]; then echo "$FAKE_SHA1 2026-10-04"
+        else echo "$FAKE_SHA2 2026-10-04"; fi ;;
+    esac ;;
+  ctest) exec /bin/cat "$FAKE_DIR/ctest.json" ;;
+  bash) printf '%s\n' "$*" >> "$FAKE_DIR/bash.log" ;;
+  *) echo "fake: no arm for ${0##*/}" >&2; exit 127 ;;
 esac
 exit 0
 '''
-FAKE_CTEST = '#!/bin/sh\n/bin/cat "$FAKE_DIR/ctest.json"\n'
-FAKE_BASH = '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$FAKE_DIR/bash.log"\nexit 0\n'
+TOOLS = ("git", "ctest", "bash")
+_BIN = []  # [TemporaryDirectory], built by the first drive(), kept to exit
 
 # What each driver needs from `ctest --show-only=json-v1`: L6 nothing (no
 # fixture, no runner); L7 one single-file slice, for its toolchain read.
@@ -68,16 +88,24 @@ def lines(path):
     return open(path).read().splitlines() if os.path.exists(path) else []
 
 
+def fake_bin():
+    """The fake PATH: a dir holding ONLY git, ctest, bash -> one FAKE."""
+    if not _BIN:
+        _BIN.append(tempfile.TemporaryDirectory(prefix="cqops-fakebin-"))
+        script = os.path.join(_BIN[0].name, "fake")
+        with open(script, "w") as fh:
+            fh.write(FAKE)
+        os.chmod(script, 0o755)
+        os.mkdir(os.path.join(_BIN[0].name, "bin"))
+        for name in TOOLS:
+            os.symlink(script, os.path.join(_BIN[0].name, "bin", name))
+    return os.path.join(_BIN[0].name, "bin")
+
+
 def drive(which, argv, sha2=SHA2):
     """Run one driver on fakes: (rc, stdout+stderr, git argv lines, JSON)."""
     with tempfile.TemporaryDirectory(prefix="cqops-drivers-") as tmp:
-        fake = os.path.join(tmp, "bin")
-        os.mkdir(fake)
-        for name, body in (("git", FAKE_GIT), ("ctest", FAKE_CTEST),
-                           ("bash", FAKE_BASH)):
-            with open(os.path.join(fake, name), "w") as fh:
-                fh.write(body)
-            os.chmod(os.path.join(fake, name), 0o755)
+        fake = fake_bin()
         with open(os.path.join(tmp, "ctest.json"), "w") as fh:
             json.dump(CTEST[which], fh)
         cq = os.path.join(tmp, "cqlang")

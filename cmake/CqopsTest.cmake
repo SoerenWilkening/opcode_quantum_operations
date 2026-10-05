@@ -303,8 +303,31 @@ endfunction()
 ## was added BEFORE that, when it could not match anything, on the argument that
 ## the hole is LARGER on a box whose ASan works and a dead regex costs nothing.
 ## That turned out to be the whole of the ASan side's preparation.
+##
+## `Assertion` IS THE THIRD TOKEN (`bd qi4m`, 2026-10-05). A Debug-only assert()
+## (CQ_BIT_ASSERT, CQ_POOL_ASSERT, CQ_SHADOW_ASSERT) is a third abort source and
+## satisfies the window exactly as a sanitizer does. Its banner depends on the
+## libc (`bd hcvb`): Apple's starts "Assertion failed: (cond)", glibc's ends
+## "Assertion `cond' failed.", and `Assertion` is the one spelling in both.
+## MEASURED WITH IT IN PLACE: all 623 death cases green, and their -V output
+## holds no `Assertion` (nor `assert`, any case), on macOS Debug and Release and
+## on glibc 2.39 Debug with ci.yml's flags (ubuntu:24.04 container, clang 18).
+## SEEN RED: neuter the `q >= p->minted` guard in cq_qubits_strand and
+## cq_qubits_release, and test_qubits_death.{strand,release}_of_an_unminted_index
+## abort one call lower, on cq_pool_free_flag's CQ_POOL_ASSERT(q < p->minted).
+## Debug PASSED them without this token and FAILS them "Regex=[Assertion]" with
+## it; guard intact, they pass. Same on both libcs. Neither case spells
+## `Assertion` by hand, so this token is their only Debug detector.
+##
+## THE HAND-WRITTEN `Assertion` TOKENS IN tests/CMakeLists.txt ARE KEPT ON
+## PURPOSE (maintainer ruling, 2026-10-05: "add, keep hand tokens"), and they
+## are now a SECOND COPY of this one. On the death cases that spell it, deleting
+## either copy leaves the other armed, so neither is the single detector there;
+## the cases that do not spell it lean on this token alone. The composed list is
+## de-duplicated, so `ctest --show-only=json-v1` shows `Assertion` once on each.
+## The function and STATUS names still say "sanitizer"; they predate this token.
 function(_cqops_death_tripwire out)
-    set(${out} "UndefinedBehaviorSanitizer;AddressSanitizer" PARENT_SCOPE)
+    set(${out} "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion" PARENT_SCOPE)
 endfunction()
 
 ## Re-arms the tripwire over every death case registered in this directory,

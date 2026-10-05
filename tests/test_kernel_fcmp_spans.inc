@@ -1,6 +1,8 @@
 /* tests/test_kernel_fcmp_spans.inc — the LAYOUT's three instruments: the
  * span-disjointness scan, the palindrome at an asymmetric mask, and two
- * programs in one region. Included by test_kernel_fcmp.c AFTER
+ * programs in one region — and, added 2026-10-05 (bd ifoy (e)), a fourth:
+ * two programs of ONE length through one buffer, the only detector for the
+ * memoised map's key. Included by test_kernel_fcmp.c AFTER
  * test_kernel_fcmp_slots.inc, whose `fc_scan_slot`, `fc_row_slots` and
  * `FC_SCAN_A`/`FC_SCAN_B` it reuses.
  *
@@ -139,13 +141,14 @@ CQ_TEST(the_compute_half_is_a_palindrome_at_an_asymmetric_mask)
 
 /* THE SOLE DETECTOR FOR A PROGRAM THAT IGNORES ITS OWN `off`, AND IT HAD TO BE
  * WRITTEN AS A POSITIVE CASE. Every span this module hands out goes through
- * `offsets()`, which is the ONE place `k->off` is added; drop it and the whole
- * program slides to the bottom of the caller's region. The kernel always
- * passes `off = 0`, so from every other case in this suite the mutation is
- * BEHAVIOURALLY INERT — the value, the palindrome, the pool, the slot scan,
- * the span-disjointness scan and all fourteen goldens stay green. Only a
- * SECOND program at a SECOND offset in one region sees it, because the two
- * then collide. M31 carries the same case for the same reason
+ * `offsets()` — `row_off()` since 2026-10-05 (bd ifoy (e)), over a memoised
+ * base-relative map — which is the ONE place `k->off` is added; drop it and
+ * the whole program slides to the bottom of the caller's region. The kernel
+ * always passes `off = 0`, so from every other case in this suite the
+ * mutation is BEHAVIOURALLY INERT — the value, the palindrome, the pool, the
+ * slot scan, the span-disjointness scan and all fourteen goldens stay green.
+ * Only a SECOND program at a SECOND offset in one region sees it, because the
+ * two then collide. M31 carries the same case for the same reason
  * (two_blocks_in_one_region_do_not_collide), and the death cases do not
  * substitute for it: they drive `check_region`, which is a different line.
  *
@@ -287,6 +290,147 @@ CQ_TEST(two_programs_in_one_region_do_not_collide)
             cq_scratch_dispose(&scr);
             cq_ctx_dispose(&ctx);
         }
+
+    cq_mock_dispose(&m);
+}
+
+/* ---- (f) Two programs of ONE length, alternated through ONE buffer. ----- */
+
+/* THE ONLY DETECTOR FOR fcmp_step.c's MAP KEY (bd ifoy (e), 2026-10-05). The
+ * step machine memoises each program's layout, keyed by its FULL ROW TEXT.
+ * Every program cq_fcmp_program builds has a length no other one has, so a
+ * key cut to the length alone, or to the caller's pointer plus the length,
+ * passed every other case here and in the fmisc and template suites —
+ * measured. This case builds two programs of the SAME length with DIFFERENT
+ * ops — `a != b` then `lower_not1!` (so `a == b`), and M31's NaN class of `a`
+ * then `lower_not1!` (so `a` is not a NaN) — and alternates them, slot by
+ * slot, through ONE buffer rewritten before every call, which is what a
+ * caller's stack array does between two kernel calls. Each one's slot and
+ * region totals are asked of the sibling modules, never of M36; each flag is
+ * checked against a reference sharing nothing with the circuit (a bitwise
+ * `==`, and the host's isunordered); and both reverse halves must leave the
+ * shared region at |0>. */
+static void fc_load(cq_fcmp_row *buf, int which)
+{
+    buf[0].op = (short)(which == 0 ? CQ_FCOP_EQ : CQ_FCOP_CLASS_NAN);
+    buf[0].s0 = CQ_FC_A;
+    buf[0].s1 = (short)(which == 0 ? CQ_FC_B : 0);
+    buf[0].s2 = 0;
+    buf[1].op = CQ_FCOP_NOT1;
+    buf[1].s0 = 0; buf[1].s1 = 0; buf[1].s2 = 0;
+}
+
+CQ_TEST(two_programs_of_one_length_each_get_their_own_layout)
+{
+    static const uint64_t VALUES[] = { CQ_F64_ONE, CQ_F64_QNAN_B,
+                                       CQ_F64_POS_INF };
+    const int steps[2] = { cq_eq_steps(CQ_FP64_W) + FS_NOT1,
+                           cq_fp_class_steps(CQ_FP_IS_NAN) + FS_NOT1 };
+    const uint32_t region[2] = { (uint32_t)cq_eq_region(CQ_FP64_W) + 1u,
+                                 cq_fp_class_region(CQ_FP_IS_NAN) + 1u };
+    int nvals = (int)(sizeof VALUES / sizeof VALUES[0]);
+    cq_fcmp_row buf[2];
+    cq_mock m;
+
+    /* The premise: the costs that tell the two programs apart do differ. */
+    CHECK(steps[0] != steps[1]);
+    CHECK(region[0] != region[1]);
+
+    cq_mock_init(&m);
+
+    for (int v = 0; v < nvals; v++) {
+        cq_fcmp_block k[2];
+        cq_scratch scr;
+        cq_ctx ctx;
+        cq_sink s = cq_mock_sink(&m);
+        int bad = 0, top;
+        int32_t ha, hb;
+
+        /* The layout, through the one buffer: A, B, A, B. */
+        for (int r = 0; r < 4; r++) {
+            int got_s;
+            uint32_t got_r;
+
+            fc_load(buf, r & 1);
+            got_s = cq_fcmp_steps(buf, 2);
+            got_r = cq_fcmp_region(buf, 2);
+            if (got_s != steps[r & 1] || got_r != region[r & 1]) {
+                cq_h_fail(__FILE__, __LINE__,
+                          "program %d of two of length 2 (call %d): %d slots "
+                          "and %u bits, want %d and %u — the map served "
+                          "another program's layout", r & 1, r, got_s, got_r,
+                          steps[r & 1], region[r & 1]);
+                bad = 1;
+            }
+        }
+        if (bad) break;
+
+        cq_mock_reset(&m);
+        cq_ctx_init(&ctx, &s);
+        ha = cq_bk_reg_w(&ctx, (uint32_t)CQ_FP64_W,
+                         cq_ref_w_make(VALUES[v], 0u, CQ_FP64_W),
+                         cq_ref_w_ones(CQ_FP64_W));
+        hb = cq_bk_reg_w(&ctx, (uint32_t)CQ_FP64_W,
+                         cq_ref_w_make(CQ_F64_ONE, 0u, CQ_FP64_W),
+                         cq_ref_w_ones(CQ_FP64_W));
+        cq_scratch_alloc(&scr, region[0] + region[1]);
+        for (uint32_t i = 0; i < scr.n; i++)
+            cq_materialise(&ctx, &scr.bits[i]);
+
+        for (int b = 0; b < 2; b++) {
+            k[b].a = cq_reg_cbits(&ctx.regs, ha);
+            k[b].b = cq_reg_cbits(&ctx.regs, hb);
+            k[b].scr = &scr;
+            k[b].off = (b == 0) ? 0u : region[0];
+            k[b].rows = buf;
+            k[b].n_rows = 2;
+        }
+
+        /* Forward with the two programs' slots INTERLEAVED, the buffer
+         * rewritten before every call, so every lookup alternates. */
+        top = (steps[0] > steps[1]) ? steps[0] : steps[1];
+        for (int u = 0; u < top; u++)
+            for (int b = 0; b < 2; b++)
+                if (u < steps[b]) {
+                    fc_load(buf, b);
+                    cq_fcmp_step(&ctx, &k[b], u);
+                }
+
+        for (int b = 0; b < 2; b++) {
+            int known = 0, got, want;
+
+            fc_load(buf, b);
+            got  = fc_wire_value(&ctx, cq_fcmp_flag(&k[b]), &known);
+            want = (b == 0) ? (VALUES[v] == CQ_F64_ONE)
+                            : !host_fcmp(VALUES[v], VALUES[v], CQ_FCMP_UNO);
+            if (!known || got != want)
+                cq_h_fail(__FILE__, __LINE__,
+                          "program %d on 0x%016llx: flag = %s%d, want %d", b,
+                          (unsigned long long)VALUES[v],
+                          known ? "" : "unknown/", got, want);
+        }
+
+        /* The exact mirror of the forward order, then the pool claim. */
+        for (int u = top - 1; u >= 0; u--)
+            for (int b = 1; b >= 0; b--)
+                if (u < steps[b]) {
+                    fc_load(buf, b);
+                    cq_fcmp_step(&ctx, &k[b], u);
+                }
+
+        for (uint32_t i = 0; i < scr.n; i++) {
+            if (cq_bit_is_qubit(scr.bits[i])
+                && !cq_shadow_known_zero(&ctx.shadow,
+                                         cq_bit_qindex(scr.bits[i])))
+                cq_h_fail(__FILE__, __LINE__,
+                          "two programs of one length: scratch bit %u (q%u) "
+                          "is not back at |0>", i, cq_bit_qindex(scr.bits[i]));
+            scr.bits[i] = cq_bit_zero();
+        }
+
+        cq_scratch_dispose(&scr);
+        cq_ctx_dispose(&ctx);
+    }
 
     cq_mock_dispose(&m);
 }

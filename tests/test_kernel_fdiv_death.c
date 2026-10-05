@@ -39,6 +39,12 @@
  *                       MATERIALISED from a template — a rebase that left a
  *                       relative code behind would index straight past the end
  *                       and hand the emitter whatever it read.
+ *                       [AMENDED 2026-10-05, bd ifoy (b): the rows now live in
+ *                       fdiv.c's immutable build-once table and the library
+ *                       reads them through `cq_fdiv_row_ref`; still no array
+ *                       is exported, and this refusal is the ONE range check
+ *                       both accessors share, so it now also keeps a read off
+ *                       the end of that static table.]
  *   cq_fdiv_row_width   x2. A projection of a row that is not STRICTLY
  *                       earlier, and a projection of a row that returns no
  *                       tuple. Driven through the ARRAY form, because the
@@ -205,7 +211,10 @@ static void arity_of_an_unknown_op(void)
 /* THE GUARD THAT CATCHES AN UNREBASED TEMPLATE CODE. Every read of the table
  * goes through `cq_fdiv_row_at`, and the loop's operand references are
  * MATERIALISED from a seven-row template — a rebase that left `TPL_THIS + j`
- * or `TPL_R_IN` behind would arrive here as an index of 4096 or 8192. */
+ * or `TPL_R_IN` behind would arrive here as an index of 4096 or 8192.
+ * [AMENDED 2026-10-05, bd ifoy (b): through `cq_fdiv_row_at` or
+ * `cq_fdiv_row_ref`, which share this one check; the rows are materialised
+ * once into an immutable table.] */
 static void row_at_outside_the_program(void)
 {
     cq_fdiv_row r;

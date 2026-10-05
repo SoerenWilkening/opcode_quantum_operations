@@ -205,14 +205,14 @@ static void emit_row(cq_ctx *ctx, const cq_fdiv_block *k, const cq_fd_map *m,
 static void fdiv_step_mapped(cq_ctx *ctx, const cq_fdiv_block *k,
                              const cq_fd_map *m, int u)
 {
-    cq_fdiv_row r;
+    const cq_fdiv_row *r;
     int local = 0, i;
 
     if (u < 0 || u >= m->post_s[m->n_post])
         cq_kernel_die("fdiv: step index outside [0, cq_fdiv_steps())");
     i = cq_fd_row_of_slot(m, u, &local);
-    cq_fdiv_row_at(i, &r);
-    emit_row(ctx, k, m, &r, cq_fd_off(m, i), local);
+    r = cq_fdiv_row_ref(i);
+    emit_row(ctx, k, m, r, cq_fd_off(m, i), local);
 }
 
 void cq_fdiv_step(cq_ctx *ctx, const cq_fdiv_block *k, int u)
@@ -232,13 +232,13 @@ void cq_fdiv_step(cq_ctx *ctx, const cq_fdiv_block *k, int u)
 static const cq_bit *fdiv_result_mapped(const cq_fdiv_block *k,
                                         const cq_fd_map *m)
 {
-    cq_fdiv_row r;
+    const cq_fdiv_row *r;
     cq_bit buf[CQ_FD_W];
     const cq_bit *p;
     int n = cq_fdiv_n_rows();
 
-    cq_fdiv_row_at(n - 1, &r);
-    if (r.op == CQ_FDOP_VIEW || r.op == CQ_FDOP_OUT)
+    r = cq_fdiv_row_ref(n - 1);
+    if (r->op == CQ_FDOP_VIEW || r->op == CQ_FDOP_OUT)
         cq_kernel_die("fdiv: `result` is a view or a projection, not a span");
     p = cq_fd_val64(k, m, n - 1, buf);
     if (p == buf) cq_kernel_die("fdiv: `result` did not resolve to a span");
