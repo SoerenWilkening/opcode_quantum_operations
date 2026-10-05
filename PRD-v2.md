@@ -425,7 +425,12 @@ second and decisive reason `f32` is out** — see the box below. Two riders v1 d
 > `fpconv.jl:1-40` holds them at `:20-21`, `:29-32` and `:37`.
 
 **Condition 5 is unreachable and the arithmetic is short.** D20 measured the shipped QEC configs
-carrying `n_logical ∈ {1, 3, 4, 6, 7}`, and raising it raises the code distance. One `f64` `fadd`
+carrying `n_logical ∈ {1, 3, 4, 6, 7}`, and raising it raises the code distance. *(Amended
+2026-10-05, `bd 64d1`: that set was never the shipped one — the tracked `qec/examples/*.json` carry
+{1, 2, 3, 4, 6, 7, 10} at QEC `1e3c315`, D20's revision, and {1, 2, 3, 4, 6, 7, 10, 16, 36} at
+`a07968b`; D20 records both. So the "four orders of magnitude" below is ~3.5 against the 2026-08-28
+maximum, 10, and ~2.9 against today's, 36 — 29,949 is ~3,000× and ~830× them — and the conclusion
+is unchanged.)* One `f64` `fadd`
 needs **29,949** ancillae — four orders of magnitude past it — and at `d = 3` one logical `CCX` is
 385,317 physical gates, so `fadd`'s 12,488 Toffolis are ~4.8 × 10⁹ physical gates *(re-measured
 2026-10-04 at QEC `d96d259`, `bd 65q`, and pinned by an opt-in case in `tests/test_sink_qec.c`; until

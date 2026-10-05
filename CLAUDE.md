@@ -285,8 +285,10 @@ exit-code check; express discriminators negatively via `FAIL_REGULAR_EXPRESSION`
 **Death tests:** use `add_cqops_death_test(name CASES ...)` + `CQ_EXPECT_ABORT`, never
 `WILL_FAIL` (it can't invert a crash). A `CHECK` inside a death case is a silent no-op — use
 `CQ_DEATH_REQUIRE`. A sanitizer's own `abort()` satisfies the window, so pin
-`UndefinedBehaviorSanitizer` in `FAIL_REGULAR_EXPRESSION`. Death cases aren't leak-checked
-(`_Exit`). `test_harness_negative` must keep failing.
+`UndefinedBehaviorSanitizer` in `FAIL_REGULAR_EXPRESSION`; a Debug `assert()` is a third
+abort source — pin `Assertion`, never `Assertion failed` (Apple's banner only; glibc's
+doesn't contain it — `bd hcvb`). Death cases aren't leak-checked (`_Exit`).
+`test_harness_negative` must keep failing.
 
 **Platform:** libm is found and linked PUBLIC (macOS hides its absence). Tests get
 `_DEFAULT_SOURCE` via `cqops_test_support`; **the library must never get a feature macro** —
@@ -306,7 +308,8 @@ is box-local (filesystem walk, deliberately not `git ls-files`).
 cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release -DCQOPS_CQLANG_DIR=/path/to/CQ_lang
 ctest --test-dir build-release -R l6    # CQ_lang's e2e corpus: link, run, don't abort
 ctest --test-dir build-release -R l7    # PRD §12 Grover through CQ_lang
-python3 tools/l6/l6_run.py --out /tmp/l6 --json /tmp/l6.json   # by hand; --reuse re-classifies
+python3 tools/l6/l6_run.py --cqlang /path/to/CQ_lang --out /tmp/l6 --json /tmp/l6.json   # by hand
+#   --cqlang is required (no default); --reuse re-classifies, but RUNS any fixture missing its .rc
 ```
 `-DCQOPS_QEC_DIR=` enables the QEC sink suites. The L6/L7 link line uses `CQOPS_L6_LDFLAGS`,
 `CQOPS_L6_LDLIBS` and `CQOPS_L6_LINK_CC` (CMake sets them; a hand run doesn't).

@@ -16,6 +16,17 @@
  * about the two angles this program actually emits, and the negative control
  * below is what keeps the distinction visible.
  *
+ * AMENDED 2026-10-05 (bd 64d1): THAT 1,200 WAS NEVER Rz(0.1)'s COST, and it is
+ * kept above because it is what this comment said on 2026-08-29. Re-measured
+ * through this sink at the precision this file runs at (it sets no
+ * CQOPS_QEC_PRECISION, so src/sink_qec.c's default of 20) on config_ccx.json:
+ * Rz(0.1) is 960 physical T at QEC 616c903, 1e3c315 and 3a58370 (the start,
+ * D20's revision and the end of 2026-08-28; 3a58370 was still current when
+ * this file landed) and still 960 at d96d259 and a07968b. 1,200 is Rz(π/4)'s
+ * cost at precision 20 at all five (§15 D19's correction); Rz(0.1) reaches it
+ * only at precision 26. The negative control asserts only T > 0, so no
+ * literal rested on the figure.
+ *
  * IT TAKES ITS ALPHABET FROM `tests/test_grover.c`, WHICH IS THE HALF THIS ONE
  * CANNOT MAKE. A `cq_sink` is handed one rotation at a time and never sees the
  * program, so nothing here can know that `{Ry(π/2), Rz(π)}` is the whole set;
@@ -33,6 +44,10 @@
  * classical-mode value, not a fault-tolerant run — condition 5 was the qec one
  * and was met at Step 26. So this file feeds the SINK the alphabet, which is
  * exactly the composition the two halves need and costs milliseconds.
+ * [Amended 2026-10-05, bd 64d1: "1..10" was right at QEC 3a58370, current when
+ * this landed (the tracked qec/examples configs carry {1,2,3,4,6,7,10}), and
+ * has moved: {1,2,3,4,6,7,10,16,36} at d96d259 and a07968b, so 1..36 now,
+ * still well short of the hundred.]
  *
  * OPT-IN behind `-DCQOPS_QEC_DIR=`, for L6's reason: this repository neither
  * pins nor can build the QEC library, and a suite registered without it would

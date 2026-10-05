@@ -67,7 +67,8 @@ function-map:
 # the wrong --output-dir writing over the tracked files. It writes NOTHING.
 #
 # IT HARD-FAILS RATHER THAN SKIPPING when the interpreter is missing, unlike the
-# two PyYAML-gated ctest suites: cmake/CqopsPython.cmake declines to REGISTER
+# PyYAML-gated Python ctest suites (tests/CMakeLists.txt's `pysuite` loop; "the
+# two" here until bd oqp8): cmake/CqopsPython.cmake declines to REGISTER
 # those, which makes their absence a visible test-count drop next to a warning.
 # A drift gate has no such tell — one that skips is one that is off — so both
 # probes below exit non-zero.

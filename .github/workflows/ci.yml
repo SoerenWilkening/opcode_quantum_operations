@@ -19,10 +19,16 @@
 #   CQOPS_LEAK_CHECK=ON    same argument one layer down (`bd kfi`): LSan is an
 #                          ASAN_OPTIONS setting rather than a -fsanitize= flag,
 #                          so its absence changes nothing about any green run.
-#   CQOPS_PYTHON=ON        M27's two generator suites are PyYAML-gated and are
-#                          NOT REGISTERED without it (cmake/CqopsPython.cmake).
+#   CQOPS_PYTHON=ON        every Python suite — the `pysuite` loop in
+#                          tests/CMakeLists.txt, each one named in the "ctest -N"
+#                          steps below — is NOT REGISTERED without a python3
+#                          that can `import yaml` (cmake/CqopsPython.cmake).
 #                          On CI a missing interpreter must be a red configure,
-#                          not a test count two smaller than yesterday's.
+#                          not a test count smaller than yesterday's. (This
+#                          line said "M27's two generator suites" until bd oqp8,
+#                          2026-10-05, when the loop held seven. It names no
+#                          count now; the lists below name each suite, and CI
+#                          checks each name is registered.)
 #
 # WHAT IT DELIBERATELY DOES NOT RUN. L6, L7 §12(1) and the QEC sink are opt-in
 # behind -DCQOPS_CQLANG_DIR= and -DCQOPS_QEC_DIR=; this repository neither pins
@@ -83,7 +89,7 @@ jobs:
       # box that has it. python3-yaml is the DISTRO package on purpose: pip on
       # Ubuntu 24.04 refuses to install into the system interpreter (PEP 668),
       # and CQOPS_PYTHON=ON below turns a missing PyYAML into a hard configure
-      # error rather than two silently unregistered suites.
+      # error rather than silently unregistered Python suites.
       - name: Toolchain, ninja, PyYAML
         run: |
           set -euo pipefail
@@ -168,7 +174,9 @@ jobs:
       # THE OPT-IN SUITES ARE ABSENT, AND CMAKE SAYS SO — assert that it did.
       #
       # This job cannot build CQ_lang or the QEC library, so L6, L7 §12(1) and
-      # the two QEC-sink suites are not registered here. That is correct and is
+      # every suite behind tests/CMakeLists.txt's `if(CQOPS_HAVE_QEC)` blocks
+      # (the QEC sink's, L7's T-count arm, M26's trace annotations) are not
+      # registered here. That is correct and is
       # not what this step is for. It is for the OTHER failure: a future change
       # that drops one of these registrations outright, or inverts a guard so it
       # can never fire, would be invisible on a runner where the suite never ran
@@ -198,13 +206,18 @@ jobs:
 
       # WHAT IS REGISTERED IS PART OF WHAT A GREEN RUN CLAIMS (Rule 17).
       #
-      #   present: the two PyYAML-gated generator suites — this is what
-      #            CQOPS_PYTHON=ON bought, checked at the far end rather than
-      #            trusted; and test_lsan_negative, which exists only when the
-      #            build claims leak detection and is the only thing in the tree
-      #            that goes red when detect_leaks quietly stops being set.
-      #   absent:  the four opt-in entries. A job that registered one would be
-      #            claiming a link it never made.
+      #   present: every Python suite (the `pysuite` loop in
+      #            tests/CMakeLists.txt) — this is what CQOPS_PYTHON=ON bought,
+      #            checked at the far end rather than trusted; and
+      #            test_lsan_negative, which exists only when the build claims
+      #            leak detection and is the only thing in the tree that goes
+      #            red when detect_leaks quietly stops being set.
+      #   absent:  the opt-in entries the second loop names, each registered
+      #            only behind -DCQOPS_CQLANG_DIR= or -DCQOPS_QEC_DIR=. A job
+      #            that registered one would be claiming a link it never made.
+      #            test_shim_trace and test_shim_trace_death (QEC-gated, bd
+      #            76r) joined the list at bd cwiy, 2026-10-05; a leak of
+      #            either was invisible here until then.
       - name: ctest -N (Debug) — registrations
         run: |
           set -euo pipefail
@@ -217,27 +230,37 @@ jobs:
           # be there and would have failed this job on its first run. A death
           # binary's cases are `<binary>.<case>`, which is why `.` is the other
           # accepted terminator and why `test_sink_qec_death` is listed by name.
+          # Same shape for `test_shim_trace`, a prefix of `test_shim_trace_death`:
+          # the anchor stops the first matching the second's cases, so each
+          # is named, and neither matches the unconditional `test_shim_*`.
           pin='^ *Test +#[0-9]+: *'
           fail=0
-          # ALL SEVEN PYTHON SUITES BY NAME, and the anchor is why each needs its
-          # own entry: `(\.|$)` makes `test_gen_shim` NOT match
-          # `test_gen_shim_provoked`. That is the property this loop wants —
+          # EVERY PYTHON SUITE BY NAME — this list mirrors the `pysuite` loop in
+          # tests/CMakeLists.txt, as does the Release step's below — and the
+          # anchor is why each needs its own entry: `(\.|$)` makes
+          # `test_gen_shim` NOT match `test_gen_shim_provoked`. That is the
+          # property this loop wants —
           # Rule 12 splits a `.py` into a new REGISTERED TEST (Python has no
           # `.inc` escape hatch), so a half left out of tests/CMakeLists.txt
           # stops running with nothing to say so. Five such splits exist as of
           # bead 6y9 and this is what keeps them honest on the machine whose
           # report people trust. The seventh, test_l6_report (bd p2y5), is not
           # a split: it is L6's verdict on synthetic inputs, and needs no CQ_lang.
+          # Nor is the eighth, test_cqlang_drivers (bd oqp8): the L6/L7
+          # drivers' contact with the checkout, on a fake git/ctest PATH.
+          # (This comment said "ALL SEVEN" until bd oqp8; it names no count
+          # now, so an added suite cannot make it stale — only the lists.)
           for t in test_gen_shim test_gen_shim_provoked \
                    test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked \
-                   test_gen_bodies_abort test_l6_report \
+                   test_gen_bodies_abort test_l6_report test_cqlang_drivers \
                    test_lsan_negative; do
               if ! grep -qE "${pin}${t}(\.|\$)" ctest-N-debug.txt; then
                   echo "CI: $t is NOT registered in Debug"; fail=1
               fi
           done
           for t in l6_cqlang_fixtures l7_grover_cqlang test_grover_qec \
-                   test_sink_qec test_sink_qec_death; do
+                   test_sink_qec test_sink_qec_death \
+                   test_shim_trace test_shim_trace_death; do
               if grep -qE "${pin}${t}(\.|\$)" ctest-N-debug.txt; then
                   echo "CI: $t IS registered — this job cannot have made that link"; fail=1
               fi
@@ -280,13 +303,14 @@ jobs:
           fail=0
           for t in test_gen_shim test_gen_shim_provoked \
                    test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked \
-                   test_gen_bodies_abort test_l6_report; do
+                   test_gen_bodies_abort test_l6_report test_cqlang_drivers; do
               if ! grep -qE "${pin}${t}(\.|\$)" ctest-N-release.txt; then
                   echo "CI: $t is NOT registered in Release"; fail=1
               fi
           done
           for t in test_lsan_negative l6_cqlang_fixtures l7_grover_cqlang \
-                   test_grover_qec test_sink_qec test_sink_qec_death; do
+                   test_grover_qec test_sink_qec test_sink_qec_death \
+                   test_shim_trace test_shim_trace_death; do
               if grep -qE "${pin}${t}(\.|\$)" ctest-N-release.txt; then
                   echo "CI: $t IS registered in Release, and must not be"; fail=1
               fi

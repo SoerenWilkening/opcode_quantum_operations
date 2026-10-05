@@ -237,6 +237,10 @@ static void dccx(void *u, uint32_t a, uint32_t b, uint32_t t){ (void)u; (void)a;
  * W = 4 makes the region 24 and the operands 8, which is 31 against a device
  * that has 32; at i128 the same arithmetic is 16,640 against a `qec_n_logical`
  * the shipped configs cap at 7 (§15 D20).
+ * [Amended 2026-10-05, bd 64d1: the cap was never 7. config.json's 10 has been
+ * in the QEC repo's tracked examples since the first of them, so the cap was 10
+ * at QEC 1e3c315 (D20's revision) and through 2026-10-02, and it is 36 at
+ * a07968b; 16,640 is still ~460x that.]
  *
  * MEASURED, NOT WRITTEN DOWN, for the reason its positive sibling gives: the
  * closed form is pinned one file over, and a change to it must not silently

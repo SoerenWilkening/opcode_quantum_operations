@@ -42,6 +42,10 @@
  *                   the logical qubits, so raising it raises d and the fabric
  *                   may not fit. K12's divrem at W = 8 alone wants 79 scratch
  *                   qubits. Exceeding it fails loud (D2).
+ *                   [Amended 2026-10-05, bd 64d1: that set was never the
+ *                   shipped one. The tracked .json configs under qec/examples/
+ *                   carry {1,2,3,4,6,7,10} at QEC 1e3c315 (D20's revision) and
+ *                   {1,2,3,4,6,7,10,16,36} at a07968b; §15 D20 records both.]
  *   No recycling  = the trace contract's "every index belongs to at most one
  *                   register" (qec/docs/HOST_LANGUAGE_HANDOFF.md §3). Purely a
  *                   DISPLAY-model constraint: the qec patch is genuinely back at

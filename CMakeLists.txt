@@ -57,10 +57,12 @@ set(CQOPS_LEAK_CHECK "AUTO" CACHE STRING
     "Debug leak detection: AUTO (on if it works), ON (require it), OFF")
 set_property(CACHE CQOPS_LEAK_CHECK PROPERTY STRINGS AUTO ON OFF)
 
-## M27's generator and its two suites need a python3 that can `import yaml`.
-## Probed, not assumed — see cmake/CqopsPython.cmake.
+## M27's generator needs a python3 that can `import yaml`, and every Python
+## suite (tests/CMakeLists.txt's `pysuite` loop — "its two suites" here until
+## bd oqp8) is registered only when one is found. Probed, not assumed — see
+## cmake/CqopsPython.cmake.
 set(CQOPS_PYTHON "AUTO" CACHE STRING
-    "Shim generator suites: AUTO (register if an interpreter qualifies), ON (require one), OFF")
+    "Python suites: AUTO (register if an interpreter qualifies), ON (require one), OFF")
 set_property(CACHE CQOPS_PYTHON PROPERTY STRINGS AUTO ON OFF)
 
 ## CQ_lang is an opt-in integration dependency, not a build dependency. Its

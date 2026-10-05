@@ -943,9 +943,21 @@ add_cqops_death_test(test_kernel_step11_death CASES
 ## goes red — the call returns — while DEBUG STAYS GREEN, because the very next
 ## line, `cq_bit_value(b[i])`, trips CQ_BIT_ASSERT on the qubit lane inside the
 ## armed window. So in Debug this case did not see its own guard deleted.
-## `Assertion` rather than the `Assertion failed` this file spells elsewhere:
-## that is Apple libc's banner, and glibc — the CI box — prints
-## "Assertion `cond' failed.", which `Assertion failed` does not match.
+## `Assertion`, not `Assertion failed` — and since bd hcvb (2026-10-05) that is
+## the spelling in EVERY list in this file. assert()'s banner depends on the
+## libc, and `Assertion failed` appears in only one of the two this project
+## meets. MEASURED with one assert-failing program (`assert(x == 42)` in
+## `check`, file f.c, line 2):
+##   Apple libc, macOS 26.6.2:
+##     Assertion failed: (x == 42), function check, file f.c, line 2.
+##   glibc 2.39, an ubuntu:24.04 container + apt's clang 18 (ci.yml's toolchain
+##   step mirrored on this box; not a CI run):
+##     prog: f.c:2: int check(int): Assertion `x == 42' failed.
+## Until bd hcvb every other list spelled `Assertion failed` (Apple's banner
+## only) and was BLIND on glibc, which is what CI runs — M31's
+## pack_of_a_quantum_lane block below has the container measurement. CMake
+## regexes are case-sensitive; at bd hcvb no message in src/, shim/, include/,
+## tests/, tools/ or cmake/ contained `Assertion`.
 set_tests_properties(test_kernel_step11_death.a_quantum_shift_amount
                      PROPERTIES FAIL_REGULAR_EXPRESSION
                      "§3 distinctness;Assertion")
@@ -1016,7 +1028,8 @@ set_tests_properties(test_kernel_add_death.add_steps_called_directly_with_a_zero
 ## The rest of the list is the standing negative pin for a wild index (`bd
 ## 9ve.2` / `9ve.3`): every layer one COULD reach if a future mutant widened the
 ## window further, plus `sub:` because `ripple` is shared with K7, plus
-## `Assertion failed` — `cq_bit_value`'s Debug-only CQ_BIT_ASSERT is a third
+## `Assertion` (assert()'s banner on both libcs; bd hcvb, M11's block above) —
+## `cq_bit_value`'s Debug-only CQ_BIT_ASSERT is a third
 ## abort source the auto-prepended tripwire does NOT name (`bd 9ve.18`). The two
 ## sanitizer banners are NOT written here: cqops_death_arm_sanitizer_tripwire
 ## prepends them under cmake_language(DEFER), and the composed list is read back
@@ -1025,7 +1038,7 @@ set_tests_properties(test_kernel_add_death.add_steps_called_directly_with_a_zero
 set_tests_properties(test_kernel_add_death.add_step_index_past_the_end
                      test_kernel_add_death.add_step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "add: width is not positive;sub:;addacc:;scratch:;shadow:;qubit pool:;emit:;reg:;sandwich:;Assertion failed")
+                     "add: width is not positive;sub:;addacc:;scratch:;shadow:;qubit pool:;emit:;reg:;sandwich:;Assertion")
 
 ## M16, Step 13. Same argument as M14's, one predicate family at a time — and
 ## `the_two_sources_are_the_same_register` is the sharpest case in the project
@@ -1109,7 +1122,7 @@ set_tests_properties(test_kernel_cmp_death.eq_step_index_high
 ## discriminator.
 set_tests_properties(test_kernel_cmp_death.slt_steps_zero_width
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "destination width is not positive;source width is not positive;ult: width is not positive;Assertion failed")
+                     "destination width is not positive;source width is not positive;ult: width is not positive;Assertion")
 
 ## (2) THE TWO INDEX CASES CONVICT DIFFERENTLY, AND ONLY ONE OF THEM ON THE EXIT
 ## CODE — measured by making the range check unreachable and reading the failure
@@ -1132,7 +1145,7 @@ set_tests_properties(test_kernel_cmp_death.slt_steps_zero_width
 set_tests_properties(test_kernel_cmp_death.slt_step_index_high
                      test_kernel_cmp_death.slt_step_index_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "slt: width is not positive;ult: step index outside;ult: width is not positive;scratch:;shadow:;qubit pool:;emit:;reg:;sandwich:;Assertion failed")
+                     "slt: width is not positive;ult: step index outside;ult: width is not positive;scratch:;shadow:;qubit pool:;emit:;reg:;sandwich:;Assertion")
 
 ## M17 and M12, Step 14. Same argument as M14's and M16's — with the difference
 ## that M12 could NOT use their trick, and paid for it.
@@ -2076,13 +2089,22 @@ set_tests_properties(test_kernel_fpfield_death.class_block_region_is_one_bit_sho
 ## landed inside the window. So "Assertion failed" is pinned absent, and the
 ## case is a real claim in both configurations rather than in one.
 ##
+## SUPERSEDED IN ONE WORD BY bd hcvb (2026-10-05): that was a claim about macOS
+## only. "Assertion failed" is Apple libc's banner, glibc's reads "...: Assertion
+## `cond' failed.", and on glibc this case was blind. Measured in a glibc 2.39
+## container (ubuntu:24.04, clang 18, Debug configured with ci.yml's flags, this
+## guard neutered `if (0 && ...)` in a scratch copy of the source): under
+## "Assertion failed" the case PASSED with "Assertion `cq_bit_is_const(b)'
+## failed." in its output; under "Assertion" it FAILS — "Error regular
+## expression found in output. Regex=[Assertion]"; guard intact, it passes.
+##
 ## The three cq_fp_view cases need no equivalent: measured, both configurations
 ## kill them — Release because an out-of-range view returns normally, Debug
 ## because ASan sees the read past the rail and its banner is already in the
 ## tripwire.
 set_tests_properties(test_kernel_fpfield_death.pack_of_a_quantum_lane
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "Assertion failed;scratch:;emit:;reg:;shadow:;qubit pool:")
+                     "Assertion;scratch:;emit:;reg:;shadow:;qubit pool:")
 
 ## ---------------------------------------------------------------------------
 ## M36 `fcmp` — K18, the FIRST floating-point KERNEL (bd 9ve.20). PRD-v2 §5's
@@ -2135,7 +2157,7 @@ add_cqops_death_test(test_kernel_fcmp_death CASES
 set_tests_properties(test_kernel_fcmp_death.step_index_past_the_end
                      test_kernel_fcmp_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fcmp: the step dispatch fell off;fpclass: step index outside;fpclass: the block's region;eq: step index outside;ult: step index outside;sub: step index outside;eq: width is not positive;ult: width is not positive;sub: width is not positive;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion failed")
+                     "fcmp: the step dispatch fell off;fpclass: step index outside;fpclass: the block's region;eq: step index outside;ult: step index outside;sub: step index outside;eq: width is not positive;ult: width is not positive;sub: width is not positive;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion")
 
 ## (2) THE REGION CHECK IS MASKED FROM BELOW TWICE. Delete it and the first
 ## out-of-region span aborts either in M08's cq_scratch_span ("FATAL: scratch:
@@ -2150,10 +2172,11 @@ set_tests_properties(test_kernel_fcmp_death.block_region_is_one_bit_short
                      test_kernel_fcmp_death.flag_of_a_program_that_does_not_fit
                      test_kernel_fcmp_death.a_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fpclass: the block's region;fpclass: the block has no region;fpclass: step index outside;eq: step index outside;ult: step index outside;sub: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion failed")
+                     "scratch:;fpclass: the block's region;fpclass: the block has no region;fpclass: step index outside;eq: step index outside;ult: step index outside;sub: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion")
 
 ## (3) THE WIDTH GUARD IS THE ONLY THING BETWEEN A WRONG `W` AND A PLAUSIBLE
-## ANSWER, AND `Assertion failed` IS THE THIRD ABORT SOURCE (bd 9ve.18's M31
+## ANSWER, AND assert() — banner `Assertion` on both libcs, bd hcvb — IS THE
+## THIRD ABORT SOURCE (bd 9ve.18's M31
 ## finding, measured there and carried here on purpose). With the guard deleted
 ## the all-classical path reaches cq_fp_pack, which reads 64 lanes of a 64-lane
 ## rail whatever `W` said, then cq_bit_value — whose precondition is a
@@ -2163,7 +2186,7 @@ set_tests_properties(test_kernel_fcmp_death.block_region_is_one_bit_short
 set_tests_properties(test_kernel_fcmp_death.oeq_width_is_not_64
                      test_kernel_fcmp_death.ule_width_is_not_64
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "Assertion failed;fpfield: pack;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness")
+                     "Assertion;fpfield: pack;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness")
 
 ## (4) THE VOCABULARY AND THE ENUM. Nothing below M36 knows what a row op, an
 ## operand code or an LLVM predicate is, so no lower layer can answer for these
@@ -2181,7 +2204,7 @@ set_tests_properties(test_kernel_fcmp_death.a_row_with_an_unknown_op
                      test_kernel_fcmp_death.program_of_an_unknown_predicate
                      test_kernel_fcmp_death.eval_of_an_unknown_predicate
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fpclass:;eq: step index outside;ult: step index outside;sub: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion failed")
+                     "scratch:;fpclass:;eq: step index outside;ult: step index outside;sub: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;Assertion")
 
 ## (5) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations;
 ## D7b is LEGAL at the handle boundary and a hard error here, because reaching
@@ -2192,7 +2215,7 @@ set_tests_properties(test_kernel_fcmp_death.a_row_with_an_unknown_op
 set_tests_properties(test_kernel_fcmp_death.oeq_dst_aliases_its_first_source
                      test_kernel_fcmp_death.olt_sources_alias_each_other
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "distinctness;scratch:;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;Assertion failed")
+                     "distinctness;scratch:;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;Assertion")
 
 ## M32 `fpround` — K23, the four SHARED softfloat helpers as exported step
 ## blocks (bd 9ve.19). PRD-v2 §5's M32 row, §7.1's instruments-before-the-
@@ -2231,13 +2254,14 @@ add_cqops_death_test(test_kernel_fpround_death CASES
 ## case a claim about the range check. Every other layer a wild index can reach
 ## is named as well, enumerated with
 ## `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c`, plus both sanitizer
-## banners and `Assertion failed` — bd 9ve.18's M31 finding, carried here on
+## banners and `Assertion` (assert()'s banner on both libcs, bd hcvb) — bd
+## 9ve.18's M31 finding, carried here on
 ## purpose because a Debug-only assert landing inside the CQ_EXPECT_ABORT
 ## window makes a mutant survive in Debug and die in Release.
 set_tests_properties(test_kernel_fpround_death.step_index_past_the_end
                      test_kernel_fpround_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fpround: the step dispatch fell off;fpround: the block's region;fpround: a one-bit operand;fpround: a 64-lane operand;fpround: an operand names a row;eq: step index outside;ult: step index outside;slt: step index outside;sub: step index outside;add: step index outside;barrel: step index outside;eq: width is not positive;ult: width is not positive;slt: width is not positive;sub: width is not positive;add: width is not positive;mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fpround: the step dispatch fell off;fpround: the block's region;fpround: a one-bit operand;fpround: a 64-lane operand;fpround: an operand names a row;eq: step index outside;ult: step index outside;slt: step index outside;sub: step index outside;add: step index outside;barrel: step index outside;eq: width is not positive;ult: width is not positive;slt: width is not positive;sub: width is not positive;add: width is not positive;mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
 ## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
@@ -2250,7 +2274,7 @@ set_tests_properties(test_kernel_fpround_death.block_region_is_one_bit_short
                      test_kernel_fpround_death.output_of_a_block_that_does_not_fit
                      test_kernel_fpround_death.a_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fpround: step index outside;fpround: the step dispatch fell off;eq: step index outside;ult: step index outside;slt: step index outside;sub: step index outside;add: step index outside;barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fpround: step index outside;fpround: the step dispatch fell off;eq: step index outside;ult: step index outside;slt: step index outside;sub: step index outside;add: step index outside;barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (3) THE VOCABULARY. Nothing below M32 knows what a block id, a row op or an
 ## output index is, so no lower layer can answer for these — but an unknown id
@@ -2263,7 +2287,7 @@ set_tests_properties(test_kernel_fpround_death.a_block_id_outside_the_four
                      test_kernel_fpround_death.flushed_with_no_output_array
                      test_kernel_fpround_death.round_has_no_result_sign
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fpround: step index outside;fpround: the block's region;eq:;ult:;slt:;sub:;add:;barrel:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fpround: step index outside;fpround: the block's region;eq:;ult:;slt:;sub:;add:;barrel:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 add_cqops_death_test(test_kernel_qrom_death CASES
     an_index_narrower_than_the_tree
@@ -2733,7 +2757,8 @@ set_tests_properties(test_runtime_gate_death.rz_controlled_on_a_constant_lane_is
 ##
 ## The interpreter is PROBED (cmake/CqopsPython.cmake): PyYAML is what decides,
 ## and on this box the two python3 on PATH disagree about having it. When none
-## qualifies these two are NOT registered and CMake warns — a suite that passes
+## qualifies, NONE of the loop's suites is registered ("these two" until bd
+## oqp8; the loop below is the list) and CMake warns — a suite that passes
 ## without running would be worse than a test count that visibly drops.
 ##
 ## CQOPS_CC hands the suites the compiler THIS build configured, so the compile
@@ -2767,9 +2792,18 @@ if(CQOPS_PY)
     ##                            It needs no PyYAML; it rides this loop so it
     ##                            is registered, gated and CI-checked exactly
     ##                            as its six neighbours are.
+    ##
+    ## AN EIGHTH SINCE 2026-10-05 (bd oqp8), also NOT a split, and on
+    ## test_l6_report's terms (no PyYAML, rides the loop, CI lists it):
+    ##
+    ##   test_cqlang_drivers      l6_run.py's and l7_run.py's contact with the
+    ##                            CQ_lang checkout — --cqlang required, every
+    ##                            git call --no-optional-locks, a run that
+    ##                            straddles a commit flagged — on a fake
+    ##                            git/ctest/bash PATH, never on CQ_lang.
     foreach(pysuite test_gen_shim test_gen_shim_provoked
                     test_gen_bodies test_gen_bodies_run test_gen_bodies_provoked
-                    test_gen_bodies_abort test_l6_report)
+                    test_gen_bodies_abort test_l6_report test_cqlang_drivers)
         add_test(NAME ${pysuite}
                  COMMAND ${CQOPS_PY} "${CMAKE_CURRENT_SOURCE_DIR}/${pysuite}.py"
                  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
@@ -3021,13 +3055,14 @@ add_cqops_death_test(test_kernel_fadd_death CASES
 ## that one is pinned absent too and only then is this case a claim about the
 ## range check. Every other layer a wild index can reach is named as well,
 ## enumerated with `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c`, plus
-## both sanitizer banners and `Assertion failed` — bd 9ve.18's M31 finding,
+## both sanitizer banners and `Assertion` (assert()'s banner on both libcs, bd
+## hcvb) — bd 9ve.18's M31 finding,
 ## carried here because a Debug-only assert landing inside the CQ_EXPECT_ABORT
 ## window makes a mutant survive in Debug and die in Release.
 set_tests_properties(test_kernel_fadd_death.step_index_past_the_end
                      test_kernel_fadd_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fadd: a slot index outside;fadd: the step dispatch fell off;fadd: the block's region;fadd: a one-bit operand;fadd: a 64-lane operand;fadd: an operand names a row;fadd: unknown;fadd: a pick;fadd: a view chain;fadd: a class row;fadd: this block has; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;fpclass: step index outside;fpround: step index outside; eq: width is not positive; ult: width is not positive; sub: width is not positive; add: width is not positive; mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fadd: a slot index outside;fadd: the step dispatch fell off;fadd: the block's region;fadd: a one-bit operand;fadd: a 64-lane operand;fadd: an operand names a row;fadd: unknown;fadd: a pick;fadd: a view chain;fadd: a class row;fadd: this block has; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;fpclass: step index outside;fpround: step index outside; eq: width is not positive; ult: width is not positive; sub: width is not positive; add: width is not positive; mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
 ## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
@@ -3041,7 +3076,7 @@ set_tests_properties(test_kernel_fadd_death.block_region_is_one_bit_short
                      test_kernel_fadd_death.result_of_a_block_that_does_not_fit
                      test_kernel_fadd_death.a_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fadd: step index outside;fadd: the step dispatch fell off;fpclass: the block's region;fpround: the block's region; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fadd: step index outside;fadd: the step dispatch fell off;fpclass: the block's region;fpround: the block's region; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (3) W != 64. Nothing below M33 knows that v2 is f64 only: cq_kernel_check_dst
 ## accepts any positive width and cq_fp_pack reads a 64-lane rail happily, so on
@@ -3051,7 +3086,7 @@ set_tests_properties(test_kernel_fadd_death.block_region_is_one_bit_short
 set_tests_properties(test_kernel_fadd_death.fadd_width_is_not_64
                      test_kernel_fadd_death.fsub_width_is_not_64
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "kernel: D7;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;fadd: step index outside;fadd: the block's region;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "kernel: D7;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;fadd: step index outside;fadd: the block's region;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (4) THE VOCABULARY AND THE PROGRAM ENUM. Nothing below M33 knows what a row
 ## op, an operand code, a pick index or a program id is, so no lower layer can
@@ -3076,7 +3111,7 @@ set_tests_properties(test_kernel_fadd_death.program_id_is_neither_add_nor_sub
                      test_kernel_fadd_death.a_block_with_no_such_input
                      test_kernel_fadd_death.a_program_of_no_rows
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness; eq:; ult:; sub:; add:; barrel:; mux:;fpclass:;fpround:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness; eq:; ult:; sub:; add:; barrel:; mux:;fpclass:;fpround:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (5) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations and
 ## D7b is LEGAL at the handle boundary — reaching a kernel means M26's defensive
@@ -3087,7 +3122,7 @@ set_tests_properties(test_kernel_fadd_death.program_id_is_neither_add_nor_sub
 set_tests_properties(test_kernel_fadd_death.fadd_dst_aliases_its_first_source
                      test_kernel_fadd_death.fsub_sources_alias_each_other
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "distinctness;emit:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;fadd: W must be 64;fsub: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "distinctness;emit:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;fadd: W must be 64;fsub: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 
 ## M34 `fmul` — K16, `soft_fmul` at f64 and the first fp kernel with a
@@ -3174,7 +3209,7 @@ add_cqops_death_test(test_kernel_fma_death CASES
 set_tests_properties(test_kernel_fma_death.width_is_not_64
                      test_kernel_fma_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "D7a;fpfield:;fpclass:;fmul:;fadd:;fdiv:;fsqrt:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "D7a;fpfield:;fpclass:;fmul:;fadd:;fdiv:;fsqrt:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## THE STRUCTURAL GUARDS ARE M39'S AND NOT M08'S. `cq_scratch_span` names the
 ## REGION rather than the consumer that mis-sized its offset, and a NULL `scr`
@@ -3190,7 +3225,7 @@ set_tests_properties(test_kernel_fma_death.step_index_past_the_end
                      test_kernel_fma_death.a_block_with_no_region
                      test_kernel_fma_death.a_block_with_no_operand_c
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fma: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fma: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## D7a AND D7b ARE `cq_kernel_check_n`'s, AND THE WHOLE POINT OF DRIVING SIX
 ## PAIRS IS THAT THE N-ARY GUARD SIZES EVERY RANGE PER OPERAND. M05's
@@ -3205,7 +3240,7 @@ set_tests_properties(test_kernel_fma_death.dst_aliases_its_first_source
                      test_kernel_fma_death.sources_a_and_c_alias
                      test_kernel_fma_death.sources_b_and_c_alias
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "distinctness;emit:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;fma: W must be 64;fpfield:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "distinctness;emit:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;fma: W must be 64;fpfield:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## THE TABLE'S OWN ACCESSORS. Each names the PROGRAM and not a layout, because
 ## fma.c is the file that knows which hand-off returns a tuple and fma_step.c's
@@ -3215,7 +3250,7 @@ set_tests_properties(test_kernel_fma_death.arity_of_an_unknown_op
                      test_kernel_fma_death.a_projection_of_a_row_that_returns_no_tuple
                      test_kernel_fma_death.a_projection_of_a_row_that_is_not_earlier
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fma: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fma: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## THE OPERAND-RESOLUTION REFUSALS (review round 1). A ROW INDEX AND AN OPERAND
 ## CODE ARE M39'S OWN VOCABULARY, so nothing below can answer for any of these
@@ -3228,12 +3263,12 @@ set_tests_properties(test_kernel_fma_death.arity_of_an_unknown_op
 set_tests_properties(test_kernel_fma_death.an_operand_names_a_row_outside_the_program
                      test_kernel_fma_death.a_64_lane_operand_names_a_one_bit_row
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;one-bit operand;unknown 64-lane operand code;view chain;barrel direction;unknown op in the program;a row index outside the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;one-bit operand;unknown 64-lane operand code;view chain;barrel direction;unknown op in the program;a row index outside the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 set_tests_properties(test_kernel_fma_death.a_one_bit_operand_is_not_a_row_of_this_program
                      test_kernel_fma_death.a_one_bit_operand_names_a_64_lane_row
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;64-lane operand names;operand names a row outside the program;unknown 64-lane operand code;view chain;barrel direction;unknown op in the program;a row index outside the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;64-lane operand names;operand names a row outside the program;unknown 64-lane operand code;view chain;barrel direction;unknown op in the program;a row index outside the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## THE CONSTANT VOCABULARY. `CQ_FU_N_CODE`'s new `_Static_assert` pins the
 ## SIZE of the enum and can say nothing about a caller that invents a code, so
@@ -3241,7 +3276,7 @@ set_tests_properties(test_kernel_fma_death.a_one_bit_operand_is_not_a_row_of_thi
 ## negative code that fell into the row path would abort with one of them.
 set_tests_properties(test_kernel_fma_death.an_unknown_64_lane_operand_code
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;operand names a row;one-bit operand;the block has no operand;view chain;barrel direction;unknown op in the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;fpclass:;fma: W must be 64;operand names a row;one-bit operand;the block has no operand;view chain;barrel direction;unknown op in the program;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## THE THREE ROW-OP SWITCHES, AND THEIR MESSAGES WERE MADE DISJOINT TO WRITE
 ## THESE. All three take a ROW and all three now die on their `default:`;
@@ -3257,22 +3292,22 @@ set_tests_properties(test_kernel_fma_death.an_unknown_64_lane_operand_code
 ## than after one of them passed for the wrong reason.
 set_tests_properties(test_kernel_fma_death.the_cost_of_an_unknown_row_op
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the region of an unknown row op;the width of an unknown row op;arity of an unknown row op;unknown op in the program;barrel direction;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the region of an unknown row op;the width of an unknown row op;arity of an unknown row op;unknown op in the program;barrel direction;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 set_tests_properties(test_kernel_fma_death.the_region_of_an_unknown_row_op
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the cost of an unknown row op;the width of an unknown row op;arity of an unknown row op;unknown op in the program;barrel direction;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the cost of an unknown row op;the width of an unknown row op;arity of an unknown row op;unknown op in the program;barrel direction;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 set_tests_properties(test_kernel_fma_death.the_width_of_an_unknown_row_op
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the cost of an unknown row op;the region of an unknown row op;arity of an unknown row op;unknown op in the program;a row index outside the program;barrel direction;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;the cost of an unknown row op;the region of an unknown row op;arity of an unknown row op;unknown op in the program;a row index outside the program;barrel direction;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## AND THE BARREL DIRECTION, WHICH THE COST HALF AND THE DISPATCH HALF SHARE.
 ## A silent `CQ_BARREL_SHL` for a row that is no barrel is a wrong step count
 ## AND a wrong gate, and neither is visible at a count.
 set_tests_properties(test_kernel_fma_death.a_barrel_direction_asked_of_a_row_that_is_no_barrel
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;unknown op in the program;the cost of an unknown row op;the region of an unknown row op;the width of an unknown row op;arity of an unknown row op;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;fpfield:;unknown op in the program;the cost of an unknown row op;the region of an unknown row op;the width of an unknown row op;arity of an unknown row op;operand names a row;one-bit operand;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 
 ## M34's fail-loud paths. Which layer would answer for each guard, and why the
@@ -3304,14 +3339,15 @@ add_cqops_death_test(test_kernel_fmul_death CASES
 ## pinned absent too and only then is this case a claim about the range check.
 ## Every other layer a wild index can reach is named as well, enumerated with
 ## `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c` plus the composed
-## blocks' own messages, plus both sanitizer banners and `Assertion failed` —
+## blocks' own messages, plus both sanitizer banners and `Assertion` (assert()'s
+## banner on both libcs, bd hcvb) —
 ## bd 9ve.18's M31 finding, carried here because a Debug-only assert landing
 ## inside the CQ_EXPECT_ABORT window makes a mutant survive in Debug and die in
 ## Release.
 set_tests_properties(test_kernel_fmul_death.step_index_past_the_end
                      test_kernel_fmul_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fmul: the step dispatch fell off;fmul: the block's region;fmul: the block has no;fmul: a one-bit operand;fmul: a 64-lane operand;fmul: an operand names a row;fmul: a row index outside;fmul: a view chain;fmul: unknown;fmul: arity of;fmul: a projection;fmul: `result`;fmul: W must be 64;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;: mul: step index outside;addacc: step index;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;: mul: width is not positive;mux: region width;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fmul: the step dispatch fell off;fmul: the block's region;fmul: the block has no;fmul: a one-bit operand;fmul: a 64-lane operand;fmul: an operand names a row;fmul: a row index outside;fmul: a view chain;fmul: unknown;fmul: arity of;fmul: a projection;fmul: `result`;fmul: W must be 64;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;: mul: step index outside;addacc: step index;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;: mul: width is not positive;mux: region width;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
 ## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
@@ -3324,7 +3360,7 @@ set_tests_properties(test_kernel_fmul_death.block_region_is_one_bit_short
                      test_kernel_fmul_death.result_of_a_program_that_does_not_fit
                      test_kernel_fmul_death.a_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fmul: step index outside;fmul: the step dispatch fell off;fmul: a one-bit operand;fmul: a 64-lane operand;fmul: an operand names a row;fmul: unknown;fmul: a projection;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;: mul: step index outside;addacc: step index;fpround: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fmul: step index outside;fmul: the step dispatch fell off;fmul: a one-bit operand;fmul: a 64-lane operand;fmul: an operand names a row;fmul: unknown;fmul: a projection;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;: mul: step index outside;addacc: step index;fpround: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (3) THE MISSING RAIL. Without the guard `base64` returns NULL and the xor
 ## row dereferences it — a SIGSEGV in Release, which is not a SIGABRT and so is
@@ -3333,7 +3369,7 @@ set_tests_properties(test_kernel_fmul_death.block_region_is_one_bit_short
 ## records, so both banners are pinned absent.
 set_tests_properties(test_kernel_fmul_death.a_block_with_no_operand_a
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fmul: step index outside;fmul: the step dispatch fell off;fmul: the block's region;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fmul: step index outside;fmul: the step dispatch fell off;fmul: the block's region;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (4) THE VOCABULARY. Nothing below M34 knows what a row op, a row index or a
 ## projection is, so no lower layer can answer for these — but an unknown op
@@ -3345,7 +3381,7 @@ set_tests_properties(test_kernel_fmul_death.arity_of_an_unknown_op
                      test_kernel_fmul_death.a_projection_of_a_row_that_is_not_earlier
                      test_kernel_fmul_death.a_projection_of_a_row_that_returns_no_tuple
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fmul: step index outside;fmul: the block's region;fmul: the block has no;eq:;ult:;sub:;add:;: mul:;mux:;fpround:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fmul: step index outside;fmul: the block's region;fmul: the block has no;eq:;ult:;sub:;add:;: mul:;mux:;fpround:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (5) THE WIDTH IS A REFUSAL AND NOT AN UNIMPLEMENTED CASE (PRD-v2 §1). Delete
 ## the guard and a W = 32 call reaches M31's `cq_fp_pack` or `cq_fp_view`,
@@ -3354,7 +3390,7 @@ set_tests_properties(test_kernel_fmul_death.arity_of_an_unknown_op
 set_tests_properties(test_kernel_fmul_death.width_is_not_64
                      test_kernel_fmul_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "D7a;Assertion failed;fpfield: pack;fpfield: view span;fmul: step index outside;fmul: the block's region;fmul: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+                     "D7a;Assertion;fpfield: pack;fpfield: view span;fmul: step index outside;fmul: the block's region;fmul: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## (6) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations
 ## and D7b is LEGAL at the handle boundary — its remedy is M26's defensive
@@ -3364,7 +3400,7 @@ set_tests_properties(test_kernel_fmul_death.width_is_not_64
 set_tests_properties(test_kernel_fmul_death.dst_aliases_its_first_source
                      test_kernel_fmul_death.sources_alias_each_other
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fmul: step index outside;fmul: the block's region;fmul: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fmul: step index outside;fmul: the block's region;fmul: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 
 
@@ -3412,7 +3448,7 @@ add_cqops_death_test(test_kernel_fsqrt_death CASES
 set_tests_properties(test_kernel_fsqrt_death.step_index_past_the_end
                      test_kernel_fsqrt_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fsqrt: a slot index outside;fsqrt: the step dispatch fell off;fsqrt: the block's region;fsqrt: the block has no;fsqrt: a one-bit operand;fsqrt: a 64-lane operand;fsqrt: an operand names a row;fsqrt: a row index outside;fsqrt: a view chain;fsqrt: an arithmetic-shift view;fsqrt: unknown;fsqrt: arity of;fsqrt: a projection;fsqrt: `result`;fsqrt: W must be 64;fsqrt: a loop row outside;fsqrt: the program outgrew;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;mux: region width;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;fpfield: view span;fpfield: pack;fpclass:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fsqrt: a slot index outside;fsqrt: the step dispatch fell off;fsqrt: the block's region;fsqrt: the block has no;fsqrt: a one-bit operand;fsqrt: a 64-lane operand;fsqrt: an operand names a row;fsqrt: a row index outside;fsqrt: a view chain;fsqrt: an arithmetic-shift view;fsqrt: unknown;fsqrt: arity of;fsqrt: a projection;fsqrt: `result`;fsqrt: W must be 64;fsqrt: a loop row outside;fsqrt: the program outgrew;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;mux: region width;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;fpfield: view span;fpfield: pack;fpclass:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
 ## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
@@ -3425,7 +3461,7 @@ set_tests_properties(test_kernel_fsqrt_death.block_region_is_one_bit_short
                      test_kernel_fsqrt_death.result_of_a_program_that_does_not_fit
                      test_kernel_fsqrt_death.a_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the step dispatch fell off;fsqrt: a one-bit operand;fsqrt: a 64-lane operand;fsqrt: an operand names a row;fsqrt: unknown;fsqrt: a projection;fsqrt: an arithmetic-shift view;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;fpround: step index outside;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the step dispatch fell off;fsqrt: a one-bit operand;fsqrt: a 64-lane operand;fsqrt: an operand names a row;fsqrt: unknown;fsqrt: a projection;fsqrt: an arithmetic-shift view;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;fpround: step index outside;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (3) THE MISSING RAIL. Without the guard `base64` returns NULL and the
 ## `is_nan` CLASS row dereferences it — a SIGSEGV in Release, which is not a
@@ -3435,7 +3471,7 @@ set_tests_properties(test_kernel_fsqrt_death.block_region_is_one_bit_short
 ## absent.
 set_tests_properties(test_kernel_fsqrt_death.a_block_with_no_operand_a
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the step dispatch fell off;fsqrt: the block's region;fpclass:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the step dispatch fell off;fsqrt: the block's region;fpclass:;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (4) THE VOCABULARY, AND THE LOOP-ROW ACCESSOR. Nothing below M40 knows what
 ## a row op, a row index, a projection or an ITERATION is, so no lower layer
@@ -3452,7 +3488,7 @@ set_tests_properties(test_kernel_fsqrt_death.arity_of_an_unknown_op
                      test_kernel_fsqrt_death.loop_row_past_the_last_iteration
                      test_kernel_fsqrt_death.loop_row_past_the_template
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;fsqrt: the program outgrew;eq:;ult:;sub:;add:;mux:;fpround:;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;fsqrt: the program outgrew;eq:;ult:;sub:;add:;mux:;fpround:;fpclass:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (5) THE WIDTH IS A REFUSAL AND NOT AN UNIMPLEMENTED CASE (PRD-v2 §1). Delete
 ## the guard and a W = 32 call reaches M31's `cq_fp_pack` or `cq_fp_view`,
@@ -3461,7 +3497,7 @@ set_tests_properties(test_kernel_fsqrt_death.arity_of_an_unknown_op
 set_tests_properties(test_kernel_fsqrt_death.width_is_not_64
                      test_kernel_fsqrt_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "D7a;Assertion failed;fpfield: pack;fpfield: view span;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+                     "D7a;Assertion;fpfield: pack;fpfield: view span;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## (6) D7a AT THE KERNEL BOUNDARY, AND THE D7b LEG IS VACUOUS AT ARITY 1 — one
 ## source cannot alias another, so there is no `sources_alias_each_other` case
@@ -3471,7 +3507,7 @@ set_tests_properties(test_kernel_fsqrt_death.width_is_not_64
 ## pinned absent.
 set_tests_properties(test_kernel_fsqrt_death.dst_aliases_its_source
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fpclass:;fsqrt: a slot index outside;fsqrt: step index outside;fsqrt: the block's region;fsqrt: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 
 ## M37 `fconv` — K19, the f64 <-> integer conversions (bd 9ve.23). The whole
@@ -3521,7 +3557,7 @@ add_cqops_death_test(test_kernel_fconv_death CASES
 set_tests_properties(test_kernel_fconv_death.uitofp_from_i64_is_refused
                      test_kernel_fconv_death.uitofp_from_i64_is_refused_classically_too
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;fconv: pack of a lane;fconv: the shipped source widths;fpfield: pack;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;fconv: pack of a lane;fconv: the shipped source widths;fpfield: pack;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (2) THE WIDTH PAIRS ARE A REFUSAL AND NOT AN UNIMPLEMENTED CASE (PRD-v2 §1).
 ## Delete a guard and the call reaches M31's `cq_fp_pack` or `cq_fp_view`,
@@ -3536,7 +3572,7 @@ set_tests_properties(test_kernel_fconv_death.fptosi_target_is_not_64
                      test_kernel_fconv_death.uitofp_source_is_not_shipped
                      test_kernel_fconv_death.uitofp_target_is_not_64
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "9ve.34;fpfield: pack;fpfield: view span;fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;eq:;ult:;sub:;add:;mux:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "9ve.34;fpfield: pack;fpfield: view span;fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;eq:;ult:;sub:;add:;mux:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (3) THE STEP INDEX. Masked from BELOW on the low side by every inner block's
 ## own range check (M16's `eq` is the first emitting row of `soft_fptosi`) and
@@ -3546,7 +3582,7 @@ set_tests_properties(test_kernel_fconv_death.fptosi_target_is_not_64
 set_tests_properties(test_kernel_fconv_death.step_index_past_the_end
                      test_kernel_fconv_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;fconv: a view chain;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;mux: region width;fpround: step index outside;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fconv: the step dispatch fell off;fconv: the block's region;fconv: the block has no;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;fconv: a view chain;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;mux: region width;fpround: step index outside;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (4) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
 ## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
@@ -3559,7 +3595,7 @@ set_tests_properties(test_kernel_fconv_death.block_region_is_one_bit_short
                      test_kernel_fconv_death.result_of_a_program_that_does_not_fit
                      test_kernel_fconv_death.a_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fconv: step index outside;fconv: the step dispatch fell off;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fconv: step index outside;fconv: the step dispatch fell off;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;fconv: the source width;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (5) THE MISSING RAIL AND THE IMPOSSIBLE SOURCE WIDTH. Without the first
 ## guard `base64` returns NULL and the `eq` row dereferences it — a SIGSEGV in
@@ -3570,7 +3606,7 @@ set_tests_properties(test_kernel_fconv_death.block_region_is_one_bit_short
 set_tests_properties(test_kernel_fconv_death.a_block_with_no_operand_a
                      test_kernel_fconv_death.a_source_width_outside_the_range
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fconv: step index outside;fconv: the step dispatch fell off;fconv: the block's region;fconv: a one-bit operand;fconv: a 64-lane operand;fconv: an operand names a row;fconv: unknown;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (6) THE VOCABULARY. Nothing below M37 knows what a row op, a row index or an
 ## operand code is, so no lower layer can answer for these — but an unknown op
@@ -3584,7 +3620,7 @@ set_tests_properties(test_kernel_fconv_death.arity_of_an_unknown_op
                      test_kernel_fconv_death.an_operand_names_no_constant
                      test_kernel_fconv_death.an_operand_names_a_row_outside_the_program
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fconv: step index outside;fconv: the block's region;fconv: the block has no;fconv: the source width;eq:;ult:;sub:;add:;mux:;fpround:;fpfield:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fconv: step index outside;fconv: the block's region;fconv: the block has no;fconv: the source width;eq:;ult:;sub:;add:;mux:;fpround:;fpfield:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (7) D7a AT THE KERNEL BOUNDARY. `dst` may not be the source: `dst ^= f(a)`
 ## is not a function of `a` if they are the same wires. M07's handle-level
@@ -3593,7 +3629,7 @@ set_tests_properties(test_kernel_fconv_death.arity_of_an_unknown_op
 ## absent.
 set_tests_properties(test_kernel_fconv_death.dst_aliases_its_source
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fconv: step index outside;fconv: the block's region;fconv: the source width;fpfield:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fconv: step index outside;fconv: the block's region;fconv: the source width;fpfield:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 
 
@@ -3639,13 +3675,14 @@ add_cqops_death_test(test_kernel_fdiv_death CASES
 ## reach. Every other layer a wild index can reach is named as well, enumerated
 ## with `grep -rhoE 'FATAL: [a-z_ ]+:' src/*.c src/kernels/*.c` plus the
 ## composed blocks' own messages, plus both sanitizer banners and
-## `Assertion failed` — bd 9ve.18's M31 finding, carried here because a
+## `Assertion` (assert()'s banner on both libcs, bd hcvb) — bd 9ve.18's M31
+## finding, carried here because a
 ## Debug-only assert landing inside the CQ_EXPECT_ABORT window makes a mutant
 ## survive in Debug and die in Release.
 set_tests_properties(test_kernel_fdiv_death.step_index_past_the_end
                      test_kernel_fdiv_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fdiv: a slot index outside the segmented map;fdiv: the step dispatch fell off;fdiv: the block's region;fdiv: the block has no;fdiv: a one-bit operand;fdiv: a 64-lane operand;fdiv: an operand names a row;fdiv: a row index outside;fdiv: a view chain;fdiv: unknown;fdiv: arity of;fdiv: a projection;fdiv: `result`;fdiv: a program segment;fdiv: W must be 64;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;addacc: step index;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;mux: region width;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fdiv: a slot index outside the segmented map;fdiv: the step dispatch fell off;fdiv: the block's region;fdiv: the block has no;fdiv: a one-bit operand;fdiv: a 64-lane operand;fdiv: an operand names a row;fdiv: a row index outside;fdiv: a view chain;fdiv: unknown;fdiv: arity of;fdiv: a projection;fdiv: `result`;fdiv: a program segment;fdiv: W must be 64;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;addacc: step index;fpround: step index outside;fpround: the step dispatch fell off;eq: width is not positive;ult: width is not positive;sub: width is not positive;add: width is not positive;mux: region width;fpfield: view span;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (2) THE REGION CHECK IS MASKED FROM BELOW BY M08. Delete it and the first
 ## out-of-region span aborts in cq_scratch_span ("FATAL: scratch: span is
@@ -3658,7 +3695,7 @@ set_tests_properties(test_kernel_fdiv_death.block_region_is_one_bit_short
                      test_kernel_fdiv_death.result_of_a_program_that_does_not_fit
                      test_kernel_fdiv_death.a_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the step dispatch fell off;fdiv: a one-bit operand;fdiv: a 64-lane operand;fdiv: an operand names a row;fdiv: unknown;fdiv: a projection;fdiv: a program segment;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;addacc: step index;fpround: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the step dispatch fell off;fdiv: a one-bit operand;fdiv: a 64-lane operand;fdiv: an operand names a row;fdiv: unknown;fdiv: a projection;fdiv: a program segment;eq: step index outside;ult: step index outside;sub: step index outside;add: step index outside;addacc: step index;fpround: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (3) THE MISSING RAIL. Without the guard `base64` returns NULL and the `xor`
 ## of fdiv.jl:54 dereferences it — a SIGSEGV in Release, which is not a SIGABRT
@@ -3668,7 +3705,7 @@ set_tests_properties(test_kernel_fdiv_death.block_region_is_one_bit_short
 ## absent.
 set_tests_properties(test_kernel_fdiv_death.a_block_with_no_operand_a
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the step dispatch fell off;fdiv: the block's region;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the step dispatch fell off;fdiv: the block's region;emit:;shadow:;qubit pool:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (4) THE VOCABULARY. Nothing below M35 knows what a row op, a row index or a
 ## projection is, so no lower layer can answer for these — but an unknown op
@@ -3684,7 +3721,7 @@ set_tests_properties(test_kernel_fdiv_death.arity_of_an_unknown_op
                      test_kernel_fdiv_death.a_projection_of_a_row_that_is_not_earlier
                      test_kernel_fdiv_death.a_projection_of_a_row_that_returns_no_tuple
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;eq:;ult:;sub:;add:;mux:;fpround:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;eq:;ult:;sub:;add:;mux:;fpround:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (5) THE WIDTH IS A REFUSAL AND NOT AN UNIMPLEMENTED CASE (PRD-v2 §1). Delete
 ## the guard and a W = 32 call reaches M31's `cq_fp_pack` or `cq_fp_view`,
@@ -3696,7 +3733,7 @@ set_tests_properties(test_kernel_fdiv_death.arity_of_an_unknown_op
 set_tests_properties(test_kernel_fdiv_death.width_is_not_64
                      test_kernel_fdiv_death.width_is_128
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "D7a;Assertion failed;fpfield: pack;fpfield: view span;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
+                     "D7a;Assertion;fpfield: pack;fpfield: view span;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: the block has no;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer")
 
 ## (6) D7 AT THE KERNEL BOUNDARY. D7a is a hard error in both configurations
 ## and D7b is LEGAL at the handle boundary — its remedy is M26's defensive
@@ -3706,7 +3743,7 @@ set_tests_properties(test_kernel_fdiv_death.width_is_not_64
 set_tests_properties(test_kernel_fdiv_death.dst_aliases_its_first_source
                      test_kernel_fdiv_death.sources_alias_each_other
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "distinctness;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;fdiv: step index outside;fdiv: a slot index outside;fdiv: the block's region;fdiv: W must be 64;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## M26 v2 — bead 9ve.36: the fp ARITHMETIC surface at f64.
 ##
@@ -3759,7 +3796,7 @@ set_tests_properties(test_template_fp_death.an_fbin_width_that_is_not_64_is_refu
                      test_template_fp_death.an_fbin_lh_width_that_is_not_64_is_refused
                      test_template_fp_death.a_fun_width_that_is_not_64_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;conversion names a width pair;bead 9ve.34")
 
 ## (2) THE CONVERSION FENCE IS THE SHIM'S OWN LIST OF SEVENTEEN PAIRS. 80 is a
 ## real ABI width and f64 is a real ABI width, so nothing below can see that
@@ -3768,7 +3805,7 @@ set_tests_properties(test_template_fp_death.an_fbin_width_that_is_not_64_is_refu
 ## because 80 is inside the range.
 set_tests_properties(test_template_fp_death.an_fcast_width_pair_that_is_not_shipped_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;bead 9ve.34")
 
 ## (3) AND THE RANGE IS CHECKED BEFORE THE PAIR IS LOOKED UP, so that a wild
 ## width never reaches the `(uint32_t)` conversion. This case is the ORDER
@@ -3776,7 +3813,7 @@ set_tests_properties(test_template_fp_death.an_fcast_width_pair_that_is_not_ship
 ## would answer and the range message would never be reachable at all.
 set_tests_properties(test_template_fp_death.an_fcast_to_a_width_above_the_abis_range_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;is not one of the ABI enumerators;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;is not one of the ABI enumerators;conversion names a width pair;bead 9ve.34")
 
 ## (4) BEAD 9ve.34 IS A REFUSAL, NOT A GAP, AND IT MUST BE THE ENTRY POINT'S.
 ## `cq_kernel_uitofp` does refuse `F == 64` — one layer down, after the mint
@@ -3786,7 +3823,7 @@ set_tests_properties(test_template_fp_death.an_fcast_to_a_width_above_the_abis_r
 ## and a maintainer would never see the bead.
 set_tests_properties(test_template_fp_death.uitofp_from_i64_is_refused_at_the_entry_point
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;conversion names a width pair")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;conversion names a width pair")
 
 ## (5) THE ENUM GUARDS MUST BE THE DISPATCH FILE'S. Each names an ENUM, and
 ## `cq_template_dispatch.c`'s fp strings are deliberately disjoint from its
@@ -3796,7 +3833,7 @@ set_tests_properties(test_template_fp_death.an_fop_outside_the_abis_enum_is_refu
                      test_template_fp_death.an_fcast_kind_outside_the_abis_enum_is_refused
                      test_template_fp_death.a_fun_op_outside_the_abis_enum_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;symbol names a width;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;symbol names a width;conversion names a width pair;bead 9ve.34")
 
 ## (6) D7a IS M07'S REFUSAL AND MUST STAY M07'S. The fp entry points resolve
 ## their handles and hand them to `cq_reg_check_operands`; if any of them grew
@@ -3812,7 +3849,7 @@ set_tests_properties(test_template_fp_death.d7a_out_aliases_the_first_source_of_
                      test_template_fp_death.d7a_out_aliases_the_source_of_an_fcast_unc
                      test_template_fp_death.d7a_out_aliases_the_source_of_a_fun_unc
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;FATAL: shim:;distinctness;kernel:;fpfield:;not live")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;FATAL: shim:;distinctness;kernel:;fpfield:;not live")
 
 ## (7) THE `_unc` DESTINATION'S WIDTH IS A SEPARATE GUARD FROM THE SOURCES',
 ## and on the conversion door it carries the whole of the composition's claim:
@@ -3822,7 +3859,7 @@ set_tests_properties(test_template_fp_death.d7a_out_aliases_the_first_source_of_
 set_tests_properties(test_template_fp_death.an_fbin_unc_destination_is_not_the_width_its_symbol_names
                      test_template_fp_death.an_fcast_unc_destination_is_not_the_to_width
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;symbol names a width;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;outside the ABI;is not one of the ABI enumerators;symbol names a width;conversion names a width pair;bead 9ve.34")
 
 ## M39's ABI-side fail-loud paths — the ARITY-3 door (bd 9ve.24, review round
 ## 1). A FIFTH DEATH BINARY, and separate from test_template_fp_death for the
@@ -3857,7 +3894,7 @@ add_cqops_death_test(test_template_fma_death CASES
 set_tests_properties(test_template_fma_death.a_ternary_width_that_is_not_64_is_refused
                      test_template_fma_death.a_ternary_unc_width_that_is_not_64_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;fpclass:;sandwich:;scratch:;FATAL: reg:;distinctness;not the width its cq_template;is not one of the ABI enumerators;outside the ABI;arithmetic symbol names a width;unary symbol names a width;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;fpclass:;sandwich:;scratch:;FATAL: reg:;distinctness;not the width its cq_template;is not one of the ABI enumerators;outside the ABI;arithmetic symbol names a width;unary symbol names a width;conversion names a width pair;bead 9ve.34")
 
 ## (2) THE TWO ENUM TABLES ARE ONE MESSAGE, AND THE ENTRY POINT IDENTIFIES
 ## NEITHER. `fma_req` consults `cq_tpl_fma_name` and then `cq_tpl_fma_kernel`
@@ -3873,7 +3910,7 @@ set_tests_properties(test_template_fma_death.a_ternary_opcode_outside_the_abis_e
                      test_template_fma_death.the_ternary_name_table_refuses_an_index_past_its_end
                      test_template_fma_death.the_ternary_kernel_table_refuses_an_index_past_its_end
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;ternary symbol names a width;not the width its cq_template;outside the ABI;conversion names a width pair;bead 9ve.34;fp arithmetic opcode;fp conversion kind;fp unary opcode")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;ternary symbol names a width;not the width its cq_template;outside the ABI;conversion names a width pair;bead 9ve.34;fp arithmetic opcode;fp conversion kind;fp unary opcode")
 
 ## (3) D7a IS M07'S REFUSAL AND MUST STAY M07'S, on all four `_unc` shapes.
 ## `FATAL: shim:` is banned outright — that one prefix covers `cq_t3_die`, the
@@ -3892,7 +3929,7 @@ set_tests_properties(test_template_fma_death.d7a_out_aliases_a_of_a_ternary_qqq_
                      test_template_fma_death.d7a_out_aliases_c_of_a_ternary_qlq_unc
                      test_template_fma_death.d7a_out_aliases_the_only_handle_of_a_ternary_qll_unc
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;FATAL: shim:;distinctness;kernel:;fpfield:;operand check:;I1:;I2:")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;FATAL: shim:;distinctness;kernel:;fpfield:;operand check:;I1:;I2:")
 
 ## (4) THE `_unc` DESTINATION'S WIDTH IS A SEPARATE GUARD FROM THE SOURCES'.
 ## All three sources here are f64 and pass the read door, so `cq_tpl_out` is
@@ -3901,7 +3938,7 @@ set_tests_properties(test_template_fma_death.d7a_out_aliases_a_of_a_ternary_qqq_
 ## are live and M07 has nothing to say.
 set_tests_properties(test_template_fma_death.a_ternary_unc_destination_is_not_the_width_its_symbol_names
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;ternary symbol names a width;is not one of the ABI enumerators;outside the ABI;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;fpfield:;sandwich:;scratch:;FATAL: reg:;distinctness;ternary symbol names a width;is not one of the ABI enumerators;outside the ABI;conversion names a width pair;bead 9ve.34")
 
 ## M42 iminmax — K27, the integer intrinsics abs/smin/smax/umin/umax (bd 9ve.29.2).
 ## v1-SHAPED integer kernels over M14/M16/M17's exported step blocks, one
@@ -3932,7 +3969,7 @@ add_cqops_death_test(test_kernel_iminmax_death CASES
     imm_step_region_does_not_fit
     imm_step_block_has_no_scratch
 )
-set(_im_lower "scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+set(_im_lower "scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (1) D7a / D7b are kernel.h's; M42's own guards must not be what spoke, and
 ## each alias case must not be satisfied by the OTHER D7 sentence.
@@ -4045,7 +4082,7 @@ set(_ibits_msgs
     "the step dispatch fell off" "outgrew" "emit of an unknown op"
     "fold of an unknown intrinsic")
 set(_ibits_lower
-    "UndefinedBehaviorSanitizer" "AddressSanitizer" "Assertion failed"
+    "UndefinedBehaviorSanitizer" "AddressSanitizer" "Assertion"
     "scratch:" "sandwich:" "shadow:" "qubit pool:" "emit:" "FATAL: reg:"
     "controlled:" "distinctness" "add: " "eq: " "mux: "
     "width is not positive")
@@ -4133,14 +4170,15 @@ add_cqops_death_test(test_kernel_fmisc_death CASES
 ## (1) THE WIDTH GUARDS. The sign ops loop over 64 lanes whatever `W` says, so
 ## a deleted guard RETURNS and the exit code carries the case; fmin/fmax would
 ## reach the sandwich. Every layer a wrong width could reach is pinned absent,
-## `Assertion failed` included (bd 9ve.18's third abort source).
+## `Assertion` included (bd 9ve.18's third abort source; spelled for both libcs,
+## bd hcvb).
 set_tests_properties(test_kernel_fmisc_death.fneg_width_is_not_64
                      test_kernel_fmisc_death.fabs_width_is_not_64
                      test_kernel_fmisc_death.copysign_width_is_not_64
                      test_kernel_fmisc_death.fmin_width_is_not_64
                      test_kernel_fmisc_death.fmax_width_is_not_64
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "D7a;D7b;fpfield:;fpclass:;fcmp:;eq:;mux:;fmisc: step index;fmisc: the block;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "D7a;D7b;fpfield:;fpclass:;fcmp:;eq:;mux:;fmisc: step index;fmisc: the block;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (2) D7a / D7b. A sign op with dst == a reaches the emitter with a control
 ## coinciding with its target, so `distinctness` and `emit:` are the lower
@@ -4154,7 +4192,7 @@ set_tests_properties(test_kernel_fmisc_death.fneg_dst_aliases_its_source
                      test_kernel_fmisc_death.copysign_sources_alias
                      test_kernel_fmisc_death.fmin_sources_alias
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "W must be 64;distinctness;emit:;fpfield:;fpclass:;fcmp:;eq:;mux:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "W must be 64;distinctness;emit:;fpfield:;fpclass:;fcmp:;eq:;mux:;scratch:;sandwich:;shadow:;qubit pool:;reg:;controlled:;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (3) THE STEP-INDEX GUARD. Masked from below on the low side (row 0 is an M31
 ## class block: "fpclass: step index outside") and by this module's own
@@ -4163,7 +4201,7 @@ set_tests_properties(test_kernel_fmisc_death.fneg_dst_aliases_its_source
 set_tests_properties(test_kernel_fmisc_death.step_index_past_the_end
                      test_kernel_fmisc_death.step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fmisc: the step dispatch fell off;fmisc: the block;fmisc: row steps;fpclass:;fcmp:;eq: step index outside;ult: step index outside;sub: step index outside;mux:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fmisc: the step dispatch fell off;fmisc: the block;fmisc: row steps;fpclass:;fcmp:;eq: step index outside;ult: step index outside;sub: step index outside;mux:;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (4) THE BLOCK'S PREMISES. The region check is masked from below by M08's
 ## cq_scratch_span and by M31's / M36's own region checks one layer in, whose
@@ -4177,7 +4215,7 @@ set_tests_properties(test_kernel_fmisc_death.block_region_is_one_bit_short
                      test_kernel_fmisc_death.a_block_with_no_operand_b
                      test_kernel_fmisc_death.a_block_naming_no_program
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fmisc: step index;fmisc: the step dispatch fell off;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fmisc: step index;fmisc: the step dispatch fell off;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (5) THE ACCESSORS AND OPERAND RESOLUTION, driven directly with a wild op,
 ## index or code (bd a-guard-that-reads-its-own-table-has-no-death-case: the
@@ -4191,7 +4229,7 @@ set_tests_properties(test_kernel_fmisc_death.rows_of_an_unknown_program
                      test_kernel_fmisc_death.row_region_of_an_unknown_op
                      test_kernel_fmisc_death.a_rail_operand_that_is_not_a_rail
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## (6) THE FOUR OPERAND REFUSALS MASK EACH OTHER IN RELEASE, AND EACH CASE BANS
 ## ITS SIBLINGS' SENTENCES. MEASURED (K24's battery, Release): with op64's row
@@ -4206,13 +4244,13 @@ set_tests_properties(test_kernel_fmisc_death.rows_of_an_unknown_program
 set_tests_properties(test_kernel_fmisc_death.a_64_lane_operand_with_an_unknown_code
                      test_kernel_fmisc_death.a_64_lane_operand_names_a_row_outside_the_program
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fmisc: a one-bit operand;fmisc: a rail operand;fmisc: arity;fmisc: row;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fmisc: a one-bit operand;fmisc: a rail operand;fmisc: arity;fmisc: row;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 set_tests_properties(test_kernel_fmisc_death.a_one_bit_operand_that_is_not_a_row
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fmisc: a one-bit operand names a 64-lane row;fmisc: a rail operand;fmisc: arity;fmisc: row;fmisc: unknown 64-lane operand code;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fmisc: a one-bit operand names a 64-lane row;fmisc: a rail operand;fmisc: arity;fmisc: row;fmisc: unknown 64-lane operand code;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 set_tests_properties(test_kernel_fmisc_death.a_one_bit_operand_names_a_64_lane_row
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fmisc: a one-bit operand is not a row;fmisc: unknown 64-lane operand code;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fmisc: a one-bit operand is not a row;fmisc: unknown 64-lane operand code;scratch:;fmisc: the block;fmisc: step index;fpfield:;fpclass:;fcmp:;eq:;mux:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## M38b `fround` — K25, the rounding-to-integral family at f64 (bd 9ve.27.2):
 ## soft_trunc / soft_floor / soft_ceil / soft_round (rint, nearbyint) /
@@ -4299,7 +4337,7 @@ function(_cqops_fround_death_ban case own)
         "eq:" "slt:" "ult:" "sub:" "add:" "mux:" "barrel:" "fadd:" "fpfield:"
         "scratch:" "sandwich:" "shadow:" "qubit pool:" "emit:" "reg:"
         "controlled:" "distinctness" "D7a"
-        "AddressSanitizer" "UndefinedBehaviorSanitizer" "Assertion failed")
+        "AddressSanitizer" "UndefinedBehaviorSanitizer" "Assertion")
     if(NOT own STREQUAL "")
         list(REMOVE_ITEM ban "${own}")
     endif()
@@ -4372,13 +4410,13 @@ add_cqops_death_test(test_kernel_fadd_block_death CASES
 set_tests_properties(test_kernel_fadd_block_death.fadd_block_step_index_past_the_end
                      test_kernel_fadd_block_death.fadd_block_step_index_is_negative
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "fadd: a slot index outside;fadd: the step dispatch fell off;fadd: the block's region;fadd: a one-bit operand;fadd: a 64-lane operand;fadd: an operand names a row;fadd: unknown;fadd: a pick;fadd: a view chain;fadd: a class row;fadd: this block has; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;fpclass: step index outside;fpround: step index outside; eq: width is not positive; ult: width is not positive; sub: width is not positive; add: width is not positive; mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "fadd: a slot index outside;fadd: the step dispatch fell off;fadd: the block's region;fadd: a one-bit operand;fadd: a 64-lane operand;fadd: an operand names a row;fadd: unknown;fadd: a pick;fadd: a view chain;fadd: a class row;fadd: this block has; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;fpclass: step index outside;fpround: step index outside; eq: width is not positive; ult: width is not positive; sub: width is not positive; add: width is not positive; mux: region width;scratch:;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 set_tests_properties(test_kernel_fadd_block_death.fadd_block_region_is_one_bit_short
                      test_kernel_fadd_block_death.fadd_block_offset_runs_off_the_region
                      test_kernel_fadd_block_death.result_of_an_fadd_block_that_does_not_fit
                      test_kernel_fadd_block_death.an_fadd_block_with_no_region
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "scratch:;fadd: step index outside;fadd: the step dispatch fell off;fpclass: the block's region;fpround: the block's region; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion failed")
+                     "scratch:;fadd: step index outside;fadd: the step dispatch fell off;fpclass: the block's region;fpround: the block's region; eq: step index outside; ult: step index outside; sub: step index outside; add: step index outside; barrel: step index outside;sandwich:;shadow:;qubit pool:;emit:;reg:;controlled:;distinctness;AddressSanitizer;UndefinedBehaviorSanitizer;Assertion")
 
 ## 9ve.44 — the ABI WIRING for Wave 10's kernels (M38 fmisc/fround, M41 ibits,
 ## M42 iminmax), as bead 9ve.36 wired Waves 5-7's.
@@ -4409,7 +4447,8 @@ add_cqops_death_test(test_template_intr_death CASES
 )
 
 ## EVERY CASE BELOW BANS, besides its own subject: the two sanitizers and
-## `Assertion failed` (bd 9ve.18's third abort source); every layer UNDER the
+## `Assertion` (bd 9ve.18's third abort source; spelled for both libcs, bd
+## hcvb); every layer UNDER the
 ## shim a wrong value could reach (kernel:, sandwich:, scratch:, shadow:, qubit
 ## pool:, emit:, controlled:, distinctness, I1:, I2:); M07's `FATAL: reg:`, `D7a`
 ## and `operand check:` where D7a is not the subject; the OTHER three refusals
@@ -4426,14 +4465,14 @@ add_cqops_death_test(test_template_intr_death CASES
 set_tests_properties(test_template_intr_death.a_bswap_width_that_is_not_a_multiple_of_16_is_refused
                      test_template_intr_death.a_bswap_unc_width_that_is_not_a_multiple_of_16_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;integer intrinsic opcode is not one of the ABI;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;integer intrinsic opcode is not one of the ABI;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
 
 ## (2) THE RANGE IS CHECKED BEFORE THE BSWAP RULE. `129` also fails the bswap
 ## rule, so a builder that ran it first would answer with ITS sentence, which is
 ## banned here; so is every enum sentence and `kernel:`.
 set_tests_properties(test_template_intr_death.an_iun_width_outside_the_abis_range_is_refused
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;multiple of 16 bits;integer intrinsic opcode is not one of the ABI;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;multiple of 16 bits;integer intrinsic opcode is not one of the ABI;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
 
 ## (3) THE ENUM, AT THE ENTRY POINT AND AT EACH TABLE. Both tables refuse with
 ## one sentence, so the entry-point case identifies neither and the two direct
@@ -4445,7 +4484,7 @@ set_tests_properties(test_template_intr_death.an_iun_op_outside_the_abis_enum_is
                      test_template_intr_death.the_iun_kernel_table_refuses_an_index_past_its_end
                      test_template_intr_death.the_iun_name_table_refuses_an_index_past_its_end
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;multiple of 16 bits;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;multiple of 16 bits;not the width its cq_template;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
 
 ## (4) D7a IS M07'S REFUSAL AND MUST STAY M07'S. `FATAL: shim:` banned outright
 ## covers every sentence the shim could print; `operand check:` because it
@@ -4454,14 +4493,14 @@ set_tests_properties(test_template_intr_death.an_iun_op_outside_the_abis_enum_is
 ## ONLY, a long way from its cause.
 set_tests_properties(test_template_intr_death.d7a_out_aliases_the_source_of_an_iun_unc
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;FATAL: shim:;operand check:;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;FATAL: shim:;operand check:;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:")
 
 ## (5) THE READ AND WRITE DOORS' WIDTH TOKEN, NOT M07's AND NOT THIS DOOR'S.
 ## Every rail is live; the enum and bswap checks have already passed.
 set_tests_properties(test_template_intr_death.an_iun_source_rail_is_not_the_width_its_symbol_names
                      test_template_intr_death.an_iun_unc_destination_is_not_the_width_its_symbol_names
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;integer intrinsic opcode is not one of the ABI;multiple of 16 bits;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;integer intrinsic opcode is not one of the ABI;multiple of 16 bits;opcode outside the ABI's enum;predicate outside the ABI's enum;cast kind outside the ABI's enum;fp arithmetic opcode;fp conversion kind;fp unary opcode;fp ternary opcode;symbol names a width;conversion names a width pair;bead 9ve.34")
 
 ## s8g — `bitcast f64 <-> i64` LANDED through the INTEGER cast door: one more
 ## `cq_shim_cast_kind` (CQ_SHIM_CAST_BITCAST) reaching M13's `zext` at F == T,
@@ -4487,7 +4526,7 @@ set_tests_properties(test_template_bitcast_death.a_bitcast_that_widens_is_refuse
                      test_template_bitcast_death.a_bitcast_that_narrows_is_refused_at_the_door
                      test_template_bitcast_death.a_bitcast_unc_whose_widths_differ_is_refused_at_the_door
                      PROPERTIES FAIL_REGULAR_EXPRESSION
-                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion failed;kernel:;width pair is inverted;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;cast kind outside the ABI's enum;not the width its cq_template;opcode outside the ABI's enum;fp conversion kind")
+                     "UndefinedBehaviorSanitizer;AddressSanitizer;Assertion;kernel:;width pair is inverted;sandwich:;scratch:;shadow:;qubit pool:;emit:;controlled:;distinctness;I1:;I2:;FATAL: reg:;D7a;operand check:;width outside the ABI's range;cast kind outside the ABI's enum;not the width its cq_template;opcode outside the ABI's enum;fp conversion kind")
 
 ## ar9 — the SENTENCE every still-aborting `fp` body prints. "fp is v2" is
 ## retired from the generated grid (maintainer, 2026-09-24): the f64 rows carry

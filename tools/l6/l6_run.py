@@ -17,7 +17,8 @@ driver cannot drift from what CQ_lang actually registers and cannot miss an
 entry a regex over CMake source would.
 
 CQ_LANG IS NOT PINNED BY THIS REPO AND IT MOVES. The revision is recorded in
-the report, by SHA and date, every run. Quote ratios out of it, never counts.
+the report, by SHA and date, every run -- at the start AND at the end, with a
+move between the two flagged (bd oqp8). Quote ratios out of it, never counts.
 
 THE VERDICT LIVES IN `l6_report.py` SINCE 2026-09-10 (`bd wgi`), split off at
 Rule 12's limit along the seam IMPLEMENTATION_PLAN §3's Layer 6 table recorded
@@ -49,12 +50,36 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RUNNER = os.path.join(HERE, "run_slice_cqops.sh")
 
 
+# `--no-optional-locks` ON EVERY GIT CALL INTO CQ_LANG (bd oqp8): the checkout
+# is another session's working tree, and a plain `git status` may take its
+# index.lock to refresh stat info while that session commits. `log` takes no
+# lock either way; the flag is on both so tests/test_cqlang_drivers.py can
+# require it of every call. Byte-identical in tools/l6/ and tools/l7/.
 def cq_revision(cqdir):
-    g = subprocess.run(["git", "log", "-1", "--format=%H %ad", "--date=short"],
+    git = ["git", "--no-optional-locks"]
+    g = subprocess.run(git + ["log", "-1", "--format=%H %ad", "--date=short"],
                        cwd=cqdir, capture_output=True, text=True)
-    dirty = subprocess.run(["git", "status", "--porcelain"], cwd=cqdir,
+    dirty = subprocess.run(git + ["status", "--porcelain"], cwd=cqdir,
                            capture_output=True, text=True).stdout.strip()
     return g.stdout.strip() + ("" if not dirty else "  (DIRTY WORKING TREE)")
+
+
+# A RUN THAT STRADDLES A CQ_LANG COMMIT (bd oqp8). The revision is read at the
+# start (the banner) and again at the end; until 2026-10-05 the JSON carried
+# ONLY the end read, so the 2026-10-04 L6 run logged 5088c536 and recorded
+# 4266c40d. Now `cq_revision` is the START, `cq_revision_end` the end, and a
+# difference is FLAGGED, never resolved: nothing records which stage saw
+# which tree. An uncommitted edit to an ALREADY-dirty tree reads as no move.
+# Byte-identical in tools/l6/ and tools/l7/.
+def revisions(start, end):
+    return dict(cq_revision=start, cq_revision_end=end,
+                cq_revision_straddled=start != end)
+
+
+def straddle_line(revs):
+    return ("  CQ_lang MOVED DURING THIS RUN: started at %s, ended at %s -- "
+            "what ran spans both trees" % (revs["cq_revision"],
+                                           revs["cq_revision_end"]))
 
 
 def fixtures(cqdir, builddir):
@@ -81,7 +106,12 @@ def fixtures(cqdir, builddir):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--cqlang", default="/Users/sorenwilkening/Desktop/CQ_lang")
+    # REQUIRED, NOT DEFAULTED (bd oqp8): the default was a machine path that
+    # went stale when CQ_lang moved to ~/Desktop/Projects/, so a bare hand run
+    # failed or read the wrong tree. This repo does not know where CQ_lang
+    # lives; the ctest entry passes CQOPS_CQLANG_DIR, and a hand run must too.
+    ap.add_argument("--cqlang", required=True,
+                    help="the CQ_lang checkout (CMake's CQOPS_CQLANG_DIR)")
     ap.add_argument("--cqbuild", default="build")
     ap.add_argument("--archive", default="build-release/libcqops.a")
     ap.add_argument("--objdir", default="",
@@ -105,7 +135,8 @@ def main():
     archive = os.path.abspath(a.archive)
     objdir = a.objdir  # Legacy positional slot in run_slice_cqops.sh.
 
-    print("CQ_lang @", cq_revision(a.cqlang))
+    start = cq_revision(a.cqlang)
+    print("CQ_lang @", start)
     print("archive  ", archive)
     print("sink     ", a.sink)
 
@@ -164,8 +195,11 @@ def main():
     for line in exit_status_lines(rows):
         print(line)
     print(residue_summary(rows))
+    revs = revisions(start, cq_revision(a.cqlang))
+    if revs["cq_revision_straddled"]:
+        print(straddle_line(revs))
     if a.json:
-        json.dump(dict(cq_revision=cq_revision(a.cqlang), archive=archive,
+        json.dump(dict(revs, archive=archive,
                        sink=a.sink, counts=counts,
                        residue=residue_totals(rows), rows=rows),
                   open(a.json, "w"), indent=1)

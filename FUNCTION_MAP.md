@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7165
+**Indexed definitions:** 7175
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -60,7 +60,7 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function cqops_select_python` | [23](cmake/CqopsPython.cmake:23) |
+| `function cqops_select_python` | [26](cmake/CqopsPython.cmake:26) |
 
 ## `cmake/CqopsSanitizers.cmake`
 
@@ -4731,7 +4731,7 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `int` | [133](src/sink_qec.h:133) |
+| `int` | [137](src/sink_qec.h:137) |
 
 ## `src/sink_qec_angle.c`
 
@@ -4755,8 +4755,8 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `function _ibits_pin` | [4052](tests/CMakeLists.txt:4052) |
-| `function _cqops_fround_death_ban` | [4273](tests/CMakeLists.txt:4273) |
+| `function _ibits_pin` | [4089](tests/CMakeLists.txt:4089) |
+| `function _cqops_fround_death_ban` | [4311](tests/CMakeLists.txt:4311) |
 
 ## `tests/package-consumer/main.c`
 
@@ -5273,6 +5273,17 @@ the definition (or the build-language declaration) in the listed file.
 | `pin_stream` | [20](tests/test_controlled_table.inc:20) |
 | `the_promotion_table_transcribed_from_controlled_jl (via CQ_TEST)` | [29](tests/test_controlled_table.inc:29) |
 
+## `tests/test_cqlang_drivers.py`
+
+| Function | Line |
+|---|---:|
+| `lines` | [67](tests/test_cqlang_drivers.py:67) |
+| `drive` | [71](tests/test_cqlang_drivers.py:71) |
+| `both_drivers_refuse_a_missing_cqlang` | [97](tests/test_cqlang_drivers.py:97) |
+| `every_git_call_into_cqlang_skips_optional_locks` | [105](tests/test_cqlang_drivers.py:105) |
+| `a_run_that_straddles_a_commit_records_both_and_flags_it` | [116](tests/test_cqlang_drivers.py:116) |
+| `a_run_that_does_not_straddle_is_not_flagged` | [132](tests/test_cqlang_drivers.py:132) |
+
 ## `tests/test_emit_death.c`
 
 | Function | Line |
@@ -5455,11 +5466,11 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `bind` | [59](tests/test_grover_qec.c:59) |
-| `unbind` | [75](tests/test_grover_qec.c:75) |
-| `the_rotation_alphabet_grovers_program_emits_costs_no_t_gates (via CQ_TEST)` | [95](tests/test_grover_qec.c:95) |
-| `a_rotation_outside_that_alphabet_is_not_free_so_the_counter_is_alive (via CQ_TEST)` | [128](tests/test_grover_qec.c:128) |
-| `the_toffoli_is_the_only_thing_in_the_program_that_costs_t (via CQ_TEST)` | [154](tests/test_grover_qec.c:154) |
+| `bind` | [74](tests/test_grover_qec.c:74) |
+| `unbind` | [90](tests/test_grover_qec.c:90) |
+| `the_rotation_alphabet_grovers_program_emits_costs_no_t_gates (via CQ_TEST)` | [110](tests/test_grover_qec.c:110) |
+| `a_rotation_outside_that_alphabet_is_not_free_so_the_counter_is_alive (via CQ_TEST)` | [143](tests/test_grover_qec.c:143) |
+| `the_toffoli_is_the_only_thing_in_the_program_that_costs_t (via CQ_TEST)` | [169](tests/test_grover_qec.c:169) |
 
 ## `tests/test_harness_negative.c`
 
@@ -7343,7 +7354,7 @@ the definition (or the build-language declaration) in the listed file.
 | `dx` | [230](tests/test_kernel_mul_death.c:230) |
 | `dcx` | [231](tests/test_kernel_mul_death.c:231) |
 | `dccx` | [232](tests/test_kernel_mul_death.c:232) |
-| `mul_scratch_exceeds_the_pool_ceiling` | [245](tests/test_kernel_mul_death.c:245) |
+| `mul_scratch_exceeds_the_pool_ceiling` | [249](tests/test_kernel_mul_death.c:249) |
 
 ## `tests/test_kernel_mul_refmodel.inc`
 
@@ -9326,9 +9337,11 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_revision` | [52](tools/l6/l6_run.py:52) |
-| `fixtures` | [60](tools/l6/l6_run.py:60) |
-| `main` | [82](tools/l6/l6_run.py:82) |
+| `cq_revision` | [58](tools/l6/l6_run.py:58) |
+| `revisions` | [74](tools/l6/l6_run.py:74) |
+| `straddle_line` | [79](tools/l6/l6_run.py:79) |
+| `fixtures` | [85](tools/l6/l6_run.py:85) |
+| `main` | [107](tools/l6/l6_run.py:107) |
 
 ## `tools/l7/grover.cq.c`
 
@@ -9340,13 +9353,15 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_revision` | [89](tools/l7/l7_run.py:89) |
-| `toolchain` | [97](tools/l7/l7_run.py:97) |
-| `read` | [117](tools/l7/l7_run.py:117) |
-| `gate_mix` | [125](tools/l7/l7_run.py:125) |
-| `main` | [132](tools/l7/l7_run.py:132) |
-| `tail_value` | [244](tools/l7/l7_run.py:244) |
-| `report` | [252](tools/l7/l7_run.py:252) |
+| `cq_revision` | [94](tools/l7/l7_run.py:94) |
+| `revisions` | [110](tools/l7/l7_run.py:110) |
+| `straddle_line` | [115](tools/l7/l7_run.py:115) |
+| `toolchain` | [121](tools/l7/l7_run.py:121) |
+| `read` | [141](tools/l7/l7_run.py:141) |
+| `gate_mix` | [149](tools/l7/l7_run.py:149) |
+| `main` | [156](tools/l7/l7_run.py:156) |
+| `tail_value` | [269](tools/l7/l7_run.py:269) |
+| `report` | [277](tools/l7/l7_run.py:277) |
 
 ## `tools/labreport/gen_data.py`
 

@@ -1,4 +1,6 @@
-## Python selection for M27's generator and its two suites (Step 22).
+## Python selection for M27's generator and the Python suites (Step 22). Step
+## 22 had two suites; tests/CMakeLists.txt's `pysuite` loop is the list now
+## (bd oqp8 replaced the counts in this file with that reference).
 ##
 ## PROBED, NOT ASSUMED — the same posture as cmake/CqopsSanitizers.cmake, and
 ## for the same reason: on this project's dev box the two python3 on PATH
@@ -18,7 +20,8 @@
 ## When no interpreter qualifies the suites are NOT registered — deliberately
 ## rather than registered-and-skipped. A test that passes without running is
 ## the vacuous-green hazard test_harness_negative.c exists to rule out; a test
-## count that visibly drops by two, next to a configure-time warning, is not.
+## count that visibly drops by one per Python suite, next to a configure-time
+## warning, is not.
 
 function(cqops_select_python out_var)
     set(${out_var} "" PARENT_SCOPE)
@@ -55,10 +58,10 @@ function(cqops_select_python out_var)
         message(FATAL_ERROR
             "cqops: CQOPS_PYTHON=ON but no python3 on this host can `import yaml`.\n"
             "  Tried: ${candidates}\n"
-            "  Install PyYAML, or configure with -DCQOPS_PYTHON=AUTO to skip the shim suites.")
+            "  Install PyYAML, or configure with -DCQOPS_PYTHON=AUTO to skip the Python suites.")
     endif()
     message(WARNING
-        "cqops: NO python3 with PyYAML found — test_gen_shim and test_gen_bodies "
-        "are NOT registered. Step 22's shim generator is unverified in this build. "
+        "cqops: NO python3 with PyYAML found — the Python suites (tests/CMakeLists.txt's "
+        "pysuite loop) are NOT registered. Step 22's shim generator is unverified in this build. "
         "Tried: ${candidates}")
 endfunction()

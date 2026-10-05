@@ -86,12 +86,36 @@ RZ_TARGET = re.compile(r"^rz\((q\d+),", re.M)
 MZ_TARGET = re.compile(r"^mz\((q\d+)\)", re.M)
 
 
+# `--no-optional-locks` ON EVERY GIT CALL INTO CQ_LANG (bd oqp8): the checkout
+# is another session's working tree, and a plain `git status` may take its
+# index.lock to refresh stat info while that session commits. `log` takes no
+# lock either way; the flag is on both so tests/test_cqlang_drivers.py can
+# require it of every call. Byte-identical in tools/l6/ and tools/l7/.
 def cq_revision(cqdir):
-    g = subprocess.run(["git", "log", "-1", "--format=%H %ad", "--date=short"],
+    git = ["git", "--no-optional-locks"]
+    g = subprocess.run(git + ["log", "-1", "--format=%H %ad", "--date=short"],
                        cwd=cqdir, capture_output=True, text=True)
-    dirty = subprocess.run(["git", "status", "--porcelain"], cwd=cqdir,
+    dirty = subprocess.run(git + ["status", "--porcelain"], cwd=cqdir,
                            capture_output=True, text=True).stdout.strip()
     return g.stdout.strip() + ("" if not dirty else "  (DIRTY WORKING TREE)")
+
+
+# A RUN THAT STRADDLES A CQ_LANG COMMIT (bd oqp8). The revision is read at the
+# start (the banner) and again at the end; until 2026-10-05 the JSON carried
+# ONLY the end read, so the 2026-10-04 L6 run logged 5088c536 and recorded
+# 4266c40d. Now `cq_revision` is the START, `cq_revision_end` the end, and a
+# difference is FLAGGED, never resolved: nothing records which stage saw
+# which tree. An uncommitted edit to an ALREADY-dirty tree reads as no move.
+# Byte-identical in tools/l6/ and tools/l7/.
+def revisions(start, end):
+    return dict(cq_revision=start, cq_revision_end=end,
+                cq_revision_straddled=start != end)
+
+
+def straddle_line(revs):
+    return ("  CQ_lang MOVED DURING THIS RUN: started at %s, ended at %s -- "
+            "what ran spans both trees" % (revs["cq_revision"],
+                                           revs["cq_revision_end"]))
 
 
 def toolchain(cqdir, builddir):
@@ -144,8 +168,9 @@ def main():
     objdir = ""  # Legacy positional slot in run_slice_cqops.sh.
     stem = os.path.join(a.out, "grover")
 
+    start = cq_revision(a.cqlang)
     print("L7 — PRD §12(1), Grover through CQ_lang")
-    print("  CQ_lang @", cq_revision(a.cqlang))
+    print("  CQ_lang @", start)
     print("  archive  ", archive)
 
     # `.residue` is written by the l6_residue.c object the shared runner puts on
@@ -182,7 +207,7 @@ def main():
                if l.strip()]
         fails.append("DID NOT BUILD: " + (why[0].strip() if why
                                           else "(no message)"))
-        report(fails, {}, {}, "", "", a)
+        report(fails, {}, {}, "", "", a, start)
         return 1
 
     rc = int(read(stem + ".rc").strip() or -1)
@@ -237,7 +262,7 @@ def main():
     if c_val is None:
         fails.append("CLASSICAL RUN printed no `grover -> <n>` line")
 
-    report(fails, q_mix, c_mix, q_val, c_val, a)
+    report(fails, q_mix, c_mix, q_val, c_val, a, start)
     return 1 if fails else 0
 
 
@@ -249,11 +274,14 @@ def tail_value(text):
     return None
 
 
-def report(fails, q_mix, c_mix, q_val, c_val, a):
+def report(fails, q_mix, c_mix, q_val, c_val, a, start):
     print("  quantum   gates:", dict(sorted(q_mix.items())), "measured:", q_val)
     print("  classical gates:", dict(sorted(c_mix.items())), "measured:", c_val)
+    revs = revisions(start, cq_revision(a.cqlang))
+    if revs["cq_revision_straddled"]:
+        print(straddle_line(revs))
     if a.json:
-        json.dump(dict(cq_revision=cq_revision(a.cqlang),
+        json.dump(dict(revs,
                        quantum=dict(gates=q_mix, measured=q_val),
                        classical=dict(gates=c_mix, measured=c_val),
                        failures=fails),
