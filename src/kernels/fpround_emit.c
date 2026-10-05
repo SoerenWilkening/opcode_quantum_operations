@@ -36,20 +36,19 @@ enum { W64 = CQ_FPR_W };
 
 /* --- The dispatch. -------------------------------------------------------- */
 
-static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
-                     int i, int u)
+static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, int i, int u)
 {
     const cq_fpround_row *r = &x->rows[i];
     cq_bit v0[CQ_FP64_W], v1[CQ_FP64_W], t0[CQ_FP64_W], t1[CQ_FP64_W];
-    uint32_t o = off[i];
+    uint32_t o = cq_fpr_at(x, i);
     int lane;
 
     switch (r->op) {
     case CQ_FROP_EQ: {
         cq_eq_block e;
 
-        e.a = cq_fpr_op64(x, off, r->s0, v0, t0);
-        e.b = cq_fpr_op64(x, off, r->s1, v1, t1);
+        e.a = cq_fpr_op64(x, r->s0, v0, t0);
+        e.b = cq_fpr_op64(x, r->s1, v1, t1);
         e.diff = cq_fpr_sp(x, o, (uint32_t)W64);
         e.orr  = cq_fpr_sp(x, o + (uint32_t)W64, (uint32_t)W64 - 1u);
         e.W = W64;
@@ -58,8 +57,8 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
     case CQ_FROP_ULT: {
         cq_ult_block c;
 
-        c.a = cq_fpr_op64(x, off, r->s0, v0, t0);
-        c.b = cq_fpr_op64(x, off, r->s1, v1, t1);
+        c.a = cq_fpr_op64(x, r->s0, v0, t0);
+        c.b = cq_fpr_op64(x, r->s1, v1, t1);
         c.nb    = cq_fpr_sp(x, o,                           (uint32_t)W64);
         c.carry = cq_fpr_sp(x, o + (uint32_t)W64,           (uint32_t)W64 + 1u);
         c.axnb  = cq_fpr_sp(x, o + (uint32_t)(2 * W64) + 1u, (uint32_t)W64);
@@ -69,8 +68,8 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
     case CQ_FROP_SLT: {
         cq_slt_block c;
 
-        c.a = cq_fpr_op64(x, off, r->s0, v0, t0);
-        c.b = cq_fpr_op64(x, off, r->s1, v1, t1);
+        c.a = cq_fpr_op64(x, r->s0, v0, t0);
+        c.b = cq_fpr_op64(x, r->s1, v1, t1);
         c.af    = cq_fpr_sp(x, o,                            (uint32_t)W64);
         c.bf    = cq_fpr_sp(x, o + (uint32_t)W64,            (uint32_t)W64);
         c.nb    = cq_fpr_sp(x, o + (uint32_t)(2 * W64),      (uint32_t)W64);
@@ -82,8 +81,8 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
     case CQ_FROP_SUB: {
         cq_sub_block s;
 
-        s.a = cq_fpr_op64(x, off, r->s0, v0, t0);
-        s.b = cq_fpr_op64(x, off, r->s1, v1, t1);
+        s.a = cq_fpr_op64(x, r->s0, v0, t0);
+        s.b = cq_fpr_op64(x, r->s1, v1, t1);
         s.nb = cq_fpr_sp(x, o,                       (uint32_t)W64);
         s.d  = cq_fpr_sp(x, o + (uint32_t)W64,       (uint32_t)W64);
         s.c  = cq_fpr_sp(x, o + (uint32_t)(2 * W64), (uint32_t)W64);
@@ -93,8 +92,8 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
     case CQ_FROP_ADD: {
         cq_add_block a;
 
-        a.a = cq_fpr_op64(x, off, r->s0, v0, t0);
-        a.b = cq_fpr_op64(x, off, r->s1, v1, t1);
+        a.a = cq_fpr_op64(x, r->s0, v0, t0);
+        a.b = cq_fpr_op64(x, r->s1, v1, t1);
         a.t = cq_fpr_sp(x, o,                 (uint32_t)W64);
         a.c = cq_fpr_sp(x, o + (uint32_t)W64, (uint32_t)W64);
         a.W = W64;
@@ -103,9 +102,9 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
     case CQ_FROP_MUX: {
         cq_mux_block m;
 
-        m.cond = cq_fpr_flag_of(x, off, r->s0);
-        m.t    = cq_fpr_op64(x, off, r->s1, v0, t0);
-        m.f    = cq_fpr_op64(x, off, r->s2, v1, t1);
+        m.cond = cq_fpr_flag_of(x, r->s0);
+        m.t    = cq_fpr_op64(x, r->s1, v0, t0);
+        m.f    = cq_fpr_op64(x, r->s2, v1, t1);
         m.r    = cq_fpr_sp(x, o,                 (uint32_t)W64);
         m.d    = cq_fpr_sp(x, o + (uint32_t)W64, (uint32_t)W64);
         cq_mux_step(ctx, &m, u);
@@ -113,8 +112,8 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
     case CQ_FROP_BSHL: case CQ_FROP_BLSHR: {
         cq_barrel_block b;
 
-        b.a = cq_fpr_op64(x, off, r->s0, v0, t0);
-        b.b = cq_fpr_op64(x, off, r->s1, v1, t1);
+        b.a = cq_fpr_op64(x, r->s0, v0, t0);
+        b.b = cq_fpr_op64(x, r->s1, v1, t1);
         b.scr = x->scr; b.off = o; b.W = W64;
         b.dir = (r->op == CQ_FROP_BSHL) ? CQ_BARREL_SHL : CQ_BARREL_LSHR;
         cq_barrel_step(ctx, &b, u);
@@ -144,38 +143,38 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
      * Rule 1 is about provenance, not only about behaviour. */
     case CQ_FROP_AND:
         /* arith.jl:270's one Toffoli per lane, at 64 lanes. */
-        cq_emit_ccx(ctx, &cq_fpr_op64(x, off, r->s0, v0, t0)[u],
-                    &cq_fpr_op64(x, off, r->s1, v1, t1)[u],
+        cq_emit_ccx(ctx, &cq_fpr_op64(x, r->s0, v0, t0)[u],
+                    &cq_fpr_op64(x, r->s1, v1, t1)[u],
                     &cq_fpr_sp(x, o, (uint32_t)W64)[u]);
         return;
     case CQ_FROP_OR:
         /* arith.jl:276-278, in order: CNOT(a), CNOT(b), Toffoli(a, b). */
         lane = u / 3;
         if (u % 3 == 0)
-            cq_emit_cx(ctx, &cq_fpr_op64(x, off, r->s0, v0, t0)[lane],
+            cq_emit_cx(ctx, &cq_fpr_op64(x, r->s0, v0, t0)[lane],
                        &cq_fpr_sp(x, o, (uint32_t)W64)[lane]);
         else if (u % 3 == 1)
-            cq_emit_cx(ctx, &cq_fpr_op64(x, off, r->s1, v1, t1)[lane],
+            cq_emit_cx(ctx, &cq_fpr_op64(x, r->s1, v1, t1)[lane],
                        &cq_fpr_sp(x, o, (uint32_t)W64)[lane]);
         else
-            cq_emit_ccx(ctx, &cq_fpr_op64(x, off, r->s0, v0, t0)[lane],
-                        &cq_fpr_op64(x, off, r->s1, v1, t1)[lane],
+            cq_emit_ccx(ctx, &cq_fpr_op64(x, r->s0, v0, t0)[lane],
+                        &cq_fpr_op64(x, r->s1, v1, t1)[lane],
                         &cq_fpr_sp(x, o, (uint32_t)W64)[lane]);
         return;
     case CQ_FROP_NOT1:
         /* arith.jl:476, in order: CNOT(w[1], r[1]) then NOT(r[1]). */
-        if (u == 0) cq_emit_cx(ctx, cq_fpr_flag_of(x, off, r->s0), cq_fpr_sp(x, o, 1u));
+        if (u == 0) cq_emit_cx(ctx, cq_fpr_flag_of(x, r->s0), cq_fpr_sp(x, o, 1u));
         else        cq_emit_x (ctx,                         cq_fpr_sp(x, o, 1u));
         return;
     case CQ_FROP_AND1:
-        cq_emit_ccx(ctx, cq_fpr_flag_of(x, off, r->s0), cq_fpr_flag_of(x, off, r->s1),
+        cq_emit_ccx(ctx, cq_fpr_flag_of(x, r->s0), cq_fpr_flag_of(x, r->s1),
                     cq_fpr_sp(x, o, 1u));
         return;
     case CQ_FROP_OR1:
-        if (u == 0)      cq_emit_cx(ctx, cq_fpr_flag_of(x, off, r->s0), cq_fpr_sp(x, o, 1u));
-        else if (u == 1) cq_emit_cx(ctx, cq_fpr_flag_of(x, off, r->s1), cq_fpr_sp(x, o, 1u));
-        else             cq_emit_ccx(ctx, cq_fpr_flag_of(x, off, r->s0),
-                                     cq_fpr_flag_of(x, off, r->s1), cq_fpr_sp(x, o, 1u));
+        if (u == 0)      cq_emit_cx(ctx, cq_fpr_flag_of(x, r->s0), cq_fpr_sp(x, o, 1u));
+        else if (u == 1) cq_emit_cx(ctx, cq_fpr_flag_of(x, r->s1), cq_fpr_sp(x, o, 1u));
+        else             cq_emit_ccx(ctx, cq_fpr_flag_of(x, r->s0),
+                                     cq_fpr_flag_of(x, r->s1), cq_fpr_sp(x, o, 1u));
         return;
     default:
         break;
@@ -183,33 +182,40 @@ static void emit_row(cq_ctx *ctx, const cq_fpr_ctx *x, const uint32_t *off,
     cq_kernel_die("fpround: unknown op in the program");
 }
 
+/* A BINARY SEARCH OVER THE MEMOISED MAP for the LAST row whose `step0 <= u`
+ * — `step0` is non-decreasing because a view owns no slot, and a first-match
+ * search would stop on a zero-width view (bd
+ * a-395-row-flat-table-needs-the-memoised-prefix-map). The zero-slot refusal
+ * below is the cheap detector for that slip. */
 static void fpr_step(cq_ctx *ctx, const cq_fpr_ctx *x, int u)
 {
-    uint32_t off[CQ_FPR_MAXR];
+    const cq_fpr_map *m = x->map;
+    int lo = 0, hi = m->n - 1, i = 0;
 
-    if (u < 0 || u >= cq_fpr_steps_of(x))
+    if (u < 0 || u >= m->steps)
         cq_kernel_die("fpround: step index outside [0, cq_<helper>_steps())");
-    cq_fpr_arm(x, off);
+    cq_fpr_arm(x);
 
-    for (int i = 0; i < x->n; i++) {
-        int n = cq_fpr_row_steps(&x->rows[i]);
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
 
-        if (u < n) { emit_row(ctx, x, off, i, u); return; }
-        u -= n;
+        if (m->step0[mid] <= u) { i = mid; lo = mid + 1; }
+        else                    { hi = mid - 1; }
     }
-    cq_kernel_die("fpround: the step dispatch fell off the end of the program");
+    if (cq_fpr_row_steps(&x->rows[i]) <= 0)
+        cq_kernel_die("fpround: the step dispatch landed on a zero-slot row");
+    emit_row(ctx, x, i, u - m->step0[i]);
 }
 
 static const cq_bit *fpr_out(const cq_fpr_ctx *x, int which)
 {
-    uint32_t off[CQ_FPR_MAXR];
     int i = cq_fpround_out_row(x->id, which);
 
-    cq_fpr_arm(x, off);
+    cq_fpr_arm(x);
     if (x->rows[i].op == CQ_FROP_VIEW)
         cq_kernel_die("fpround: that output is a view and has no span");
-    return (cq_fpr_op_width(x->rows[i].op) == 1) ? cq_fpr_flag_of(x, off, i)
-                                          : cq_fpr_row_out(x, off, i);
+    return (cq_fpr_op_width(x->rows[i].op) == 1) ? cq_fpr_flag_of(x, i)
+                                                  : cq_fpr_row_out(x, i);
 }
 
 /* --- The four public blocks. ---------------------------------------------- */
@@ -222,18 +228,16 @@ static const cq_bit *fpr_out(const cq_fpr_ctx *x, int which)
 #define RND(k) cq_fpr_ctx_of(CQ_FPR_ROUND,   (k)->wr, (k)->result_exp,         \
                       (k)->result_sign, (k)->scr, (k)->off)
 
-#define FPR_NULLARY(id)                                                        \
-    cq_fpr_ctx x = cq_fpr_ctx_of((id), NULL, NULL, NULL, NULL, 0u)
+/* Totals come straight from the memoised map (fpround_int.h). */
+uint32_t cq_norm52_region (void) { return cq_fpr_map_get(CQ_FPR_NORM52)->region;  }
+uint32_t cq_clz_region    (void) { return cq_fpr_map_get(CQ_FPR_CLZ)->region;     }
+uint32_t cq_subnorm_region(void) { return cq_fpr_map_get(CQ_FPR_SUBNORM)->region; }
+uint32_t cq_round_region  (void) { return cq_fpr_map_get(CQ_FPR_ROUND)->region;   }
 
-uint32_t cq_norm52_region (void) { FPR_NULLARY(CQ_FPR_NORM52);  return cq_fpr_region_of(&x); }
-uint32_t cq_clz_region    (void) { FPR_NULLARY(CQ_FPR_CLZ);     return cq_fpr_region_of(&x); }
-uint32_t cq_subnorm_region(void) { FPR_NULLARY(CQ_FPR_SUBNORM); return cq_fpr_region_of(&x); }
-uint32_t cq_round_region  (void) { FPR_NULLARY(CQ_FPR_ROUND);   return cq_fpr_region_of(&x); }
-
-int cq_norm52_steps (void) { FPR_NULLARY(CQ_FPR_NORM52);  return cq_fpr_steps_of(&x); }
-int cq_clz_steps    (void) { FPR_NULLARY(CQ_FPR_CLZ);     return cq_fpr_steps_of(&x); }
-int cq_subnorm_steps(void) { FPR_NULLARY(CQ_FPR_SUBNORM); return cq_fpr_steps_of(&x); }
-int cq_round_steps  (void) { FPR_NULLARY(CQ_FPR_ROUND);   return cq_fpr_steps_of(&x); }
+int cq_norm52_steps (void) { return cq_fpr_map_get(CQ_FPR_NORM52)->steps;  }
+int cq_clz_steps    (void) { return cq_fpr_map_get(CQ_FPR_CLZ)->steps;     }
+int cq_subnorm_steps(void) { return cq_fpr_map_get(CQ_FPR_SUBNORM)->steps; }
+int cq_round_steps  (void) { return cq_fpr_map_get(CQ_FPR_ROUND)->steps;   }
 
 void cq_norm52_step(cq_ctx *ctx, const cq_norm52_block *k, int u)
 { cq_fpr_ctx x = N52(k); fpr_step(ctx, &x, u); }
@@ -278,15 +282,14 @@ const cq_bit *cq_subnorm_ftz(const cq_subnorm_block *k)
 void cq_subnorm_flushed(const cq_subnorm_block *k, cq_bit out[CQ_FP64_W])
 {
     cq_fpr_ctx x = SUB(k);
-    uint32_t off[CQ_FPR_MAXR];
     int shift, b;
     uint64_t mask;
     cq_bit tmp[CQ_FP64_W];
 
     if (out == NULL) cq_kernel_die("fpround: no output array for the view");
-    cq_fpr_arm(&x, off);
+    cq_fpr_arm(&x);
     b = cq_fpr_view_collapse(&x, cq_fpround_out_row(CQ_FPR_SUBNORM, 4), &shift, &mask);
-    cq_fpr_view_fill(cq_fpr_base64(&x, off, b, tmp), shift, mask, out);
+    cq_fpr_view_fill(cq_fpr_base64(&x, b, tmp), shift, mask, out);
 }
 
 const cq_bit *cq_round_normal(const cq_round_block *k)

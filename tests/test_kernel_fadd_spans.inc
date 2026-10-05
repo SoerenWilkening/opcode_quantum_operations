@@ -167,8 +167,10 @@ CQ_TEST(the_compute_half_is_a_palindrome_at_an_asymmetric_mask)
 
 /* THE SOLE DETECTOR FOR A PROGRAM THAT IGNORES ITS OWN `off`, AND IT HAD TO BE
  * WRITTEN AS A POSITIVE CASE. Every span this module hands out goes through
- * `cq_fa_arm`, which is the ONE place `k->off` is added; drop it and the whole
- * program slides to the bottom of the caller's region. Both Rule 7 kernels
+ * `cq_fa_off` (fadd_int.h), which is the ONE place `k->off` is added — it was
+ * `cq_fa_arm` until bd y65c (2026-10-05) moved the add there and made both
+ * arm functions set the base; drop it and the whole program slides to the
+ * bottom of the caller's region (y65c's base-0 mutant: red here). Both Rule 7 kernels
  * pass `off = 0`, so from every other case in this suite the mutation is
  * BEHAVIOURALLY INERT — the value, the palindrome, the pool, the slot scan,
  * the span-disjointness scan and both goldens stay green. Only a SECOND

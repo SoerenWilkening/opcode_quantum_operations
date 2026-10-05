@@ -107,6 +107,18 @@ const cq_bit *cq_fp_span_sign(const cq_bit *a);   /*  1 lane  */
  * is not a bug to chase in either direction. */
 void cq_fp_const(cq_bit *out, uint64_t pattern);
 
+/* THE (shift, mask) VIEW every fp step machine collapses a view chain to (M32,
+ * M33, M34, M35, M37, M38b, M39, M40 — each kept a verbatim copy of this
+ * loop): out[i] = base[i + shift] where bit i of `mask` is set and i + shift
+ * is a lane, CQ_BIT_ZERO everywhere else, with a NEGATIVE shift meaning a left
+ * shift. Written as one zero fill plus one copy per RUN of kept lanes rather
+ * than one cq_bit assignment per lane: measured 2026-10-05 (macOS `sample`,
+ * Debug), the per-lane form — run once per view operand per GATE — was the
+ * largest remaining self time of test_kernel_fmul, most of it ASan's
+ * memcpy/memset interceptors. Lane for lane the output is the same. `out` is
+ * CQ_FP64_W entries, written whole, and must not overlap `base`. */
+void cq_fp_view_fill(const cq_bit *base, int shift, uint64_t mask, cq_bit *out);
+
 static inline void cq_fp_const_frac_mask(cq_bit *o) { cq_fp_const(o, CQ_FP64_FRAC_MASK); }
 static inline void cq_fp_const_implicit (cq_bit *o) { cq_fp_const(o, CQ_FP64_IMPLICIT);  }
 static inline void cq_fp_const_exp_mask (cq_bit *o) { cq_fp_const(o, CQ_FP64_EXP_MASK);  }

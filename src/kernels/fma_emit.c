@@ -233,15 +233,20 @@ static void emit_row(cq_ctx *ctx, const cq_fma_block *k, const uint32_t *off,
     cq_kernel_die("fma: unknown op in the program");
 }
 
-void cq_fma_step(cq_ctx *ctx, const cq_fma_block *k, int u)
+/* One slot over an ALREADY-ARMED offset table. The Rule 7 kernel arms once
+ * per call and keeps the table in its env, M34's fmul_step_armed shape: the
+ * 395-entry rebasing loop in `cq_fu_arm` was the top of test_kernel_fma's
+ * Debug self time when it ran once per GATE (macOS `sample`, 2026-10-05). The
+ * table is a pure function of the map and `k->off`, both fixed for the call,
+ * so arming once and arming per slot give the same offsets. */
+static void fma_step_armed(cq_ctx *ctx, const cq_fma_block *k,
+                           const uint32_t *off, int u)
 {
-    uint32_t off[CQ_FU_MAXR];
     const cq_fma_row *rows;
     int i, within, n;
 
     if (u < 0 || u >= cq_fma_steps())
         cq_kernel_die("fma: step index outside [0, cq_fma_steps())");
-    cq_fu_arm(k, off);
     rows = cq_fma_rows(&n);
     /* A BINARY SEARCH OVER THE MEMOISED MAP rather than a walk that re-asks
      * every sibling module what every row costs — 790 module calls per gate at
@@ -252,22 +257,31 @@ void cq_fma_step(cq_ctx *ctx, const cq_fma_block *k, int u)
     emit_row(ctx, k, off, rows, i, within);
 }
 
+void cq_fma_step(cq_ctx *ctx, const cq_fma_block *k, int u)
+{
+    uint32_t off[CQ_FU_MAXR];
+
+    if (u < 0 || u >= cq_fma_steps())
+        cq_kernel_die("fma: step index outside [0, cq_fma_steps())");
+    cq_fu_arm(k, off);
+    fma_step_armed(ctx, k, off, u);
+}
+
 /* The last row — fma.jl:210's `return result`, the outermost `ifelse` of the
  * select chain, whose output is a `mux`'s own span. The guard is what keeps
  * this from handing back a pointer into a dead stack frame if the table's last
  * row ever became a view or a projection: NOTHING in the library holds a
  * circuit or a buffer (Rule 13), so an assembled operand lives only as long as
  * the call that built it. */
-const cq_bit *cq_fma_result(const cq_fma_block *k)
+static const cq_bit *fma_result_armed(const cq_fma_block *k,
+                                      const uint32_t *off)
 {
-    uint32_t off[CQ_FU_MAXR];
     cq_bit buf[CQ_FU_W];
     const cq_fma_row *rows;
     const cq_bit *p;
     int n;
 
     rows = cq_fma_rows(&n);
-    cq_fu_arm(k, off);
     if (rows[n - 1].op == CQ_FUOP_VIEW || rows[n - 1].op == CQ_FUOP_OUT)
         cq_kernel_die("fma: `result` is a view or a projection, not a span");
     p = cq_fu_val64(k, off, n - 1, buf);
@@ -275,16 +289,27 @@ const cq_bit *cq_fma_result(const cq_fma_block *k)
     return p;
 }
 
+const cq_bit *cq_fma_result(const cq_fma_block *k)
+{
+    uint32_t off[CQ_FU_MAXR];
+
+    cq_fu_arm(k, off);
+    return fma_result_armed(k, off);
+}
+
 /* --- The three-source kernel: Bennett-in-the-small over one flat region. -- */
 
 typedef struct {
     cq_fma_block k;
+    uint32_t     off[CQ_FU_MAXR];
     cq_bit      *dst;
 } fma_env;
 
 static void fma_compute(cq_ctx *ctx, void *env, int s)
 {
-    cq_fma_step(ctx, &((const fma_env *)env)->k, s);
+    const fma_env *e = (const fma_env *)env;
+
+    fma_step_armed(ctx, &e->k, e->off, s);
 }
 
 /* The "^=" of Rule 7's contract, and the only place `dst` is written on the
@@ -294,7 +319,7 @@ static void fma_copyout(cq_ctx *ctx, void *env, int s)
 {
     const fma_env *e = (const fma_env *)env;
 
-    cq_emit_cx(ctx, &cq_fma_result(&e->k)[s], &e->dst[s]);
+    cq_emit_cx(ctx, &fma_result_armed(&e->k, e->off)[s], &e->dst[s]);
 }
 
 void cq_kernel_fma(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
@@ -344,6 +369,7 @@ void cq_kernel_fma(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
     cq_scratch_alloc(&scr, cq_fma_region());
     e.k.a = a; e.k.b = b; e.k.c = c; e.k.scr = &scr; e.k.off = 0u;
     e.dst = dst;
+    cq_fu_arm(&e.k, e.off);
 
     cq_sandwich(ctx, &scr, fma_compute, cq_fma_steps(),
                 fma_copyout, W, &e);

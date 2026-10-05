@@ -84,9 +84,9 @@ static uint64_t const_of(int s)
  * its region except `sub`, whose `d` lies between `nb` and `c` (add.h), and
  * the barrel, whose running value is the LAST stage's mux output and is only
  * findable through cq_barrel_result (shift_var.h). */
-cq_bit *cq_fa_row_out(const cq_fa_ctx *x, const uint32_t *off, int i)
+cq_bit *cq_fa_row_out(const cq_fa_ctx *x, const cq_fa_offs *off, int i)
 {
-    uint32_t o = off[i];
+    uint32_t o = cq_fa_off(off, i);
     int op = x->rows[i].op;
 
     if (op == CQ_FAOP_SUB)
@@ -103,18 +103,18 @@ cq_bit *cq_fa_row_out(const cq_fa_ctx *x, const uint32_t *off, int i)
 
 /* --- The three M32 hand-offs. -------------------------------------------- */
 
-cq_clz_block cq_fa_clz_of(const cq_fa_ctx *x, const uint32_t *off, int i,
+cq_clz_block cq_fa_clz_of(const cq_fa_ctx *x, const cq_fa_offs *off, int i,
                           cq_fa_bufs *bf)
 {
     cq_clz_block k;
 
     k.wr         = cq_fa_op64(x, off, x->rows[i].s0, bf->v[0], bf->v[2]);
     k.result_exp = cq_fa_op64(x, off, x->rows[i].s1, bf->v[1], bf->v[3]);
-    k.scr = x->scr; k.off = off[i];
+    k.scr = x->scr; k.off = cq_fa_off(off, i);
     return k;
 }
 
-cq_subnorm_block cq_fa_subnorm_of(const cq_fa_ctx *x, const uint32_t *off,
+cq_subnorm_block cq_fa_subnorm_of(const cq_fa_ctx *x, const cq_fa_offs *off,
                                   int i, cq_fa_bufs *bf)
 {
     cq_subnorm_block k;
@@ -122,11 +122,11 @@ cq_subnorm_block cq_fa_subnorm_of(const cq_fa_ctx *x, const uint32_t *off,
     k.wr          = cq_fa_op64(x, off, x->rows[i].s0, bf->v[0], bf->v[3]);
     k.result_exp  = cq_fa_op64(x, off, x->rows[i].s1, bf->v[1], bf->v[3]);
     k.result_sign = cq_fa_op64(x, off, x->rows[i].s2, bf->v[2], bf->v[3]);
-    k.scr = x->scr; k.off = off[i];
+    k.scr = x->scr; k.off = cq_fa_off(off, i);
     return k;
 }
 
-cq_round_block cq_fa_round_of(const cq_fa_ctx *x, const uint32_t *off, int i,
+cq_round_block cq_fa_round_of(const cq_fa_ctx *x, const cq_fa_offs *off, int i,
                               cq_fa_bufs *bf)
 {
     cq_round_block k;
@@ -134,7 +134,7 @@ cq_round_block cq_fa_round_of(const cq_fa_ctx *x, const uint32_t *off, int i,
     k.wr          = cq_fa_op64(x, off, x->rows[i].s0, bf->v[0], bf->v[3]);
     k.result_exp  = cq_fa_op64(x, off, x->rows[i].s1, bf->v[1], bf->v[3]);
     k.result_sign = cq_fa_op64(x, off, x->rows[i].s2, bf->v[2], bf->v[3]);
-    k.scr = x->scr; k.off = off[i];
+    k.scr = x->scr; k.off = cq_fa_off(off, i);
     return k;
 }
 
@@ -150,7 +150,7 @@ cq_round_block cq_fa_round_of(const cq_fa_ctx *x, const uint32_t *off, int i,
  * bounds, and one handed a 64-lane row would read a wire that is not a flag.
  * Release has no other detector: the read succeeds, the gate is plausible and
  * the value is wrong. */
-const cq_bit *cq_fa_flag_of(const cq_fa_ctx *x, const uint32_t *off, int i)
+const cq_bit *cq_fa_flag_of(const cq_fa_ctx *x, const cq_fa_offs *off, int i)
 {
     const cq_fadd_row *r;
     uint32_t o;
@@ -161,7 +161,7 @@ const cq_bit *cq_fa_flag_of(const cq_fa_ctx *x, const uint32_t *off, int i)
         cq_kernel_die("fadd: a one-bit operand names a 64-lane row");
 
     r = &x->rows[i];
-    o = off[i];
+    o = cq_fa_off(off, i);
 
     if (r->op == CQ_FAOP_PICK) {
         cq_fa_bufs bf;
@@ -230,17 +230,12 @@ static int view_collapse(const cq_fa_ctx *x, int s, int *shift, uint64_t *mask)
 
 static void view_fill(const cq_bit *base, int shift, uint64_t mask, cq_bit *out)
 {
-    for (int i = 0; i < W64; i++) {
-        int j = i + shift;
-
-        out[i] = (((mask >> (unsigned)i) & UINT64_C(1)) != 0u && j >= 0 && j < W64)
-               ? base[j] : cq_bit_zero();
-    }
+    cq_fp_view_fill(base, shift, mask, out);          /* fpfield.h, one copy */
 }
 
 /* A PICK of a 64-lane output. `flushed_result` is the one output that is a
  * VIEW over an operand rather than a span, so M32 ASSEMBLES it (D-K23-8). */
-static const cq_bit *pick64(const cq_fa_ctx *x, const uint32_t *off, int i,
+static const cq_bit *pick64(const cq_fa_ctx *x, const cq_fa_offs *off, int i,
                             cq_bit *buf)
 {
     const cq_fadd_row *r = &x->rows[i];
@@ -277,7 +272,7 @@ static const cq_bit *pick64(const cq_fa_ctx *x, const uint32_t *off, int i,
 
 /* A NON-view 64-lane operand: one of the two rails, a constant span, a picked
  * output, or an emitting row's own output. */
-static const cq_bit *base64(const cq_fa_ctx *x, const uint32_t *off, int s,
+static const cq_bit *base64(const cq_fa_ctx *x, const cq_fa_offs *off, int s,
                             cq_bit *buf)
 {
     if (s >= 0) {
@@ -302,7 +297,7 @@ static const cq_bit *base64(const cq_fa_ctx *x, const uint32_t *off, int s,
     return buf;
 }
 
-const cq_bit *cq_fa_op64(const cq_fa_ctx *x, const uint32_t *off, int s,
+const cq_bit *cq_fa_op64(const cq_fa_ctx *x, const cq_fa_offs *off, int s,
                          cq_bit *buf, cq_bit *tmp)
 {
     if (s >= 0 && s < x->n && x->rows[s].op == CQ_FAOP_VIEW) {

@@ -359,12 +359,7 @@ static int view_collapse(const cq_fv_ctx *x, int s, int *shift, uint64_t *mask)
 
 static void view_fill(const cq_bit *base, int shift, uint64_t mask, cq_bit *out)
 {
-    for (int i = 0; i < W64; i++) {
-        int j = i + shift;
-
-        out[i] = (((mask >> (unsigned)i) & UINT64_C(1)) != 0u && j >= 0 && j < W64)
-               ? base[j] : cq_bit_zero();
-    }
+    cq_fp_view_fill(base, shift, mask, out);          /* fpfield.h, one copy */
 }
 
 /* A NON-view 64-lane operand: the rail (widened when the source is narrower

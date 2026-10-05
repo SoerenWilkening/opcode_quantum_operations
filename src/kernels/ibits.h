@@ -138,4 +138,29 @@ void cq_ibits_step(cq_ctx *ctx, const cq_ibits_block *k, int u);
  * caller's region. The last row is always an `add` (`dest = prev + 0`). */
 const cq_bit *cq_ibits_result(const cq_ibits_block *k);
 
+/* THE LAYOUT OF ONE BOUND BLOCK, BUILT ONCE PER CALL RATHER THAN ONCE PER
+ * GATE — M34's fmul_step_armed shape (bd
+ * a-395-row-flat-table-needs-the-memoised-prefix-map). Until 2026-10-05 every
+ * step re-tallied the whole program and walked it linearly to its row; at
+ * ctlz/cttz's 2W + 2 rows that was the top of test_kernel_ibits' self time
+ * (macOS `sample`). Every row's ABSOLUTE offset — `cq_ibits_arm` is the one
+ * place `off` is added — and first slot, plus the totals: a pure function of
+ * the block's rows, W and `off`, holding no operand and no circuit state
+ * (Rule 13). The arm performs every refusal `cq_ibits_step` and
+ * `cq_ibits_result` perform before they read a row; the Rule 7 kernel arms
+ * once and keeps the map in its env. `step0` is non-decreasing, so the
+ * dispatch searches for the LAST row whose `step0 <= u`. */
+typedef struct {
+    uint32_t off[CQ_IBITS_MAX_ROWS];
+    int      step0[CQ_IBITS_MAX_ROWS + 1];
+    int      steps;
+    uint32_t bits;
+} cq_ibits_map;
+
+void          cq_ibits_arm(const cq_ibits_block *k, cq_ibits_map *m);
+void          cq_ibits_step_armed(cq_ctx *ctx, const cq_ibits_block *k,
+                                  const cq_ibits_map *m, int u);
+const cq_bit *cq_ibits_result_armed(const cq_ibits_block *k,
+                                    const cq_ibits_map *m);
+
 #endif /* CQOPS_KERNELS_IBITS_H */

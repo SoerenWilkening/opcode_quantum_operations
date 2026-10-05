@@ -19,7 +19,7 @@ python3 tools/function_map.py
 `make lint` checks that the checked-in map is current. Line numbers point to
 the definition (or the build-language declaration) in the listed file.
 
-**Indexed definitions:** 7175
+**Indexed definitions:** 7182
 
 ## `cmake/CqopsDebugToolchain.cmake`
 
@@ -3598,27 +3598,27 @@ the definition (or the build-language declaration) in the listed file.
 |---|---:|
 | `emit_row` | [48](src/kernels/fadd_emit.c:48) |
 | `cq_fa_step` | [209](src/kernels/fadd_emit.c:209) |
-| `fa_step_armed` | [226](src/kernels/fadd_emit.c:226) |
-| `fa_step_mapped` | [239](src/kernels/fadd_emit.c:239) |
-| `fa_result_armed` | [248](src/kernels/fadd_emit.c:248) |
-| `fa_result_mapped` | [254](src/kernels/fadd_emit.c:254) |
-| `cq_fa_result` | [263](src/kernels/fadd_emit.c:263) |
-| `blk_ctx` | [276](src/kernels/fadd_emit.c:276) |
-| `blk_step` | [290](src/kernels/fadd_emit.c:290) |
-| `blk_result` | [299](src/kernels/fadd_emit.c:299) |
-| `cq_fsub_region` | [308](src/kernels/fadd_emit.c:308) |
-| `cq_fsub_steps` | [309](src/kernels/fadd_emit.c:309) |
-| `cq_fsub_step` | [311](src/kernels/fadd_emit.c:311) |
-| `cq_fsub_result` | [314](src/kernels/fadd_emit.c:314) |
-| `cq_fadd_region` | [321](src/kernels/fadd_emit.c:321) |
-| `cq_fadd_steps` | [322](src/kernels/fadd_emit.c:322) |
-| `cq_fadd_step` | [324](src/kernels/fadd_emit.c:324) |
-| `cq_fadd_result` | [327](src/kernels/fadd_emit.c:327) |
-| `fadd_compute` | [340](src/kernels/fadd_emit.c:340) |
-| `fadd_copyout` | [347](src/kernels/fadd_emit.c:347) |
-| `fadd` | [354](src/kernels/fadd_emit.c:354) |
-| `cq_kernel_fadd` | [405](src/kernels/fadd_emit.c:405) |
-| `cq_kernel_fsub` | [409](src/kernels/fadd_emit.c:409) |
+| `fa_step_armed` | [227](src/kernels/fadd_emit.c:227) |
+| `fa_step_mapped` | [240](src/kernels/fadd_emit.c:240) |
+| `fa_result_armed` | [249](src/kernels/fadd_emit.c:249) |
+| `fa_result_mapped` | [255](src/kernels/fadd_emit.c:255) |
+| `cq_fa_result` | [264](src/kernels/fadd_emit.c:264) |
+| `blk_ctx` | [278](src/kernels/fadd_emit.c:278) |
+| `blk_step` | [292](src/kernels/fadd_emit.c:292) |
+| `blk_result` | [301](src/kernels/fadd_emit.c:301) |
+| `cq_fsub_region` | [310](src/kernels/fadd_emit.c:310) |
+| `cq_fsub_steps` | [311](src/kernels/fadd_emit.c:311) |
+| `cq_fsub_step` | [313](src/kernels/fadd_emit.c:313) |
+| `cq_fsub_result` | [316](src/kernels/fadd_emit.c:316) |
+| `cq_fadd_region` | [323](src/kernels/fadd_emit.c:323) |
+| `cq_fadd_steps` | [324](src/kernels/fadd_emit.c:324) |
+| `cq_fadd_step` | [326](src/kernels/fadd_emit.c:326) |
+| `cq_fadd_result` | [329](src/kernels/fadd_emit.c:329) |
+| `fadd_compute` | [342](src/kernels/fadd_emit.c:342) |
+| `fadd_copyout` | [349](src/kernels/fadd_emit.c:349) |
+| `fadd` | [356](src/kernels/fadd_emit.c:356) |
+| `cq_kernel_fadd` | [407](src/kernels/fadd_emit.c:407) |
+| `cq_kernel_fsub` | [411](src/kernels/fadd_emit.c:411) |
 
 ## `src/kernels/fadd_eval.c`
 
@@ -3629,6 +3629,12 @@ the definition (or the build-language declaration) in the listed file.
 | `shr_julia` | [62](src/kernels/fadd_eval.c:62) |
 | `cq_fadd_eval` | [67](src/kernels/fadd_eval.c:67) |
 | `cq_fsub_eval` | [163](src/kernels/fadd_eval.c:163) |
+
+## `src/kernels/fadd_int.h`
+
+| Function | Line |
+|---|---:|
+| `cq_fa_off` | [86](src/kernels/fadd_int.h:86) |
 
 ## `src/kernels/fadd_operand.c`
 
@@ -3643,9 +3649,9 @@ the definition (or the build-language declaration) in the listed file.
 | `shr64` | [206](src/kernels/fadd_operand.c:206) |
 | `view_collapse` | [215](src/kernels/fadd_operand.c:215) |
 | `view_fill` | [231](src/kernels/fadd_operand.c:231) |
-| `pick64` | [243](src/kernels/fadd_operand.c:243) |
-| `base64` | [280](src/kernels/fadd_operand.c:280) |
-| `cq_fa_op64` | [305](src/kernels/fadd_operand.c:305) |
+| `pick64` | [238](src/kernels/fadd_operand.c:238) |
+| `base64` | [275](src/kernels/fadd_operand.c:275) |
+| `cq_fa_op64` | [300](src/kernels/fadd_operand.c:300) |
 
 ## `src/kernels/fadd_step.c`
 
@@ -3663,8 +3669,8 @@ the definition (or the build-language declaration) in the listed file.
 | `cq_fa_row_at` | [195](src/kernels/fadd_step.c:195) |
 | `walk` | [212](src/kernels/fadd_step.c:212) |
 | `cq_fa_arm` | [227](src/kernels/fadd_step.c:227) |
-| `cq_fa_arm_map` | [235](src/kernels/fadd_step.c:235) |
-| `cq_fa_sp` | [246](src/kernels/fadd_step.c:246) |
+| `cq_fa_arm_map` | [237](src/kernels/fadd_step.c:237) |
+| `cq_fa_sp` | [249](src/kernels/fadd_step.c:249) |
 
 ## `src/kernels/fcmp.c`
 
@@ -3796,8 +3802,8 @@ the definition (or the build-language declaration) in the listed file.
 | `shr64` | [335](src/kernels/fconv_step.c:335) |
 | `view_collapse` | [344](src/kernels/fconv_step.c:344) |
 | `view_fill` | [360](src/kernels/fconv_step.c:360) |
-| `base64` | [379](src/kernels/fconv_step.c:379) |
-| `cq_fv_op64` | [402](src/kernels/fconv_step.c:402) |
+| `base64` | [374](src/kernels/fconv_step.c:374) |
+| `cq_fv_op64` | [397](src/kernels/fconv_step.c:397) |
 
 ## `src/kernels/fdiv.c`
 
@@ -3846,8 +3852,8 @@ the definition (or the build-language declaration) in the listed file.
 | `shr64` | [204](src/kernels/fdiv_operand.c:204) |
 | `cq_fd_view_collapse` | [211](src/kernels/fdiv_operand.c:211) |
 | `cq_fd_view_fill` | [230](src/kernels/fdiv_operand.c:230) |
-| `base64` | [241](src/kernels/fdiv_operand.c:241) |
-| `cq_fd_op64` | [257](src/kernels/fdiv_operand.c:257) |
+| `base64` | [236](src/kernels/fdiv_operand.c:236) |
+| `cq_fd_op64` | [252](src/kernels/fdiv_operand.c:252) |
 
 ## `src/kernels/fdiv_step.c`
 
@@ -3883,11 +3889,13 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `emit_row` | [54](src/kernels/fma_emit.c:54) |
-| `cq_fma_step` | [236](src/kernels/fma_emit.c:236) |
-| `cq_fma_result` | [261](src/kernels/fma_emit.c:261) |
-| `fma_compute` | [285](src/kernels/fma_emit.c:285) |
-| `fma_copyout` | [293](src/kernels/fma_emit.c:293) |
-| `cq_kernel_fma` | [300](src/kernels/fma_emit.c:300) |
+| `fma_step_armed` | [242](src/kernels/fma_emit.c:242) |
+| `cq_fma_step` | [260](src/kernels/fma_emit.c:260) |
+| `fma_result_armed` | [276](src/kernels/fma_emit.c:276) |
+| `cq_fma_result` | [292](src/kernels/fma_emit.c:292) |
+| `fma_compute` | [308](src/kernels/fma_emit.c:308) |
+| `fma_copyout` | [318](src/kernels/fma_emit.c:318) |
+| `cq_kernel_fma` | [325](src/kernels/fma_emit.c:325) |
 
 ## `src/kernels/fma_eval.c`
 
@@ -3915,8 +3923,8 @@ the definition (or the build-language declaration) in the listed file.
 | `shr64` | [235](src/kernels/fma_operand.c:235) |
 | `cq_fu_view_collapse` | [242](src/kernels/fma_operand.c:242) |
 | `cq_fu_view_fill` | [261](src/kernels/fma_operand.c:261) |
-| `base64` | [273](src/kernels/fma_operand.c:273) |
-| `cq_fu_op64` | [293](src/kernels/fma_operand.c:293) |
+| `base64` | [268](src/kernels/fma_operand.c:268) |
+| `cq_fu_op64` | [288](src/kernels/fma_operand.c:288) |
 
 ## `src/kernels/fma_step.c`
 
@@ -4038,8 +4046,8 @@ the definition (or the build-language declaration) in the listed file.
 | `shr64` | [363](src/kernels/fmul_step.c:363) |
 | `cq_fm_view_collapse` | [370](src/kernels/fmul_step.c:370) |
 | `cq_fm_view_fill` | [389](src/kernels/fmul_step.c:389) |
-| `base64` | [400](src/kernels/fmul_step.c:400) |
-| `cq_fm_op64` | [416](src/kernels/fmul_step.c:416) |
+| `base64` | [395](src/kernels/fmul_step.c:395) |
+| `cq_fm_op64` | [411](src/kernels/fmul_step.c:411) |
 
 ## `src/kernels/fpclass.c`
 
@@ -4073,29 +4081,32 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_fp_view` | [15](src/kernels/fpfield.c:15) |
-| `cq_fp_view_exp` | [28](src/kernels/fpfield.c:28) |
-| `cq_fp_view_frac` | [34](src/kernels/fpfield.c:34) |
-| `cq_fp_view_sign` | [40](src/kernels/fpfield.c:40) |
-| `cq_fp_span_exp` | [45](src/kernels/fpfield.c:45) |
-| `cq_fp_span_frac` | [46](src/kernels/fpfield.c:46) |
-| `cq_fp_span_sign` | [47](src/kernels/fpfield.c:47) |
-| `cq_fp_const` | [49](src/kernels/fpfield.c:49) |
-| `cq_fp_pack` | [55](src/kernels/fpfield.c:55) |
+| `cq_fp_view` | [23](src/kernels/fpfield.c:23) |
+| `cq_fp_view_exp` | [36](src/kernels/fpfield.c:36) |
+| `cq_fp_view_frac` | [42](src/kernels/fpfield.c:42) |
+| `cq_fp_view_sign` | [48](src/kernels/fpfield.c:48) |
+| `cq_fp_span_exp` | [53](src/kernels/fpfield.c:53) |
+| `cq_fp_span_frac` | [54](src/kernels/fpfield.c:54) |
+| `cq_fp_span_sign` | [55](src/kernels/fpfield.c:55) |
+| `in_range` | [58](src/kernels/fpfield.c:58) |
+| `lowest_set` | [67](src/kernels/fpfield.c:67) |
+| `cq_fp_view_fill` | [83](src/kernels/fpfield.c:83) |
+| `cq_fp_const` | [113](src/kernels/fpfield.c:113) |
+| `cq_fp_pack` | [118](src/kernels/fpfield.c:118) |
 
 ## `src/kernels/fpfield.h`
 
 | Function | Line |
 |---|---:|
-| `cq_fp_const_frac_mask` | [110](src/kernels/fpfield.h:110) |
-| `cq_fp_const_implicit` | [111](src/kernels/fpfield.h:111) |
-| `cq_fp_const_exp_mask` | [112](src/kernels/fpfield.h:112) |
-| `cq_fp_const_inf_bits` | [113](src/kernels/fpfield.h:113) |
-| `cq_fp_const_qnan` | [114](src/kernels/fpfield.h:114) |
-| `cq_fp_const_quiet_bit` | [115](src/kernels/fpfield.h:115) |
-| `cq_fp_const_indef` | [116](src/kernels/fpfield.h:116) |
-| `cq_fp_const_zero` | [117](src/kernels/fpfield.h:117) |
-| `cq_fp_const_exp_all` | [118](src/kernels/fpfield.h:118) |
+| `cq_fp_const_frac_mask` | [122](src/kernels/fpfield.h:122) |
+| `cq_fp_const_implicit` | [123](src/kernels/fpfield.h:123) |
+| `cq_fp_const_exp_mask` | [124](src/kernels/fpfield.h:124) |
+| `cq_fp_const_inf_bits` | [125](src/kernels/fpfield.h:125) |
+| `cq_fp_const_qnan` | [126](src/kernels/fpfield.h:126) |
+| `cq_fp_const_quiet_bit` | [127](src/kernels/fpfield.h:127) |
+| `cq_fp_const_indef` | [128](src/kernels/fpfield.h:128) |
+| `cq_fp_const_zero` | [129](src/kernels/fpfield.h:129) |
+| `cq_fp_const_exp_all` | [130](src/kernels/fpfield.h:130) |
 
 ## `src/kernels/fpround.c`
 
@@ -4110,33 +4121,33 @@ the definition (or the build-language declaration) in the listed file.
 | Function | Line |
 |---|---:|
 | `emit_row` | [39](src/kernels/fpround_emit.c:39) |
-| `fpr_step` | [186](src/kernels/fpround_emit.c:186) |
-| `fpr_out` | [203](src/kernels/fpround_emit.c:203) |
-| `cq_norm52_region` | [228](src/kernels/fpround_emit.c:228) |
-| `cq_clz_region` | [229](src/kernels/fpround_emit.c:229) |
-| `cq_subnorm_region` | [230](src/kernels/fpround_emit.c:230) |
-| `cq_round_region` | [231](src/kernels/fpround_emit.c:231) |
-| `cq_norm52_steps` | [233](src/kernels/fpround_emit.c:233) |
-| `cq_clz_steps` | [234](src/kernels/fpround_emit.c:234) |
-| `cq_subnorm_steps` | [235](src/kernels/fpround_emit.c:235) |
-| `cq_round_steps` | [236](src/kernels/fpround_emit.c:236) |
-| `cq_norm52_step` | [238](src/kernels/fpround_emit.c:238) |
-| `cq_clz_step` | [241](src/kernels/fpround_emit.c:241) |
-| `cq_subnorm_step` | [244](src/kernels/fpround_emit.c:244) |
-| `cq_round_step` | [247](src/kernels/fpround_emit.c:247) |
-| `cq_norm52_m` | [250](src/kernels/fpround_emit.c:250) |
-| `cq_norm52_e` | [253](src/kernels/fpround_emit.c:253) |
-| `cq_clz_wr` | [256](src/kernels/fpround_emit.c:256) |
-| `cq_clz_exp` | [259](src/kernels/fpround_emit.c:259) |
-| `cq_subnorm_wr` | [262](src/kernels/fpround_emit.c:262) |
-| `cq_subnorm_exp` | [265](src/kernels/fpround_emit.c:265) |
-| `cq_subnorm_flag` | [268](src/kernels/fpround_emit.c:268) |
-| `cq_subnorm_ftz` | [271](src/kernels/fpround_emit.c:271) |
-| `cq_subnorm_flushed` | [278](src/kernels/fpround_emit.c:278) |
-| `cq_round_normal` | [292](src/kernels/fpround_emit.c:292) |
-| `cq_round_overflow_result` | [295](src/kernels/fpround_emit.c:295) |
-| `cq_round_exp_overflow` | [298](src/kernels/fpround_emit.c:298) |
-| `cq_round_exp_overflow_aft` | [301](src/kernels/fpround_emit.c:301) |
+| `fpr_step` | [190](src/kernels/fpround_emit.c:190) |
+| `fpr_out` | [210](src/kernels/fpround_emit.c:210) |
+| `cq_norm52_region` | [232](src/kernels/fpround_emit.c:232) |
+| `cq_clz_region` | [233](src/kernels/fpround_emit.c:233) |
+| `cq_subnorm_region` | [234](src/kernels/fpround_emit.c:234) |
+| `cq_round_region` | [235](src/kernels/fpround_emit.c:235) |
+| `cq_norm52_steps` | [237](src/kernels/fpround_emit.c:237) |
+| `cq_clz_steps` | [238](src/kernels/fpround_emit.c:238) |
+| `cq_subnorm_steps` | [239](src/kernels/fpround_emit.c:239) |
+| `cq_round_steps` | [240](src/kernels/fpround_emit.c:240) |
+| `cq_norm52_step` | [242](src/kernels/fpround_emit.c:242) |
+| `cq_clz_step` | [245](src/kernels/fpround_emit.c:245) |
+| `cq_subnorm_step` | [248](src/kernels/fpround_emit.c:248) |
+| `cq_round_step` | [251](src/kernels/fpround_emit.c:251) |
+| `cq_norm52_m` | [254](src/kernels/fpround_emit.c:254) |
+| `cq_norm52_e` | [257](src/kernels/fpround_emit.c:257) |
+| `cq_clz_wr` | [260](src/kernels/fpround_emit.c:260) |
+| `cq_clz_exp` | [263](src/kernels/fpround_emit.c:263) |
+| `cq_subnorm_wr` | [266](src/kernels/fpround_emit.c:266) |
+| `cq_subnorm_exp` | [269](src/kernels/fpround_emit.c:269) |
+| `cq_subnorm_flag` | [272](src/kernels/fpround_emit.c:272) |
+| `cq_subnorm_ftz` | [275](src/kernels/fpround_emit.c:275) |
+| `cq_subnorm_flushed` | [282](src/kernels/fpround_emit.c:282) |
+| `cq_round_normal` | [295](src/kernels/fpround_emit.c:295) |
+| `cq_round_overflow_result` | [298](src/kernels/fpround_emit.c:298) |
+| `cq_round_exp_overflow` | [301](src/kernels/fpround_emit.c:301) |
+| `cq_round_exp_overflow_aft` | [304](src/kernels/fpround_emit.c:304) |
 
 ## `src/kernels/fpround_eval.c`
 
@@ -4159,23 +4170,22 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `cq_fpr_ctx_of` | [56](src/kernels/fpround_step.c:56) |
-| `cq_fpr_op_width` | [77](src/kernels/fpround_step.c:77) |
-| `cq_fpr_row_steps` | [88](src/kernels/fpround_step.c:88) |
-| `row_region` | [111](src/kernels/fpround_step.c:111) |
-| `cq_fpr_region_of` | [130](src/kernels/fpround_step.c:130) |
-| `cq_fpr_steps_of` | [138](src/kernels/fpround_step.c:138) |
-| `walk` | [151](src/kernels/fpround_step.c:151) |
-| `cq_fpr_arm` | [166](src/kernels/fpround_step.c:166) |
-| `cq_fpr_sp` | [175](src/kernels/fpround_step.c:175) |
-| `const_of` | [182](src/kernels/fpround_step.c:182) |
-| `cq_fpr_row_out` | [210](src/kernels/fpround_step.c:210) |
-| `cq_fpr_flag_of` | [237](src/kernels/fpround_step.c:237) |
-| `cq_fpr_base64` | [273](src/kernels/fpround_step.c:273) |
-| `shr64` | [295](src/kernels/fpround_step.c:295) |
-| `cq_fpr_view_collapse` | [304](src/kernels/fpround_step.c:304) |
-| `cq_fpr_view_fill` | [320](src/kernels/fpround_step.c:320) |
-| `cq_fpr_op64` | [332](src/kernels/fpround_step.c:332) |
+| `cq_fpr_ctx_of` | [59](src/kernels/fpround_step.c:59) |
+| `cq_fpr_op_width` | [82](src/kernels/fpround_step.c:82) |
+| `cq_fpr_row_steps` | [93](src/kernels/fpround_step.c:93) |
+| `row_region` | [116](src/kernels/fpround_step.c:116) |
+| `cq_fpr_map_get` | [139](src/kernels/fpround_step.c:139) |
+| `cq_fpr_arm` | [172](src/kernels/fpround_step.c:172) |
+| `cq_fpr_at` | [183](src/kernels/fpround_step.c:183) |
+| `cq_fpr_sp` | [190](src/kernels/fpround_step.c:190) |
+| `const_of` | [197](src/kernels/fpround_step.c:197) |
+| `cq_fpr_row_out` | [225](src/kernels/fpround_step.c:225) |
+| `cq_fpr_flag_of` | [252](src/kernels/fpround_step.c:252) |
+| `cq_fpr_base64` | [288](src/kernels/fpround_step.c:288) |
+| `shr64` | [309](src/kernels/fpround_step.c:309) |
+| `cq_fpr_view_collapse` | [318](src/kernels/fpround_step.c:318) |
+| `cq_fpr_view_fill` | [334](src/kernels/fpround_step.c:334) |
+| `cq_fpr_op64` | [341](src/kernels/fpround_step.c:341) |
 
 ## `src/kernels/fround.c`
 
@@ -4236,8 +4246,8 @@ the definition (or the build-language declaration) in the listed file.
 | `shr64` | [144](src/kernels/fround_operand.c:144) |
 | `cq_fi_view_collapse` | [151](src/kernels/fround_operand.c:151) |
 | `view_fill` | [168](src/kernels/fround_operand.c:168) |
-| `base64` | [179](src/kernels/fround_operand.c:179) |
-| `cq_fi_op64` | [190](src/kernels/fround_operand.c:190) |
+| `base64` | [174](src/kernels/fround_operand.c:174) |
+| `cq_fi_op64` | [185](src/kernels/fround_operand.c:185) |
 
 ## `src/kernels/fround_step.c`
 
@@ -4294,9 +4304,9 @@ the definition (or the build-language declaration) in the listed file.
 | `shr64` | [184](src/kernels/fsqrt_operand.c:184) |
 | `cq_fs_view_collapse` | [191](src/kernels/fsqrt_operand.c:191) |
 | `cq_fs_view_fill` | [208](src/kernels/fsqrt_operand.c:208) |
-| `sar_fill` | [225](src/kernels/fsqrt_operand.c:225) |
-| `base64` | [236](src/kernels/fsqrt_operand.c:236) |
-| `cq_fs_op64` | [264](src/kernels/fsqrt_operand.c:264) |
+| `sar_fill` | [220](src/kernels/fsqrt_operand.c:220) |
+| `base64` | [231](src/kernels/fsqrt_operand.c:231) |
+| `cq_fs_op64` | [259](src/kernels/fsqrt_operand.c:259) |
 
 ## `src/kernels/fsqrt_step.c`
 
@@ -4330,37 +4340,39 @@ the definition (or the build-language declaration) in the listed file.
 
 | Function | Line |
 |---|---:|
-| `compute` | [34](src/kernels/ibits_kernel.c:34) |
-| `copyout` | [41](src/kernels/ibits_kernel.c:41) |
-| `xor_count` | [50](src/kernels/ibits_kernel.c:50) |
-| `lane` | [56](src/kernels/ibits_kernel.c:56) |
-| `fold_constant` | [58](src/kernels/ibits_kernel.c:58) |
-| `ibits` | [95](src/kernels/ibits_kernel.c:95) |
-| `cq_kernel_ctpop` | [129](src/kernels/ibits_kernel.c:129) |
-| `cq_kernel_ctlz` | [132](src/kernels/ibits_kernel.c:132) |
-| `cq_kernel_cttz` | [135](src/kernels/ibits_kernel.c:135) |
-| `cq_kernel_bitreverse` | [138](src/kernels/ibits_kernel.c:138) |
-| `cq_kernel_bswap` | [141](src/kernels/ibits_kernel.c:141) |
+| `compute` | [35](src/kernels/ibits_kernel.c:35) |
+| `copyout` | [44](src/kernels/ibits_kernel.c:44) |
+| `xor_count` | [53](src/kernels/ibits_kernel.c:53) |
+| `lane` | [59](src/kernels/ibits_kernel.c:59) |
+| `fold_constant` | [61](src/kernels/ibits_kernel.c:61) |
+| `ibits` | [98](src/kernels/ibits_kernel.c:98) |
+| `cq_kernel_ctpop` | [133](src/kernels/ibits_kernel.c:133) |
+| `cq_kernel_ctlz` | [136](src/kernels/ibits_kernel.c:136) |
+| `cq_kernel_cttz` | [139](src/kernels/ibits_kernel.c:139) |
+| `cq_kernel_bitreverse` | [142](src/kernels/ibits_kernel.c:142) |
+| `cq_kernel_bswap` | [145](src/kernels/ibits_kernel.c:145) |
 
 ## `src/kernels/ibits_step.c`
 
 | Function | Line |
 |---|---:|
-| `cq_ibits_row_steps` | [41](src/kernels/ibits_step.c:41) |
-| `cq_ibits_row_region` | [54](src/kernels/ibits_step.c:54) |
-| `check_program` | [67](src/kernels/ibits_step.c:67) |
-| `cq_ibits_steps` | [76](src/kernels/ibits_step.c:76) |
-| `cq_ibits_region` | [85](src/kernels/ibits_step.c:85) |
-| `check_block` | [96](src/kernels/ibits_step.c:96) |
-| `span` | [105](src/kernels/ibits_step.c:105) |
-| `out_of` | [111](src/kernels/ibits_step.c:111) |
-| `view` | [122](src/kernels/ibits_step.c:122) |
-| `flag_of` | [156](src/kernels/ibits_step.c:156) |
-| `emit_row` | [169](src/kernels/ibits_step.c:169) |
-| `costs` | [222](src/kernels/ibits_step.c:222) |
-| `op_of` | [233](src/kernels/ibits_step.c:233) |
-| `cq_ibits_step` | [240](src/kernels/ibits_step.c:240) |
-| `cq_ibits_result` | [271](src/kernels/ibits_step.c:271) |
+| `cq_ibits_row_steps` | [43](src/kernels/ibits_step.c:43) |
+| `cq_ibits_row_region` | [56](src/kernels/ibits_step.c:56) |
+| `check_program` | [69](src/kernels/ibits_step.c:69) |
+| `cq_ibits_steps` | [78](src/kernels/ibits_step.c:78) |
+| `cq_ibits_region` | [87](src/kernels/ibits_step.c:87) |
+| `span` | [96](src/kernels/ibits_step.c:96) |
+| `out_of` | [102](src/kernels/ibits_step.c:102) |
+| `view` | [113](src/kernels/ibits_step.c:113) |
+| `flag_of` | [161](src/kernels/ibits_step.c:161) |
+| `emit_row` | [174](src/kernels/ibits_step.c:174) |
+| `costs` | [227](src/kernels/ibits_step.c:227) |
+| `op_of` | [238](src/kernels/ibits_step.c:238) |
+| `cq_ibits_arm` | [249](src/kernels/ibits_step.c:249) |
+| `cq_ibits_step_armed` | [273](src/kernels/ibits_step.c:273) |
+| `cq_ibits_step` | [291](src/kernels/ibits_step.c:291) |
+| `cq_ibits_result_armed` | [299](src/kernels/ibits_step.c:299) |
+| `cq_ibits_result` | [309](src/kernels/ibits_step.c:309) |
 
 ## `src/kernels/iminmax.c`
 
@@ -6016,11 +6028,11 @@ the definition (or the build-language declaration) in the listed file.
 | `fa_wire_value` | [22](tests/test_kernel_fadd_spans.inc:22) |
 | `the_programs_spans_are_pairwise_disjoint (via CQ_TEST)` | [55](tests/test_kernel_fadd_spans.inc:55) |
 | `the_compute_half_is_a_palindrome_at_an_asymmetric_mask (via CQ_TEST)` | [130](tests/test_kernel_fadd_spans.inc:130) |
-| `fa_blk_step` | [195](tests/test_kernel_fadd_spans.inc:195) |
-| `fa_blk_result` | [207](tests/test_kernel_fadd_spans.inc:207) |
-| `fa_two_blocks` | [216](tests/test_kernel_fadd_spans.inc:216) |
-| `two_fsub_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [349](tests/test_kernel_fadd_spans.inc:349) |
-| `two_fadd_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [353](tests/test_kernel_fadd_spans.inc:353) |
+| `fa_blk_step` | [197](tests/test_kernel_fadd_spans.inc:197) |
+| `fa_blk_result` | [209](tests/test_kernel_fadd_spans.inc:209) |
+| `fa_two_blocks` | [218](tests/test_kernel_fadd_spans.inc:218) |
+| `two_fsub_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [351](tests/test_kernel_fadd_spans.inc:351) |
+| `two_fadd_blocks_in_one_region_do_not_collide (via CQ_TEST)` | [355](tests/test_kernel_fadd_spans.inc:355) |
 
 ## `tests/test_kernel_fcmp.c`
 

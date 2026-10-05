@@ -45,12 +45,12 @@ enum { W64 = CQ_FA_W };
 
 /* --- The dispatch. -------------------------------------------------------- */
 
-static void emit_row(cq_ctx *ctx, const cq_fa_ctx *x, const uint32_t *off,
+static void emit_row(cq_ctx *ctx, const cq_fa_ctx *x, const cq_fa_offs *off,
                      int i, int u)
 {
     const cq_fadd_row *r = &x->rows[i];
     cq_bit v0[CQ_FP64_W], v1[CQ_FP64_W], t0[CQ_FP64_W], t1[CQ_FP64_W];
-    uint32_t o = off[i];
+    uint32_t o = cq_fa_off(off, i);
     int lane;
 
     switch (r->op) {
@@ -208,23 +208,24 @@ static void emit_row(cq_ctx *ctx, const cq_fa_ctx *x, const uint32_t *off,
 
 void cq_fa_step(cq_ctx *ctx, const cq_fa_ctx *x, int u)
 {
-    uint32_t off[CQ_FA_MAXR];
+    uint32_t rel[CQ_FA_MAXR];
+    cq_fa_offs off;
 
     if (u < 0 || u >= cq_fa_steps_of(x))
         cq_kernel_die("fadd: step index outside [0, cq_fsub_steps())");
-    cq_fa_arm(x, off);
+    cq_fa_arm(x, rel, &off);
 
     for (int i = 0; i < x->n; i++) {
         int n = cq_fa_row_steps(&x->rows[i]);
 
-        if (u < n) { emit_row(ctx, x, off, i, u); return; }
+        if (u < n) { emit_row(ctx, x, &off, i, u); return; }
         u -= n;
     }
     cq_kernel_die("fadd: the step dispatch fell off the end of the program");
 }
 
 static void fa_step_armed(cq_ctx *ctx, const cq_fa_ctx *x,
-                          const cq_fa_map *m, const uint32_t *off, int u)
+                          const cq_fa_map *m, const cq_fa_offs *off, int u)
 {
     int i, within;
 
@@ -239,14 +240,14 @@ static void fa_step_armed(cq_ctx *ctx, const cq_fa_ctx *x,
 static void fa_step_mapped(cq_ctx *ctx, const cq_fa_ctx *x,
                            const cq_fa_map *m, int u)
 {
-    uint32_t off[CQ_FA_MAXR];
+    cq_fa_offs off;
 
-    cq_fa_arm_map(x, m, off);
-    fa_step_armed(ctx, x, m, off, u);
+    cq_fa_arm_map(x, m, &off);
+    fa_step_armed(ctx, x, m, &off, u);
 }
 
 static const cq_bit *fa_result_armed(const cq_fa_ctx *x, cq_fadd_prog p,
-                                     const uint32_t *off)
+                                     const cq_fa_offs *off)
 {
     return cq_fa_row_out(x, off, cq_fadd_result_row(p));
 }
@@ -254,18 +255,19 @@ static const cq_bit *fa_result_armed(const cq_fa_ctx *x, cq_fadd_prog p,
 static const cq_bit *fa_result_mapped(const cq_fa_ctx *x, cq_fadd_prog p,
                                       const cq_fa_map *m)
 {
-    uint32_t off[CQ_FA_MAXR];
+    cq_fa_offs off;
 
-    cq_fa_arm_map(x, m, off);
-    return fa_result_armed(x, p, off);
+    cq_fa_arm_map(x, m, &off);
+    return fa_result_armed(x, p, &off);
 }
 
 const cq_bit *cq_fa_result(const cq_fa_ctx *x, cq_fadd_prog p)
 {
-    uint32_t off[CQ_FA_MAXR];
+    uint32_t rel[CQ_FA_MAXR];
+    cq_fa_offs off;
 
-    cq_fa_arm(x, off);
-    return cq_fa_row_out(x, off, cq_fadd_result_row(p));
+    cq_fa_arm(x, rel, &off);
+    return cq_fa_row_out(x, &off, cq_fadd_result_row(p));
 }
 
 /* --- The exported `fsub` compute half (bd 9ve.23 / K19). ----------------- */
@@ -332,7 +334,7 @@ const cq_bit *cq_fadd_result(const cq_fadd_block *k)
 typedef struct {
     cq_fa_ctx    x;
     const cq_fa_map *map;
-    uint32_t     off[CQ_FA_MAXR];
+    cq_fa_offs   off;
     cq_fadd_prog p;
     cq_bit      *dst;
 } fadd_env;
@@ -341,14 +343,14 @@ static void fadd_compute(cq_ctx *ctx, void *env, int s)
 {
     const fadd_env *e = (const fadd_env *)env;
 
-    fa_step_armed(ctx, &e->x, e->map, e->off, s);
+    fa_step_armed(ctx, &e->x, e->map, &e->off, s);
 }
 
 static void fadd_copyout(cq_ctx *ctx, void *env, int s)
 {
     const fadd_env *e = (const fadd_env *)env;
 
-    cq_emit_cx(ctx, &fa_result_armed(&e->x, e->p, e->off)[s], &e->dst[s]);
+    cq_emit_cx(ctx, &fa_result_armed(&e->x, e->p, &e->off)[s], &e->dst[s]);
 }
 
 static void fadd(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
@@ -395,7 +397,7 @@ static void fadd(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, const cq_bit *b,
      * that allocated two regions would put half its targets outside it. */
     cq_scratch_alloc(&scr, e.map->region);
     e.x.scr = &scr;
-    cq_fa_arm_map(&e.x, e.map, e.off);
+    cq_fa_arm_map(&e.x, e.map, &e.off);
 
     cq_sandwich(ctx, &scr, fadd_compute, e.map->steps,
                 fadd_copyout, W, &e);

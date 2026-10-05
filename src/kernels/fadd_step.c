@@ -209,33 +209,36 @@ int cq_fa_row_at(const cq_fa_map *m, int u, int *within)
 
 /* The prefix-offset walk, which also returns the region total — so the fit
  * check and the offsets come out of ONE pass. */
-static uint32_t walk(const cq_fa_ctx *x, uint32_t *off)
+static uint32_t walk(const cq_fa_ctx *x, uint32_t *rel)
 {
-    uint32_t o = x->off;
+    uint32_t o = 0u;
 
     for (int i = 0; i < x->n; i++) {
-        off[i] = o;
+        rel[i] = o;
         o += row_region(&x->rows[i]);
     }
-    return o - x->off;
+    return o;
 }
 
 /* The region check is the PROGRAM's, and it has to be: without it the first
  * out-of-region span aborts in M08 naming the REGION rather than the consumer
  * that mis-sized its offset, and the two-programs-in-one-region shape then has
  * no diagnostic of its own. Hard error in both configurations. */
-void cq_fa_arm(const cq_fa_ctx *x, uint32_t *off)
+void cq_fa_arm(const cq_fa_ctx *x, uint32_t *rel, cq_fa_offs *off)
 {
     cq_fa_check_program(x->rows, x->n);
     if (x->scr == NULL) cq_kernel_die("fadd: the block has no region");
-    if ((uint64_t)x->off + walk(x, off) > (uint64_t)cq_scratch_size(x->scr))
+    off->rel  = rel;
+    off->base = x->off;                 /* added in cq_fa_off (fadd_int.h) */
+    if ((uint64_t)x->off + walk(x, rel) > (uint64_t)cq_scratch_size(x->scr))
         cq_kernel_die("fadd: the block's region does not fit at its offset");
 }
 
-void cq_fa_arm_map(const cq_fa_ctx *x, const cq_fa_map *m, uint32_t *off)
+void cq_fa_arm_map(const cq_fa_ctx *x, const cq_fa_map *m, cq_fa_offs *off)
 {
     if (x->scr == NULL) cq_kernel_die("fadd: the block has no region");
-    for (int i = 0; i < m->n; i++) off[i] = x->off + m->rel[i];
+    off->rel  = m->rel;
+    off->base = x->off;                 /* added in cq_fa_off (fadd_int.h) */
     if ((uint64_t)x->off + (uint64_t)m->region
         > (uint64_t)cq_scratch_size(x->scr))
         cq_kernel_die("fadd: the block's region does not fit at its offset");

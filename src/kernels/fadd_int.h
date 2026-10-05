@@ -67,25 +67,44 @@ typedef struct {
     int         steps, n;
 } cq_fa_map;
 
+/* WHERE A ROW'S SPANS LIE: row i starts at `base + rel[i]`, ABSOLUTE inside
+ * the region, read through cq_fa_off and nowhere else. `rel` is relative to
+ * the program's base; `base` is `x->off`, copied in by the two arms below and
+ * ADDED only in cq_fa_off — the one place `x->off` is applied, which is why a
+ * program cannot see its own offset and why a two-programs-in-one-region case
+ * is the only detector for dropping it (bd
+ * a-block-that-ignores-its-own-off-needs-a-two-block-case). The map path
+ * points `rel` at the memoised cq_fa_map's own prefixes instead of rebasing
+ * every row on every gate: measured 2026-10-05 (macOS `sample`), that
+ * 133-row rebase was 38% of test_kernel_fround_fadd's Debug self time, M38b
+ * driving the exported `fadd` block once per gate. */
+typedef struct {
+    const uint32_t *rel;
+    uint32_t        base;
+} cq_fa_offs;
+
+static inline uint32_t cq_fa_off(const cq_fa_offs *o, int i)
+{
+    return o->base + o->rel[i];
+}
+
 const cq_fa_map *cq_fa_map_get(cq_fadd_prog p);
 int              cq_fa_row_at(const cq_fa_map *m, int u, int *within);
 void             cq_fa_arm_map(const cq_fa_ctx *x, const cq_fa_map *m,
-                               uint32_t *off);
+                               cq_fa_offs *off);
 
-/* The prefix-offset walk plus the fit check, in ONE pass. `off` is CQ_FA_MAXR
- * entries and every one is ABSOLUTE inside the region — this is the one place
- * `x->off` is applied, which is why a program cannot see its own offset and
- * why a two-programs-in-one-region case is the only detector for dropping it
- * (bd a-block-that-ignores-its-own-off-needs-a-two-block-case). */
-void     cq_fa_arm(const cq_fa_ctx *x, uint32_t *off);
+/* The prefix-offset walk plus the fit check, in ONE pass, for a hand-built
+ * context with no map: `rel` (CQ_FA_MAXR entries) receives the walk and `off`
+ * is pointed at it. */
+void     cq_fa_arm(const cq_fa_ctx *x, uint32_t *rel, cq_fa_offs *off);
 cq_bit  *cq_fa_sp (const cq_fa_ctx *x, uint32_t at, uint32_t len);
 
 /* Row `i`'s 64-lane output span, and row `i`'s one-bit flag. Each refuses a
  * row of the other width: the 64-lane resolver refusing an unknown code is the
  * obvious guard and the 1-bit one is the one that gets forgotten (bd
  * a-table-driven-kernel-needs-both-operand-refusals, measured on M36). */
-cq_bit       *cq_fa_row_out(const cq_fa_ctx *x, const uint32_t *off, int i);
-const cq_bit *cq_fa_flag_of(const cq_fa_ctx *x, const uint32_t *off, int i);
+cq_bit       *cq_fa_row_out(const cq_fa_ctx *x, const cq_fa_offs *off, int i);
+const cq_bit *cq_fa_flag_of(const cq_fa_ctx *x, const cq_fa_offs *off, int i);
 
 /* Four 64-lane scratch arrays, one frame of operand resolution. A block that
  * embedded its inner operands as FIELDS would hand the consumer fields whose
@@ -97,7 +116,7 @@ typedef struct { cq_bit v[4][CQ_FP64_W]; } cq_fa_bufs;
 /* A 64-lane operand. `buf` receives a view, a constant or an assembled PICK;
  * `tmp` is the second buffer a view OVER a constant needs, and the two must be
  * distinct arrays. */
-const cq_bit *cq_fa_op64(const cq_fa_ctx *x, const uint32_t *off, int s,
+const cq_bit *cq_fa_op64(const cq_fa_ctx *x, const cq_fa_offs *off, int s,
                          cq_bit *buf, cq_bit *tmp);
 
 /* ONE GATE OF A PROGRAM, and the SURFACE THE DEATH TESTS DRIVE. The public
@@ -113,11 +132,11 @@ void          cq_fa_step  (cq_ctx *ctx, const cq_fa_ctx *x, int u);
 const cq_bit *cq_fa_result(const cq_fa_ctx *x, cq_fadd_prog p);
 
 /* The three M32 hand-offs, assembled from row `i`'s own operands. */
-cq_clz_block     cq_fa_clz_of    (const cq_fa_ctx *x, const uint32_t *off,
+cq_clz_block     cq_fa_clz_of    (const cq_fa_ctx *x, const cq_fa_offs *off,
                                   int i, cq_fa_bufs *bf);
-cq_subnorm_block cq_fa_subnorm_of(const cq_fa_ctx *x, const uint32_t *off,
+cq_subnorm_block cq_fa_subnorm_of(const cq_fa_ctx *x, const cq_fa_offs *off,
                                   int i, cq_fa_bufs *bf);
-cq_round_block   cq_fa_round_of  (const cq_fa_ctx *x, const uint32_t *off,
+cq_round_block   cq_fa_round_of  (const cq_fa_ctx *x, const cq_fa_offs *off,
                                   int i, cq_fa_bufs *bf);
 
 #endif /* CQOPS_KERNELS_FADD_INT_H */

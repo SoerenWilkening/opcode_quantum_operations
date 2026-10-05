@@ -27,10 +27,13 @@
  * operands would carry state whose initialisation a consumer can forget, and a
  * forgotten bind is a silent wrong circuit rather than a failure.
  *
- * THE PREFIX-OFFSET WALK IS DONE ONCE PER STEP AND NOT ONCE PER LOOKUP. A row
- * reference resolves to a span, and a span needs the sum of every earlier
- * row's region; doing that per operand would make the step O(n^2) in a 48-row
- * program driven 9,165 times per call.
+ * THE PREFIX OFFSETS ARE A MAP BUILT ONCE PER HELPER, NOT A WALK PER STEP. A
+ * row reference resolves to a span, and a span needs the sum of every earlier
+ * row's region. Until 2026-10-05 that sum was re-walked — asking the siblings
+ * for every row's cost — on every step AND on every accessor call, which put
+ * the walk at the top of test_kernel_fmul's self time (M34 reads a norm52
+ * output per gate of its 106-bit product). The map (fpround_int.h) holds
+ * layout only; the views and the constant spans are still rebuilt per step.
  *
  * I6(a) IS SATISFIED WITH NOTHING LEFT TO CHECK. `cq_fpr_row_out` and
  * `cq_fpr_sp` are the only things here that hand back a WRITABLE pointer, and
@@ -60,7 +63,9 @@ cq_fpr_ctx cq_fpr_ctx_of(cq_fpround_id id, const cq_bit *a, const cq_bit *b,
 
     x.in[0] = a; x.in[1] = b; x.in[2] = c;
     x.scr = scr; x.off = off; x.id = id;
-    x.rows = cq_fpround_rows(id, &x.n);
+    x.map = cq_fpr_map_get(id);
+    x.rows = x.map->rows;
+    x.n = x.map->n;
     return x;
 }
 
@@ -127,50 +132,60 @@ static uint32_t row_region(const cq_fpround_row *r)
     return 1u;                        /* not1, and1, or1: one output bit */
 }
 
-uint32_t cq_fpr_region_of(const cq_fpr_ctx *x)
+/* BUILT ONCE PER HELPER, FROM TWO COMPILE-TIME CONSTANTS — see fpround_int.h.
+ * `cq_fpround_rows` refuses an id outside the four before the static table is
+ * indexed. The library is single-threaded, so a one-shot flag is the whole
+ * initialisation. */
+const cq_fpr_map *cq_fpr_map_get(cq_fpround_id id)
 {
+    static cq_fpr_map maps[CQ_FPR_N_BLOCK];
+    static int ready[CQ_FPR_N_BLOCK];
+    const cq_fpround_row *rows;
+    cq_fpr_map *m;
     uint32_t bits = 0u;
+    int n, slots = 0;
 
-    for (int i = 0; i < x->n; i++) bits += row_region(&x->rows[i]);
-    return bits;
-}
-
-int cq_fpr_steps_of(const cq_fpr_ctx *x)
-{
-    int slots = 0;
-
-    for (int i = 0; i < x->n; i++) slots += cq_fpr_row_steps(&x->rows[i]);
-    return slots;
-}
-
-/* The prefix-offset walk, which also returns the region total — so the fit
- * check and the offsets come out of ONE pass. The walk runs once per STEP and
- * not once per operand lookup: a row reference resolves to a span, and a span
- * needs the sum of every earlier row's region, so doing it per operand would
- * make the step O(n^2) in a 48-row program driven 9,165 times per call. */
-static uint32_t walk(const cq_fpr_ctx *x, uint32_t *off)
-{
-    uint32_t o = x->off;
-
-    for (int i = 0; i < x->n; i++) {
-        off[i] = o;
-        o += row_region(&x->rows[i]);
+    rows = cq_fpround_rows(id, &n);
+    m = &maps[id];
+    if (ready[id]) return m;
+    if (n > CQ_FPR_MAXR)
+        cq_kernel_die("fpround: the program outgrew the prefix map");
+    for (int i = 0; i < n; i++) {
+        m->rel[i]   = bits;
+        m->step0[i] = slots;
+        bits  += row_region(&rows[i]);
+        slots += cq_fpr_row_steps(&rows[i]);
     }
-    return o - x->off;
+    m->step0[n] = slots;
+    m->rows   = rows;
+    m->n      = n;
+    m->region = bits;
+    m->steps  = slots;
+    ready[id] = 1;
+    return m;
 }
 
 /* The region check is the BLOCK's, and it has to be: without it the first
  * out-of-region span aborts in M08 naming the REGION rather than the consumer
  * that mis-sized its offset, and the two-blocks-in-one-region shape then has
  * no diagnostic of its own. Hard error in both configurations. */
-void cq_fpr_arm(const cq_fpr_ctx *x, uint32_t *off)
+void cq_fpr_arm(const cq_fpr_ctx *x)
 {
     if (x->scr == NULL) cq_kernel_die("fpround: the block has no region");
-    if ((uint64_t)x->off + walk(x, off) > (uint64_t)cq_scratch_size(x->scr))
+    if ((uint64_t)x->off + (uint64_t)x->map->region
+        > (uint64_t)cq_scratch_size(x->scr))
         cq_kernel_die("fpround: the block's region does not fit at its offset");
 }
 
-/* `at` is ABSOLUTE inside the region: the prefix walk has already added
+/* THE ONE PLACE `x->off` IS APPLIED. The map is base-relative and every span
+ * below is reached through this, so a dropped `off` stays a single-line
+ * mutation that only a second block in one region sees. */
+uint32_t cq_fpr_at(const cq_fpr_ctx *x, int i)
+{
+    return x->off + x->map->rel[i];
+}
+
+/* `at` is ABSOLUTE inside the region: `cq_fpr_at` has already added
  * `x->off`, which is the one place this block's base is applied. */
 cq_bit *cq_fpr_sp(const cq_fpr_ctx *x, uint32_t at, uint32_t len)
 {
@@ -207,9 +222,9 @@ static uint64_t const_of(int s)
  * of its region except `sub`, whose `d` lies between `nb` and `c` (add.h), and
  * the barrel, whose running value is the LAST stage's mux output and is only
  * findable through cq_barrel_result (shift_var.h). */
-cq_bit *cq_fpr_row_out(const cq_fpr_ctx *x, const uint32_t *off, int i)
+cq_bit *cq_fpr_row_out(const cq_fpr_ctx *x, int i)
 {
-    uint32_t o = off[i];
+    uint32_t o = cq_fpr_at(x, i);
 
     if (x->rows[i].op == CQ_FROP_SUB) return cq_fpr_sp(x, o + (uint32_t)W64, (uint32_t)W64);
     if (x->rows[i].op == CQ_FROP_BSHL || x->rows[i].op == CQ_FROP_BLSHR) {
@@ -234,7 +249,7 @@ cq_bit *cq_fpr_row_out(const cq_fpr_ctx *x, const uint32_t *off, int i)
  * one of the negative codes would index the row table out of bounds, and one
  * handed a 64-lane row would read a wire that is not a flag. Release has no
  * other detector: the read succeeds, the gate is plausible, the value wrong. */
-const cq_bit *cq_fpr_flag_of(const cq_fpr_ctx *x, const uint32_t *off, int i)
+const cq_bit *cq_fpr_flag_of(const cq_fpr_ctx *x, int i)
 {
     uint32_t o;
 
@@ -243,7 +258,7 @@ const cq_bit *cq_fpr_flag_of(const cq_fpr_ctx *x, const uint32_t *off, int i)
     if (cq_fpr_op_width(x->rows[i].op) != 1)
         cq_kernel_die("fpround: a one-bit operand names a 64-lane row");
 
-    o = off[i];
+    o = cq_fpr_at(x, i);
     if (x->rows[i].op == CQ_FROP_EQ) {
         cq_eq_block e;
 
@@ -270,15 +285,14 @@ const cq_bit *cq_fpr_flag_of(const cq_fpr_ctx *x, const uint32_t *off, int i)
 
 /* A NON-view 64-lane operand: one of the three inputs, a constant span, or an
  * emitting row's output. */
-const cq_bit *cq_fpr_base64(const cq_fpr_ctx *x, const uint32_t *off, int s,
-                            cq_bit *buf)
+const cq_bit *cq_fpr_base64(const cq_fpr_ctx *x, int s, cq_bit *buf)
 {
     if (s >= 0) {
         if (s >= x->n)
             cq_kernel_die("fpround: an operand names a row outside the program");
         if (cq_fpr_op_width(x->rows[s].op) != W64)
             cq_kernel_die("fpround: a 64-lane operand names a one-bit row");
-        return cq_fpr_row_out(x, off, s);
+        return cq_fpr_row_out(x, s);
     }
     if (s >= CQ_FR_IN2) {                          /* IN0 = -1 … IN2 = -3 */
         const cq_bit *p = x->in[-s - 1];
@@ -319,26 +333,21 @@ int cq_fpr_view_collapse(const cq_fpr_ctx *x, int s, int *shift, uint64_t *mask)
 
 void cq_fpr_view_fill(const cq_bit *base, int shift, uint64_t mask, cq_bit *out)
 {
-    for (int i = 0; i < W64; i++) {
-        int j = i + shift;
-
-        out[i] = (((mask >> (unsigned)i) & UINT64_C(1)) != 0u && j >= 0 && j < W64)
-               ? base[j] : cq_bit_zero();
-    }
+    cq_fp_view_fill(base, shift, mask, out);          /* fpfield.h, one copy */
 }
 
 /* A 64-lane operand. `buf` receives a view or a constant; `tmp` is the second
  * buffer a view over a constant needs, and the two must be distinct arrays. */
-const cq_bit *cq_fpr_op64(const cq_fpr_ctx *x, const uint32_t *off, int s,
-                          cq_bit *buf, cq_bit *tmp)
+const cq_bit *cq_fpr_op64(const cq_fpr_ctx *x, int s, cq_bit *buf,
+                          cq_bit *tmp)
 {
     if (s >= 0 && s < x->n && x->rows[s].op == CQ_FROP_VIEW) {
         int shift;
         uint64_t mask;
         int b = cq_fpr_view_collapse(x, s, &shift, &mask);
 
-        cq_fpr_view_fill(cq_fpr_base64(x, off, b, tmp), shift, mask, buf);
+        cq_fpr_view_fill(cq_fpr_base64(x, b, tmp), shift, mask, buf);
         return buf;
     }
-    return cq_fpr_base64(x, off, s, buf);
+    return cq_fpr_base64(x, s, buf);
 }

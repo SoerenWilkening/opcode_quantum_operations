@@ -28,12 +28,15 @@
 
 typedef struct {
     cq_ibits_block k;
+    cq_ibits_map   m;                  /* armed once per call (ibits.h) */
     cq_bit        *dst;
 } ibits_env;
 
 static void compute(cq_ctx *ctx, void *env, int s)
 {
-    cq_ibits_step(ctx, &((const ibits_env *)env)->k, s);
+    const ibits_env *e = (const ibits_env *)env;
+
+    cq_ibits_step_armed(ctx, &e->k, &e->m, s);
 }
 
 /* The "^=" of Rule 7's contract and the only place `dst` is written on the
@@ -42,7 +45,7 @@ static void copyout(cq_ctx *ctx, void *env, int s)
 {
     const ibits_env *e = (const ibits_env *)env;
 
-    cq_emit_cx(ctx, &cq_ibits_result(&e->k)[s], &e->dst[s]);
+    cq_emit_cx(ctx, &cq_ibits_result_armed(&e->k, &e->m)[s], &e->dst[s]);
 }
 
 /* dst ^= c, lane by lane. `c` never exceeds W (a count of lanes), so it is
@@ -121,6 +124,7 @@ static void ibits(cq_ctx *ctx, cq_bit *dst, const cq_bit *a, int W,
     e.k.a = a; e.k.scr = &scr; e.k.off = 0u;
     e.k.rows = rows; e.k.n_rows = n; e.k.W = W;
     e.dst = dst;
+    cq_ibits_arm(&e.k, &e.m);
 
     cq_sandwich(ctx, &scr, compute, cq_ibits_steps(rows, n, W), copyout, W, &e);
     cq_scratch_dispose(&scr);

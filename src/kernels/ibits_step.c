@@ -35,6 +35,8 @@
 #include "kernels/kernel.h"
 #include "kernels/mux.h"
 
+#include <string.h>
+
 /* lower_or!: three gates per lane (arith.jl:276-278). */
 enum { IB_OR_STEPS_PER_LANE = 3 };
 
@@ -91,17 +93,6 @@ uint32_t cq_ibits_region(const cq_ibits_row *rows, int n, int W)
     return bits;
 }
 
-/* The block's own region check, so a mis-sized consumer aborts naming the
- * PROGRAM rather than M08's region. Both configurations. */
-static void check_block(const cq_ibits_block *k)
-{
-    check_program(k->rows, k->n_rows, k->W);
-    if (k->scr == NULL) cq_kernel_die("ibits: the block has no region");
-    if ((uint64_t)k->off + cq_ibits_region(k->rows, k->n_rows, k->W)
-        > (uint64_t)cq_scratch_size(k->scr))
-        cq_kernel_die("ibits: the block's region does not fit at its offset");
-}
-
 static cq_bit *span(const cq_ibits_block *k, uint32_t at, uint32_t len)
 {
     return cq_scratch_span(k->scr, at, len);
@@ -141,12 +132,26 @@ static const cq_bit *view(const cq_ibits_block *k, const uint32_t *off, int i,
     if (base != NULL && o->shr == 0 && o->shl == 0 && o->keep == W)
         return base;                        /* the identity view: no copy */
 
-    for (int j = 0; j < W; j++) {
-        int m = j - o->shl, s = m + o->shr;
+    /* Lane j is kept iff m = j - shl is in [0, keep) and its source lane
+     * s = m + shr is below W, i.e. j in [lo, hi) below; every other lane is
+     * CQ_BIT_ZERO. One zero fill and one contiguous copy rather than W
+     * per-lane assignments — fpfield.h's cq_fp_view_fill, for the same
+     * reason measured 2026-10-05: a W-lane view per operand per GATE, each
+     * per-lane assignment an intercepted memcpy under Debug's ASan. */
+    {
+        int lo = o->shl, hi = o->shl + o->keep;
 
-        if (m < 0 || m >= o->keep || s >= W) buf[j] = cq_bit_zero();
-        else if (base != NULL)               buf[j] = base[s];
-        else buf[j] = cq_bit_const(s < 15 ? (o->k >> s) & 1 : 0);
+        if (hi > W + o->shl - o->shr) hi = W + o->shl - o->shr;
+        if (hi > W) hi = W;
+        memset(buf, 0, sizeof *buf * (size_t)W);
+        if (hi > lo && base != NULL)
+            memcpy(&buf[lo], &base[lo - o->shl + o->shr],
+                   sizeof *buf * (size_t)(hi - lo));
+        for (int j = lo; j < hi && base == NULL; j++) {
+            int s = j - o->shl + o->shr;
+
+            if (s < 15 && ((o->k >> s) & 1)) buf[j] = cq_bit_one();
+        }
     }
     return buf;
 }
@@ -237,46 +242,74 @@ static int op_of(const cq_ibits_row *r)
     return r->op;
 }
 
-void cq_ibits_step(cq_ctx *ctx, const cq_ibits_block *k, int u)
+/* The map of ibits.h, with the block's own refusals over tallies taken with
+ * each op's cost asked ONCE: the region check is the BLOCK's, so a mis-sized
+ * consumer aborts naming the PROGRAM rather than M08's region, in both
+ * configurations. */
+void cq_ibits_arm(const cq_ibits_block *k, cq_ibits_map *m)
 {
-    uint32_t off[CQ_IBITS_MAX_ROWS], rg[CQ_IBOP_N], bits = 0u, o;
+    uint32_t rg[CQ_IBOP_N], o;
     int sl[CQ_IBOP_N], steps = 0;
 
     check_program(k->rows, k->n_rows, k->W);
     costs(k->W, sl, rg);
-    for (int i = 0; i < k->n_rows; i++) {
-        steps += sl[op_of(&k->rows[i])];
-        bits  += rg[op_of(&k->rows[i])];
-    }
-    /* check_block's two refusals, over the tallies just taken, so a step
-     * walks the table with lookups only. */
-    if (k->scr == NULL) cq_kernel_die("ibits: the block has no region");
-    if ((uint64_t)k->off + bits > (uint64_t)cq_scratch_size(k->scr))
-        cq_kernel_die("ibits: the block's region does not fit at its offset");
-    if (u < 0 || u >= steps)
-        cq_kernel_die("ibits: step index outside [0, cq_ibits_steps(...))");
-
     o = k->off;                             /* the ONE place `off` is added */
     for (int i = 0; i < k->n_rows; i++) {
         int op = op_of(&k->rows[i]);
 
-        off[i] = o;
-        if (u < sl[op]) { emit_row(ctx, k, off, i, u); return; }
-        u -= sl[op];
-        o += rg[op];
+        m->off[i]   = o;
+        m->step0[i] = steps;
+        steps += sl[op];
+        o     += rg[op];
     }
-    cq_kernel_die("ibits: the step dispatch fell off the end of the program");
+    m->step0[k->n_rows] = steps;
+    m->steps = steps;
+    m->bits  = o - k->off;
+    if (k->scr == NULL) cq_kernel_die("ibits: the block has no region");
+    if ((uint64_t)k->off + m->bits > (uint64_t)cq_scratch_size(k->scr))
+        cq_kernel_die("ibits: the block's region does not fit at its offset");
+}
+
+void cq_ibits_step_armed(cq_ctx *ctx, const cq_ibits_block *k,
+                         const cq_ibits_map *m, int u)
+{
+    int lo = 0, hi = k->n_rows - 1, i = 0;
+
+    if (u < 0 || u >= m->steps)
+        cq_kernel_die("ibits: step index outside [0, cq_ibits_steps(...))");
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+
+        if (m->step0[mid] <= u) { i = mid; lo = mid + 1; }
+        else                    { hi = mid - 1; }
+    }
+    if (m->step0[i + 1] <= m->step0[i])
+        cq_kernel_die("ibits: the step dispatch landed on a zero-slot row");
+    emit_row(ctx, k, m->off, i, u - m->step0[i]);
+}
+
+void cq_ibits_step(cq_ctx *ctx, const cq_ibits_block *k, int u)
+{
+    cq_ibits_map m;
+
+    cq_ibits_arm(k, &m);
+    cq_ibits_step_armed(ctx, k, &m, u);
+}
+
+const cq_bit *cq_ibits_result_armed(const cq_ibits_block *k,
+                                    const cq_ibits_map *m)
+{
+    int last = k->n_rows - 1;
+
+    if (k->rows[last].op != CQ_IBOP_ADD)
+        cq_kernel_die("ibits: the program's last row is not its closing add");
+    return span(k, m->off[last], (uint32_t)k->W);
 }
 
 const cq_bit *cq_ibits_result(const cq_ibits_block *k)
 {
-    uint32_t o;
-    int last = k->n_rows - 1;
+    cq_ibits_map m;
 
-    check_block(k);
-    if (k->rows[last].op != CQ_IBOP_ADD)
-        cq_kernel_die("ibits: the program's last row is not its closing add");
-    o = k->off;
-    for (int i = 0; i < last; i++) o += cq_ibits_row_region(&k->rows[i], k->W);
-    return span(k, o, (uint32_t)k->W);
+    cq_ibits_arm(k, &m);
+    return cq_ibits_result_armed(k, &m);
 }
