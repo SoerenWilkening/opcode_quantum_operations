@@ -1,0 +1,116 @@
+/* The ordered width pairs FROM < TO of CQ_WIDTHS, for the integer casts (BACKEND_ABI §2.6):
+ * zext and sext take X(from, from_bits, to, to_bits) as listed, trunc the same line read
+ * the other way (from the wider). The preprocessor cannot compare widths, so the pair list
+ * is generated and checked in; tests/test_tpl_cast.c fails when it disagrees with CQ_WIDTHS.
+ * After a width change, regenerate the lines below: for every i < j in CQ_WIDTHS order, one
+ * line X(<name i>, <bits i>, <name j>, <bits j>) (the test prints the first missing or extra pair). */
+#ifndef CQ_CAST_PAIRS_H
+#define CQ_CAST_PAIRS_H
+#define CQ_CAST_PAIRS(X) \
+    X(i1, 1, i6, 6) \
+    X(i1, 1, i7, 7) \
+    X(i1, 1, i8, 8) \
+    X(i1, 1, i16, 16) \
+    X(i1, 1, i17, 17) \
+    X(i1, 1, i24, 24) \
+    X(i1, 1, i31, 31) \
+    X(i1, 1, i32, 32) \
+    X(i1, 1, i48, 48) \
+    X(i1, 1, i64, 64) \
+    X(i1, 1, i80, 80) \
+    X(i1, 1, i100, 100) \
+    X(i1, 1, i128, 128) \
+    X(i1, 1, i200, 200) \
+    X(i6, 6, i7, 7) \
+    X(i6, 6, i8, 8) \
+    X(i6, 6, i16, 16) \
+    X(i6, 6, i17, 17) \
+    X(i6, 6, i24, 24) \
+    X(i6, 6, i31, 31) \
+    X(i6, 6, i32, 32) \
+    X(i6, 6, i48, 48) \
+    X(i6, 6, i64, 64) \
+    X(i6, 6, i80, 80) \
+    X(i6, 6, i100, 100) \
+    X(i6, 6, i128, 128) \
+    X(i6, 6, i200, 200) \
+    X(i7, 7, i8, 8) \
+    X(i7, 7, i16, 16) \
+    X(i7, 7, i17, 17) \
+    X(i7, 7, i24, 24) \
+    X(i7, 7, i31, 31) \
+    X(i7, 7, i32, 32) \
+    X(i7, 7, i48, 48) \
+    X(i7, 7, i64, 64) \
+    X(i7, 7, i80, 80) \
+    X(i7, 7, i100, 100) \
+    X(i7, 7, i128, 128) \
+    X(i7, 7, i200, 200) \
+    X(i8, 8, i16, 16) \
+    X(i8, 8, i17, 17) \
+    X(i8, 8, i24, 24) \
+    X(i8, 8, i31, 31) \
+    X(i8, 8, i32, 32) \
+    X(i8, 8, i48, 48) \
+    X(i8, 8, i64, 64) \
+    X(i8, 8, i80, 80) \
+    X(i8, 8, i100, 100) \
+    X(i8, 8, i128, 128) \
+    X(i8, 8, i200, 200) \
+    X(i16, 16, i17, 17) \
+    X(i16, 16, i24, 24) \
+    X(i16, 16, i31, 31) \
+    X(i16, 16, i32, 32) \
+    X(i16, 16, i48, 48) \
+    X(i16, 16, i64, 64) \
+    X(i16, 16, i80, 80) \
+    X(i16, 16, i100, 100) \
+    X(i16, 16, i128, 128) \
+    X(i16, 16, i200, 200) \
+    X(i17, 17, i24, 24) \
+    X(i17, 17, i31, 31) \
+    X(i17, 17, i32, 32) \
+    X(i17, 17, i48, 48) \
+    X(i17, 17, i64, 64) \
+    X(i17, 17, i80, 80) \
+    X(i17, 17, i100, 100) \
+    X(i17, 17, i128, 128) \
+    X(i17, 17, i200, 200) \
+    X(i24, 24, i31, 31) \
+    X(i24, 24, i32, 32) \
+    X(i24, 24, i48, 48) \
+    X(i24, 24, i64, 64) \
+    X(i24, 24, i80, 80) \
+    X(i24, 24, i100, 100) \
+    X(i24, 24, i128, 128) \
+    X(i24, 24, i200, 200) \
+    X(i31, 31, i32, 32) \
+    X(i31, 31, i48, 48) \
+    X(i31, 31, i64, 64) \
+    X(i31, 31, i80, 80) \
+    X(i31, 31, i100, 100) \
+    X(i31, 31, i128, 128) \
+    X(i31, 31, i200, 200) \
+    X(i32, 32, i48, 48) \
+    X(i32, 32, i64, 64) \
+    X(i32, 32, i80, 80) \
+    X(i32, 32, i100, 100) \
+    X(i32, 32, i128, 128) \
+    X(i32, 32, i200, 200) \
+    X(i48, 48, i64, 64) \
+    X(i48, 48, i80, 80) \
+    X(i48, 48, i100, 100) \
+    X(i48, 48, i128, 128) \
+    X(i48, 48, i200, 200) \
+    X(i64, 64, i80, 80) \
+    X(i64, 64, i100, 100) \
+    X(i64, 64, i128, 128) \
+    X(i64, 64, i200, 200) \
+    X(i80, 80, i100, 100) \
+    X(i80, 80, i128, 128) \
+    X(i80, 80, i200, 200) \
+    X(i100, 100, i128, 128) \
+    X(i100, 100, i200, 200) \
+    X(i128, 128, i200, 200) \
+    /* end of list */
+#endif
