@@ -176,7 +176,22 @@ static const cq_kernel abs_[] = {
 #define ICMP_OP_(p, base, swap, neg) [CQ_KOP_ICMP_##p] = { "icmp_" #p, "o (i1) ^= [a " #p " b] (ABI §2.4).", 2, 1, CANDS(icmp_##p##_), 0, CMP_SAMPLES },
 #define MINMAX_OP_(name, base, max) [CQ_KOP_##name] = { #name, "o ^= " #name "(a, b) (ABI §2.7).", 2, 0, CANDS(name##_), 0, CMP_SAMPLES },
 
+/* kmgy.18: the angle-ladder reduction (src/kernels/ladder.c), listed in CQ_ANGLE_* order. */
+#define ANGLE_SRC "docs/ANGLE_LADDER.md §5 (BACKEND_ABI §1.5 Impl.): exponent flags by the EQ compare, m = significand AND " \
+    "NOT [e = 0x7FF], the 169-bit window of 1/pi selected by e, the 53 x 169 tree multiply (cq_mul) keeping bits 115 .. 168, " \
+    "K = (p_hi ^ s) + (p_115 ^ s) by one adder (rounding and negation together); recorded on a tape, K XORed into o, undone. "
+static const cq_kernel angle_k_[] = {
+    { "barrel", cq_k_angle_k_barrel, NULL, ANGLE_SRC "Window: barrel shift of the classical constant by NOT(e'), most significant "
+      "stage first so stage b keeps only 169 + 2^b - 1 bits (BJ lower_var_shl!, not read; ours), each stage a mux "
+      "y_(i+2^b) ^ e_b (y_i ^ y_(i+2^b)) with e_b fanned out" },
+    { "table", cq_k_angle_k_table, NULL, ANGLE_SRC "Window: table lookup, a one-hot decoder of e' (CCX tree, level bits fanned "
+      "out) and each window bit the XOR of the indicators of the exponents whose window has a 1 there (a QROM without unary "
+      "iteration; cf. BJ emit_qrom!, not read)" },
+};
+
 const cq_kernel_op cq_kernel_ops[CQ_KOP_COUNT] = {
+    [CQ_KOP_ANGLE_K] = { "angle_k", "o (N = CQ_LADDER_N bits) ^= k(A) = round(val(A) 2^N / 4pi) mod 2^N, 0 for Inf/NaN; "
+        "A an f64 rail, i64 only (ABI §1.5).", 1, CQ_LADDER_N, CANDS(angle_k_), CQ_STEP_I64, 2 },
     CQ_ICMP_PREDS(ICMP_OP_)
     [CQ_KOP_SELECT] = { "select", "o ^= c ? a1 : a2, c an i1 rail (ABI §2.5).", 3, 0, CANDS(select_), 0, CMP_SAMPLES },
     CQ_MINMAX_OPS(MINMAX_OP_)

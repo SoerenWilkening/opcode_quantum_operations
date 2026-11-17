@@ -21,6 +21,13 @@ int  cq_cell_read(uint64_t a, cq_bit b[8]);
  * and the cell is HOST, or, if a is not writable, the cell is QUANTUM holding the bits.
  * Otherwise the cell is QUANTUM holding the bits (qubits included) and no host byte is written. */
 void cq_cell_write(uint64_t a, const cq_bit b[8], int quantum);
+/* n consecutive cells from a (wrapping mod 2^64) as cq_cell_read gives them, into b[8n]; returns 1
+ * if any is QUANTUM. Never faults. */
+int  cq_cells_read(uint64_t a, cq_bit *b, uint32_t n);
+/* A bus store (ABI §1.10) of the w-bit v at the classical address a under c (NULL: none; a
+ * classical c folds). t: the tape slot the displaced content goes to (8 ceil(w/8) bits), shared
+ * by the stores of one quantum-address access; NULL: a fresh slot rail, as the ABI's store takes. */
+void cq_bus_store_at(const cq_bit *c, uint64_t a, cq_bit *v, uint32_t w, cq_bit *t);
 
 /* One access whose address rail (64 bits) holds a qubit: the QRAM of docs/QRAM_CONSTRUCTION.md
  * (src/qram.c). c: a qubit control, or NULL for none. h: the loaded or swapped rail, or the value

@@ -1,6 +1,7 @@
 /* Depth-table measurement; see depth.h. */
 #include <string.h>
 #include "depth.h"
+#include "../src/angle_k.h"
 
 #define REGEN "cmake --build <build> --target depth_tables"
 
@@ -170,7 +171,11 @@ static hx_val abs_ref(const hx_val *a, uint32_t w) {
     return r;
 }
 
+/* kmgy.18: the host k(a), itself checked against tests/ref/k_vectors.txt (tests/test_rot.c). */
+static hx_val angle_k_ref(const hx_val *a, uint32_t w) { (void)w; return hx_of_u128(cq_angle_k(a[0].l[0], 2)); }
+
 static const hx_ref_fn ref_of[CQ_KOP_COUNT] = {
+    [CQ_KOP_ANGLE_K] = angle_k_ref,
 #define ICMP_REF_OF_(p, base, swap, neg) [CQ_KOP_ICMP_##p] = icmp_##p##_ref,
     CQ_ICMP_PREDS(ICMP_REF_OF_)
     [CQ_KOP_SELECT] = select_ref, [CQ_KOP_ABS] = abs_ref,

@@ -1,15 +1,11 @@
 /* Rotations with a classical angle (kmgy.7): the gate stream of every rotation symbol at every
  * width (the replay backend ignores angles, so no values), the emitted angles, and the host
- * k(a) against tests/ref/k_vectors.txt (tests/ref/k_ref.py). Always asserts. */
-#define _POSIX_C_SOURCE 200809L
+ * k(a) against tests/ref/k_vectors.txt (tests/ref/k_ref.py); a quantum A takes the ladder. Always asserts. */
 #undef NDEBUG
 #include <assert.h>
 #include <math.h>
-#include <signal.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
 #include "harness.h"
 #include "cqrt.h"
 #include "cq_replay.h"
@@ -117,20 +113,23 @@ static void check(uint32_t w, ry_fn ry, ryc_fn ryc, ryq_fn ryq, ryqc_fn ryqc) {
     }
 }
 
-/* A quantum angle rail is kmgy.18's: the classical path must abort, not guess. */
-static void must_abort(void (*f)(void)) {
-    fflush(NULL);
-    pid_t p = fork();
-    assert(p >= 0);
-    if (p == 0) { f(); _exit(0); }
-    int st;
-    assert(waitpid(p, &st, 0) == p && WIFSIGNALED(st) && WTERMSIG(st) == SIGABRT);
+/* One qubit in A takes the ladder circuit (kmgy.18, tested in tests/test_ladder.c): N rotations per
+ * target bit, not the one host-computed rotation. */
+static void quantum_A(void) {
+    uint32_t base = cq_pool_live();
+    for (int f = 0; f < 4; f++) {
+        cq_replay_reset();
+        int32_t A = f64_rail(1.0), h = rail_of(0, 8), c = rail_of(1, 1);
+        cq_get_qubit(&cq_rail_bits(A)[63]);
+        if (f == 0) cqrt_ry_i8_qangle((uint32_t)h, (uint32_t)A);
+        if (f == 1) cqrt_ry_i8_qangle_controlled((uint32_t)c, (uint32_t)h, (uint32_t)A);
+        if (f == 2) cqrt_rz_qangle((uint32_t)A);
+        if (f == 3) cqrt_rz_qangle_controlled((uint32_t)c, (uint32_t)A);
+        assert(rots() == (f < 2 ? 8u * CQ_LADDER_N : CQ_LADDER_N));
+        cq_rail_free(A); cq_rail_free(h); cq_rail_free(c);
+        assert(cq_pool_live() == base);
+    }
 }
-static int32_t qA(void) { int32_t A = f64_rail(1.0); cq_get_qubit(&cq_rail_bits(A)[63]); return A; }
-static void abort_ry(void) { cqrt_ry_i8_qangle((uint32_t)rail_of(0, 8), (uint32_t)qA()); }
-static void abort_ryc(void) { cqrt_ry_f64_qangle_controlled((uint32_t)rail_of(1, 1), (uint32_t)rail_of(0, 64), (uint32_t)qA()); }
-static void abort_rz(void) { cqrt_rz_qangle((uint32_t)qA()); }
-static void abort_rzc(void) { cqrt_rz_qangle_controlled((uint32_t)rail_of(1, 1), (uint32_t)qA()); }
 
 static void check_rz(void) {
     uint32_t base = cq_pool_live();
@@ -216,7 +215,7 @@ int main(void) {
     CQ_WIDTHS(CHECK_) CQ_FP_WIDTHS(CHECK_)
     check_rz();
     printf("rz_i1 rz_qangle rz_qangle_controlled: ok\n");
-    must_abort(abort_ry); must_abort(abort_ryc); must_abort(abort_rz); must_abort(abort_rzc);
-    printf("quantum angle rail aborts (kmgy.18); %zu symbols linked\n", sizeof linked / sizeof *linked);
+    quantum_A();
+    printf("quantum angle rail: the ladder (kmgy.18); %zu symbols linked\n", sizeof linked / sizeof *linked);
     return 0;
 }

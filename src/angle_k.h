@@ -1,6 +1,6 @@
 /* The angle-ladder index k(a) on the host (BACKEND_ABI §1.5, §1.7; docs/ANGLE_LADDER.md).
- * Internal to libcq_runtime.a; the quantum angle rail (kmgy.18) builds its circuit from the
- * same constant and window. */
+ * Internal to libcq_runtime.a; the quantum angle rail (kmgy.18, src/kernels/ladder.c) builds its
+ * circuit from the same constant and window. */
 #ifndef CQ_ANGLE_K_H
 #define CQ_ANGLE_K_H
 #include <stdint.h>
@@ -23,5 +23,11 @@ void cq_angle_window(uint32_t e1, int s, uint64_t w[4]);
 /* k(a) = round(val(a) * 2^N / P) mod 2^N for the double with bit pattern a, 0 for Inf/NaN.
  * Correctly rounded for every pattern (docs/ANGLE_LADDER.md §4). */
 unsigned __int128 cq_angle_k(uint64_t a, int s);
+
+/* An angle rail A with a qubit (src/ladder.c): K = k(A) by circuit, then s = 2: Ry(fl(4pi) 2^(i-N))
+ * on each of the w bits of h under K_i; s = 1 (h NULL): P(fl(2pi) 2^(i-N)) on K_i; under c too
+ * unless c is NULL (classical 0: nothing); angles negated when inv; then the reduction undone. */
+#include "cq_rt.h"
+void cq_ladder(const cq_bit *c, cq_bit *h, uint32_t w, const cq_bit *A, int s, int inv);
 
 #endif

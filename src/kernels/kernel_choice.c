@@ -853,4 +853,21 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i128 dadda_tree */
         1, /* i200 dadda_tree */
     },
+    { /* angle_k */
+        0, /* i1: not defined */
+        0, /* i6: not defined */
+        0, /* i7: not defined */
+        0, /* i8: not defined */
+        0, /* i16: not defined */
+        0, /* i17: not defined */
+        0, /* i24: not defined */
+        0, /* i31: not defined */
+        0, /* i32: not defined */
+        0, /* i48: not defined */
+        0, /* i64 barrel */
+        0, /* i80: not defined */
+        0, /* i100: not defined */
+        0, /* i128: not defined */
+        0, /* i200: not defined */
+    },
 };

@@ -1377,3 +1377,16 @@ Sources:
 
 - shift_add: Shift-and-add as BACKEND_ABI §2.2 Impl. (BJ lower_mul_wide!, not read): one CCX row of partial products per multiplier bit (bits fanned out), each added by the shipped adder; the 2W columns, o ^= OR over W-1 <= i < 2W-1 of p_i ^ p_(i+1) (all of bits W-1 .. 2W-1 equal); recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
 - dadda_tree: Tree multiplier: operand bits fanned out (CX doubling), every partial product in one CCX layer, Dadda reduction (Dadda, Some schemes for parallel multipliers, Alta Frequenza 34 (1965); not read) by depth-3 full adders and half adders, earliest bits first, then one shipped adder; the 2W columns, o ^= OR over W-1 <= i < 2W-1 of p_i ^ p_(i+1) (all of bits W-1 .. 2W-1 equal); recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
+
+## angle_k
+
+o (N = CQ_LADDER_N bits) ^= k(A) = round(val(A) 2^N / 4pi) mod 2^N, 0 for Inf/NaN; A an f64 rail, i64 only (ABI §1.5).
+
+| width | barrel | table |
+|---|---|---|
+| i64 | **245 / 163127 / 47860** | 1854 / 340581 / 44596 |
+
+Sources:
+
+- barrel: docs/ANGLE_LADDER.md §5 (BACKEND_ABI §1.5 Impl.): exponent flags by the EQ compare, m = significand AND NOT [e = 0x7FF], the 169-bit window of 1/pi selected by e, the 53 x 169 tree multiply (cq_mul) keeping bits 115 .. 168, K = (p_hi ^ s) + (p_115 ^ s) by one adder (rounding and negation together); recorded on a tape, K XORed into o, undone. Window: barrel shift of the classical constant by NOT(e'), most significant stage first so stage b keeps only 169 + 2^b - 1 bits (BJ lower_var_shl!, not read; ours), each stage a mux y_(i+2^b) ^ e_b (y_i ^ y_(i+2^b)) with e_b fanned out
+- table: docs/ANGLE_LADDER.md §5 (BACKEND_ABI §1.5 Impl.): exponent flags by the EQ compare, m = significand AND NOT [e = 0x7FF], the 169-bit window of 1/pi selected by e, the 53 x 169 tree multiply (cq_mul) keeping bits 115 .. 168, K = (p_hi ^ s) + (p_115 ^ s) by one adder (rounding and negation together); recorded on a tape, K XORed into o, undone. Window: table lookup, a one-hot decoder of e' (CCX tree, level bits fanned out) and each window bit the XOR of the indicators of the exponents whose window has a 1 there (a QROM without unary iteration; cf. BJ emit_qrom!, not read)

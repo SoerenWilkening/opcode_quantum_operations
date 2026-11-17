@@ -32,11 +32,13 @@ typedef struct {
  * depth tables take the worst case over FROM): FROM < w (zext, sext) or FROM > w (trunc). */
 #define CQ_STEP_FROM_BELOW UINT32_MAX
 #define CQ_STEP_FROM_ABOVE (UINT32_MAX - 1)
+#define CQ_STEP_I64 (UINT32_MAX - 2)   /* only at i64 (the angle ladder: A is an f64 rail) */
 extern const uint32_t cq_kernel_widths[];
 extern const uint32_t cq_kernel_nwidths;
 static inline int cq_kernel_has_width(const cq_kernel_op *op, uint32_t w) {
     if (op->width_step == CQ_STEP_FROM_BELOW) return w > cq_kernel_widths[0];
     if (op->width_step == CQ_STEP_FROM_ABOVE) return w < cq_kernel_widths[cq_kernel_nwidths - 1];
+    if (op->width_step == CQ_STEP_I64) return w == 64;
     return !op->width_step || w % op->width_step == 0;
 }
 
@@ -96,6 +98,7 @@ enum {
     CQ_KOP_MUL,      /* multiply (kmgy.11) */
     CQ_KOP_UMUL_OVERFLOW,
     CQ_KOP_SMUL_OVERFLOW,
+    CQ_KOP_ANGLE_K,  /* the angle-ladder reduction (kmgy.18), i64 only */
     CQ_KOP_COUNT
 };
 extern const cq_kernel_op cq_kernel_ops[CQ_KOP_COUNT];
@@ -274,5 +277,16 @@ int  cq_mul_kind(uint32_t w);
 CQ_K_MUL_DECL_(mul)
 CQ_K_MUL_DECL_(umul_overflow)
 CQ_K_MUL_DECL_(smul_overflow)
+
+/* ---- The angle-ladder reduction (kmgy.18, src/kernels/ladder.c; docs/ANGLE_LADDER.md §5).
+ * Records onto t K = k(a) for the 64 bits a (an f64 pattern, any mix of classical and quantum bits)
+ * and P = 2^s pi (s = 2: Ry, 1: the phase), bit for bit cq_angle_k (src/angle_k.c), 0 for Inf/NaN;
+ * sets k[0 .. CQ_LADDER_N-1] (read only, valid until cq_tape_undo). a is read only. Classical bits fold.
+ * kind: how the window of 1/pi is selected by the exponent, in registry order; cq_angle_k_kind() ships. */
+enum { CQ_ANGLE_BARREL, CQ_ANGLE_TABLE };
+void cq_angle_k_circuit(int kind, cq_tape *t, const cq_bit *a, int s, const cq_bit **k);
+int  cq_angle_k_kind(void);
+void cq_k_angle_k_barrel(int32_t o, const int32_t *args, uint32_t w);   /* o (N bits) ^= k(A), s = 2 */
+void cq_k_angle_k_table(int32_t o, const int32_t *args, uint32_t w);
 
 #endif

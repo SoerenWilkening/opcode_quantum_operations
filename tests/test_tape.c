@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "cqrt.h"
+#include "cq_bus.h"
 #include "cq_replay.h"
 #include "harness.h"
 
@@ -32,37 +33,49 @@ CQ_WIDTHS_NARROW(ECHO_N)
 CQ_FP_WIDTHS(ECHO_F)
 unsigned _BitInt(200) echo_i200(unsigned _BitInt(200) x) { return x; }
 
-/* ---- Child runner: status as waitpid gives it, output into out. */
+/* ---- Child runner: status as waitpid gives it, output into out (outn bytes). The child's stdin
+ * is a pipe holding in_text, or the parent's when in_text is NULL. */
 static char out[1 << 16];
+static size_t outn;
+static const char *in_text;
 static int run(void (*scenario)(void)) {
-    int p[2];
+    int p[2], ip[2];
     assert(pipe(p) == 0);
+    if (in_text) {
+        assert(pipe(ip) == 0);
+        assert(write(ip[1], in_text, strlen(in_text)) == (ssize_t)strlen(in_text));
+        close(ip[1]);
+    }
     fflush(NULL);
     pid_t pid = fork();
     assert(pid >= 0);
     if (!pid) {
         close(p[0]); dup2(p[1], 1); dup2(p[1], 2); close(p[1]);
+        if (in_text) { dup2(ip[0], 0); close(ip[0]); }
+        setvbuf(stdout, NULL, _IONBF, 0);   /* write(1, ...) entries and stdio interleave in order */
         scenario();
         exit(0);
     }
     close(p[1]);
+    if (in_text) close(ip[0]);
     size_t n = 0;
     ssize_t k;
     while ((k = read(p[0], out + n, sizeof out - 1 - n)) > 0) n += (size_t)k;
-    out[n] = 0;
+    out[outn = n] = 0;
     close(p[0]);
     int st;
     assert(waitpid(pid, &st, 0) == pid);
     return st;
 }
-static void expect(void (*s)(void), const char *name, int code, const char *want) {
+static void expect_n(void (*s)(void), const char *name, int code, const char *want, size_t wn) {
     int st = run(s);
-    if (!WIFEXITED(st) || WEXITSTATUS(st) != code || strcmp(out, want)) {
+    if (!WIFEXITED(st) || WEXITSTATUS(st) != code || outn != wn || memcmp(out, want, wn)) {
         fprintf(stderr, "%s: status %#x, output:\n%s\n--- wanted exit %d and:\n%s\n", name, st, out, code, want);
         abort();
     }
     printf("%s: ok\n", name);
 }
+static void expect(void (*s)(void), const char *name, int code, const char *want) { expect_n(s, name, code, want, strlen(want)); }
 static void expect_abort(void (*s)(void), const char *name, const char *msg) {
     int st = run(s);
     if (!WIFSIGNALED(st) || WTERMSIG(st) != SIGABRT || !strstr(out, msg)) {
@@ -230,37 +243,428 @@ static void s_trap(void) {
     cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "__builtin_trap", 0);
 }
 
-/* ---- INPUT rows that merge under a quantum predicate or field: kmgy.28 */
-static uint32_t q64(uint64_t v) { uint32_t h = cqrt_alloc_i64(v); cq_get_qubit(cq_rail_bits((int32_t)h)); return h; }
-static void s_in_pred(void) {
-    uint32_t t = cqrt_tape_alloc();
-    cqrt_tape_write_i64_lit(t, ptr(stdin));
-    cqrt_tape_effect_i32_controlled(qbit(1), t, "fgetc", 1);
+/* ---- Helpers for the bus-facing scenarios: values read without measuring (the replay backend
+ * holds a basis state), and the ancilla checks. */
+static uint64_t q64(uint64_t v) { uint32_t h = cqrt_alloc_i64(v); cq_get_qubit(cq_rail_bits((int32_t)h)); return h; }
+static uint32_t qmask64(uint64_t v, uint64_t mask) {   /* a rail holding v, the bits of mask as qubits */
+    uint32_t h = cqrt_alloc_i64(v);
+    for (int i = 0; i < 64; i++) if (mask >> i & 1) cq_get_qubit(&cq_rail_bits((int32_t)h)[i]);
+    return h;
 }
-static void s_in_addr(void) {
-    char b[8];
-    uint32_t t = cqrt_tape_alloc();
-    cqrt_tape_write_i64(t, q64(ptr(b))); cqrt_tape_write_i32_lit(t, 8); cqrt_tape_write_i64_lit(t, ptr(stdin));
-    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "fgets", 3);
+static uint32_t q32(uint32_t v) { uint32_t h = cqrt_alloc_i32(v); cq_get_qubit(cq_rail_bits((int32_t)h)); return h; }
+static int bitv(cq_bit b) { return cq_bit_is_q(b) ? cq_replay_get_bit(b.q) : b.kind; }
+static uint64_t peekr(uint32_t h) {
+    uint64_t v = 0;
+    for (uint32_t i = 0; i < cq_rail_width((int32_t)h) && i < 64; i++) v |= (uint64_t)bitv(cq_rail_bits((int32_t)h)[i]) << i;
+    return v;
 }
-static void s_in_len(void) {
-    char b[8];
-    uint32_t t = cqrt_tape_alloc(), n = cqrt_alloc_i32(8);
-    cq_get_qubit(cq_rail_bits((int32_t)n));
-    cqrt_tape_write_i64_lit(t, ptr(b)); cqrt_tape_write_i32(t, n); cqrt_tape_write_i64_lit(t, ptr(stdin));
-    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "fgets", 3);
+static uint8_t peekc(uint64_t a) {
+    cq_bit c[8];
+    cq_cell_read(a, c);
+    uint8_t v = 0;
+    for (int i = 0; i < 8; i++) v |= (uint8_t)(bitv(c[i]) << i);
+    return v;
 }
-static void s_in_stream(void) {
-    uint32_t t = cqrt_tape_alloc();
-    cqrt_tape_write_i64(t, q64(ptr(stdin)));
-    cqrt_tape_effect_i32_controlled(cqrt_alloc_i1(1), t, "getc_unlocked", 1);
+static void hexm(const char *tag, const void *p, size_t n, char *o) {   /* "tag=" and n bytes in hex */
+    o += snprintf(o, strlen(tag) + 2, "%s=", tag);
+    for (size_t j = 0; j < n; j++) o += snprintf(o, 3, "%02x", ((const uint8_t *)p)[j]);
 }
-static void s_out_qaddr(void) {   /* a deferred buffer at an address rail: kmgy.30 */
-    uint32_t t = cqrt_tape_alloc();
-    cqrt_tape_write_i64(t, q64(ptr("s")));
-    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "puts", 1);
+static void showm(uint64_t a, size_t n) {   /* the bus's view of n cells */
+    uint8_t b[256];
+    char o[1024];
+    for (size_t j = 0; j < n; j++) b[j] = peekc(a + j);
+    hexm(" m", b, n, o);
+    printf("%s", o);
+}
+/* Every free qubit reads 0, and the live ones are exactly those held by live rails and by the
+ * cells [a, a + n): no ancilla left taken. Valid while no rail has been freed in the child. */
+static void balanced(uint64_t a, size_t n) {
+    uint32_t nf = cq_pool_minted() - cq_pool_live(), q[4096], held = 0;
+    assert(nf <= 4096);
+    for (uint32_t i = 0; i < nf; i++) { q[i] = cq_pool_take(); assert(!cq_replay_get_bit(q[i])); }
+    while (nf) cq_pool_give(q[--nf]);
+    uint32_t probe = cqrt_alloc_i1(0);
+    for (uint32_t h = 1; h < probe; h++)
+        for (uint32_t i = 0; i < cq_rail_width((int32_t)h); i++) held += cq_bit_is_q(cq_rail_bits((int32_t)h)[i]);
+    for (size_t j = 0; j < n; j++) { cq_bit c[8]; cq_cell_read(a + j, c); for (int i = 0; i < 8; i++) held += cq_bit_is_q(c[i]); }
+    if (cq_pool_live() != held) { printf("pool: %u live, %u held\n", cq_pool_live(), held); exit(9); }
+}
+static void rest_stdio(void) {   /* what is left of stdin, through stdio */
+    char r[256];
+    size_t k = fread(r, 1, sizeof r - 1, stdin);
+    r[k] = 0;
+    printf(" rest=%s|\n", r);
+}
+static void rest_fd(int fd) {
+    char r[256];
+    ssize_t k = read(fd, r, sizeof r - 1);
+    r[k < 0 ? 0 : k] = 0;
+    printf(" rest=%s|", r);
 }
 
+/* ---- Capture (kmgy.30, §1.11 Resolved and Capture) */
+static int P_;       /* a predicate qubit's value */
+static uint64_t N_;  /* a quantum length, address offset or stream choice */
+
+/* All HOST: performed at the call, in order. A QUANTUM cell: deferred, captured at the call. */
+static void s_cap_cells(void) {
+    uint32_t t = cqrt_tape_alloc(), one = cqrt_alloc_i1(1), M = cqrt_qram_alloc_i8(0);
+    char buf[] = "abc\n", host[] = "host";
+    static const char ro[] = "ro\n";   /* read-only: a classical store makes the cell QUANTUM, host byte kept */
+    printf("A\n");
+    cqrt_tape_write_i64_lit(t, ptr(host));
+    cqrt_tape_effect_controlled(one, t, "puts", 1);   /* every cell HOST: at the call */
+    printf("B\n");
+    cqrt_qram_store_i8_hl(M, ptr(ro), cqrt_alloc_i8('R'));
+    cqrt_tape_write_i64_lit(t, ptr(ro)); cqrt_tape_write_i64_lit(t, ptr(stdout));
+    cqrt_tape_effect_controlled(one, t, "fputs", 2);   /* a QUANTUM cell, classical content: deferred */
+    printf("C\n");
+    cqrt_qram_store_i8_hl_controlled(qbit(1), M, ptr(buf + 1), cqrt_alloc_i8('Z'));   /* buf[1] QUANTUM 'Z' */
+    cqrt_tape_write_i64_lit(t, 1); cqrt_tape_write_i64_lit(t, ptr(buf)); cqrt_tape_write_i64_lit(t, 4);
+    cqrt_tape_effect_controlled(one, t, "write", 3);
+    strcpy(buf, "xyz\n");   /* the capture was at the call */
+    printf("live\n");
+}
+static void s_cap_cells2(void) {   /* the same under a quantum predicate, which defers anyway */
+    uint32_t t = cqrt_tape_alloc(), M = cqrt_qram_alloc_i8(0);
+    char buf[] = "abc\n";
+    cqrt_qram_store_i8_hl_controlled(qbit(1), M, ptr(buf + 2), cqrt_alloc_i8('Q'));
+    cqrt_tape_write_i64_lit(t, 1); cqrt_tape_write_i64_lit(t, ptr(buf)); cqrt_tape_write_i64_lit(t, 4);
+    cqrt_tape_effect_controlled(qbit(P_), t, "write", 3);
+    buf[0] = '-';
+    printf("live\n");
+}
+static void s_cap_unreadable(void) {   /* never faults: an unreadable cell reads 0 */
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, 16);
+    cqrt_tape_effect_controlled(qbit(1), t, "puts", 1);
+    cqrt_tape_write_i64_lit(t, 1); cqrt_tape_write_i64_lit(t, 16); cqrt_tape_write_i64_lit(t, 3);
+    cqrt_tape_effect_controlled(qbit(1), t, "write", 3);
+    printf("live\n");
+}
+static char qbuf[128] __attribute__((aligned(64)));
+static void s_cap_qaddr(void) {   /* puts and write at an address rail reaching qbuf + 16k, k < 4 */
+    uint32_t t = cqrt_tape_alloc(), one = cqrt_alloc_i1(1);
+    for (int k = 0; k < 4; k++) snprintf(qbuf + 16 * k, 16, "str%d", k);
+    cqrt_tape_write_i64(t, qmask64(ptr(qbuf) + 16 * N_, 0x30));
+    cqrt_tape_effect_controlled(one, t, "puts", 1);
+    cqrt_tape_write_i64_lit(t, 1); cqrt_tape_write_i64(t, qmask64(ptr(qbuf) + 16 * N_, 0x30)); cqrt_tape_write_i64_lit(t, 5);
+    cqrt_tape_effect_controlled(one, t, "write", 3);
+    memset(qbuf, '!', 64);
+    printf("live\n");
+}
+static void s_cap_len(void) {   /* write(1, buf, n) and fwrite(buf, 1, n, stdout), n a rail */
+    uint32_t t = cqrt_tape_alloc(), one = cqrt_alloc_i1(1);
+    char buf[] = "abcdefghijklmno";
+    cqrt_tape_write_i64_lit(t, 1); cqrt_tape_write_i64_lit(t, ptr(buf)); cqrt_tape_write_i64(t, qmask64(N_, 7));
+    cqrt_tape_effect_controlled(one, t, "write", 3);
+    cqrt_tape_write_i64_lit(t, ptr(buf)); cqrt_tape_write_i64_lit(t, 1); cqrt_tape_write_i64(t, qmask64(N_, 7));
+    cqrt_tape_write_i64_lit(t, ptr(stdout));
+    cqrt_tape_effect_controlled(one, t, "fwrite", 4);
+    cqrt_tape_write_i64_lit(t, ptr(buf)); cqrt_tape_write_i64(t, qmask64(2, 3)); cqrt_tape_write_i64(t, qmask64(N_, 7));
+    cqrt_tape_write_i64_lit(t, ptr(stdout));
+    cqrt_tape_effect_controlled(one, t, "fwrite", 4);   /* size 2, nmemb n: 2n bytes */
+    memset(buf, '.', 15);
+    printf("live|");
+}
+static void s_cap_va(void) {   /* vprintf whose %s string has a QUANTUM cell: deferred, read through the bus */
+    uint32_t t = cqrt_tape_alloc(), M = cqrt_qram_alloc_i8(0);
+    char s[] = "vs";
+    cqrt_qram_store_i8_hl_controlled(qbit(1), M, ptr(s + 1), cqrt_alloc_i8('Q'));
+    vdefer(t, cqrt_alloc_i1(1), "V %s %d\n", s, 5);
+    s[0] = '-';
+    printf("live\n");
+}
+static void s_cap_fmt_gap(void) {   /* a format with a QUANTUM cell: kmgy.36 */
+    uint32_t t = cqrt_tape_alloc(), M = cqrt_qram_alloc_i8(0);
+    char f[] = "%d\n";
+    cqrt_qram_store_i8_hl_controlled(qbit(1), M, ptr(f + 1), cqrt_alloc_i8('s'));
+    cqrt_tape_write_i64_lit(t, ptr(stdout)); cqrt_tape_write_i64_lit(t, ptr(f)); cqrt_tape_write_i32_lit(t, 1);
+    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "fprintf", 3);
+}
+
+static void capture_tests(void) {
+    expect(s_cap_cells, "capture: HOST at the call, a QUANTUM cell deferred", 0, "A\nhost\nB\nC\nlive\nRo\naZc\n");
+    for (P_ = 0; P_ < 2; P_++) expect(s_cap_cells2, P_ ? "capture: QUANTUM cell, predicate 1" : "capture: predicate 0", 0, P_ ? "live\nabQ\n" : "live\n");
+    expect_n(s_cap_unreadable, "capture: unreadable address reads 0", 0, "live\n\n\0\0\0", 9);
+    for (N_ = 0; N_ < 4; N_++) {
+        char w[64];
+        snprintf(w, sizeof w, "live\nstr%d\nstr%d", (int)N_, (int)N_);
+        expect_n(s_cap_qaddr, "capture: buffer at an address rail", 0, w, strlen(w) + 1);
+    }
+    const uint64_t ns[] = { 0, 1, 3, 5, 7 };
+    for (int i = 0; i < 5; i++) {
+        N_ = ns[i];
+        char w[64];
+        int k = snprintf(w, sizeof w, "live|%.*s%.*s%.*s", (int)N_, "abcdefgh", (int)N_, "abcdefgh", (int)(2 * N_), "abcdefghijklmno");
+        expect_n(s_cap_len, "capture: rail length", 0, w, (size_t)k);
+    }
+    expect(s_cap_va, "capture: va_list string with a QUANTUM cell", 0, "live\nV vQ 5\n");
+    expect_abort(s_cap_fmt_gap, "capture: format with a QUANTUM cell (ABI gap)", "kmgy.36");
+}
+
+/* ---- INPUT merge rows (kmgy.28, §1.11 host-boundary table). Each child prints r, the bus's view
+ * of the destination and what is left of the input; the parent's model says what they must be. */
+static char dst[64] __attribute__((aligned(64)));
+static void fill(void) { memset(dst, 'X', sizeof dst); }
+
+static void s_fgets_pred(void) {   /* the predicate row: performed always, merged under p */
+    fill();
+    uint32_t t = cqrt_tape_alloc(), p = qbit(P_);
+    cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i32_lit(t, 16); cqrt_tape_write_i64_lit(t, ptr(stdin));
+    uint32_t r = cqrt_tape_effect_i64_controlled(p, t, "fgets", 3);
+    balanced(ptr(dst), 16);
+    printf("r=%d", peekr(r) == ptr(dst) ? 1 : (int)peekr(r));
+    showm(ptr(dst), 16);
+    rest_stdio();
+}
+static void s_fgetc_pred(void) {
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(stdin));
+    uint32_t r = cqrt_tape_effect_i32_controlled(qbit(P_), t, "getc_unlocked", 1);
+    balanced(0, 0);
+    printf("r=%c", (int)peekr(r) ? (int)peekr(r) : '0');
+    rest_stdio();
+}
+static void vscan(uint32_t t, uint32_t c, uint32_t *r, const char *f, ...) {
+    va_list ap;
+    va_start(ap, f);
+    cqrt_tape_write_i64_lit(t, ptr(f)); cqrt_tape_write_i64_lit(t, ptr(ap));
+    *r = cqrt_tape_effect_i32_controlled(c, t, "vscanf", 2);
+    va_end(ap);
+}
+static void s_scanf_pred(void) {   /* scanf and vscanf: each pointer's bytes stored under p */
+    fill();
+    uint32_t t = cqrt_tape_alloc(), r1, r2;
+    cqrt_tape_write_i64_lit(t, ptr("%d %3s")); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64_lit(t, ptr(dst + 8));
+    r1 = cqrt_tape_effect_i32_controlled(qbit(P_), t, "scanf", 3);
+    vscan(t, qbit(P_), &r2, " %hhd%n", dst + 16, dst + 20);
+    balanced(ptr(dst), 32);
+    printf("r=%d,%d", (int)peekr(r1), (int)peekr(r2));
+    showm(ptr(dst), 24);
+    rest_stdio();
+}
+static void s_getline_pred(void) {
+    struct { char *line; size_t cap; } lc = { NULL, 0 };
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(&lc.line)); cqrt_tape_write_i64_lit(t, ptr(&lc.cap)); cqrt_tape_write_i64_lit(t, ptr(stdin));
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "getline", 3);
+    balanced(ptr(&lc), sizeof lc);
+    uint64_t l = 0, c = 0;
+    for (int j = 7; j >= 0; j--) l = l << 8 | peekc(ptr(&lc.line) + j), c = c << 8 | peekc(ptr(&lc.cap) + j);
+    printf("r=%d line=%s cap>0=%d", (int)peekr(r), l ? (char *)(uintptr_t)l : "null", c > 0);
+    rest_stdio();
+}
+static void s_gets_pred(void) {
+    fill();
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(dst));
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "gets", 1);
+    balanced(ptr(dst), 8);
+    printf("r=%d", peekr(r) == ptr(dst));
+    showm(ptr(dst), 8);
+    rest_stdio();
+}
+static void s_fgets_len(void) {   /* the length row: n a rail holding N_ */
+    fill();
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i32(t, q32((uint32_t)N_)); cqrt_tape_write_i64_lit(t, ptr(stdin));
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "fgets", 3);
+    balanced(ptr(dst), 16);
+    printf("r=%d", peekr(r) == ptr(dst));
+    showm(ptr(dst), 16);
+    rest_stdio();
+}
+static void s_read_len(void) {
+    fill();
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i32_lit(t, 0); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64(t, q64(N_));
+    uint32_t r = cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "read", 3);
+    balanced(ptr(dst), 16);
+    printf("r=%lld", (long long)peekr(r));
+    showm(ptr(dst), 16);
+    rest_fd(0);
+    printf("\n");
+}
+static uint64_t S_;   /* fread: N_ nmemb (S_ classical 2) or, S_ >= 100, size S_ - 100 quantum and nmemb 2 */
+static void s_fread_len(void) {
+    fill();
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(dst));
+    if (S_ < 100) { cqrt_tape_write_i64_lit(t, S_); cqrt_tape_write_i64(t, q64(N_)); }
+    else { cqrt_tape_write_i64(t, q64(S_ - 100)); cqrt_tape_write_i64_lit(t, 2); }
+    cqrt_tape_write_i64_lit(t, ptr(stdin));
+    uint32_t r = cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "fread", 4);
+    if (S_ < 100) balanced(ptr(dst), 16);   /* the divider's rails are freed: no handle census */
+    printf("r=%lld", (long long)peekr(r));
+    showm(ptr(dst), 16);
+    rest_stdio();
+}
+static void s_fgets_addr(void) {   /* the buffer address row: dst + 16 N_ through a rail reaching 4 slots */
+    fill();
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64(t, qmask64(ptr(dst) + 16 * N_, 0x30)); cqrt_tape_write_i32_lit(t, 8); cqrt_tape_write_i64_lit(t, ptr(stdin));
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "fgets", 3);
+    balanced(ptr(dst), 64);
+    printf("r=%lld", (long long)(peekr(r) ? peekr(r) - ptr(dst) : -1));
+    showm(ptr(dst), 64);
+    rest_stdio();
+}
+static void s_stream_file(void) {   /* the identifier row on FILE*: two streams the tape opened */
+    fill();
+    uint32_t t = cqrt_tape_alloc(), one = cqrt_alloc_i1(1);
+    FILE *f[2];
+    for (int k = 0; k < 2; k++) {
+        f[k] = (FILE *)(uintptr_t)peekr(cqrt_tape_effect_i64_controlled(one, t, "tmpfile", 0));
+        fputs(k ? "CD\nE" : "AB\nF", f[k]); rewind(f[k]);
+    }
+    uint64_t a = ptr(f[0]), b = ptr(f[1]);
+    cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i32_lit(t, 8); cqrt_tape_write_i64(t, qmask64(N_ ? b : a, a ^ b));
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "fgets", 3);
+    balanced(ptr(dst), 8);
+    printf("r=%d", peekr(r) == ptr(dst));
+    showm(ptr(dst), 8);
+    printf(" rest=%c%c\n", fgetc(f[0]), fgetc(f[1]));
+}
+static void s_stream_fd(void) {   /* the identifier row on a descriptor: fds 10 and 11 */
+    fill();
+    for (int k = 0; k < 2; k++) {
+        int p[2];
+        assert(pipe(p) == 0);
+        assert(write(p[1], k ? "abcdef" : "123456", 6) == 6);
+        close(p[1]); dup2(p[0], 10 + k); close(p[0]);
+    }
+    uint32_t t = cqrt_tape_alloc(), fd = cqrt_alloc_i32(10 + (uint32_t)N_);
+    cq_get_qubit(&cq_rail_bits((int32_t)fd)[0]);
+    cqrt_tape_write_i32(t, fd); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64_lit(t, 4);
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "read", 3);
+    balanced(ptr(dst), 8);
+    printf("r=%d", (int)peekr(r));
+    showm(ptr(dst), 8);
+    rest_fd(10); rest_fd(11);
+    printf("\n");
+}
+static void s_classical_in(void) {   /* the classical INPUT row: no gate */
+    cq_replay_reset();
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i32_lit(t, 16); cqrt_tape_write_i64_lit(t, ptr(stdin));
+    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "fgets", 3);
+    assert(cq_replay_gates() == 0 && cq_pool_live() == 0);
+    printf("%s", dst);
+}
+/* The fields no INPUT row covers (kmgy.36). */
+static void s_gap_ungetc(void) {
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i32(t, q32('a')); cqrt_tape_write_i64_lit(t, ptr(stdin));
+    cqrt_tape_effect_i32_controlled(cqrt_alloc_i1(1), t, "ungetc", 2);
+}
+static void s_gap_pread(void) {
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i32_lit(t, 0); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64_lit(t, 4); cqrt_tape_write_i64(t, q64(0));
+    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "pread", 4);
+}
+static void s_gap_getdelim(void) {
+    char *l = NULL;
+    size_t n = 0;
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(&l)); cqrt_tape_write_i64_lit(t, ptr(&n)); cqrt_tape_write_i32(t, q32(',')); cqrt_tape_write_i64_lit(t, ptr(stdin));
+    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "getdelim", 4);
+}
+static void s_gap_scanf_fmt(void) {
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64(t, q64(ptr("%d"))); cqrt_tape_write_i64_lit(t, ptr(dst));
+    cqrt_tape_effect_i32_controlled(cqrt_alloc_i1(1), t, "scanf", 2);
+}
+
+static void model(char *w, int r, const void *m, size_t n, const char *rest) {   /* "r=.. m=.. rest=..|" */
+    w += snprintf(w, 32, "r=%d ", r);
+    hexm("m", m, n, w);
+    snprintf(w + strlen(w), strlen(rest) + 9, " rest=%s|\n", rest);
+}
+static void merge_tests(void) {
+    char w[1024], m[64];
+    in_text = "hi\nrest\n";
+    for (P_ = 0; P_ < 2; P_++) {
+        memset(m, 'X', 16);
+        if (P_) memcpy(m, "hi\n", 4);
+        model(w, P_, m, 16, "rest\n");
+        expect(s_fgets_pred, "INPUT, quantum predicate: fgets", 0, w);
+        snprintf(w, sizeof w, "r=%c rest=i\nrest\n|\n", P_ ? 'h' : '0');
+        expect(s_fgetc_pred, "INPUT, quantum predicate: getc_unlocked", 0, w);
+        memset(m, 'X', 16);
+        if (P_) memcpy(m, "hi\0", 3);
+        model(w, P_, m, 8, "rest\n");
+        expect(s_gets_pred, "INPUT, quantum predicate: gets", 0, w);
+        snprintf(w, sizeof w, "r=%d line=%s cap>0=%d rest=rest\n|\n", P_ ? 3 : 0, P_ ? "hi\n" : "null", P_);
+        expect(s_getline_pred, "INPUT, quantum predicate: getline", 0, w);
+    }
+    in_text = "42 abc -7xyz";
+    for (P_ = 0; P_ < 2; P_++) {
+        memset(m, 'X', 24);
+        if (P_) { int v = 42; memcpy(m, &v, 4); memcpy(m + 8, "abc", 4); m[16] = (char)-7; v = 3; memcpy(m + 20, &v, 4); }
+        snprintf(w, sizeof w, "r=%d,%d ", P_ ? 2 : 0, P_);
+        hexm("m", m, 24, w + strlen(w));
+        strcat(w, " rest=xyz|\n");
+        expect(s_scanf_pred, "INPUT, quantum predicate: scanf, vscanf", 0, w);
+    }
+    in_text = "hello\nworld\n";
+    const int64_t fl[] = { 0, 1, 2, 4, 7, 8, 4101 };
+    for (P_ = 0; P_ < 2; P_++)
+        for (int i = 0; i < 7; i++) {
+            N_ = (uint64_t)fl[i];
+            memset(m, 'X', 16);
+            if (P_ && fl[i] >= 1) { int64_t k = fl[i] - 1 < 6 ? fl[i] - 1 : 6; memcpy(m, "hello\n", (size_t)k); m[k] = 0; }
+            model(w, P_ && fl[i] >= 1, m, 16, "world\n");
+            expect(s_fgets_len, "INPUT, quantum length: fgets", 0, w);
+        }
+    in_text = "abcdef";
+    const uint64_t rl[] = { 0, 1, 3, 6, 9, 4106 };
+    for (int i = 0; i < 6; i++) {
+        N_ = rl[i];
+        uint64_t k = N_ < 6 ? N_ : 6;
+        memset(m, 'X', 16); memcpy(m, "abcdef", k);
+        model(w, (int)k, m, 16, "");
+        expect(s_read_len, "INPUT, quantum length: read", 0, w);
+    }
+    in_text = "abcdefg";
+    const uint64_t fr[][2] = { { 2, 0 }, { 2, 1 }, { 2, 3 }, { 2, 5 }, { 100, 0 }, { 101, 0 }, { 103, 0 }, { 104, 0 } };
+    for (int i = 0; i < 8; i++) {
+        S_ = fr[i][0], N_ = fr[i][1];
+        uint64_t s = S_ < 100 ? S_ : S_ - 100, nm = S_ < 100 ? N_ : 2, bytes = s * nm < 7 ? s * nm : 7;
+        memset(m, 'X', 16); memcpy(m, "abcdefg", bytes);
+        model(w, (int)(s ? (nm < 7 / s ? nm : 7 / s) : 0), m, 16, "");
+        expect(s_fread_len, "INPUT, quantum length: fread size·nmemb", 0, w);
+    }
+    in_text = "hey\nmore\n";
+    for (P_ = 0; P_ < 2; P_++)
+        for (N_ = 0; N_ < 4; N_++) {
+            memset(m, 'X', 64);
+            if (P_) memcpy(m + 16 * N_, "hey\n", 5);
+            model(w, P_ ? (int)(16 * N_) : -1, m, 64, "more\n");
+            expect(s_fgets_addr, "INPUT, quantum buffer address: fgets", 0, w);
+        }
+    in_text = NULL;
+    for (P_ = 0; P_ < 2; P_++)
+        for (N_ = 0; N_ < 2; N_++) {
+            memset(m, 'X', 8);
+            if (P_) memcpy(m, N_ ? "CD\n" : "AB\n", 4);
+            model(w, P_, m, 8, "");
+            snprintf(strstr(w, " rest="), 16, " rest=FE\n");
+            expect(s_stream_file, "INPUT, quantum stream: FILE*", 0, w);
+            memset(m, 'X', 8);
+            if (P_) memcpy(m, N_ ? "abcd" : "1234", 4);
+            model(w, P_ ? 4 : 0, m, 8, "");
+            snprintf(strstr(w, " rest="), 32, " rest=56| rest=ef|\n");
+            expect(s_stream_fd, "INPUT, quantum stream: descriptor", 0, w);
+        }
+    in_text = "line\n";
+    expect(s_classical_in, "INPUT, classical: no gate", 0, "line\n");
+    in_text = NULL;
+    expect_abort(s_gap_ungetc, "INPUT gap: ungetc's character", "kmgy.36");
+    expect_abort(s_gap_pread, "INPUT gap: pread's offset", "kmgy.36");
+    expect_abort(s_gap_getdelim, "INPUT gap: getdelim's delimiter", "kmgy.36");
+    expect_abort(s_gap_scanf_fmt, "INPUT gap: scanf's format pointer", "kmgy.36");
+}
 /* ---- tape_write through the sampled harness: h' ^= h (controlled: c ? h : 0), h unchanged.
  * h' is never freed by the ABI; the test frees it once copied out so the leak check holds. */
 static uint32_t T;
@@ -302,11 +706,8 @@ int main(void) {
     int st = run(s_trap);
     assert(WIFSIGNALED(st) && (WTERMSIG(st) == SIGILL || WTERMSIG(st) == SIGTRAP));
     printf("__builtin_trap: ok\n");
-    expect_abort(s_in_pred, "INPUT, quantum predicate", "kmgy.28");
-    expect_abort(s_in_addr, "INPUT, quantum buffer address", "kmgy.28");
-    expect_abort(s_in_len, "INPUT, quantum length", "kmgy.28");
-    expect_abort(s_in_stream, "INPUT, quantum stream", "kmgy.28");
-    expect_abort(s_out_qaddr, "deferred buffer at an address rail", "kmgy.30");
+    capture_tests();
+    merge_tests();
 
     T = cqrt_tape_alloc();
 #define HX_RUN(n, ...) hx_##n();

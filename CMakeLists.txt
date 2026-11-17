@@ -216,3 +216,12 @@ target_sources(cq_templates PRIVATE src/templates/cmp.c)
 add_executable(test_tpl_cmp tests/test_tpl_cmp.c)
 target_link_libraries(test_tpl_cmp cq_templates cq_test_harness)
 add_test(NAME tpl_cmp COMMAND test_tpl_cmp)
+
+# Angle ladder, quantum angle rail (kmgy.18): the reduction kernel in src/kernels/ladder.c, the rotations in
+# src/ladder.c. CQ_LADDER_FULL=1 in the environment runs every vector fully quantum (slow; see the test).
+target_sources(cq_runtime PRIVATE src/ladder.c src/kernels/ladder.c)
+add_executable(test_ladder tests/test_ladder.c)
+target_link_libraries(test_ladder cq_test_harness)
+target_include_directories(test_ladder PRIVATE src)
+target_compile_definitions(test_ladder PRIVATE CQ_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+add_test(NAME ladder COMMAND test_ladder)

@@ -55,6 +55,17 @@ static int cell_bits(uint64_t a, cq_bit b[8], const uint8_t *host) {
 
 int cq_cell_read(uint64_t a, cq_bit b[8]) { return cell_bits(a, b, NULL); }
 
+int cq_cells_read(uint64_t a, cq_bit *b, uint32_t n) {
+    uint8_t host[256];
+    int q = 0;
+    for (uint32_t k = 0; k < n; k += 256) {   /* one host read per chunk; per cell where it fails */
+        uint32_t m = n - k < 256 ? n - k : 256;
+        int all = cq_host_read(a + k, host, m);
+        for (uint32_t j = 0; j < m; j++) q |= cell_bits(a + k + j, &b[8 * (k + j)], all ? &host[j] : NULL);
+    }
+    return q;
+}
+
 void cq_cell_write(uint64_t a, const cq_bit b[8], int quantum) {
     uint8_t v = 0;
     for (int i = 0; i < 8; i++)
@@ -75,7 +86,7 @@ enum { LOAD = CQ_BUS_LOAD, STORE = CQ_BUS_STORE, SWAP = CQ_BUS_SWAP };
 
 /* h is the loaded or swapped rail, or the value v of a store; w bits. c: a qubit control, or
  * NULL for none (a classical control has been resolved by the caller). */
-static void access(int op, const cq_bit *c, uint64_t a, cq_bit *h, uint32_t w) {
+static void access(int op, const cq_bit *c, uint64_t a, cq_bit *h, uint32_t w, cq_bit *slot) {
     uint32_t s = (w + 7) / 8;
     cq_bit cells[8 * MAX_CELLS];
     uint8_t host[MAX_CELLS];
@@ -87,7 +98,7 @@ static void access(int op, const cq_bit *c, uint64_t a, cq_bit *h, uint32_t w) {
         return;
     }
     /* A store swaps every bit of its cells with the fresh tape slot t, a swap the low w bits with h. */
-    cq_bit *t = op == STORE ? cq_rail_bits(cq_rail_alloc(8 * s, NULL)) : h;
+    cq_bit *t = op != STORE ? h : slot ? slot : cq_rail_bits(cq_rail_alloc(8 * s, NULL));
     for (uint32_t i = 0, n = op == STORE ? 8 * s : w; i < n; i++)
         if (c) { cq_cx(&cells[i], &t[i]); cq_ccx(c, &t[i], &cells[i]); cq_cx(&cells[i], &t[i]); }
         else { cq_bit x = t[i]; t[i] = cells[i]; cells[i] = x; }   /* the swap as a relabeling: no gate */
@@ -132,7 +143,15 @@ static void bus_op(int op, int ctl, uint32_t c, uint32_t m, const uint32_t *ah, 
             a |= (uint64_t)ab[i].kind << i;
         }
     }
-    access(op, cb, a, hb, w);
+    access(op, cb, a, hb, w, NULL);
+}
+
+void cq_bus_store_at(const cq_bit *c, uint64_t a, cq_bit *v, uint32_t w, cq_bit *t) {
+    if (c && !cq_bit_is_q(*c)) {
+        if (c->kind == CQ_BIT_ZERO) { if (!t) cq_rail_alloc(8 * ((w + 7) / 8), NULL); return; }
+        c = NULL;
+    }
+    access(STORE, c, a, v, w, t);
 }
 
 /* cq_invert (cq_rt.h): a load or swap is its own inverse and is recorded; a store is a flush

@@ -192,6 +192,31 @@ Which of the two step-4 constructions ships is decided in `kmgy.18` by measured 
 depth-first rule). The QROM is O(2046) deep. The barrel shift is 11 controlled-shift layers over
 about 1139 + 169 qubits, logarithmic apart from fan-out of each shift bit.
 
+**Built, 2026-11-17 (`kmgy.18`).** The circuit is `src/kernels/ladder.c` (`cq_angle_k_circuit`),
+the rotations `src/ladder.c`, the test `tests/test_ladder.c`. Differences from the outline above:
+
+- Steps 6 and 7 are one N-bit add: K = (p_hi ⊕ s) + (p_round ⊕ s), since −(x + r) = ~x + ~r mod
+  2^N. Step 8's zero is applied to m instead (m = significand AND NOT [e = 0x7FF], 53 CCX off the
+  critical path): m = 0 gives p = 0 and K = 0 with either sign.
+- Step 4: the outline listed both constructions and assumed neither. Both are built and
+  registered as the kernel operation `angle_k` (i64 only; docs/DEPTH.md). The barrel goes most
+  significant shift bit first, so stage b keeps only 169 + 2^b − 1 bits (1192 at the first,
+  classical-input stage, which folds to CX); each stage is a mux with its control fanned out,
+  emitted gate kind by gate kind. The table is a one-hot decoder of e' and a CX per 1-bit of
+  every exponent's window (a QROM without unary iteration). Measured, all 64 bits of A qubits,
+  compute + copy into K + uncompute, P = 4π:
+
+  | window | depth | gates | qubits |
+  |---|---|---|---|
+  | **barrel (ships)** | 245 | 163,127 | 47,860 |
+  | table | 1,854 | 340,581 | 44,596 |
+
+  The 53 × 169 multiply is ~31 deep of the barrel's ~120 forward. A whole `ry_<W>_qangle` call is
+  depth ~300 (the reduction, N = 53 rounds of controlled Ry, the undo) at every width: for W ≤ N
+  target q takes K_((q+r) mod N) in round r; a wider rail takes ⌈W/N⌉ fanned-out copies of K.
+- K matches `k_ref.py` on all 2172 vectors of `tests/ref/k_vectors.txt` with A fully quantum, with
+  both window constructions (`CQ_LADDER_FULL=1`; the default ctest run takes a fixed subset).
+
 The classical-valued A path (ABI line 304–305) computes the same k on the host. It must use this
 same arithmetic or `k_ref.py`'s values, not `round(x * 2^N / P)` in double: that is wrong for
 large |x|.
@@ -202,16 +227,18 @@ large |x|.
    grid", but the seven-operation interface only carries `double`, so P·2^(i−N) is emitted as
    fl(P)·2^(i−N), off by |P − fl(P)| in total (§2). The ABI does not say which angle to emit.
    This note assumes fl(P)·2^(i−N), an exact power-of-two scaling. To confirm with the ABI
-   owner.
+   owner. *Closed 2026-11-17:* decided as fl(P)·2^(i−N) (beads `kmgy.18`) and built so.
 2. **The one-rotation classical path.** It emits Ry(P·k/2^N) as a double, one more rounding,
    fl(fl(P)·k·2^−N). It can differ from the quantum ladder's total by half an ulp. The ABI
    requires both to use the same k, which they do. It does not require the same double.
+   *Measured 2026-11-17:* on 199 sampled finite doubles (P = 4π) the one rotation and the exact sum of
+   the ladder angles K selects differ by at most 8.8e−16 rad, 0.495 ulp of the angle.
 3. **N above 128.** Covered by rerunning `guard_search.py` with a larger `NMAX`. Nothing is
    assumed about it here.
 4. **g = 62 is likely enough** (one-sided error, see §4) but not proven. Kept at 63.
 5. **The ABI leaves to the backend** (line 284): N, the circuit, the window cut, and the QROM
    versus barrel-shift choice. It fixes k as a function of the 64 bits and N, so none of these
-   choices is visible to a program.
+   choices is visible to a program. *2026-11-17:* the barrel shift ships, by measured depth (§5).
 
 ## 7. Reference for tests
 
