@@ -328,87 +328,529 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* shl */
         0, /* i1 barrel */
-        1, /* i6 barrel_fanout */
-        1, /* i7 barrel_fanout */
+        2, /* i6 barrel_fanout_fold */
+        2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
         1, /* i16 barrel_fanout */
-        1, /* i17 barrel_fanout */
-        1, /* i24 barrel_fanout */
-        1, /* i31 barrel_fanout */
+        2, /* i17 barrel_fanout_fold */
+        2, /* i24 barrel_fanout_fold */
+        2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
-        1, /* i48 barrel_fanout */
+        2, /* i48 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
-        1, /* i80 barrel_fanout */
-        1, /* i100 barrel_fanout */
+        2, /* i80 barrel_fanout_fold */
+        2, /* i100 barrel_fanout_fold */
         1, /* i128 barrel_fanout */
-        1, /* i200 barrel_fanout */
+        2, /* i200 barrel_fanout_fold */
     },
     { /* lshr */
         0, /* i1 barrel */
-        1, /* i6 barrel_fanout */
-        1, /* i7 barrel_fanout */
+        2, /* i6 barrel_fanout_fold */
+        2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
         1, /* i16 barrel_fanout */
-        1, /* i17 barrel_fanout */
-        1, /* i24 barrel_fanout */
-        1, /* i31 barrel_fanout */
+        2, /* i17 barrel_fanout_fold */
+        2, /* i24 barrel_fanout_fold */
+        2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
-        1, /* i48 barrel_fanout */
+        2, /* i48 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
-        1, /* i80 barrel_fanout */
-        1, /* i100 barrel_fanout */
+        2, /* i80 barrel_fanout_fold */
+        2, /* i100 barrel_fanout_fold */
         1, /* i128 barrel_fanout */
-        1, /* i200 barrel_fanout */
+        2, /* i200 barrel_fanout_fold */
     },
     { /* ashr */
         0, /* i1 barrel */
-        1, /* i6 barrel_fanout */
-        1, /* i7 barrel_fanout */
+        2, /* i6 barrel_fanout_fold */
+        2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
         1, /* i16 barrel_fanout */
-        1, /* i17 barrel_fanout */
-        1, /* i24 barrel_fanout */
-        1, /* i31 barrel_fanout */
+        2, /* i17 barrel_fanout_fold */
+        2, /* i24 barrel_fanout_fold */
+        2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
-        1, /* i48 barrel_fanout */
+        2, /* i48 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
-        1, /* i80 barrel_fanout */
-        1, /* i100 barrel_fanout */
+        2, /* i80 barrel_fanout_fold */
+        2, /* i100 barrel_fanout_fold */
         1, /* i128 barrel_fanout */
-        1, /* i200 barrel_fanout */
+        2, /* i200 barrel_fanout_fold */
     },
     { /* fshl */
         0, /* i1 barrel */
-        1, /* i6 barrel_fanout */
-        1, /* i7 barrel_fanout */
+        2, /* i6 barrel_fanout_fold */
+        2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
         1, /* i16 barrel_fanout */
-        1, /* i17 barrel_fanout */
-        1, /* i24 barrel_fanout */
-        1, /* i31 barrel_fanout */
+        2, /* i17 barrel_fanout_fold */
+        2, /* i24 barrel_fanout_fold */
+        2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
-        1, /* i48 barrel_fanout */
+        2, /* i48 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
-        1, /* i80 barrel_fanout */
-        1, /* i100 barrel_fanout */
+        2, /* i80 barrel_fanout_fold */
+        2, /* i100 barrel_fanout_fold */
         1, /* i128 barrel_fanout */
-        1, /* i200 barrel_fanout */
+        2, /* i200 barrel_fanout_fold */
     },
     { /* fshr */
         0, /* i1 barrel */
-        1, /* i6 barrel_fanout */
-        1, /* i7 barrel_fanout */
+        2, /* i6 barrel_fanout_fold */
+        2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
         1, /* i16 barrel_fanout */
-        1, /* i17 barrel_fanout */
-        1, /* i24 barrel_fanout */
-        1, /* i31 barrel_fanout */
+        2, /* i17 barrel_fanout_fold */
+        2, /* i24 barrel_fanout_fold */
+        2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
-        1, /* i48 barrel_fanout */
+        2, /* i48 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
-        1, /* i80 barrel_fanout */
-        1, /* i100 barrel_fanout */
+        2, /* i80 barrel_fanout_fold */
+        2, /* i100 barrel_fanout_fold */
         1, /* i128 barrel_fanout */
-        1, /* i200 barrel_fanout */
+        2, /* i200 barrel_fanout_fold */
+    },
+    { /* udiv */
+        0, /* i1 restoring_ripple */
+        1, /* i6 restoring_lookahead */
+        3, /* i7 radix8_lookahead */
+        3, /* i8 radix8_lookahead */
+        3, /* i16 radix8_lookahead */
+        3, /* i17 radix8_lookahead */
+        3, /* i24 radix8_lookahead */
+        3, /* i31 radix8_lookahead */
+        3, /* i32 radix8_lookahead */
+        3, /* i48 radix8_lookahead */
+        3, /* i64 radix8_lookahead */
+        3, /* i80 radix8_lookahead */
+        3, /* i100 radix8_lookahead */
+        3, /* i128 radix8_lookahead */
+        3, /* i200 radix8_lookahead */
+    },
+    { /* urem */
+        0, /* i1 restoring_ripple */
+        1, /* i6 restoring_lookahead */
+        2, /* i7 radix4_lookahead */
+        1, /* i8 restoring_lookahead */
+        3, /* i16 radix8_lookahead */
+        2, /* i17 radix4_lookahead */
+        3, /* i24 radix8_lookahead */
+        3, /* i31 radix8_lookahead */
+        3, /* i32 radix8_lookahead */
+        3, /* i48 radix8_lookahead */
+        3, /* i64 radix8_lookahead */
+        3, /* i80 radix8_lookahead */
+        3, /* i100 radix8_lookahead */
+        3, /* i128 radix8_lookahead */
+        3, /* i200 radix8_lookahead */
+    },
+    { /* sdiv */
+        0, /* i1 restoring_ripple */
+        1, /* i6 restoring_lookahead */
+        3, /* i7 radix8_lookahead */
+        3, /* i8 radix8_lookahead */
+        3, /* i16 radix8_lookahead */
+        3, /* i17 radix8_lookahead */
+        3, /* i24 radix8_lookahead */
+        3, /* i31 radix8_lookahead */
+        3, /* i32 radix8_lookahead */
+        3, /* i48 radix8_lookahead */
+        3, /* i64 radix8_lookahead */
+        3, /* i80 radix8_lookahead */
+        3, /* i100 radix8_lookahead */
+        3, /* i128 radix8_lookahead */
+        3, /* i200 radix8_lookahead */
+    },
+    { /* srem */
+        0, /* i1 restoring_ripple */
+        1, /* i6 restoring_lookahead */
+        2, /* i7 radix4_lookahead */
+        2, /* i8 radix4_lookahead */
+        3, /* i16 radix8_lookahead */
+        2, /* i17 radix4_lookahead */
+        3, /* i24 radix8_lookahead */
+        3, /* i31 radix8_lookahead */
+        3, /* i32 radix8_lookahead */
+        3, /* i48 radix8_lookahead */
+        3, /* i64 radix8_lookahead */
+        3, /* i80 radix8_lookahead */
+        3, /* i100 radix8_lookahead */
+        3, /* i128 radix8_lookahead */
+        3, /* i200 radix8_lookahead */
+    },
+    { /* icmp_eq */
+        0, /* i1 chain */
+        1, /* i6 tree */
+        1, /* i7 tree */
+        1, /* i8 tree */
+        1, /* i16 tree */
+        1, /* i17 tree */
+        1, /* i24 tree */
+        1, /* i31 tree */
+        1, /* i32 tree */
+        1, /* i48 tree */
+        1, /* i64 tree */
+        1, /* i80 tree */
+        1, /* i100 tree */
+        1, /* i128 tree */
+        1, /* i200 tree */
+    },
+    { /* icmp_ne */
+        0, /* i1 chain */
+        1, /* i6 tree */
+        1, /* i7 tree */
+        1, /* i8 tree */
+        1, /* i16 tree */
+        1, /* i17 tree */
+        1, /* i24 tree */
+        1, /* i31 tree */
+        1, /* i32 tree */
+        1, /* i48 tree */
+        1, /* i64 tree */
+        1, /* i80 tree */
+        1, /* i100 tree */
+        1, /* i128 tree */
+        1, /* i200 tree */
+    },
+    { /* icmp_ult */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* icmp_ugt */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* icmp_uge */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* icmp_ule */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* icmp_slt */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* icmp_sgt */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* icmp_sge */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* icmp_sle */
+        2, /* i1 tree */
+        2, /* i6 tree */
+        2, /* i7 tree */
+        2, /* i8 tree */
+        2, /* i16 tree */
+        2, /* i17 tree */
+        2, /* i24 tree */
+        2, /* i31 tree */
+        2, /* i32 tree */
+        2, /* i48 tree */
+        2, /* i64 tree */
+        2, /* i80 tree */
+        2, /* i100 tree */
+        2, /* i128 tree */
+        2, /* i200 tree */
+    },
+    { /* select */
+        0, /* i1 ccx2 */
+        3, /* i6 diff_fanout */
+        3, /* i7 diff_fanout */
+        3, /* i8 diff_fanout */
+        3, /* i16 diff_fanout */
+        3, /* i17 diff_fanout */
+        3, /* i24 diff_fanout */
+        3, /* i31 diff_fanout */
+        3, /* i32 diff_fanout */
+        3, /* i48 diff_fanout */
+        3, /* i64 diff_fanout */
+        3, /* i80 diff_fanout */
+        3, /* i100 diff_fanout */
+        3, /* i128 diff_fanout */
+        3, /* i200 diff_fanout */
+    },
+    { /* smax */
+        4, /* i1 tree */
+        4, /* i6 tree */
+        4, /* i7 tree */
+        5, /* i8 tree_fanout */
+        5, /* i16 tree_fanout */
+        5, /* i17 tree_fanout */
+        5, /* i24 tree_fanout */
+        5, /* i31 tree_fanout */
+        5, /* i32 tree_fanout */
+        5, /* i48 tree_fanout */
+        5, /* i64 tree_fanout */
+        5, /* i80 tree_fanout */
+        5, /* i100 tree_fanout */
+        5, /* i128 tree_fanout */
+        5, /* i200 tree_fanout */
+    },
+    { /* smin */
+        4, /* i1 tree */
+        4, /* i6 tree */
+        4, /* i7 tree */
+        5, /* i8 tree_fanout */
+        5, /* i16 tree_fanout */
+        5, /* i17 tree_fanout */
+        5, /* i24 tree_fanout */
+        5, /* i31 tree_fanout */
+        5, /* i32 tree_fanout */
+        5, /* i48 tree_fanout */
+        5, /* i64 tree_fanout */
+        5, /* i80 tree_fanout */
+        5, /* i100 tree_fanout */
+        5, /* i128 tree_fanout */
+        5, /* i200 tree_fanout */
+    },
+    { /* umax */
+        4, /* i1 tree */
+        4, /* i6 tree */
+        4, /* i7 tree */
+        5, /* i8 tree_fanout */
+        5, /* i16 tree_fanout */
+        5, /* i17 tree_fanout */
+        5, /* i24 tree_fanout */
+        5, /* i31 tree_fanout */
+        5, /* i32 tree_fanout */
+        5, /* i48 tree_fanout */
+        5, /* i64 tree_fanout */
+        5, /* i80 tree_fanout */
+        5, /* i100 tree_fanout */
+        5, /* i128 tree_fanout */
+        5, /* i200 tree_fanout */
+    },
+    { /* umin */
+        4, /* i1 tree */
+        4, /* i6 tree */
+        4, /* i7 tree */
+        5, /* i8 tree_fanout */
+        5, /* i16 tree_fanout */
+        5, /* i17 tree_fanout */
+        5, /* i24 tree_fanout */
+        5, /* i31 tree_fanout */
+        5, /* i32 tree_fanout */
+        5, /* i48 tree_fanout */
+        5, /* i64 tree_fanout */
+        5, /* i80 tree_fanout */
+        5, /* i100 tree_fanout */
+        5, /* i128 tree_fanout */
+        5, /* i200 tree_fanout */
+    },
+    { /* abs */
+        0, /* i1 ripple */
+        3, /* i6 lookahead_fanout */
+        3, /* i7 lookahead_fanout */
+        3, /* i8 lookahead_fanout */
+        3, /* i16 lookahead_fanout */
+        3, /* i17 lookahead_fanout */
+        3, /* i24 lookahead_fanout */
+        3, /* i31 lookahead_fanout */
+        3, /* i32 lookahead_fanout */
+        3, /* i48 lookahead_fanout */
+        3, /* i64 lookahead_fanout */
+        3, /* i80 lookahead_fanout */
+        3, /* i100 lookahead_fanout */
+        3, /* i128 lookahead_fanout */
+        3, /* i200 lookahead_fanout */
+    },
+    { /* ctpop */
+        1, /* i1 csa_tree */
+        1, /* i6 csa_tree */
+        1, /* i7 csa_tree */
+        1, /* i8 csa_tree */
+        1, /* i16 csa_tree */
+        1, /* i17 csa_tree */
+        1, /* i24 csa_tree */
+        1, /* i31 csa_tree */
+        1, /* i32 csa_tree */
+        1, /* i48 csa_tree */
+        1, /* i64 csa_tree */
+        1, /* i80 csa_tree */
+        1, /* i100 csa_tree */
+        1, /* i128 csa_tree */
+        1, /* i200 csa_tree */
+    },
+    { /* ctlz */
+        0, /* i1 thermometer */
+        1, /* i6 priority_tree */
+        1, /* i7 priority_tree */
+        1, /* i8 priority_tree */
+        1, /* i16 priority_tree */
+        1, /* i17 priority_tree */
+        1, /* i24 priority_tree */
+        1, /* i31 priority_tree */
+        1, /* i32 priority_tree */
+        1, /* i48 priority_tree */
+        1, /* i64 priority_tree */
+        1, /* i80 priority_tree */
+        1, /* i100 priority_tree */
+        1, /* i128 priority_tree */
+        1, /* i200 priority_tree */
+    },
+    { /* cttz */
+        0, /* i1 thermometer */
+        1, /* i6 priority_tree */
+        1, /* i7 priority_tree */
+        1, /* i8 priority_tree */
+        1, /* i16 priority_tree */
+        1, /* i17 priority_tree */
+        1, /* i24 priority_tree */
+        1, /* i31 priority_tree */
+        1, /* i32 priority_tree */
+        1, /* i48 priority_tree */
+        1, /* i64 priority_tree */
+        1, /* i80 priority_tree */
+        1, /* i100 priority_tree */
+        1, /* i128 priority_tree */
+        1, /* i200 priority_tree */
+    },
+    { /* mul */
+        0, /* i1 shift_add */
+        1, /* i6 dadda_tree */
+        1, /* i7 dadda_tree */
+        1, /* i8 dadda_tree */
+        1, /* i16 dadda_tree */
+        1, /* i17 dadda_tree */
+        1, /* i24 dadda_tree */
+        1, /* i31 dadda_tree */
+        1, /* i32 dadda_tree */
+        1, /* i48 dadda_tree */
+        1, /* i64 dadda_tree */
+        1, /* i80 dadda_tree */
+        1, /* i100 dadda_tree */
+        1, /* i128 dadda_tree */
+        1, /* i200 dadda_tree */
+    },
+    { /* umul_overflow */
+        0, /* i1 shift_add */
+        1, /* i6 dadda_tree */
+        1, /* i7 dadda_tree */
+        1, /* i8 dadda_tree */
+        1, /* i16 dadda_tree */
+        1, /* i17 dadda_tree */
+        1, /* i24 dadda_tree */
+        1, /* i31 dadda_tree */
+        1, /* i32 dadda_tree */
+        1, /* i48 dadda_tree */
+        1, /* i64 dadda_tree */
+        1, /* i80 dadda_tree */
+        1, /* i100 dadda_tree */
+        1, /* i128 dadda_tree */
+        1, /* i200 dadda_tree */
+    },
+    { /* smul_overflow */
+        1, /* i1 dadda_tree */
+        1, /* i6 dadda_tree */
+        1, /* i7 dadda_tree */
+        1, /* i8 dadda_tree */
+        1, /* i16 dadda_tree */
+        1, /* i17 dadda_tree */
+        1, /* i24 dadda_tree */
+        1, /* i31 dadda_tree */
+        1, /* i32 dadda_tree */
+        1, /* i48 dadda_tree */
+        1, /* i64 dadda_tree */
+        1, /* i80 dadda_tree */
+        1, /* i100 dadda_tree */
+        1, /* i128 dadda_tree */
+        1, /* i200 dadda_tree */
     },
 };

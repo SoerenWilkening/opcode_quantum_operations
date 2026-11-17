@@ -53,6 +53,20 @@ static inline int cq_kernel_has_width(const cq_kernel_op *op, uint32_t w) {
     X(usub_sat, 0, 0) \
     X(ssub_sat, 0, 0)
 #define CQ_KOP_ARITH_(name, comm, ow) CQ_KOP_ARITH_##name,
+/* Divide and remainder (kmgy.12, ABI §2.2), all non-commutative: X(name). */
+#define CQ_DIV_OPS(X) X(udiv) X(urem) X(sdiv) X(srem)
+#define CQ_KOP_DIV_(name) CQ_KOP_DIV_##name,
+/* Compare, select, min/max, abs (kmgy.14, ABI §2.4, §2.5, §2.7). icmp: X(pred, base flag CQ_CMP_*,
+ * operands swapped, result negated); eq/ne take the CQ_CMP_EQ kernels, the rest CQ_CMP_ULT/SLT.
+ * min/max: X(name, base flag, 1: the result is b when [a < b]). */
+#define CQ_ICMP_EQ_PREDS(X) X(eq, CQ_CMP_EQ, 0, 0) X(ne, CQ_CMP_EQ, 0, 1)
+#define CQ_ICMP_ORD_PREDS(X) \
+    X(ult, CQ_CMP_ULT, 0, 0) X(ugt, CQ_CMP_ULT, 1, 0) X(uge, CQ_CMP_ULT, 0, 1) X(ule, CQ_CMP_ULT, 1, 1) \
+    X(slt, CQ_CMP_SLT, 0, 0) X(sgt, CQ_CMP_SLT, 1, 0) X(sge, CQ_CMP_SLT, 0, 1) X(sle, CQ_CMP_SLT, 1, 1)
+#define CQ_ICMP_PREDS(X) CQ_ICMP_EQ_PREDS(X) CQ_ICMP_ORD_PREDS(X)
+#define CQ_MINMAX_OPS(X) X(smax, CQ_CMP_SLT, 1) X(smin, CQ_CMP_SLT, 0) X(umax, CQ_CMP_ULT, 1) X(umin, CQ_CMP_ULT, 0)
+#define CQ_KOP_ICMP_(p, base, swap, neg) CQ_KOP_ICMP_##p,
+#define CQ_KOP_MINMAX_(name, base, max) CQ_KOP_##name,
 
 /* One line per operation; its candidates are listed in registry.c. */
 enum {
@@ -71,6 +85,17 @@ enum {
     CQ_KOP_ASHR,
     CQ_KOP_FSHL,
     CQ_KOP_FSHR,
+    CQ_DIV_OPS(CQ_KOP_DIV_)       /* CQ_KOP_DIV_udiv, ... (kmgy.12) */
+    CQ_ICMP_PREDS(CQ_KOP_ICMP_)   /* CQ_KOP_ICMP_eq, ... (kmgy.14) */
+    CQ_KOP_SELECT,                /* (c, a1, a2): c is i1, the arms W */
+    CQ_MINMAX_OPS(CQ_KOP_MINMAX_) /* CQ_KOP_smax, ... */
+    CQ_KOP_ABS,
+    CQ_KOP_CTPOP,    /* bit counting (kmgy.16) */
+    CQ_KOP_CTLZ,
+    CQ_KOP_CTTZ,
+    CQ_KOP_MUL,      /* multiply (kmgy.11) */
+    CQ_KOP_UMUL_OVERFLOW,
+    CQ_KOP_SMUL_OVERFLOW,
     CQ_KOP_COUNT
 };
 extern const cq_kernel_op cq_kernel_ops[CQ_KOP_COUNT];
@@ -106,6 +131,13 @@ void cq_k_xor(int32_t o, const int32_t *args, uint32_t w);
     void cq_k_fshr_##cand(int32_t o, const int32_t *args, uint32_t w);
 CQ_K_SHIFT_DECL_(barrel)       /* shift.c */
 CQ_K_SHIFT_DECL_(barrel_fan)
+CQ_K_SHIFT_DECL_(barrel_fold)
+#define CQ_K_DIV_DECL_(name) \
+    void cq_k_##name##_ripple(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_lookahead(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_r4(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_r8(int32_t o, const int32_t *args, uint32_t w);
+CQ_DIV_OPS(CQ_K_DIV_DECL_)    /* div.c */
 
 /* ---- The adder (kmgy.10), for every integer circuit built on addition (mul, div, compare,
  * bit counting, the angle ladder).
@@ -147,5 +179,100 @@ enum { CQ_ADD_SUM = 1, CQ_ADD_COUT = 2 };
  * valid until cq_tape_undo. */
 cq_sum cq_adder(int kind, cq_tape *t, const cq_bit *a, const cq_bit *b, int nb, const cq_bit *cin, uint32_t n, int want);
 int    cq_adder_kind(uint32_t n);                  /* the adder add ships at width n (generated table) */
+
+/* ---- Bit counting (kmgy.16, src/kernels/count.c), for the ctpop/ctlz/cttz templates and any circuit
+ * that needs a count (a normalisation step: leading zeros).
+ * x: n >= 1 bit pointers, classical or quantum, read only; x[n-1] is the top bit. Any view is free:
+ * reversed (trailing zeros = cq_clz of the reversed pointers), strided, constants mixed in.
+ * Records onto t and sets r[0 .. m-1] to the count's bits, low first, m = cq_count_width(n) (the bit
+ * length of n, so n fits). The r bits are read only (some may be x bits or constants), valid until
+ * cq_tape_undo. All-classical x takes no qubit and emits no gate.
+ *   cq_popcount: the number of set bits. kind CQ_POPCOUNT_LINEAR (one adder per bit) or _CSA
+ *                (carry-save tree, one final adder).
+ *   cq_clz:      the number of zero bits above the highest set one, n when all are zero.
+ *                kind CQ_CLZ_THERMO (prefix AND, XOR trees) or _TREE (priority-encoder tree).
+ * The kinds are in the order the registry lists ctpop's and ctlz's candidates. */
+enum { CQ_POPCOUNT_LINEAR, CQ_POPCOUNT_CSA };
+enum { CQ_CLZ_THERMO, CQ_CLZ_TREE };
+uint32_t cq_count_width(uint32_t n);
+void cq_popcount(int kind, cq_tape *t, const cq_bit *const *x, uint32_t n, const cq_bit **r);
+void cq_clz(int kind, cq_tape *t, const cq_bit *const *x, uint32_t n, const cq_bit **r);
+void cq_k_ctpop_linear(int32_t o, const int32_t *args, uint32_t w);
+void cq_k_ctpop_csa   (int32_t o, const int32_t *args, uint32_t w);
+void cq_k_ctlz_thermo (int32_t o, const int32_t *args, uint32_t w);
+void cq_k_ctlz_tree   (int32_t o, const int32_t *args, uint32_t w);
+void cq_k_cttz_thermo (int32_t o, const int32_t *args, uint32_t w);
+void cq_k_cttz_tree   (int32_t o, const int32_t *args, uint32_t w);
+
+/* ---- Compare and select (kmgy.14, src/kernels/cmp.c), for the icmp/select/min/max/abs templates and
+ * any circuit that needs a flag or a merge (the tape INPUT rows, the quantum-address bus, the divider).
+ * a, b, a1, a2: n >= 1 bits each, read only, classical or quantum (a literal folds), may alias.
+ * f, o: the target. rec = 0: its gates are emitted plainly (o of a kernel, kept after cq_tape_undo);
+ * rec = 1: they are recorded on t too (f from cq_tape_bits, cleared again by cq_tape_undo).
+ * Scratch is recorded on t either way: undo t after use. All-classical: no qubit, no gate.
+ *   cq_cmp:    f ^= [a pred b], pred CQ_CMP_EQ (a == b), CQ_CMP_ULT (a <u b), CQ_CMP_SLT (a <s b).
+ *              The other predicates: swap a and b, or cq_x(f) (ne, uge, ule, sge, sle).
+ *              kind: for EQ CQ_CMP_CHAIN or _TREE (AND of the XNORs); for ULT, SLT CQ_CMP_RIPPLE,
+ *              _LOOKAHEAD (the carry out of a + ~b + 1) or _TREE (log-depth comparator).
+ *   cq_select: o[i] ^= c ? a1[i] : a2[i] on n bits; c one bit. kind CQ_SEL_*.
+ * cq_cmp_kind / cq_select_kind: the candidate icmp_eq/ult/slt and select ship at width n. */
+enum { CQ_CMP_EQ, CQ_CMP_ULT, CQ_CMP_SLT };
+enum { CQ_CMP_CHAIN = 0, CQ_CMP_RIPPLE = 0, CQ_CMP_LOOKAHEAD = 1, CQ_CMP_TREE = 2 };
+enum { CQ_SEL_CCX2, CQ_SEL_CCX2_FANOUT, CQ_SEL_DIFF, CQ_SEL_DIFF_FANOUT };   /* registry order */
+void cq_cmp(int kind, cq_tape *t, int pred, const cq_bit *a, const cq_bit *b, uint32_t n, cq_bit *f, int rec);
+void cq_select(int kind, cq_tape *t, const cq_bit *c, const cq_bit *a1, const cq_bit *a2, cq_bit *o, uint32_t n, int rec);
+int  cq_cmp_kind(int pred, uint32_t n);
+int  cq_select_kind(uint32_t n);
+#define CQ_K_ICMP_EQ_DECL_(p, base, swap, neg) \
+    void cq_k_icmp_##p##_chain(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_icmp_##p##_tree(int32_t o, const int32_t *args, uint32_t w);
+#define CQ_K_ICMP_ORD_DECL_(p, base, swap, neg) \
+    void cq_k_icmp_##p##_ripple(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_icmp_##p##_lookahead(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_icmp_##p##_tree(int32_t o, const int32_t *args, uint32_t w);
+CQ_ICMP_EQ_PREDS(CQ_K_ICMP_EQ_DECL_)
+CQ_ICMP_ORD_PREDS(CQ_K_ICMP_ORD_DECL_)
+void cq_k_select_ccx2(int32_t o, const int32_t *args, uint32_t w);
+void cq_k_select_ccx2_fanout(int32_t o, const int32_t *args, uint32_t w);
+void cq_k_select_diff(int32_t o, const int32_t *args, uint32_t w);
+void cq_k_select_diff_fanout(int32_t o, const int32_t *args, uint32_t w);
+/* min/max: the flag by each compare kind, then the select DIFF or DIFF_FANOUT. */
+#define CQ_K_MINMAX_DECL_(name, base, max) \
+    void cq_k_##name##_ripple(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_ripple_fanout(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_lookahead(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_lookahead_fanout(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_tree(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_tree_fanout(int32_t o, const int32_t *args, uint32_t w);
+CQ_MINMAX_OPS(CQ_K_MINMAX_DECL_)
+/* abs: a ^ sign (sign fanned out or not), plus sign by the adder. */
+void cq_k_abs_ripple(int32_t o, const int32_t *args, uint32_t w);
+void cq_k_abs_ripple_fanout(int32_t o, const int32_t *args, uint32_t w);
+void cq_k_abs_lookahead(int32_t o, const int32_t *args, uint32_t w);
+void cq_k_abs_lookahead_fanout(int32_t o, const int32_t *args, uint32_t w);
+
+/* ---- The multiplier (kmgy.11, src/kernels/mul.c), for mul, {u,s}mul_overflow and the angle ladder
+ * (K from the significand times a window of 2^N/P: x = the 53 significand bits, y = the constant's
+ * bits as classical cq_bit_const values, lo/n = the bits kept).
+ * Records onto t bits lo .. lo+n-1 of the product x * y and sets out[0 .. n-1] to them (read only:
+ * some may be operand bits or constants; valid until cq_tape_undo). x: nx bits, y: ny bits, read
+ * only, classical or quantum, may alias. sgn = 0: unsigned; sgn = 1: both two's complement, and
+ * lo + n <= nx + ny. Columns below lo are formed too (their carries reach the window), none above.
+ * A classical factor bit folds: a 0 drops its partial products, a 1 makes them wires, so a constant
+ * operand costs about its popcount rows; all-classical takes no qubit and emits no gate.
+ * kind CQ_MUL_SHIFT_ADD (a cq_adder per row of y, depth ~ ny log) or CQ_MUL_TREE (fan-out, one CCX
+ * layer, Dadda tree, one cq_adder: depth ~ log(nx) + 3 log1.5(min(nx, ny)) + log(lo+n), up to
+ * ~5 nx ny scratch bits with two quantum operands: 2 10^5 at 200 x 200); registry order.
+ * cq_mul_kind: what mul ships at width w (the tree everywhere but i1). */
+enum { CQ_MUL_SHIFT_ADD, CQ_MUL_TREE };
+void cq_mul(int kind, cq_tape *t, const cq_bit *x, uint32_t nx, const cq_bit *y, uint32_t ny, int sgn,
+            uint32_t lo, uint32_t n, const cq_bit **out);
+int  cq_mul_kind(uint32_t w);
+#define CQ_K_MUL_DECL_(name) \
+    void cq_k_##name##_shift_add(int32_t o, const int32_t *args, uint32_t w); \
+    void cq_k_##name##_tree(int32_t o, const int32_t *args, uint32_t w);
+CQ_K_MUL_DECL_(mul)
+CQ_K_MUL_DECL_(umul_overflow)
+CQ_K_MUL_DECL_(smul_overflow)
 
 #endif

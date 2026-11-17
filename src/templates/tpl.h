@@ -25,7 +25,8 @@ static inline uint32_t cq_tpl_run(int op, uint32_t w, uint32_t o, const uint32_t
     int32_t h[4];
     for (int j = 0; j < kop->nargs; j++) {
         h[j] = (int32_t)args[j];
-        if (cq_rail_width(h[j]) != w) { fprintf(stderr, "cq_template_%s: operand %d is not i%u\n", kop->name, j, w); abort(); }
+        uint32_t aw = op == CQ_KOP_SELECT && !j ? 1 : w;   /* select's condition is i1 (kmgy.14) */
+        if (cq_rail_width(h[j]) != aw) { fprintf(stderr, "cq_template_%s: operand %d is not i%u\n", kop->name, j, aw); abort(); }
     }
     if (!o) o = (uint32_t)cq_rail_alloc(ow, NULL);
     else if (cq_rail_width((int32_t)o) != ow) { fprintf(stderr, "cq_template_%s: result is not i%u\n", kop->name, ow); abort(); }

@@ -89,7 +89,8 @@ the C prototype (a C caller passes 0 there): with r9 taken, C puts the limbs and
 argument on the stack exactly as LLVM 19 does, whatever compiler builds the library. The
 ternary shape macros (`CQ_TPL_TERN_PARAMS_`, `include/cq_template.h`) count r per operand, so this
 follows the width list and the shapes. Today it is exactly `cq_template_{fshl,fshr}_i200_qll`,
-`_lql` (third operand, r = 1 + 4) and `_llq_unc` (second operand, r = 1 + 4). Core, tape `_lit`,
+`_lql` (third operand, r = 1 + 4), `_llq_unc` (second operand, r = 1 + 4) and
+`cq_template_select_i200_ll` (second arm, r = 1 + 4; added by kmgy.14). Core, tape `_lit`,
 bus, rotations, the binary `_hl`/`_lh` shapes and every other ternary shape start a wide literal
 at r ≤ 4 and are unchanged. ABI:1050-1052 ("N/64 registers when all fit, else all on the stack
 with the remaining registers skipped") does not match LLVM 19.1.7 for r = 3 and r = 4, which

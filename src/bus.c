@@ -1,6 +1,6 @@
 /* The memory bus of BACKEND_ABI §1.10 with a classical address: the overlay, the bus handle
  * and every load/store/swap entry point. An address rail holding a qubit is the QRAM path,
- * issue kmgy.21, and aborts here. Types and conventions: include/cqrt.h. */
+ * src/qram.c. Types and conventions: include/cqrt.h. */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,7 +70,7 @@ void cq_cell_write(uint64_t a, const cq_bit b[8], int quantum) {
 }
 
 /* ---- One access at a classical address (the _hl gate lists of §1.10 Impl). */
-enum { LOAD, STORE, SWAP };
+enum { LOAD = CQ_BUS_LOAD, STORE = CQ_BUS_STORE, SWAP = CQ_BUS_SWAP };
 #define MAX_CELLS ((CQ_RAIL_MAX_WIDTH + 7) / 8)
 
 /* h is the loaded or swapped rail, or the value v of a store; w bits. c: a qubit control, or
@@ -128,8 +128,7 @@ static void bus_op(int op, int ctl, uint32_t c, uint32_t m, const uint32_t *ah, 
         const cq_bit *ab = rail(*ah, 64);
         a = 0;
         for (int i = 0; i < 64; i++) {
-            if (cq_bit_is_q(ab[i]))
-                die("bus: quantum address rail, the QRAM path of issue kmgy.21 is not implemented; handle", *ah);
+            if (cq_bit_is_q(ab[i])) { cq_qram_access(op, cb, ab, hb, w); return; }
             a |= (uint64_t)ab[i].kind << i;
         }
     }

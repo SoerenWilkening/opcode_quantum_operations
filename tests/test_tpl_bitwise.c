@@ -10,6 +10,7 @@
 #include "harness.h"
 #include "cq_template.h"
 #include "cq_replay.h"
+#include "kernels.h"
 
 static const hx_val zero;
 
@@ -120,6 +121,17 @@ static int32_t expand(const int32_t *a, int32_t *h, hx_val *v) {
     for (uint32_t i = 0; quantum && i < cur->w; i++) cq_get_qubit(&kb[i]);
     return h[n];
 }
+/* Every qubit in the pool's free list reads 0: the ancillae came back clean. */
+static void clean(void) {
+    uint32_t n = cq_pool_minted() - cq_pool_live(), *q = malloc((n + 1) * sizeof *q);
+    assert(q);
+    for (uint32_t i = 0; i < n; i++) { q[i] = cq_pool_take(); assert(!cq_replay_get_bit(q[i])); }
+    while (n) cq_pool_give(q[--n]);
+    free(q);
+}
+
+static int is_shift(const sym *s) { return strstr(s->name, "sh") != NULL; }   /* shl lshr ashr fshl fshr */
+
 /* Forward into a fresh r, r into o, _unc r: r must measure 0. */
 static void fwd_op(int32_t o, const int32_t *a, uint32_t w) {
     int32_t h[3]; hx_val v[3];
@@ -132,6 +144,7 @@ static void fwd_op(int32_t o, const int32_t *a, uint32_t w) {
     assert(hx_eq(hx_from_rail(r), zero));
     cq_rail_free(r);
     if (tmp) cq_rail_free(tmp);   /* not measured: m returns a 1 qubit to the pool as it is */
+    if (is_shift(cur)) clean();   /* only shifts take ancillae */
 }
 static void unc_op(int32_t o, const int32_t *a, uint32_t w) {
     (void)w;
@@ -151,7 +164,6 @@ static void check(const sym *s) {
     const hx_op op = { s->name, s->nargs - fixed, 0, fwd_op, unc_op, ref_op };
     assert(hx_run(&op, s->w, 0, NULL) == HX_OK);
 }
-static int is_shift(const sym *s) { return strstr(s->name, "sh") != NULL; }   /* shl lshr ashr fshl fshr */
 
 /* ---- Cost of the literal shapes, forced-quantum value, literal from v: the gates of one forward. */
 static void cost_lit(const sym *s, hx_val lit, int lit_slot, uint32_t max_depth) {
@@ -177,6 +189,34 @@ static void cost_lit(const sym *s, hx_val lit, int lit_slot, uint32_t max_depth)
     cq_rail_free((int32_t)r);
     for (int j = 0; j < s->nargs; j++) if (h[j]) cq_rail_free(h[j]);
     assert(cq_pool_live() == base);
+}
+
+/* kmgy.32: the two k mod W reductions agree. One harness op runs both candidates onto o, so o ^=
+ * f_old ^ f_new must leave o as it was. */
+static const cq_kernel *cand_old, *cand_new;
+static void both_op(int32_t o, const int32_t *a, uint32_t w) {
+    cand_old->emit(o, a, w);
+    cand_new->emit(o, a, w); clean();
+}
+static hx_val zero_ref(const hx_val *a, uint32_t w) { (void)a; (void)w; return zero; }
+static const cq_kernel *cand(int op, const char *name) {
+    for (int c = 0; c < cq_kernel_ops[op].ncand; c++)
+        if (!strcmp(cq_kernel_ops[op].cand[c].name, name)) return &cq_kernel_ops[op].cand[c];
+    abort();
+}
+static void check_reductions(void) {
+    for (int op = CQ_KOP_SHL; op <= CQ_KOP_FSHR; op++) {
+        cand_old = cand(op, "barrel_fanout");
+        cand_new = cand(op, "barrel_fanout_fold");
+        const hx_op h = { cq_kernel_ops[op].name, cq_kernel_ops[op].nargs, 0, both_op, both_op, zero_ref };
+        for (uint32_t i = 0; i < cq_kernel_nwidths; i++) {
+            uint32_t w = cq_kernel_widths[i];
+            if (!(w & (w - 1))) continue;
+            hx_max_samples = w <= 32 ? 16 : 4;
+            assert(hx_run(&h, w, 0, NULL) == HX_OK);
+        }
+    }
+    printf("barrel_fanout and barrel_fanout_fold agree at every width that is no power of two\n");
 }
 
 /* The link check: every generated name, forward and _unc. */
@@ -218,6 +258,7 @@ int main(int argc, char **argv) {
         }
         printf("%s[_unc]: ok\n", s->name);
     }
+    check_reductions();   /* last: its wide circuits mint many qubits, and clean() scans them all */
     printf("%zu template symbols linked and checked\n", sizeof linked / sizeof *linked);
     return 0;
 }

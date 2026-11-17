@@ -70,23 +70,24 @@ def lit(name, W, val):   # a value of type iW from a volatile global, junk above
     k=len(decl); D(f'@k{k}_{name} = global i256 {val | (random.getrandbits(256) & ~((1<<W)-1))}')
     a=t(); body.append(f'  {a} = load volatile i256, ptr @k{k}_{name}')
     b=t(); body.append(f'  {b} = trunc i256 {a} to i{W}'); return b
-def tpl(op, W, sfx, shape, ref):
-    name=f'cq_template_{op}_i{W}{sfx}'; ty=f'i{W}'
-    vals=[random.getrandbits(W) for _ in shape]
+def tpl(op, W, sfx, shape, ref, rw=None):   # shape letter c: an i1 handle (select's condition); rw: result width
+    name=f'cq_template_{op}_i{W}{sfx}'; ty=f'i{W}'; rw=rw or W; rty=f'i{rw}'
+    ws=[1 if s=='c' else W for s in shape]
+    vals=[random.getrandbits(w) for w in ws]
     args=[]
-    for s,v in zip(shape,vals):
-        x=lit(name, W, v)
-        if s=='q': h=t(); body.append(f'  {h} = call i32 @cqrt_alloc_{ty}({ty} {x})'); args.append(f'i32 {h}')
+    for s,v,w in zip(shape,vals,ws):
+        x=lit(name, w, v)
+        if s in 'qc': h=t(); body.append(f'  {h} = call i32 @cqrt_alloc_i{w}(i{w} {x})'); args.append(f'i32 {h}')
         else: args.append(f'{ty} {x}')
-    ps=', '.join('i32' if s=='q' else ty for s in shape)
+    ps=', '.join('i32' if s in 'qc' else ty for s in shape)
     D(f'declare i32 @{name}({ps})'); D(f'declare void @{name}_unc(i32, {ps})')
-    want=ref(W, *vals) & ((1<<W)-1)
+    want=ref(W, *vals) & ((1<<rw)-1)
     r=t(); body.append(f'  {r} = call i32 @{name}({", ".join(args)})')
-    o=t(); body.append(f'  {o} = call i32 @cqrt_alloc_{ty}({ty} 0)')
+    o=t(); body.append(f'  {o} = call i32 @cqrt_alloc_{rty}({rty} 0)')
     body.append(f'  call void @{name}_unc(i32 {o}, {", ".join(args)})')
     for h,what in ((r,name),(o,name+'_unc')):
-        m=t(); body.append(f'  {m} = call {ty} @cqrt_measure_{ty}(i32 {h})')
-        ok=t(); body.append(f'  {ok} = icmp eq {ty} {m}, {want}'); check(f'i{W}: {what} value', ok)
+        m=t(); body.append(f'  {m} = call {ext.get(rw,"")}{rty} @cqrt_measure_{rty}(i32 {h})')
+        ok=t(); body.append(f'  {ok} = icmp eq {rty} {m}, {want}'); check(f'i{W}: {what} value', ok)
 def fshl(W,a,b,k): k%=W; return a if not k else a<<k | b>>(W-k)
 def fshr(W,a,b,k): k%=W; return b if not k else a<<(W-k) | b>>k
 shapes=[('_qql','qql'),('_qlq','qlq'),('_qll','qll'),('_lqq','lqq'),('_lql','lql'),('_llq','llq')]
@@ -96,6 +97,13 @@ for W in [w for w in ints if w>128]+[128,100,17]:
     for op,ref in (('fshl',fshl),('fshr',fshr)):
         for sfx,sh in shapes: tpl(op, W, sfx, sh, ref)
     for op,sfx,sh,ref in bins: tpl(op, W, sfx, sh, ref)
+    # kmgy.14: select in every shape (_ll at i200: arm2 after r9 is left unused), compares (i1 result), min/max, abs.
+    for sfx,sh in (('','cqq'),('_hl','cql'),('_lh','clq'),('_ll','cll')): tpl('select', W, sfx, sh, lambda W,c,a,b: a if c else b)
+    sg=lambda W,x: x-(1<<W) if x>>(W-1) else x
+    tpl('icmp_slt', W, '_hl', 'ql', lambda W,a,b: int(sg(W,a)<sg(W,b)), 1)
+    tpl('icmp_eq', W, '_hl', 'ql', lambda W,a,b: int(a==b), 1)
+    tpl('smax', W, '_hl', 'ql', lambda W,a,b: max(sg(W,a),sg(W,b)))
+    tpl('abs', W, '', 'q', lambda W,a: abs(sg(W,a)))
 # Tape: a wide literal field echoed back by a host callee of the driver (tape family control).
 for W in [w for w in ints if w>128]:
     ty=f'i{W}'; v=random.getrandbits(W); i=len(strs); nm=f'cq_ir_echo_{ty}'

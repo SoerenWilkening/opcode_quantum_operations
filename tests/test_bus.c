@@ -1,14 +1,11 @@
 /* Memory bus §1.10 with a classical address (kmgy.19): every load/store/swap form at every
  * width, against a host byte array and a plain C model of memory + overlay; the no-fault cases;
- * the link check. Always asserts. */
+ * the link check. A quantum address rail: tests/test_qram.c. Always asserts. */
 #undef NDEBUG
 #include <assert.h>
-#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <sys/wait.h>
-#include <unistd.h>
 #include "harness.h"
 #include "cqrt.h"
 #include "cq_bus.h"
@@ -329,30 +326,6 @@ static void no_fault(uint8_t *ro) {
     cqrt_free(h); cqrt_free(r);
 }
 
-/* A quantum address rail aborts and names kmgy.21. */
-static void quantum_address_aborts(void) {
-    int fd[2];
-    assert(pipe(fd) == 0);
-    fflush(NULL);
-    pid_t pid = fork();
-    assert(pid >= 0);
-    if (pid == 0) {
-        dup2(fd[1], 2);
-        uint32_t r = prep((hx_val){ { 0x1000 } }, 64, 1);
-        cqrt_qram_load_i8(M, r);
-        _exit(0);
-    }
-    close(fd[1]);
-    char out[4096] = { 0 };
-    size_t n = 0;
-    ssize_t k;
-    while (n < sizeof out - 1 && (k = read(fd[0], out + n, sizeof out - 1 - n)) > 0) n += (size_t)k;
-    close(fd[0]);
-    int st;
-    assert(waitpid(pid, &st, 0) == pid && WIFSIGNALED(st) && WTERMSIG(st) == SIGABRT);
-    assert(strstr(out, "kmgy.21"));
-}
-
 int main(void) {
     M = cqrt_qram_alloc_i8(0);
     assert(M && cqrt_qram_alloc_i8(0) == M);
@@ -366,7 +339,6 @@ int main(void) {
 
     byte_order();
     controls(ro);
-    quantum_address_aborts();
     for (unsigned i = 0; i < NT; i++) harness_loads(&T[i]);
     printf("load: the 4 _hl forms x %u widths through the harness, both modes: ok\n", (unsigned)NT);
     cq_replay_reset();   /* the harness measured: free pool qubits may hold 1 (kmgy.31); no cell holds a qubit yet */

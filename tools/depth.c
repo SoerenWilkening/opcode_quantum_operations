@@ -76,10 +76,112 @@ static hx_val ashr_ref(const hx_val *a, uint32_t w) { return funnel_ref(bit(&a[0
 static hx_val fshl_ref(const hx_val *a, uint32_t w) { return funnel_ref(a[0], a[1], &a[2], w, 1); }
 static hx_val fshr_ref(const hx_val *a, uint32_t w) { return funnel_ref(a[0], a[1], &a[2], w, 0); }
 
+/* kmgy.12: CR §2's rows. Bit-serial long division of magnitudes; -x = ~x + 1. */
+static hx_val neg_(hx_val x, uint32_t w) {
+    x = hx_xor(x, hx_ones(w));
+    for (uint32_t k = 0; k < CQ_LIMBS && !++x.l[k]; k++) {}
+    return hx_mask(x, w);
+}
+static hx_val divrem_ref(const hx_val *a, uint32_t w, int sgn, int rem) {
+    int na = sgn && bit(&a[0], w - 1), nb = sgn && bit(&a[1], w - 1);
+    hx_val x = na ? neg_(a[0], w) : a[0], y = nb ? neg_(a[1], w) : a[1], q = { { 0 } }, r = { { 0 } };
+    if (hx_eq(y, zero_)) q = hx_ones(w), r = x;                       /* b = 0: 2^W - 1 and a (magnitudes) */
+    else for (uint32_t i = w; i--;) {                                  /* r < y < 2^w, so 2r + 1 < 2^(w+1) fits */
+        for (uint32_t k = CQ_LIMBS; k--;) r.l[k] = r.l[k] << 1 | (k ? r.l[k - 1] >> 63 : 0);
+        r.l[0] |= (uint64_t)bit(&x, i);
+        int ge = 1;
+        for (uint32_t k = CQ_LIMBS; k--;) if (r.l[k] != y.l[k]) { ge = r.l[k] > y.l[k]; break; }
+        if (ge) { hx_val ny = neg_(y, w + 1); unsigned c = 0;
+            for (uint32_t k = 0; k < CQ_LIMBS; k++) { unsigned __int128 s = (unsigned __int128)r.l[k] + ny.l[k] + c; r.l[k] = (uint64_t)s; c = (unsigned)(s >> 64); }
+            r = hx_mask(r, w); q.l[i / 64] |= 1ull << (i % 64); }
+    }
+    return rem ? (na ? neg_(r, w) : r) : (na != nb ? neg_(q, w) : q);   /* INT_MIN / -1: 2^(W-1), unnegated */
+}
+static hx_val udiv_ref(const hx_val *a, uint32_t w) { return divrem_ref(a, w, 0, 0); }
+static hx_val urem_ref(const hx_val *a, uint32_t w) { return divrem_ref(a, w, 0, 1); }
+static hx_val sdiv_ref(const hx_val *a, uint32_t w) { return divrem_ref(a, w, 1, 0); }
+static hx_val srem_ref(const hx_val *a, uint32_t w) { return divrem_ref(a, w, 1, 1); }
+
+/* kmgy.16: bit counts; ctlz(0) = cttz(0) = W (CR §2). */
+static hx_val ctpop_ref(const hx_val *a, uint32_t w) { uint64_t c = 0; for (uint32_t i = 0; i < w; i++) c += (uint64_t)bit(a, i); return (hx_val){ { c } }; }
+static hx_val ctlz_ref(const hx_val *a, uint32_t w) { uint64_t c = 0; while (c < w && !bit(a, w - 1 - (uint32_t)c)) c++; return (hx_val){ { c } }; }
+static hx_val cttz_ref(const hx_val *a, uint32_t w) { uint64_t c = 0; while (c < w && !bit(a, (uint32_t)c)) c++; return (hx_val){ { c } }; }
+
+/* kmgy.11: the exact 2W-bit product of the magnitudes (schoolbook on limbs); signed overflow by
+ * the magnitude against 2^(W-1). */
+static void mag_mul(const hx_val *a, uint32_t w, int sgn, uint64_t p[8], int *neg) {
+    hx_val x[2];
+    *neg = 0;
+    for (int j = 0; j < 2; j++) {
+        int s = sgn && bit(&a[j], w - 1);
+        x[j] = s ? hx_mask(hx_xor(a[j], hx_ones(w)), w) : a[j];
+        for (uint32_t k = 0; s && k < CQ_LIMBS && !++x[j].l[k]; k++) {}
+        x[j] = hx_mask(x[j], w);
+        *neg ^= s;
+    }
+    memset(p, 0, 8 * sizeof *p);
+    for (uint32_t i = 0; i < CQ_LIMBS; i++) {
+        unsigned __int128 c = 0;
+        for (uint32_t j = 0; j < CQ_LIMBS; j++) { c += (unsigned __int128)x[0].l[i] * x[1].l[j] + p[i + j]; p[i + j] = (uint64_t)c; c >>= 64; }
+        p[i + CQ_LIMBS] = (uint64_t)c;
+    }
+}
+static int pbit(const uint64_t *p, uint32_t i) { return (int)(p[i / 64] >> (i % 64) & 1); }
+static hx_val mul_ref(const hx_val *a, uint32_t w) {
+    uint64_t p[8]; int neg;
+    mag_mul(a, w, 0, p, &neg);
+    hx_val r; memcpy(r.l, p, sizeof r.l);
+    return r;
+}
+static hx_val umul_overflow_ref(const hx_val *a, uint32_t w) {
+    uint64_t p[8]; int neg, o = 0;
+    mag_mul(a, w, 0, p, &neg);
+    for (uint32_t i = w; i < 2 * w; i++) o |= pbit(p, i);
+    return (hx_val){ { (uint64_t)o } };
+}
+static hx_val smul_overflow_ref(const hx_val *a, uint32_t w) {
+    uint64_t p[8]; int neg, hi = 0, lo = 0;
+    mag_mul(a, w, 1, p, &neg);
+    for (uint32_t i = w; i < 2 * w; i++) hi |= pbit(p, i);
+    for (uint32_t i = 0; i + 1 < w; i++) lo |= pbit(p, i);
+    int ge = hi || pbit(p, w - 1), gt = hi || (pbit(p, w - 1) && lo);   /* |p| >= 2^(W-1), |p| > 2^(W-1) */
+    return (hx_val){ { (uint64_t)(neg ? gt : ge) } };
+}
+
+/* kmgy.14: compares on limbs from the top; signed by biasing the sign bit. */
+static int lt_ref(const hx_val *a, uint32_t w, int sgn) {
+    hx_val x = a[0], y = a[1];
+    if (sgn) { x.l[(w - 1) / 64] ^= 1ull << ((w - 1) % 64); y.l[(w - 1) / 64] ^= 1ull << ((w - 1) % 64); }
+    for (uint32_t k = CQ_LIMBS; k--;) if (x.l[k] != y.l[k]) return x.l[k] < y.l[k];
+    return 0;
+}
+#define ICMP_REF_(p, base, swap, neg) static hx_val icmp_##p##_ref(const hx_val *a, uint32_t w) { \
+    const hx_val v[2] = { a[swap], a[!swap] }; \
+    return (hx_val){ { (uint64_t)((base == CQ_CMP_EQ ? hx_eq(v[0], v[1]) : lt_ref(v, w, base == CQ_CMP_SLT)) ^ neg) } }; }
+CQ_ICMP_PREDS(ICMP_REF_)
+static hx_val select_ref(const hx_val *a, uint32_t w) { (void)w; return a[0].l[0] & 1 ? a[1] : a[2]; }
+#define MINMAX_REF_(name, base, max) static hx_val name##_ref(const hx_val *a, uint32_t w) { \
+    return a[lt_ref(a, w, base == CQ_CMP_SLT) == max]; }
+CQ_MINMAX_OPS(MINMAX_REF_)
+static hx_val abs_ref(const hx_val *a, uint32_t w) {
+    if (!bit(a, w - 1)) return a[0];
+    hx_val r = hx_xor(a[0], hx_ones(w));
+    for (uint32_t k = 0; k < CQ_LIMBS && !++r.l[k]; k++) {}
+    return r;
+}
+
 static const hx_ref_fn ref_of[CQ_KOP_COUNT] = {
+#define ICMP_REF_OF_(p, base, swap, neg) [CQ_KOP_ICMP_##p] = icmp_##p##_ref,
+    CQ_ICMP_PREDS(ICMP_REF_OF_)
+    [CQ_KOP_SELECT] = select_ref, [CQ_KOP_ABS] = abs_ref,
+#define MINMAX_REF_OF_(name, base, max) [CQ_KOP_##name] = name##_ref,
+    CQ_MINMAX_OPS(MINMAX_REF_OF_)
+    [CQ_KOP_MUL] = mul_ref, [CQ_KOP_UMUL_OVERFLOW] = umul_overflow_ref, [CQ_KOP_SMUL_OVERFLOW] = smul_overflow_ref,
+    [CQ_KOP_CTPOP] = ctpop_ref, [CQ_KOP_CTLZ] = ctlz_ref, [CQ_KOP_CTTZ] = cttz_ref,
     [CQ_KOP_AND] = and_ref, [CQ_KOP_OR] = or_ref, [CQ_KOP_XOR] = xor_ref,
     [CQ_KOP_SHL] = shl_ref, [CQ_KOP_LSHR] = lshr_ref, [CQ_KOP_ASHR] = ashr_ref,
     [CQ_KOP_FSHL] = fshl_ref, [CQ_KOP_FSHR] = fshr_ref,
+    [CQ_KOP_DIV_udiv] = udiv_ref, [CQ_KOP_DIV_urem] = urem_ref, [CQ_KOP_DIV_sdiv] = sdiv_ref, [CQ_KOP_DIV_srem] = srem_ref,
 #define ARITH_REF_OF_(name, comm, ow) [CQ_KOP_ARITH_##name] = name##_ref,
     CQ_ARITH_OPS(ARITH_REF_OF_)
     [CQ_KOP_PARITY] = parity_ref,
@@ -126,7 +228,9 @@ int depth_measure(const cq_kernel_op *op, hx_ref_fn ref, depth_cell cell[][CQ_NW
                 hx_max_samples = 0;
             } else {
                 hx_max_samples = op->samples;
-                d->ok = hx_run(&h, cq_kernel_widths[wi], HX_NOABORT, &d->st) == HX_OK;
+                const uint32_t cond[HX_MAX_ARGS] = { 1 };   /* select's condition is i1 (kmgy.14) */
+                d->ok = hx_run_w(&h, cq_kernel_widths[wi], op == &cq_kernel_ops[CQ_KOP_SELECT] ? cond : NULL,
+                                 HX_NOABORT, &d->st) == HX_OK;
                 hx_max_samples = 0;
             }
             if (d->ok && (best < 0 || better(&d->st, &cell[best][wi].st))) best = c;

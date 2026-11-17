@@ -127,4 +127,51 @@ CQ_WIDTHS_WIDE(CQ_TPL_ARITH_DECL_WIDE_)
 CQ_WIDTHS_NARROW(CQ_TPL_BITSH_DECL_NARROW_)
 CQ_WIDTHS_WIDE(CQ_TPL_BITSH_DECL_WIDE_)
 
+/* §2.8 bit counting (kmgy.16) at every width, one operand, bare and _unc: ctpop, ctlz, cttz. The result
+ * has width W; ctlz(0) = cttz(0) = W (CR §2), no is_zero_poison argument. */
+#define CQ_TPL_COUNT_DECL_(n, bits) CQ_TPL_UNARY_DECL_(ctpop, n) CQ_TPL_UNARY_DECL_(ctlz, n) CQ_TPL_UNARY_DECL_(cttz, n)
+CQ_WIDTHS(CQ_TPL_COUNT_DECL_)
+
+/* §2.2 udiv, urem, sdiv, srem (kmgy.12): bare, _hl, _lh (none commutes), totalized by CR §2:
+ * udiv(a, 0) = 2^W - 1, urem(a, 0) = a, sdiv(a, 0) = -1 if a >= 0 else +1, srem(a, 0) = a,
+ * sdiv(INT_MIN, -1) = INT_MIN, srem(INT_MIN, -1) = 0. Literals as for add. */
+#define CQ_TPL_DIV_DECL_(op, n, bits, LIT) CQ_TPL_BIN_DECL_(op, n, bits, LIT) CQ_TPL_LH_DECL_(op, n, bits, LIT)
+#define CQ_TPL_DIVS_DECL_(n, bits, LIT) CQ_TPL_DIV_DECL_(udiv, n, bits, LIT) CQ_TPL_DIV_DECL_(urem, n, bits, LIT) \
+    CQ_TPL_DIV_DECL_(sdiv, n, bits, LIT) CQ_TPL_DIV_DECL_(srem, n, bits, LIT)
+#define CQ_TPL_DIVS_DECL_NARROW_(n, bits) CQ_TPL_DIVS_DECL_(n, bits, CQ_TPL_LIT_NARROW_)
+#define CQ_TPL_DIVS_DECL_WIDE_(n, bits) CQ_TPL_DIVS_DECL_(n, bits, CQ_TPL_LIT_WIDE_)
+CQ_WIDTHS_NARROW(CQ_TPL_DIVS_DECL_NARROW_)
+CQ_WIDTHS_WIDE(CQ_TPL_DIVS_DECL_WIDE_)
+
+/* §2.2 mul (o = a * b mod 2^W) and §2.7 umul_overflow, smul_overflow (result i1: the product does
+ * not fit in W bits, unsigned or signed) (kmgy.11): bare and _hl, all commutative. Literals as for add. */
+#define CQ_TPL_MUL_DECL_(n, bits, LIT) CQ_TPL_BIN_DECL_(mul, n, bits, LIT) \
+    CQ_TPL_BIN_DECL_(umul_overflow, n, bits, LIT) CQ_TPL_BIN_DECL_(smul_overflow, n, bits, LIT)
+#define CQ_TPL_MUL_DECL_NARROW_(n, bits) CQ_TPL_MUL_DECL_(n, bits, CQ_TPL_LIT_NARROW_)
+#define CQ_TPL_MUL_DECL_WIDE_(n, bits) CQ_TPL_MUL_DECL_(n, bits, CQ_TPL_LIT_WIDE_)
+CQ_WIDTHS_NARROW(CQ_TPL_MUL_DECL_NARROW_)
+CQ_WIDTHS_WIDE(CQ_TPL_MUL_DECL_WIDE_)
+
+/* §2.4 icmp_<pred> (result i1) for pred eq ne ugt uge ult ule sgt sge slt sle, bare and _hl (a compare
+ * never takes _lh: the predicate is flipped). §2.7 smax smin umax umin, bare and _hl (commutative);
+ * abs, unary, abs(INT_MIN) = INT_MIN, no poison argument (kmgy.14). Literals as for add.
+ * §2.5 select (c, arm1, arm2): o = c ? arm1 : arm2, c an i1 handle, the shape letters name the arms:
+ * bare, _hl (arm2 a literal), _lh (arm1), _ll (both). Wide literal limbs are named b0..b3 (arm1) and
+ * k0..k3 (arm2); select_i200_ll has the unused uint64_t k_r9 before arm2 (see fshl above). */
+#define CQ_TPL_CMP_DECL_(n, bits, LIT, NLIT) \
+    CQ_TPL_BIN_DECL_(icmp_eq, n, bits, LIT) CQ_TPL_BIN_DECL_(icmp_ne, n, bits, LIT) \
+    CQ_TPL_BIN_DECL_(icmp_ugt, n, bits, LIT) CQ_TPL_BIN_DECL_(icmp_uge, n, bits, LIT) \
+    CQ_TPL_BIN_DECL_(icmp_ult, n, bits, LIT) CQ_TPL_BIN_DECL_(icmp_ule, n, bits, LIT) \
+    CQ_TPL_BIN_DECL_(icmp_sgt, n, bits, LIT) CQ_TPL_BIN_DECL_(icmp_sge, n, bits, LIT) \
+    CQ_TPL_BIN_DECL_(icmp_slt, n, bits, LIT) CQ_TPL_BIN_DECL_(icmp_sle, n, bits, LIT) \
+    CQ_TPL_BIN_DECL_(smax, n, bits, LIT) CQ_TPL_BIN_DECL_(smin, n, bits, LIT) \
+    CQ_TPL_BIN_DECL_(umax, n, bits, LIT) CQ_TPL_BIN_DECL_(umin, n, bits, LIT) \
+    CQ_TPL_UNARY_DECL_(abs, n) \
+    CQ_TPL_TERN_DECL_(select, n, bits, NLIT, q, q, q, ) CQ_TPL_TERN_DECL_(select, n, bits, NLIT, q, q, l, _hl) \
+    CQ_TPL_TERN_DECL_(select, n, bits, NLIT, q, l, q, _lh) CQ_TPL_TERN_DECL_(select, n, bits, NLIT, q, l, l, _ll)
+#define CQ_TPL_CMP_DECL_NARROW_(n, bits) CQ_TPL_CMP_DECL_(n, bits, CQ_TPL_LIT_NARROW_, CQ_TPL_NLIT_NARROW_)
+#define CQ_TPL_CMP_DECL_WIDE_(n, bits) CQ_TPL_CMP_DECL_(n, bits, CQ_TPL_LIT_WIDE_, CQ_TPL_NLIT_WIDE_)
+CQ_WIDTHS_NARROW(CQ_TPL_CMP_DECL_NARROW_)
+CQ_WIDTHS_WIDE(CQ_TPL_CMP_DECL_WIDE_)
+
 #endif

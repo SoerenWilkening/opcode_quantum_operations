@@ -182,3 +182,37 @@ add_executable(test_invert tests/test_invert.c)
 target_link_libraries(test_invert cq_templates cq_test_harness)
 set_target_properties(test_invert PROPERTIES ENABLE_EXPORTS ON)   # its effect callee is found by dlsym
 add_test(NAME invert COMMAND test_invert)
+
+# Bit counting ctpop, ctlz, cttz (kmgy.16): src/kernels/count.c in the runtime, src/templates/count.c.
+target_sources(cq_runtime PRIVATE src/kernels/count.c)
+target_sources(cq_templates PRIVATE src/templates/count.c)
+add_executable(test_tpl_count tests/test_tpl_count.c)
+target_link_libraries(test_tpl_count cq_templates cq_test_harness)
+add_test(NAME tpl_count COMMAND test_tpl_count)
+
+# Divide and remainder (kmgy.12): src/kernels/div.c in the runtime, src/templates/div.c in the templates.
+target_sources(cq_runtime PRIVATE src/kernels/div.c)
+target_sources(cq_templates PRIVATE src/templates/div.c)
+add_executable(test_tpl_div tests/test_tpl_div.c)
+target_link_libraries(test_tpl_div cq_templates cq_test_harness)
+add_test(NAME tpl_div COMMAND test_tpl_div)
+
+# Multiply (kmgy.11): the multiplier and its kernels in src/kernels/mul.c (runtime), src/templates/mul.c.
+target_sources(cq_runtime PRIVATE src/kernels/mul.c)
+target_sources(cq_templates PRIVATE src/templates/mul.c)
+add_executable(test_tpl_mul tests/test_tpl_mul.c)
+target_link_libraries(test_tpl_mul cq_templates cq_test_harness)
+add_test(NAME tpl_mul COMMAND test_tpl_mul)
+
+# Memory bus, quantum address (kmgy.21): the fan-out QRAM of docs/QRAM_CONSTRUCTION.md, src/qram.c.
+target_sources(cq_runtime PRIVATE src/qram.c)
+add_executable(test_qram tests/test_qram.c)
+target_link_libraries(test_qram cq_test_harness)
+add_test(NAME qram COMMAND test_qram)
+
+# Compare, select, min/max, abs (kmgy.14): src/kernels/cmp.c in the runtime, src/templates/cmp.c.
+target_sources(cq_runtime PRIVATE src/kernels/cmp.c)
+target_sources(cq_templates PRIVATE src/templates/cmp.c)
+add_executable(test_tpl_cmp tests/test_tpl_cmp.c)
+target_link_libraries(test_tpl_cmp cq_templates cq_test_harness)
+add_test(NAME tpl_cmp COMMAND test_tpl_cmp)

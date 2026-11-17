@@ -22,4 +22,10 @@ int  cq_cell_read(uint64_t a, cq_bit b[8]);
  * Otherwise the cell is QUANTUM holding the bits (qubits included) and no host byte is written. */
 void cq_cell_write(uint64_t a, const cq_bit b[8], int quantum);
 
+/* One access whose address rail (64 bits) holds a qubit: the QRAM of docs/QRAM_CONSTRUCTION.md
+ * (src/qram.c). c: a qubit control, or NULL for none. h: the loaded or swapped rail, or the value
+ * v of a store, w bits. A store takes its tape slot here. Aborts above CQ_MAX_QADDR_BITS qubits. */
+enum { CQ_BUS_LOAD, CQ_BUS_STORE, CQ_BUS_SWAP };
+void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint32_t w);
+
 #endif

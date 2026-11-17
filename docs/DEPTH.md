@@ -504,133 +504,876 @@ Sources:
 
 o ^= a << (k mod W), k a W-bit rail (ABI §2.3, CR §2).
 
-| width | barrel | barrel_fanout |
-|---|---|---|
-| i1 | **1 / 1 / 2** | 1 / 1 / 2 |
-| i6 | 78 / 206 / 61 | **60 / 256 / 86** |
-| i7 | 97 / 241 / 70 | **71 / 297 / 98** |
-| i8 | 56 / 110 / 35 | **21 / 172 / 66** |
-| i16 | 140 / 314 / 84 | **29 / 502 / 178** |
-| i17 | 354 / 1223 / 291 | **222 / 1517 / 438** |
-| i24 | 318 / 960 / 243 | **116 / 1366 / 446** |
-| i31 | 397 / 1217 / 304 | **111 / 1713 / 552** |
-| i32 | 336 / 818 / 197 | **37 / 1324 / 450** |
-| i48 | 670 / 2234 / 541 | **152 / 3246 / 1047** |
-| i64 | 788 / 2018 / 454 | **45 / 3290 / 1090** |
-| i80 | 1242 / 4432 / 1014 | **216 / 6466 / 2031** |
-| i100 | 1592 / 6640 / 1424 | **251 / 9146 / 2677** |
-| i128 | 1816 / 4802 / 1031 | **53 / 7864 / 2562** |
-| i200 | 3410 / 14328 / 3001 | **301 / 20152 / 5913** |
+| width | barrel | barrel_fanout | barrel_fanout_fold |
+|---|---|---|---|
+| i1 | **1 / 1 / 2** | 1 / 1 / 2 | 1 / 1 / 2 |
+| i6 | 78 / 206 / 61 | 60 / 256 / 86 | **50 / 340 / 126** |
+| i7 | 97 / 241 / 70 | 71 / 297 / 98 | **61 / 451 / 163** |
+| i8 | 56 / 110 / 35 | **21 / 172 / 66** | 21 / 172 / 66 |
+| i16 | 140 / 314 / 84 | **29 / 502 / 178** | 29 / 502 / 178 |
+| i17 | 354 / 1223 / 291 | 222 / 1517 / 438 | **106 / 6095 / 1898** |
+| i24 | 318 / 960 / 243 | 116 / 1366 / 446 | **86 / 2592 / 856** |
+| i31 | 397 / 1217 / 304 | 111 / 1713 / 552 | **105 / 3139 / 1013** |
+| i32 | 336 / 818 / 197 | **37 / 1324 / 450** | 37 / 1324 / 450 |
+| i48 | 670 / 2234 / 541 | 152 / 3246 / 1047 | **106 / 6908 / 2205** |
+| i64 | 788 / 2018 / 454 | **45 / 3290 / 1090** | 45 / 3290 / 1090 |
+| i80 | 1242 / 4432 / 1014 | 216 / 6466 / 2031 | **122 / 19798 / 6165** |
+| i100 | 1592 / 6640 / 1424 | 251 / 9146 / 2677 | **169 / 14316 / 4404** |
+| i128 | 1816 / 4802 / 1031 | **53 / 7864 / 2562** | 53 / 7864 / 2562 |
+| i200 | 3410 / 14328 / 3001 | 301 / 20152 / 5913 | **181 / 23712 / 7355** |
 
 Sources:
 
 - barrel: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit drives its muxes directly.
 - barrel_fanout: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit first copied to one bit per mux by a CX doubling tree (the standard fan-out, cf. Moore & Nilsson, arXiv:quant-ph/9808027), as is ashr's sign.
+- barrel_fanout_fold: As barrel_fanout, with another r = k mod W at a W that is no power of two (kmgy.32, ours): W = V 2^t, V odd, r keeps the low t bits of k and r >> t = (k >> t) mod V; a bit of weight 2^b moves to 2^(b mod P) (2^P = 1 mod V) or the 1-bits of 2^b mod V, a Wallace tree to two rows, the rows fold again while the bound shrinks, one lookahead add (cq_adder), then s - qV for every q at once (lookahead subtractions) and a one-hot select on the flags [s >= qV].
 
 ## lshr
 
 o ^= a >> (k mod W), logical (ABI §2.3, CR §2).
 
-| width | barrel | barrel_fanout |
-|---|---|---|
-| i1 | **1 / 1 / 2** | 1 / 1 / 2 |
-| i6 | 78 / 206 / 61 | **60 / 256 / 86** |
-| i7 | 97 / 241 / 70 | **71 / 297 / 98** |
-| i8 | 56 / 110 / 35 | **21 / 172 / 66** |
-| i16 | 140 / 314 / 84 | **29 / 502 / 178** |
-| i17 | 354 / 1223 / 291 | **222 / 1517 / 438** |
-| i24 | 318 / 960 / 243 | **116 / 1366 / 446** |
-| i31 | 397 / 1217 / 304 | **111 / 1713 / 552** |
-| i32 | 336 / 818 / 197 | **37 / 1324 / 450** |
-| i48 | 670 / 2234 / 541 | **152 / 3246 / 1047** |
-| i64 | 788 / 2018 / 454 | **45 / 3290 / 1090** |
-| i80 | 1242 / 4432 / 1014 | **216 / 6466 / 2031** |
-| i100 | 1592 / 6640 / 1424 | **251 / 9146 / 2677** |
-| i128 | 1816 / 4802 / 1031 | **53 / 7864 / 2562** |
-| i200 | 3410 / 14328 / 3001 | **301 / 20152 / 5913** |
+| width | barrel | barrel_fanout | barrel_fanout_fold |
+|---|---|---|---|
+| i1 | **1 / 1 / 2** | 1 / 1 / 2 | 1 / 1 / 2 |
+| i6 | 78 / 206 / 61 | 60 / 256 / 86 | **50 / 340 / 126** |
+| i7 | 97 / 241 / 70 | 71 / 297 / 98 | **61 / 451 / 163** |
+| i8 | 56 / 110 / 35 | **21 / 172 / 66** | 21 / 172 / 66 |
+| i16 | 140 / 314 / 84 | **29 / 502 / 178** | 29 / 502 / 178 |
+| i17 | 354 / 1223 / 291 | 222 / 1517 / 438 | **106 / 6095 / 1898** |
+| i24 | 318 / 960 / 243 | 116 / 1366 / 446 | **86 / 2592 / 856** |
+| i31 | 397 / 1217 / 304 | 111 / 1713 / 552 | **105 / 3139 / 1013** |
+| i32 | 336 / 818 / 197 | **37 / 1324 / 450** | 37 / 1324 / 450 |
+| i48 | 670 / 2234 / 541 | 152 / 3246 / 1047 | **106 / 6908 / 2205** |
+| i64 | 788 / 2018 / 454 | **45 / 3290 / 1090** | 45 / 3290 / 1090 |
+| i80 | 1242 / 4432 / 1014 | 216 / 6466 / 2031 | **122 / 19798 / 6165** |
+| i100 | 1592 / 6640 / 1424 | 251 / 9146 / 2677 | **169 / 14316 / 4404** |
+| i128 | 1816 / 4802 / 1031 | **53 / 7864 / 2562** | 53 / 7864 / 2562 |
+| i200 | 3410 / 14328 / 3001 | 301 / 20152 / 5913 | **181 / 23712 / 7355** |
 
 Sources:
 
 - barrel: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit drives its muxes directly.
 - barrel_fanout: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit first copied to one bit per mux by a CX doubling tree (the standard fan-out, cf. Moore & Nilsson, arXiv:quant-ph/9808027), as is ashr's sign.
+- barrel_fanout_fold: As barrel_fanout, with another r = k mod W at a W that is no power of two (kmgy.32, ours): W = V 2^t, V odd, r keeps the low t bits of k and r >> t = (k >> t) mod V; a bit of weight 2^b moves to 2^(b mod P) (2^P = 1 mod V) or the 1-bits of 2^b mod V, a Wallace tree to two rows, the rows fold again while the bound shrinks, one lookahead add (cq_adder), then s - qV for every q at once (lookahead subtractions) and a one-hot select on the flags [s >= qV].
 
 ## ashr
 
 o ^= a >> (k mod W), arithmetic (ABI §2.3, CR §2).
 
-| width | barrel | barrel_fanout |
-|---|---|---|
-| i1 | **1 / 1 / 2** | 3 / 3 / 3 |
-| i6 | 112 / 274 / 71 | **61 / 336 / 102** |
-| i7 | 129 / 311 / 80 | **71 / 381 / 115** |
-| i8 | 88 / 180 / 45 | **23 / 258 / 84** |
-| i16 | 232 / 540 / 118 | **31 / 760 / 228** |
-| i17 | 523 / 1643 / 358 | **223 / 1971 / 522** |
-| i24 | 550 / 1520 / 331 | **117 / 1974 / 558** |
-| i31 | 641 / 1851 / 402 | **111 / 2409 / 681** |
-| i32 | 580 / 1452 / 295 | **39 / 2022 / 580** |
-| i48 | 1230 / 3642 / 765 | **153 / 4750 / 1319** |
-| i64 | 1400 / 3660 / 712 | **47 / 5060 / 1412** |
-| i80 | 2346 / 7312 / 1478 | **217 / 9506 / 2575** |
-| i100 | 2904 / 10136 / 1984 | **251 / 12842 / 3337** |
-| i128 | 3292 / 8844 / 1673 | **55 / 12162 / 3332** |
-| i200 | 6434 / 22520 / 4321 | **301 / 28744 / 7433** |
+| width | barrel | barrel_fanout | barrel_fanout_fold |
+|---|---|---|---|
+| i1 | **1 / 1 / 2** | 3 / 3 / 3 | 3 / 3 / 3 |
+| i6 | 112 / 274 / 71 | 61 / 336 / 102 | **50 / 420 / 142** |
+| i7 | 129 / 311 / 80 | 71 / 381 / 115 | **61 / 535 / 180** |
+| i8 | 88 / 180 / 45 | **23 / 258 / 84** | 23 / 258 / 84 |
+| i16 | 232 / 540 / 118 | **31 / 760 / 228** | 31 / 760 / 228 |
+| i17 | 523 / 1643 / 358 | 223 / 1971 / 522 | **107 / 6549 / 1982** |
+| i24 | 550 / 1520 / 331 | 117 / 1974 / 558 | **86 / 3200 / 968** |
+| i31 | 641 / 1851 / 402 | 111 / 2409 / 681 | **105 / 3835 / 1142** |
+| i32 | 580 / 1452 / 295 | **39 / 2022 / 580** | 39 / 2022 / 580 |
+| i48 | 1230 / 3642 / 765 | 153 / 4750 / 1319 | **106 / 8412 / 2477** |
+| i64 | 1400 / 3660 / 712 | **47 / 5060 / 1412** | 47 / 5060 / 1412 |
+| i80 | 2346 / 7312 / 1478 | 217 / 9506 / 2575 | **123 / 22838 / 6709** |
+| i100 | 2904 / 10136 / 1984 | 251 / 12842 / 3337 | **169 / 18012 / 5064** |
+| i128 | 3292 / 8844 / 1673 | **55 / 12162 / 3332** | 55 / 12162 / 3332 |
+| i200 | 6434 / 22520 / 4321 | 301 / 28744 / 7433 | **181 / 32304 / 8875** |
 
 Sources:
 
 - barrel: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit drives its muxes directly.
 - barrel_fanout: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit first copied to one bit per mux by a CX doubling tree (the standard fan-out, cf. Moore & Nilsson, arXiv:quant-ph/9808027), as is ashr's sign.
+- barrel_fanout_fold: As barrel_fanout, with another r = k mod W at a W that is no power of two (kmgy.32, ours): W = V 2^t, V odd, r keeps the low t bits of k and r >> t = (k >> t) mod V; a bit of weight 2^b moves to 2^(b mod P) (2^P = 1 mod V) or the 1-bits of 2^b mod V, a Wallace tree to two rows, the rows fold again while the bound shrinks, one lookahead add (cq_adder), then s - qV for every q at once (lookahead subtractions) and a one-hot select on the flags [s >= qV].
 
 ## fshl
 
 o ^= the high W bits of (a:b) << (k mod W) (ABI §2.3, CR §2).
 
-| width | barrel | barrel_fanout |
-|---|---|---|
-| i1 | **1 / 1 / 2** | 1 / 1 / 2 |
-| i6 | 112 / 274 / 77 | **61 / 324 / 102** |
-| i7 | 129 / 311 / 87 | **71 / 367 / 115** |
-| i8 | 88 / 180 / 52 | **21 / 242 / 83** |
-| i16 | 232 / 540 / 133 | **29 / 728 / 227** |
-| i17 | 523 / 1643 / 375 | **223 / 1937 / 522** |
-| i24 | 550 / 1520 / 355 | **117 / 1926 / 558** |
-| i31 | 641 / 1851 / 433 | **111 / 2347 / 681** |
-| i32 | 580 / 1452 / 326 | **37 / 1958 / 579** |
-| i48 | 1230 / 3642 / 813 | **153 / 4654 / 1319** |
-| i64 | 1400 / 3660 / 775 | **45 / 4932 / 1411** |
-| i80 | 2346 / 7312 / 1558 | **217 / 9346 / 2575** |
-| i100 | 2904 / 10136 / 2084 | **251 / 12642 / 3337** |
-| i128 | 3292 / 8844 / 1800 | **53 / 11906 / 3331** |
-| i200 | 6434 / 22520 / 4521 | **301 / 28344 / 7433** |
+| width | barrel | barrel_fanout | barrel_fanout_fold |
+|---|---|---|---|
+| i1 | **1 / 1 / 2** | 1 / 1 / 2 | 1 / 1 / 2 |
+| i6 | 112 / 274 / 77 | 61 / 324 / 102 | **50 / 408 / 142** |
+| i7 | 129 / 311 / 87 | 71 / 367 / 115 | **61 / 521 / 180** |
+| i8 | 88 / 180 / 52 | **21 / 242 / 83** | 21 / 242 / 83 |
+| i16 | 232 / 540 / 133 | **29 / 728 / 227** | 29 / 728 / 227 |
+| i17 | 523 / 1643 / 375 | 223 / 1937 / 522 | **107 / 6515 / 1982** |
+| i24 | 550 / 1520 / 355 | 117 / 1926 / 558 | **86 / 3152 / 968** |
+| i31 | 641 / 1851 / 433 | 111 / 2347 / 681 | **105 / 3773 / 1142** |
+| i32 | 580 / 1452 / 326 | **37 / 1958 / 579** | 37 / 1958 / 579 |
+| i48 | 1230 / 3642 / 813 | 153 / 4654 / 1319 | **106 / 8316 / 2477** |
+| i64 | 1400 / 3660 / 775 | **45 / 4932 / 1411** | 45 / 4932 / 1411 |
+| i80 | 2346 / 7312 / 1558 | 217 / 9346 / 2575 | **123 / 22678 / 6709** |
+| i100 | 2904 / 10136 / 2084 | 251 / 12642 / 3337 | **169 / 17812 / 5064** |
+| i128 | 3292 / 8844 / 1800 | **53 / 11906 / 3331** | 53 / 11906 / 3331 |
+| i200 | 6434 / 22520 / 4521 | 301 / 28344 / 7433 | **181 / 31904 / 8875** |
 
 Sources:
 
 - barrel: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit drives its muxes directly.
 - barrel_fanout: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit first copied to one bit per mux by a CX doubling tree (the standard fan-out, cf. Moore & Nilsson, arXiv:quant-ph/9808027), as is ashr's sign.
+- barrel_fanout_fold: As barrel_fanout, with another r = k mod W at a W that is no power of two (kmgy.32, ours): W = V 2^t, V odd, r keeps the low t bits of k and r >> t = (k >> t) mod V; a bit of weight 2^b moves to 2^(b mod P) (2^P = 1 mod V) or the 1-bits of 2^b mod V, a Wallace tree to two rows, the rows fold again while the bound shrinks, one lookahead add (cq_adder), then s - qV for every q at once (lookahead subtractions) and a one-hot select on the flags [s >= qV].
 
 ## fshr
 
 o ^= the low W bits of (a:b) >> (k mod W) (ABI §2.3, CR §2).
 
-| width | barrel | barrel_fanout |
-|---|---|---|
-| i1 | **1 / 1 / 2** | 1 / 1 / 2 |
-| i6 | 112 / 274 / 77 | **61 / 324 / 102** |
-| i7 | 129 / 311 / 87 | **71 / 367 / 115** |
-| i8 | 88 / 180 / 52 | **21 / 242 / 83** |
-| i16 | 232 / 540 / 133 | **29 / 728 / 227** |
-| i17 | 523 / 1643 / 375 | **223 / 1937 / 522** |
-| i24 | 550 / 1520 / 355 | **117 / 1926 / 558** |
-| i31 | 641 / 1851 / 433 | **111 / 2347 / 681** |
-| i32 | 580 / 1452 / 326 | **37 / 1958 / 579** |
-| i48 | 1230 / 3642 / 813 | **153 / 4654 / 1319** |
-| i64 | 1400 / 3660 / 775 | **45 / 4932 / 1411** |
-| i80 | 2346 / 7312 / 1558 | **217 / 9346 / 2575** |
-| i100 | 2904 / 10136 / 2084 | **251 / 12642 / 3337** |
-| i128 | 3292 / 8844 / 1800 | **53 / 11906 / 3331** |
-| i200 | 6434 / 22520 / 4521 | **301 / 28344 / 7433** |
+| width | barrel | barrel_fanout | barrel_fanout_fold |
+|---|---|---|---|
+| i1 | **1 / 1 / 2** | 1 / 1 / 2 | 1 / 1 / 2 |
+| i6 | 112 / 274 / 77 | 61 / 324 / 102 | **50 / 408 / 142** |
+| i7 | 129 / 311 / 87 | 71 / 367 / 115 | **61 / 521 / 180** |
+| i8 | 88 / 180 / 52 | **21 / 242 / 83** | 21 / 242 / 83 |
+| i16 | 232 / 540 / 133 | **29 / 728 / 227** | 29 / 728 / 227 |
+| i17 | 523 / 1643 / 375 | 223 / 1937 / 522 | **107 / 6515 / 1982** |
+| i24 | 550 / 1520 / 355 | 117 / 1926 / 558 | **86 / 3152 / 968** |
+| i31 | 641 / 1851 / 433 | 111 / 2347 / 681 | **105 / 3773 / 1142** |
+| i32 | 580 / 1452 / 326 | **37 / 1958 / 579** | 37 / 1958 / 579 |
+| i48 | 1230 / 3642 / 813 | 153 / 4654 / 1319 | **106 / 8316 / 2477** |
+| i64 | 1400 / 3660 / 775 | **45 / 4932 / 1411** | 45 / 4932 / 1411 |
+| i80 | 2346 / 7312 / 1558 | 217 / 9346 / 2575 | **123 / 22678 / 6709** |
+| i100 | 2904 / 10136 / 2084 | 251 / 12642 / 3337 | **169 / 17812 / 5064** |
+| i128 | 3292 / 8844 / 1800 | **53 / 11906 / 3331** | 53 / 11906 / 3331 |
+| i200 | 6434 / 22520 / 4521 | 301 / 28344 / 7433 | **181 / 31904 / 8875** |
 
 Sources:
 
 - barrel: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit drives its muxes directly.
 - barrel_fanout: Ours: one funnel shift of the 2W-bit hi:lo (shl, lshr, ashr as funnels with zero or sign-copy halves); r = k mod W (low bits of k at a power-of-two W, else k_j wired to the residues 2^j mod W, a Wallace tree of full adders, a ripple add, conditional subtractions of W 2^t); barrel of ceil(log2 W) out-of-place mux stages over r, the last onto o, the rest undone in reverse (Bennett). Barrel shifter as BACKEND_ABI §2.3 (BJ lower_var_shl!/lower_var_lshr!/lower_var_ashr!, not read here). Each stage's control bit first copied to one bit per mux by a CX doubling tree (the standard fan-out, cf. Moore & Nilsson, arXiv:quant-ph/9808027), as is ashr's sign.
+- barrel_fanout_fold: As barrel_fanout, with another r = k mod W at a W that is no power of two (kmgy.32, ours): W = V 2^t, V odd, r keeps the low t bits of k and r >> t = (k >> t) mod V; a bit of weight 2^b moves to 2^(b mod P) (2^P = 1 mod V) or the 1-bits of 2^b mod V, a Wallace tree to two rows, the rows fold again while the bound shrinks, one lookahead add (cq_adder), then s - qV for every q at once (lookahead subtractions) and a one-hot select on the flags [s >= qV].
+
+## udiv
+
+o ^= a / b unsigned; b = 0 gives 2^W - 1 (ABI §2.2, CR §2).
+
+| width | restoring_ripple | restoring_lookahead | radix4_lookahead | radix8_lookahead |
+|---|---|---|---|---|
+| i1 | **13 / 15 / 7** | 13 / 15 / 7 | 15 / 35 / 15 | 17 / 83 / 34 |
+| i6 | 121 / 356 / 115 | **118 / 372 / 119** | 121 / 752 / 238 | 121 / 1446 / 459 |
+| i7 | 153 / 475 / 150 | 147 / 499 / 156 | 135 / 941 / 294 | **133 / 1772 / 555** |
+| i8 | 187 / 610 / 189 | 178 / 650 / 199 | 175 / 1246 / 380 | **167 / 2200 / 680** |
+| i16 | 547 / 2280 / 652 | 444 / 2540 / 717 | 389 / 4382 / 1244 | **369 / 7460 / 2132** |
+| i17 | 601 / 2561 / 728 | 476 / 2865 / 804 | 405 / 4813 / 1362 | **401 / 8258 / 2349** |
+| i24 | 1051 / 4990 / 1379 | 740 / 5694 / 1555 | 607 / 9420 / 2591 | **593 / 15704 / 4344** |
+| i31 | 1597 / 8203 / 2226 | 1011 / 9475 / 2544 | 827 / 15197 / 4112 | **785 / 25184 / 6846** |
+| i32 | 1683 / 8726 / 2363 | 1054 / 10102 / 2707 | 852 / 16350 / 4412 | **811 / 26748 / 7259** |
+| i48 | 3363 / 19300 / 5114 | 1726 / 22752 / 5977 | 1326 / 35964 / 9507 | **1265 / 58088 / 15428** |
+| i64 | 5555 / 33972 / 8890 | 2432 / 40464 / 10513 | 1852 / 63182 / 16504 | **1737 / 101104 / 26519** |
+| i80 | 8291 / 52770 / 13705 | 3166 / 63322 / 16343 | 2324 / 98124 / 25447 | **2161 / 156170 / 40652** |
+| i100 | 12431 / 82030 / 21165 | 4120 / 99034 / 25416 | 2996 / 152512 / 39304 | **2775 / 241750 / 62505** |
+| i128 | 19571 / 133746 / 34297 | 5506 / 162378 / 41455 | 4004 / 248702 / 63716 | **3679 / 392696 / 100886** |
+| i200 | 45275 / 324472 / 82536 | 9242 / 397320 / 100748 | 6470 / 604156 / 153587 | **5873 / 949130 / 241788** |
+
+Sources:
+
+- restoring_ripple: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder ripple carry.
+- restoring_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder the Draper-Kutin-Rains-Svore lookahead (arXiv:quant-ph/0406142), so a trip is O(log n) deep and the whole O(W log W).
+- radix4_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 4, lookahead adders: a trip takes two bits of a and compares R' with b, 2b, 3b at once (3b precomputed by one adder, the copies of R' by fan-out); the flags' thermometer is the digit, its one-hot form selects R' - jb. Ours, after the textbook radix-2^k restoring division with all multiples compared in parallel (cf. Parhami, Computer Arithmetic, 2nd ed., ch. 14; not read here).
+- radix8_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 8 as radix 4: three bits a trip, seven multiples (3b, 5b, 7b by adders, the even ones shifted views).
+
+## urem
+
+o ^= a mod b unsigned; b = 0 gives a (ABI §2.2, CR §2).
+
+| width | restoring_ripple | restoring_lookahead | radix4_lookahead | radix8_lookahead |
+|---|---|---|---|---|
+| i1 | **15 / 23 / 9** | 15 / 23 / 9 | 17 / 43 / 17 | 19 / 91 / 36 |
+| i6 | 131 / 404 / 127 | **127 / 420 / 131** | 133 / 874 / 263 | 141 / 1716 / 510 |
+| i7 | 163 / 531 / 164 | 157 / 555 / 170 | **147 / 1083 / 323** | 153 / 2086 / 614 |
+| i8 | 197 / 674 / 205 | **185 / 714 / 215** | 187 / 1408 / 413 | 187 / 2558 / 747 |
+| i16 | 559 / 2408 / 684 | 451 / 2668 / 749 | 403 / 4704 / 1309 | **391 / 8170 / 2263** |
+| i17 | 615 / 2697 / 762 | 487 / 3001 / 838 | **421 / 5155 / 1431** | 425 / 9012 / 2488 |
+| i24 | 1065 / 5182 / 1427 | 749 / 5886 / 1603 | 623 / 9902 / 2688 | **617 / 16766 / 4539** |
+| i31 | 1611 / 8451 / 2288 | 1025 / 9723 / 2606 | 843 / 15819 / 4237 | **809 / 26554 / 7097** |
+| i32 | 1697 / 8982 / 2427 | 1061 / 10358 / 2771 | 867 / 16992 / 4541 | **835 / 28162 / 7518** |
+| i48 | 3379 / 19684 / 5210 | 1735 / 23136 / 6073 | 1343 / 36926 / 9700 | **1291 / 60206 / 15815** |
+| i64 | 5571 / 34484 / 9018 | 2439 / 40976 / 10641 | 1867 / 64464 / 16761 | **1763 / 103926 / 27034** |
+| i80 | 8309 / 53410 / 13865 | 3177 / 63962 / 16503 | 2343 / 99726 / 25768 | **2189 / 159696 / 41295** |
+| i100 | 12449 / 82830 / 21365 | 4131 / 99834 / 25616 | 3015 / 154514 / 39705 | **2803 / 246156 / 63308** |
+| i128 | 19589 / 134770 / 34553 | 5513 / 163402 / 41711 | 4019 / 251264 / 64229 | **3707 / 398334 / 101913** |
+| i200 | 45295 / 326072 / 82936 | 9253 / 398920 / 101148 | 6489 / 608158 / 154388 | **5903 / 957936 / 243391** |
+
+Sources:
+
+- restoring_ripple: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder ripple carry.
+- restoring_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder the Draper-Kutin-Rains-Svore lookahead (arXiv:quant-ph/0406142), so a trip is O(log n) deep and the whole O(W log W).
+- radix4_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 4, lookahead adders: a trip takes two bits of a and compares R' with b, 2b, 3b at once (3b precomputed by one adder, the copies of R' by fan-out); the flags' thermometer is the digit, its one-hot form selects R' - jb. Ours, after the textbook radix-2^k restoring division with all multiples compared in parallel (cf. Parhami, Computer Arithmetic, 2nd ed., ch. 14; not read here).
+- radix8_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 8 as radix 4: three bits a trip, seven multiples (3b, 5b, 7b by adders, the even ones shifted views).
+
+## sdiv
+
+o ^= a / b signed, truncating; b = 0 gives -1 (a >= 0) or +1, INT_MIN / -1 gives INT_MIN (ABI §2.2, CR §2).
+
+| width | restoring_ripple | restoring_lookahead | radix4_lookahead | radix8_lookahead |
+|---|---|---|---|---|
+| i1 | **31 / 49 / 17** | 31 / 49 / 17 | 35 / 69 / 25 | 37 / 117 / 44 |
+| i6 | 161 / 570 / 185 | **157 / 595 / 192** | 157 / 975 / 311 | 157 / 1669 / 532 |
+| i7 | 195 / 725 / 232 | 189 / 767 / 244 | 173 / 1209 / 382 | **171 / 2040 / 643** |
+| i8 | 231 / 896 / 283 | 217 / 954 / 299 | 213 / 1550 / 480 | **205 / 2504 / 780** |
+| i16 | 609 / 2854 / 842 | 487 / 3186 / 931 | 433 / 5028 / 1458 | **413 / 8106 / 2346** |
+| i17 | 667 / 3171 / 930 | 525 / 3574 / 1039 | 453 / 5522 / 1597 | **449 / 8967 / 2584** |
+| i24 | 1131 / 5852 / 1665 | 787 / 6691 / 1886 | 655 / 10417 / 2922 | **641 / 16701 / 4675** |
+| i31 | 1691 / 9317 / 2596 | 1065 / 10787 / 2980 | 877 / 16509 / 4548 | **835 / 26496 / 7282** |
+| i32 | 1779 / 9876 / 2745 | 1101 / 11450 / 3155 | 901 / 17698 / 4860 | **861 / 28096 / 7707** |
+| i48 | 3493 / 21026 / 5688 | 1777 / 24811 / 6662 | 1379 / 38023 / 10192 | **1319 / 60147 / 16113** |
+| i64 | 5717 / 36274 / 9656 | 2483 / 43234 / 11435 | 1905 / 65952 / 17426 | **1793 / 103874 / 27441** |
+| i80 | 8487 / 55648 / 14663 | 3223 / 66812 / 17505 | 2383 / 101614 / 26609 | **2221 / 159660 / 41814** |
+| i100 | 12667 / 85628 / 22363 | 4179 / 103433 / 26881 | 3057 / 156911 / 40769 | **2837 / 246149 / 63970** |
+| i128 | 19863 / 138352 / 35831 | 5561 / 168010 / 43331 | 4061 / 254334 / 65592 | **3741 / 398328 / 102762** |
+| i200 | 45713 / 331670 / 84934 | 9305 / 406201 / 103707 | 6535 / 613037 / 156546 | **5941 / 958011 / 244747** |
+
+Sources:
+
+- restoring_ripple: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder ripple carry.
+- restoring_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder the Draper-Kutin-Rains-Svore lookahead (arXiv:quant-ph/0406142), so a trip is O(log n) deep and the whole O(W log W).
+- radix4_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 4, lookahead adders: a trip takes two bits of a and compares R' with b, 2b, 3b at once (3b precomputed by one adder, the copies of R' by fan-out); the flags' thermometer is the digit, its one-hot form selects R' - jb. Ours, after the textbook radix-2^k restoring division with all multiples compared in parallel (cf. Parhami, Computer Arithmetic, 2nd ed., ch. 14; not read here).
+- radix8_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 8 as radix 4: three bits a trip, seven multiples (3b, 5b, 7b by adders, the even ones shifted views).
+
+## srem
+
+o ^= a rem b signed, sign of a; b = 0 gives a, INT_MIN rem -1 gives 0 (ABI §2.2, CR §2).
+
+| width | restoring_ripple | restoring_lookahead | radix4_lookahead | radix8_lookahead |
+|---|---|---|---|---|
+| i1 | **31 / 53 / 18** | 31 / 53 / 18 | 33 / 73 / 26 | 35 / 121 / 45 |
+| i6 | 169 / 604 / 191 | **163 / 629 / 198** | 163 / 1083 / 330 | 171 / 1925 / 577 |
+| i7 | 203 / 765 / 239 | 195 / 807 / 251 | **180 / 1335 / 404** | 186 / 2338 / 695 |
+| i8 | 239 / 942 / 291 | 223 / 1000 / 307 | **220 / 1694 / 505** | 220 / 2844 / 839 |
+| i16 | 617 / 2948 / 858 | 495 / 3280 / 947 | 442 / 5316 / 1507 | **430 / 8782 / 2461** |
+| i17 | 677 / 3271 / 947 | 535 / 3674 / 1056 | **463 / 5828 / 1649** | 467 / 9685 / 2706 |
+| i24 | 1141 / 5994 / 1689 | 797 / 6833 / 1910 | 666 / 10849 / 2995 | **660 / 17713 / 4846** |
+| i31 | 1701 / 9501 / 2627 | 1075 / 10971 / 3011 | 888 / 17067 / 4642 | **854 / 27802 / 7502** |
+| i32 | 1789 / 10066 / 2777 | 1111 / 11640 / 3187 | 912 / 18274 / 4957 | **880 / 29444 / 7934** |
+| i48 | 3505 / 21312 / 5736 | 1789 / 25097 / 6710 | 1392 / 38887 / 10337 | **1340 / 62167 / 16452** |
+| i64 | 5729 / 36656 / 9720 | 2495 / 43616 / 11499 | 1918 / 67104 / 17619 | **1814 / 106566 / 27892** |
+| i80 | 8501 / 56126 / 14743 | 3237 / 67290 / 17585 | 2398 / 103054 / 26850 | **2244 / 163024 / 42377** |
+| i100 | 12681 / 86226 / 22463 | 4193 / 104031 / 26981 | 3072 / 158711 / 41070 | **2860 / 250353 / 64673** |
+| i128 | 19877 / 139118 / 35959 | 5575 / 168776 / 43459 | 4076 / 256638 / 65977 | **3764 / 403708 / 103661** |
+| i200 | 45729 / 332868 / 85134 | 9321 / 407399 / 103907 | 6552 / 616637 / 157147 | **5966 / 966415 / 246150** |
+
+Sources:
+
+- restoring_ripple: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder ripple carry.
+- restoring_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Every adder the Draper-Kutin-Rains-Svore lookahead (arXiv:quant-ph/0406142), so a trip is O(log n) deep and the whole O(W log W).
+- radix4_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 4, lookahead adders: a trip takes two bits of a and compares R' with b, 2b, 3b at once (3b precomputed by one adder, the copies of R' by fan-out); the flags' thermometer is the digit, its one-hot form selects R' - jb. Ours, after the textbook radix-2^k restoring division with all multiples compared in parallel (cf. Parhami, Computer Arithmetic, 2nd ed., ch. 14; not read here).
+- radix8_lookahead: Restoring long division (the pencil-and-paper algorithm; ABI §2.2 cites BJ _soft_udiv_compile, not read here), ours as a circuit: trip n compares the n-bit partial remainder with b by the carry out of R' + ~b + 1, ANDed with [b < 2^n] (a Kogge-Stone suffix AND of ~b), and selects the new remainder as R' ^ q(~b ^ carries) through a CX fan-out of q; signed forms negate magnitudes in and the result out ((x ^ s) + s); all on one tape, undone after the XOR into o (Bennett). Radix 8 as radix 4: three bits a trip, seven multiples (3b, 5b, 7b by adders, the even ones shifted views).
+
+## icmp_eq
+
+o (i1) ^= [a eq b] (ABI §2.4).
+
+| width | chain | tree |
+|---|---|---|
+| i1 | **7 / 7 / 4** | 7 / 7 / 4 |
+| i6 | 15 / 45 / 23 | **11 / 45 / 23** |
+| i7 | 17 / 53 / 27 | **11 / 53 / 27** |
+| i8 | 19 / 61 / 31 | **11 / 61 / 31** |
+| i16 | 35 / 125 / 63 | **13 / 125 / 63** |
+| i17 | 37 / 133 / 67 | **15 / 133 / 67** |
+| i24 | 51 / 189 / 95 | **15 / 189 / 95** |
+| i31 | 65 / 245 / 123 | **15 / 245 / 123** |
+| i32 | 67 / 253 / 127 | **15 / 253 / 127** |
+| i48 | 99 / 381 / 191 | **17 / 381 / 191** |
+| i64 | 131 / 509 / 255 | **17 / 509 / 255** |
+| i80 | 163 / 637 / 319 | **19 / 637 / 319** |
+| i100 | 203 / 797 / 399 | **19 / 797 / 399** |
+| i128 | 259 / 1021 / 511 | **19 / 1021 / 511** |
+| i200 | 403 / 1597 / 799 | **21 / 1597 / 799** |
+
+Sources:
+
+- chain: BACKEND_ABI §2.4 Impl. (BJ lower_eq!, not read): XNOR of the operands per bit (CX, CX, X into scratch), then a linear AND chain of CCX; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: XNOR per bit as chain, then a balanced CCX AND tree, depth ceil(log2 W): ours; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_ne
+
+o (i1) ^= [a ne b] (ABI §2.4).
+
+| width | chain | tree |
+|---|---|---|
+| i1 | **7 / 8 / 4** | 7 / 8 / 4 |
+| i6 | 15 / 46 / 23 | **11 / 46 / 23** |
+| i7 | 17 / 54 / 27 | **11 / 54 / 27** |
+| i8 | 19 / 62 / 31 | **11 / 62 / 31** |
+| i16 | 35 / 126 / 63 | **13 / 126 / 63** |
+| i17 | 37 / 134 / 67 | **15 / 134 / 67** |
+| i24 | 51 / 190 / 95 | **15 / 190 / 95** |
+| i31 | 65 / 246 / 123 | **15 / 246 / 123** |
+| i32 | 67 / 254 / 127 | **15 / 254 / 127** |
+| i48 | 99 / 382 / 191 | **17 / 382 / 191** |
+| i64 | 131 / 510 / 255 | **17 / 510 / 255** |
+| i80 | 163 / 638 / 319 | **19 / 638 / 319** |
+| i100 | 203 / 798 / 399 | **19 / 798 / 399** |
+| i128 | 259 / 1022 / 511 | **19 / 1022 / 511** |
+| i200 | 403 / 1598 / 799 | **21 / 1598 / 799** |
+
+Sources:
+
+- chain: BACKEND_ABI §2.4 Impl. (BJ lower_eq!, not read): XNOR of the operands per bit (CX, CX, X into scratch), then a linear AND chain of CCX; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: XNOR per bit as chain, then a balanced CCX AND tree, depth ceil(log2 W): ours; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_ult
+
+o (i1) ^= [a ult b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 9 / 14 / 5 | 9 / 14 / 5 | **5 / 5 / 4** |
+| i6 | 19 / 74 / 25 | 16 / 82 / 27 | **13 / 68 / 26** |
+| i7 | 21 / 86 / 29 | 17 / 94 / 31 | **14 / 82 / 31** |
+| i8 | 23 / 98 / 33 | 18 / 114 / 37 | **14 / 96 / 36** |
+| i16 | 39 / 194 / 65 | 22 / 238 / 76 | **16 / 206 / 75** |
+| i17 | 41 / 206 / 69 | 22 / 250 / 80 | **17 / 218 / 79** |
+| i24 | 55 / 290 / 97 | 24 / 362 / 115 | **17 / 316 / 114** |
+| i31 | 69 / 374 / 125 | 25 / 462 / 147 | **18 / 414 / 149** |
+| i32 | 71 / 386 / 129 | 26 / 490 / 155 | **18 / 428 / 154** |
+| i48 | 103 / 578 / 193 | 28 / 742 / 234 | **19 / 650 / 233** |
+| i64 | 135 / 770 / 257 | 30 / 998 / 314 | **20 / 874 / 313** |
+| i80 | 167 / 962 / 321 | 30 / 1250 / 393 | **21 / 1096 / 392** |
+| i100 | 207 / 1202 / 401 | 32 / 1566 / 492 | **22 / 1376 / 492** |
+| i128 | 263 / 1538 / 513 | 34 / 2018 / 633 | **22 / 1768 / 632** |
+| i200 | 407 / 2402 / 801 | 36 / 3162 / 991 | **24 / 2774 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_ugt
+
+o (i1) ^= [a ugt b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 9 / 14 / 5 | 9 / 14 / 5 | **5 / 5 / 4** |
+| i6 | 19 / 74 / 25 | 16 / 82 / 27 | **13 / 68 / 26** |
+| i7 | 21 / 86 / 29 | 17 / 94 / 31 | **14 / 82 / 31** |
+| i8 | 23 / 98 / 33 | 18 / 114 / 37 | **14 / 96 / 36** |
+| i16 | 39 / 194 / 65 | 22 / 238 / 76 | **16 / 206 / 75** |
+| i17 | 41 / 206 / 69 | 22 / 250 / 80 | **17 / 218 / 79** |
+| i24 | 55 / 290 / 97 | 24 / 362 / 115 | **17 / 316 / 114** |
+| i31 | 69 / 374 / 125 | 25 / 462 / 147 | **18 / 414 / 149** |
+| i32 | 71 / 386 / 129 | 26 / 490 / 155 | **18 / 428 / 154** |
+| i48 | 103 / 578 / 193 | 28 / 742 / 234 | **19 / 650 / 233** |
+| i64 | 135 / 770 / 257 | 30 / 998 / 314 | **20 / 874 / 313** |
+| i80 | 167 / 962 / 321 | 30 / 1250 / 393 | **21 / 1096 / 392** |
+| i100 | 207 / 1202 / 401 | 32 / 1566 / 492 | **22 / 1376 / 492** |
+| i128 | 263 / 1538 / 513 | 34 / 2018 / 633 | **22 / 1768 / 632** |
+| i200 | 407 / 2402 / 801 | 36 / 3162 / 991 | **24 / 2774 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_uge
+
+o (i1) ^= [a uge b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 9 / 15 / 5 | 9 / 15 / 5 | **5 / 6 / 4** |
+| i6 | 19 / 75 / 25 | 16 / 83 / 27 | **13 / 69 / 26** |
+| i7 | 21 / 87 / 29 | 17 / 95 / 31 | **14 / 83 / 31** |
+| i8 | 23 / 99 / 33 | 18 / 115 / 37 | **14 / 97 / 36** |
+| i16 | 39 / 195 / 65 | 22 / 239 / 76 | **16 / 207 / 75** |
+| i17 | 41 / 207 / 69 | 22 / 251 / 80 | **17 / 219 / 79** |
+| i24 | 55 / 291 / 97 | 24 / 363 / 115 | **17 / 317 / 114** |
+| i31 | 69 / 375 / 125 | 25 / 463 / 147 | **18 / 415 / 149** |
+| i32 | 71 / 387 / 129 | 26 / 491 / 155 | **18 / 429 / 154** |
+| i48 | 103 / 579 / 193 | 28 / 743 / 234 | **19 / 651 / 233** |
+| i64 | 135 / 771 / 257 | 30 / 999 / 314 | **20 / 875 / 313** |
+| i80 | 167 / 963 / 321 | 30 / 1251 / 393 | **21 / 1097 / 392** |
+| i100 | 207 / 1203 / 401 | 32 / 1567 / 492 | **22 / 1377 / 492** |
+| i128 | 263 / 1539 / 513 | 34 / 2019 / 633 | **22 / 1769 / 632** |
+| i200 | 407 / 2403 / 801 | 36 / 3163 / 991 | **24 / 2775 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_ule
+
+o (i1) ^= [a ule b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 9 / 15 / 5 | 9 / 15 / 5 | **5 / 6 / 4** |
+| i6 | 19 / 75 / 25 | 16 / 83 / 27 | **13 / 69 / 26** |
+| i7 | 21 / 87 / 29 | 17 / 95 / 31 | **14 / 83 / 31** |
+| i8 | 23 / 99 / 33 | 18 / 115 / 37 | **14 / 97 / 36** |
+| i16 | 39 / 195 / 65 | 22 / 239 / 76 | **16 / 207 / 75** |
+| i17 | 41 / 207 / 69 | 22 / 251 / 80 | **17 / 219 / 79** |
+| i24 | 55 / 291 / 97 | 24 / 363 / 115 | **17 / 317 / 114** |
+| i31 | 69 / 375 / 125 | 25 / 463 / 147 | **18 / 415 / 149** |
+| i32 | 71 / 387 / 129 | 26 / 491 / 155 | **18 / 429 / 154** |
+| i48 | 103 / 579 / 193 | 28 / 743 / 234 | **19 / 651 / 233** |
+| i64 | 135 / 771 / 257 | 30 / 999 / 314 | **20 / 875 / 313** |
+| i80 | 167 / 963 / 321 | 30 / 1251 / 393 | **21 / 1097 / 392** |
+| i100 | 207 / 1203 / 401 | 32 / 1567 / 492 | **22 / 1377 / 492** |
+| i128 | 263 / 1539 / 513 | 34 / 2019 / 633 | **22 / 1769 / 632** |
+| i200 | 407 / 2403 / 801 | 36 / 3163 / 991 | **24 / 2775 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_slt
+
+o (i1) ^= [a slt b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 12 / 16 / 5 | 12 / 16 / 5 | **5 / 5 / 4** |
+| i6 | 19 / 76 / 25 | 18 / 84 / 27 | **13 / 68 / 26** |
+| i7 | 21 / 88 / 29 | 17 / 96 / 31 | **14 / 82 / 31** |
+| i8 | 23 / 100 / 33 | 21 / 116 / 37 | **14 / 96 / 36** |
+| i16 | 39 / 196 / 65 | 25 / 240 / 76 | **16 / 206 / 75** |
+| i17 | 41 / 208 / 69 | 22 / 252 / 80 | **17 / 218 / 79** |
+| i24 | 55 / 292 / 97 | 26 / 364 / 115 | **17 / 316 / 114** |
+| i31 | 69 / 376 / 125 | 25 / 464 / 147 | **18 / 414 / 149** |
+| i32 | 71 / 388 / 129 | 29 / 492 / 155 | **18 / 428 / 154** |
+| i48 | 103 / 580 / 193 | 30 / 744 / 234 | **19 / 650 / 233** |
+| i64 | 135 / 772 / 257 | 33 / 1000 / 314 | **20 / 874 / 313** |
+| i80 | 167 / 964 / 321 | 31 / 1252 / 393 | **21 / 1096 / 392** |
+| i100 | 207 / 1204 / 401 | 32 / 1568 / 492 | **22 / 1376 / 492** |
+| i128 | 263 / 1540 / 513 | 37 / 2020 / 633 | **22 / 1768 / 632** |
+| i200 | 407 / 2404 / 801 | 36 / 3164 / 991 | **24 / 2774 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_sgt
+
+o (i1) ^= [a sgt b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 12 / 16 / 5 | 12 / 16 / 5 | **5 / 5 / 4** |
+| i6 | 19 / 76 / 25 | 18 / 84 / 27 | **13 / 68 / 26** |
+| i7 | 21 / 88 / 29 | 17 / 96 / 31 | **14 / 82 / 31** |
+| i8 | 23 / 100 / 33 | 21 / 116 / 37 | **14 / 96 / 36** |
+| i16 | 39 / 196 / 65 | 25 / 240 / 76 | **16 / 206 / 75** |
+| i17 | 41 / 208 / 69 | 22 / 252 / 80 | **17 / 218 / 79** |
+| i24 | 55 / 292 / 97 | 26 / 364 / 115 | **17 / 316 / 114** |
+| i31 | 69 / 376 / 125 | 25 / 464 / 147 | **18 / 414 / 149** |
+| i32 | 71 / 388 / 129 | 29 / 492 / 155 | **18 / 428 / 154** |
+| i48 | 103 / 580 / 193 | 30 / 744 / 234 | **19 / 650 / 233** |
+| i64 | 135 / 772 / 257 | 33 / 1000 / 314 | **20 / 874 / 313** |
+| i80 | 167 / 964 / 321 | 31 / 1252 / 393 | **21 / 1096 / 392** |
+| i100 | 207 / 1204 / 401 | 32 / 1568 / 492 | **22 / 1376 / 492** |
+| i128 | 263 / 1540 / 513 | 37 / 2020 / 633 | **22 / 1768 / 632** |
+| i200 | 407 / 2404 / 801 | 36 / 3164 / 991 | **24 / 2774 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_sge
+
+o (i1) ^= [a sge b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 13 / 17 / 5 | 13 / 17 / 5 | **5 / 6 / 4** |
+| i6 | 19 / 77 / 25 | 19 / 85 / 27 | **13 / 69 / 26** |
+| i7 | 21 / 89 / 29 | 17 / 97 / 31 | **14 / 83 / 31** |
+| i8 | 23 / 101 / 33 | 22 / 117 / 37 | **14 / 97 / 36** |
+| i16 | 39 / 197 / 65 | 26 / 241 / 76 | **16 / 207 / 75** |
+| i17 | 41 / 209 / 69 | 22 / 253 / 80 | **17 / 219 / 79** |
+| i24 | 55 / 293 / 97 | 27 / 365 / 115 | **17 / 317 / 114** |
+| i31 | 69 / 377 / 125 | 25 / 465 / 147 | **18 / 415 / 149** |
+| i32 | 71 / 389 / 129 | 30 / 493 / 155 | **18 / 429 / 154** |
+| i48 | 103 / 581 / 193 | 31 / 745 / 234 | **19 / 651 / 233** |
+| i64 | 135 / 773 / 257 | 34 / 1001 / 314 | **20 / 875 / 313** |
+| i80 | 167 / 965 / 321 | 32 / 1253 / 393 | **21 / 1097 / 392** |
+| i100 | 207 / 1205 / 401 | 32 / 1569 / 492 | **22 / 1377 / 492** |
+| i128 | 263 / 1541 / 513 | 38 / 2021 / 633 | **22 / 1769 / 632** |
+| i200 | 407 / 2405 / 801 | 36 / 3165 / 991 | **24 / 2775 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## icmp_sle
+
+o (i1) ^= [a sle b] (ABI §2.4).
+
+| width | ripple | lookahead | tree |
+|---|---|---|---|
+| i1 | 13 / 17 / 5 | 13 / 17 / 5 | **5 / 6 / 4** |
+| i6 | 19 / 77 / 25 | 19 / 85 / 27 | **13 / 69 / 26** |
+| i7 | 21 / 89 / 29 | 17 / 97 / 31 | **14 / 83 / 31** |
+| i8 | 23 / 101 / 33 | 22 / 117 / 37 | **14 / 97 / 36** |
+| i16 | 39 / 197 / 65 | 26 / 241 / 76 | **16 / 207 / 75** |
+| i17 | 41 / 209 / 69 | 22 / 253 / 80 | **17 / 219 / 79** |
+| i24 | 55 / 293 / 97 | 27 / 365 / 115 | **17 / 317 / 114** |
+| i31 | 69 / 377 / 125 | 25 / 465 / 147 | **18 / 415 / 149** |
+| i32 | 71 / 389 / 129 | 30 / 493 / 155 | **18 / 429 / 154** |
+| i48 | 103 / 581 / 193 | 31 / 745 / 234 | **19 / 651 / 233** |
+| i64 | 135 / 773 / 257 | 34 / 1001 / 314 | **20 / 875 / 313** |
+| i80 | 167 / 965 / 321 | 32 / 1253 / 393 | **21 / 1097 / 392** |
+| i100 | 207 / 1205 / 401 | 32 / 1569 / 492 | **22 / 1377 / 492** |
+| i128 | 263 / 1541 / 513 | 38 / 2021 / 633 | **22 / 1769 / 632** |
+| i200 | 407 / 2405 / 801 | 36 / 3165 / 991 | **24 / 2775 / 991** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.4 Impl. (BJ lower_ult!, not read): the carry out of a + ~b + 1 by the ripple adder (kmgy.10), carry only, no sum bits; ult is its complement, slt also XORs both sign bits in; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: As ripple with the Draper-Kutin-Rains-Svore lookahead adder (arXiv:quant-ph/0406142), carry out only; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: Comparator tree, ours: per bit lt_i = ~a_i b_i and eq_i = XNOR, nodes combined by lt = lt_hi ^ eq_hi lt_lo (in place), eq = eq_hi eq_lo, depth about 2 log2 W, no sum logic (the binary-tree comparator, cf. the prefix formulation of Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read); signed: the sign bit's leaf swapped; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## select
+
+o ^= c ? a1 : a2, c an i1 rail (ABI §2.5).
+
+| width | ccx2 | ccx2_fanout | diff | diff_fanout |
+|---|---|---|---|---|
+| i1 | **3 / 3 / 4** | 3 / 3 / 4 | 6 / 6 / 5 | 6 / 6 / 5 |
+| i6 | 13 / 18 / 19 | 8 / 28 / 24 | 11 / 36 / 25 | **7 / 46 / 30** |
+| i7 | 15 / 21 / 22 | 8 / 33 / 28 | 12 / 42 / 29 | **7 / 54 / 35** |
+| i8 | 17 / 24 / 25 | 8 / 38 / 32 | 13 / 48 / 33 | **7 / 62 / 40** |
+| i16 | 33 / 48 / 49 | 10 / 78 / 64 | 21 / 96 / 65 | **9 / 126 / 80** |
+| i17 | 35 / 51 / 52 | 12 / 83 / 68 | 22 / 102 / 69 | **11 / 134 / 85** |
+| i24 | 49 / 72 / 73 | 12 / 118 / 96 | 29 / 144 / 97 | **11 / 190 / 120** |
+| i31 | 63 / 93 / 94 | 12 / 153 / 124 | 36 / 186 / 125 | **11 / 246 / 155** |
+| i32 | 65 / 96 / 97 | 12 / 158 / 128 | 37 / 192 / 129 | **11 / 254 / 160** |
+| i48 | 97 / 144 / 145 | 14 / 238 / 192 | 53 / 288 / 193 | **13 / 382 / 240** |
+| i64 | 129 / 192 / 193 | 14 / 318 / 256 | 69 / 384 / 257 | **13 / 510 / 320** |
+| i80 | 161 / 240 / 241 | 16 / 398 / 320 | 85 / 480 / 321 | **15 / 638 / 400** |
+| i100 | 201 / 300 / 301 | 16 / 498 / 400 | 105 / 600 / 401 | **15 / 798 / 500** |
+| i128 | 257 / 384 / 385 | 16 / 638 / 512 | 133 / 768 / 513 | **15 / 1022 / 640** |
+| i200 | 401 / 600 / 601 | 18 / 998 / 800 | 205 / 1200 / 801 | **17 / 1598 / 1000** |
+
+Sources:
+
+- ccx2: BACKEND_ABI §2.5 Impl. (BJ lower_mux!, not read): o ^= a2 ^ c (a1 ^ a2); per bit CX(a2), CCX(c, a1), CCX(c, a2) onto o, no ancilla; c drives all 2W CCX
+- ccx2_fanout: BACKEND_ABI §2.5 Impl. (BJ lower_mux!, not read): o ^= a2 ^ c (a1 ^ a2); as ccx2; c first copied to W bits by the CX doubling fan-out (cf. Moore & Nilsson, arXiv:quant-ph/9808027), undone after
+- diff: BACKEND_ABI §2.5 Impl. (BJ lower_mux!, not read): o ^= a2 ^ c (a1 ^ a2); d = a1 ^ a2 in scratch, per bit CX(a2), CCX(c, d) onto o; c drives all W CCX
+- diff_fanout: BACKEND_ABI §2.5 Impl. (BJ lower_mux!, not read): o ^= a2 ^ c (a1 ^ a2); as diff; c first copied to W bits by the CX doubling fan-out (cf. Moore & Nilsson, arXiv:quant-ph/9808027), undone after
+
+## smax
+
+o ^= smax(a, b) (ABI §2.7).
+
+| width | ripple | ripple_fanout | lookahead | lookahead_fanout | tree | tree_fanout |
+|---|---|---|---|---|---|---|
+| i1 | 17 / 26 / 7 | 17 / 26 / 7 | 17 / 26 / 7 | 17 / 26 / 7 | **10 / 12 / 6** | 10 / 12 / 6 |
+| i6 | 26 / 116 / 37 | 27 / 126 / 42 | 26 / 124 / 39 | 27 / 134 / 44 | **20 / 106 / 38** | 21 / 116 / 43 |
+| i7 | 29 / 134 / 43 | 29 / 146 / 49 | 25 / 142 / 45 | 25 / 154 / 51 | **23 / 126 / 45** | 23 / 138 / 51 |
+| i8 | 32 / 152 / 49 | 31 / 166 / 56 | 30 / 168 / 53 | 29 / 182 / 60 | 24 / 146 / 52 | **23 / 160 / 59** |
+| i16 | 56 / 296 / 97 | 49 / 326 / 112 | 40 / 340 / 108 | 33 / 370 / 123 | 34 / 304 / 107 | **27 / 334 / 122** |
+| i17 | 59 / 314 / 103 | 53 / 346 / 119 | 37 / 358 / 114 | 31 / 390 / 130 | 35 / 322 / 113 | **29 / 354 / 129** |
+| i24 | 80 / 440 / 145 | 67 / 486 / 168 | 48 / 512 / 163 | 35 / 558 / 186 | 42 / 462 / 162 | **29 / 508 / 185** |
+| i31 | 101 / 566 / 187 | 81 / 626 / 217 | 57 / 654 / 209 | 37 / 714 / 239 | 51 / 602 / 211 | **31 / 662 / 241** |
+| i32 | 104 / 584 / 193 | 83 / 646 / 224 | 58 / 688 / 219 | 37 / 750 / 250 | 52 / 622 / 218 | **31 / 684 / 249** |
+| i48 | 152 / 872 / 289 | 117 / 966 / 336 | 74 / 1036 / 330 | 39 / 1130 / 377 | 68 / 940 / 329 | **33 / 1034 / 376** |
+| i64 | 200 / 1160 / 385 | 149 / 1286 / 448 | 92 / 1388 / 442 | 41 / 1514 / 505 | 86 / 1260 / 441 | **35 / 1386 / 504** |
+| i80 | 248 / 1448 / 481 | 183 / 1606 / 560 | 106 / 1736 / 553 | 41 / 1894 / 632 | 102 / 1578 / 552 | **37 / 1736 / 631** |
+| i100 | 308 / 1808 / 601 | 223 / 2006 / 700 | 126 / 2172 / 692 | 41 / 2370 / 791 | 124 / 1978 / 692 | **39 / 2176 / 791** |
+| i128 | 392 / 2312 / 769 | 279 / 2566 / 896 | 158 / 2792 / 889 | 45 / 3046 / 1016 | 152 / 2538 / 888 | **39 / 2792 / 1015** |
+| i200 | 608 / 3608 / 1201 | 425 / 4006 / 1400 | 228 / 4368 / 1391 | 45 / 4766 / 1590 | 226 / 3976 / 1391 | **43 / 4374 / 1590** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- ripple_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## smin
+
+o ^= smin(a, b) (ABI §2.7).
+
+| width | ripple | ripple_fanout | lookahead | lookahead_fanout | tree | tree_fanout |
+|---|---|---|---|---|---|---|
+| i1 | 18 / 26 / 7 | 18 / 26 / 7 | 18 / 26 / 7 | 18 / 26 / 7 | **10 / 12 / 6** | 10 / 12 / 6 |
+| i6 | 26 / 116 / 37 | 27 / 126 / 42 | 26 / 124 / 39 | 27 / 134 / 44 | **20 / 106 / 38** | 21 / 116 / 43 |
+| i7 | 29 / 134 / 43 | 29 / 146 / 49 | 25 / 142 / 45 | 25 / 154 / 51 | **23 / 126 / 45** | 23 / 138 / 51 |
+| i8 | 32 / 152 / 49 | 31 / 166 / 56 | 30 / 168 / 53 | 29 / 182 / 60 | 24 / 146 / 52 | **23 / 160 / 59** |
+| i16 | 56 / 296 / 97 | 49 / 326 / 112 | 40 / 340 / 108 | 33 / 370 / 123 | 34 / 304 / 107 | **27 / 334 / 122** |
+| i17 | 59 / 314 / 103 | 53 / 346 / 119 | 37 / 358 / 114 | 31 / 390 / 130 | 35 / 322 / 113 | **29 / 354 / 129** |
+| i24 | 80 / 440 / 145 | 67 / 486 / 168 | 48 / 512 / 163 | 35 / 558 / 186 | 42 / 462 / 162 | **29 / 508 / 185** |
+| i31 | 101 / 566 / 187 | 81 / 626 / 217 | 57 / 654 / 209 | 37 / 714 / 239 | 51 / 602 / 211 | **31 / 662 / 241** |
+| i32 | 104 / 584 / 193 | 83 / 646 / 224 | 58 / 688 / 219 | 37 / 750 / 250 | 52 / 622 / 218 | **31 / 684 / 249** |
+| i48 | 152 / 872 / 289 | 117 / 966 / 336 | 74 / 1036 / 330 | 39 / 1130 / 377 | 68 / 940 / 329 | **33 / 1034 / 376** |
+| i64 | 200 / 1160 / 385 | 149 / 1286 / 448 | 92 / 1388 / 442 | 41 / 1514 / 505 | 86 / 1260 / 441 | **35 / 1386 / 504** |
+| i80 | 248 / 1448 / 481 | 183 / 1606 / 560 | 106 / 1736 / 553 | 41 / 1894 / 632 | 102 / 1578 / 552 | **37 / 1736 / 631** |
+| i100 | 308 / 1808 / 601 | 223 / 2006 / 700 | 126 / 2172 / 692 | 41 / 2370 / 791 | 124 / 1978 / 692 | **39 / 2176 / 791** |
+| i128 | 392 / 2312 / 769 | 279 / 2566 / 896 | 158 / 2792 / 889 | 45 / 3046 / 1016 | 152 / 2538 / 888 | **39 / 2792 / 1015** |
+| i200 | 608 / 3608 / 1201 | 425 / 4006 / 1400 | 228 / 4368 / 1391 | 45 / 4766 / 1590 | 226 / 3976 / 1391 | **43 / 4374 / 1590** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- ripple_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## umax
+
+o ^= umax(a, b) (ABI §2.7).
+
+| width | ripple | ripple_fanout | lookahead | lookahead_fanout | tree | tree_fanout |
+|---|---|---|---|---|---|---|
+| i1 | 11 / 22 / 7 | 11 / 22 / 7 | 11 / 22 / 7 | 11 / 22 / 7 | **10 / 12 / 6** | 10 / 12 / 6 |
+| i6 | 26 / 112 / 37 | 27 / 122 / 42 | 22 / 120 / 39 | 23 / 130 / 44 | **20 / 106 / 38** | 21 / 116 / 43 |
+| i7 | 29 / 130 / 43 | 29 / 142 / 49 | 25 / 138 / 45 | 25 / 150 / 51 | **23 / 126 / 45** | 23 / 138 / 51 |
+| i8 | 32 / 148 / 49 | 31 / 162 / 56 | 24 / 164 / 53 | 23 / 178 / 60 | 24 / 146 / 52 | **23 / 160 / 59** |
+| i16 | 56 / 292 / 97 | 49 / 322 / 112 | 34 / 336 / 108 | 27 / 366 / 123 | 34 / 304 / 107 | **27 / 334 / 122** |
+| i17 | 59 / 310 / 103 | 53 / 342 / 119 | 37 / 354 / 114 | 31 / 386 / 130 | 35 / 322 / 113 | **29 / 354 / 129** |
+| i24 | 80 / 436 / 145 | 67 / 482 / 168 | 44 / 508 / 163 | 31 / 554 / 186 | 42 / 462 / 162 | **29 / 508 / 185** |
+| i31 | 101 / 562 / 187 | 81 / 622 / 217 | 57 / 650 / 209 | 37 / 710 / 239 | 51 / 602 / 211 | **31 / 662 / 241** |
+| i32 | 104 / 580 / 193 | 83 / 642 / 224 | 52 / 684 / 219 | 31 / 746 / 250 | 52 / 622 / 218 | **31 / 684 / 249** |
+| i48 | 152 / 868 / 289 | 117 / 962 / 336 | 70 / 1032 / 330 | 35 / 1126 / 377 | 68 / 940 / 329 | **33 / 1034 / 376** |
+| i64 | 200 / 1156 / 385 | 149 / 1282 / 448 | 86 / 1384 / 442 | 35 / 1510 / 505 | 86 / 1260 / 441 | **35 / 1386 / 504** |
+| i80 | 248 / 1444 / 481 | 183 / 1602 / 560 | 104 / 1732 / 553 | 39 / 1890 / 632 | 102 / 1578 / 552 | **37 / 1736 / 631** |
+| i100 | 308 / 1804 / 601 | 223 / 2002 / 700 | 126 / 2168 / 692 | 41 / 2366 / 791 | 124 / 1978 / 692 | **39 / 2176 / 791** |
+| i128 | 392 / 2308 / 769 | 279 / 2562 / 896 | 152 / 2788 / 889 | 39 / 3042 / 1016 | 152 / 2538 / 888 | **39 / 2792 / 1015** |
+| i200 | 608 / 3604 / 1201 | 425 / 4002 / 1400 | 228 / 4364 / 1391 | 45 / 4762 / 1590 | 226 / 3976 / 1391 | **43 / 4374 / 1590** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- ripple_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## umin
+
+o ^= umin(a, b) (ABI §2.7).
+
+| width | ripple | ripple_fanout | lookahead | lookahead_fanout | tree | tree_fanout |
+|---|---|---|---|---|---|---|
+| i1 | 12 / 22 / 7 | 12 / 22 / 7 | 12 / 22 / 7 | 12 / 22 / 7 | **10 / 12 / 6** | 10 / 12 / 6 |
+| i6 | 26 / 112 / 37 | 27 / 122 / 42 | 22 / 120 / 39 | 23 / 130 / 44 | **20 / 106 / 38** | 21 / 116 / 43 |
+| i7 | 29 / 130 / 43 | 29 / 142 / 49 | 25 / 138 / 45 | 25 / 150 / 51 | **23 / 126 / 45** | 23 / 138 / 51 |
+| i8 | 32 / 148 / 49 | 31 / 162 / 56 | 24 / 164 / 53 | 23 / 178 / 60 | 24 / 146 / 52 | **23 / 160 / 59** |
+| i16 | 56 / 292 / 97 | 49 / 322 / 112 | 34 / 336 / 108 | 27 / 366 / 123 | 34 / 304 / 107 | **27 / 334 / 122** |
+| i17 | 59 / 310 / 103 | 53 / 342 / 119 | 37 / 354 / 114 | 31 / 386 / 130 | 35 / 322 / 113 | **29 / 354 / 129** |
+| i24 | 80 / 436 / 145 | 67 / 482 / 168 | 44 / 508 / 163 | 31 / 554 / 186 | 42 / 462 / 162 | **29 / 508 / 185** |
+| i31 | 101 / 562 / 187 | 81 / 622 / 217 | 57 / 650 / 209 | 37 / 710 / 239 | 51 / 602 / 211 | **31 / 662 / 241** |
+| i32 | 104 / 580 / 193 | 83 / 642 / 224 | 52 / 684 / 219 | 31 / 746 / 250 | 52 / 622 / 218 | **31 / 684 / 249** |
+| i48 | 152 / 868 / 289 | 117 / 962 / 336 | 70 / 1032 / 330 | 35 / 1126 / 377 | 68 / 940 / 329 | **33 / 1034 / 376** |
+| i64 | 200 / 1156 / 385 | 149 / 1282 / 448 | 86 / 1384 / 442 | 35 / 1510 / 505 | 86 / 1260 / 441 | **35 / 1386 / 504** |
+| i80 | 248 / 1444 / 481 | 183 / 1602 / 560 | 104 / 1732 / 553 | 39 / 1890 / 632 | 102 / 1578 / 552 | **37 / 1736 / 631** |
+| i100 | 308 / 1804 / 601 | 223 / 2002 / 700 | 126 / 2168 / 692 | 41 / 2366 / 791 | 124 / 1978 / 692 | **39 / 2176 / 791** |
+| i128 | 392 / 2308 / 769 | 279 / 2562 / 896 | 152 / 2788 / 889 | 39 / 3042 / 1016 | 152 / 2538 / 888 | **39 / 2792 / 1015** |
+| i200 | 608 / 3604 / 1201 | 425 / 4002 / 1400 | 228 / 4364 / 1391 | 45 / 4762 / 1590 | 226 / 3976 / 1391 | **43 / 4374 / 1590** |
+
+Sources:
+
+- ripple: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- ripple_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the ripple compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the lookahead compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- tree_fanout: BACKEND_ABI §2.7 Impl. (compare + select): f = [a < b] on the tape by the tree compare candidate of icmp, o ^= the select (diff) of a and b under f, f fanned out; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## abs
+
+o ^= |a|, abs(INT_MIN) = INT_MIN (ABI §2.7).
+
+| width | ripple | ripple_fanout | lookahead | lookahead_fanout |
+|---|---|---|---|---|
+| i1 | **5 / 5 / 4** | 5 / 5 / 4 | 5 / 5 / 4 | 5 / 5 / 4 |
+| i6 | 27 / 60 / 29 | 23 / 68 / 33 | 25 / 63 / 30 | **21 / 71 / 34** |
+| i7 | 31 / 71 / 34 | 25 / 81 / 39 | 29 / 77 / 36 | **23 / 87 / 41** |
+| i8 | 35 / 82 / 39 | 27 / 94 / 45 | 31 / 88 / 41 | **23 / 100 / 47** |
+| i16 | 67 / 170 / 79 | 45 / 198 / 93 | 51 / 194 / 87 | **29 / 222 / 101** |
+| i17 | 71 / 181 / 84 | 47 / 211 / 99 | 55 / 214 / 95 | **31 / 244 / 110** |
+| i24 | 99 / 258 / 119 | 63 / 302 / 141 | 69 / 303 / 134 | **33 / 347 / 156** |
+| i31 | 127 / 335 / 154 | 77 / 393 / 183 | 85 / 401 / 176 | **35 / 459 / 205** |
+| i32 | 131 / 346 / 159 | 79 / 406 / 189 | 87 / 412 / 181 | **35 / 472 / 211** |
+| i48 | 195 / 522 / 239 | 113 / 614 / 285 | 121 / 633 / 276 | **39 / 725 / 322** |
+| i64 | 259 / 698 / 319 | 145 / 822 / 381 | 155 / 854 / 371 | **41 / 978 / 433** |
+| i80 | 323 / 874 / 399 | 179 / 1030 / 477 | 189 / 1078 / 467 | **45 / 1234 / 545** |
+| i100 | 403 / 1094 / 499 | 219 / 1290 / 597 | 231 / 1361 / 588 | **47 / 1557 / 686** |
+| i128 | 515 / 1402 / 639 | 275 / 1654 / 765 | 287 / 1744 / 753 | **47 / 1996 / 879** |
+| i200 | 803 / 2194 / 999 | 421 / 2590 / 1197 | 435 / 2755 / 1186 | **53 / 3151 / 1384** |
+
+Sources:
+
+- ripple: Conditional negate (a ^ s) + s, s the sign bit: x = a ^ s in scratch, then the adder (kmgy.10) adds s as its carry-in to x + 0; BACKEND_ABI §2.7 Impl. builds select(a >=s 0, a, 0 - a), this needs no compare or select, ripple adder, s drives every XOR; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- ripple_fanout: Conditional negate (a ^ s) + s, s the sign bit: x = a ^ s in scratch, then the adder (kmgy.10) adds s as its carry-in to x + 0; BACKEND_ABI §2.7 Impl. builds select(a >=s 0, a, 0 - a), this needs no compare or select, ripple adder, s fanned out (CX doubling); scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead: Conditional negate (a ^ s) + s, s the sign bit: x = a ^ s in scratch, then the adder (kmgy.10) adds s as its carry-in to x + 0; BACKEND_ABI §2.7 Impl. builds select(a >=s 0, a, 0 - a), this needs no compare or select, lookahead adder, s drives every XOR; scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+- lookahead_fanout: Conditional negate (a ^ s) + s, s the sign bit: x = a ^ s in scratch, then the adder (kmgy.10) adds s as its carry-in to x + 0; BACKEND_ABI §2.7 Impl. builds select(a >=s 0, a, 0 - a), this needs no compare or select, lookahead adder, s fanned out (CX doubling); scratch recorded on a tape, the flag's last gates onto o, tape undone (Bennett)
+
+## ctpop
+
+o ^= the number of set bits of a (ABI §2.8).
+
+| width | linear | csa_tree |
+|---|---|---|
+| i1 | 5 / 5 / 4 | **1 / 1 / 2** |
+| i6 | 38 / 89 / 41 | **19 / 53 / 22** |
+| i7 | 44 / 107 / 48 | **19 / 51 / 18** |
+| i8 | 52 / 155 / 67 | **29 / 80 / 31** |
+| i16 | 102 / 419 / 165 | **41 / 173 / 57** |
+| i17 | 108 / 449 / 176 | **41 / 181 / 59** |
+| i24 | 150 / 659 / 253 | **43 / 263 / 80** |
+| i31 | 192 / 869 / 330 | **43 / 317 / 88** |
+| i32 | 200 / 1061 / 397 | **53 / 362 / 107** |
+| i48 | 296 / 1637 / 605 | **55 / 548 / 154** |
+| i64 | 394 / 2561 / 931 | **65 / 743 / 205** |
+| i80 | 490 / 3233 / 1171 | **63 / 929 / 252** |
+| i100 | 610 / 4073 / 1471 | **67 / 1163 / 311** |
+| i128 | 1396 / 6715 / 2383 | **74 / 1514 / 401** |
+| i200 | 2188 / 10603 / 3751 | **74 / 2366 / 615** |
+
+Sources:
+
+- linear: BACKEND_ABI §2.8 Impl. (BJ: the W bits summed by W - 1 adds), here each bit the carry-in of an m-bit adder (the shipped add) onto the running count; recorded on a tape, the m = bitlen(W) count bits XORed into o, tape undone (Bennett)
+- csa_tree: Carry-save (Wallace) tree of depth-3 full adders per weight column, carries out of the top column dropped, until two rows remain, then one m-bit adder (the shipped add): Wallace, A suggestion for a fast multiplier, IEEE Trans. Electron. Comput. EC-13 (1964); not read; recorded on a tape, the m = bitlen(W) count bits XORed into o, tape undone (Bennett)
+
+## ctlz
+
+o ^= the number of leading zeros of a, W for 0 (ABI §2.8, CR §2).
+
+| width | thermometer | priority_tree |
+|---|---|---|
+| i1 | **5 / 5 / 3** | 5 / 5 / 3 |
+| i6 | 25 / 77 / 33 | **15 / 55 / 21** |
+| i7 | 25 / 91 / 39 | **15 / 57 / 22** |
+| i8 | 25 / 114 / 48 | **19 / 78 / 30** |
+| i16 | 31 / 271 / 112 | **25 / 165 / 59** |
+| i17 | 37 / 289 / 120 | **25 / 212 / 79** |
+| i24 | 37 / 443 / 183 | **25 / 266 / 93** |
+| i31 | 37 / 585 / 243 | **25 / 307 / 104** |
+| i32 | 37 / 620 / 256 | **33 / 340 / 116** |
+| i48 | 43 / 1000 / 415 | **33 / 549 / 189** |
+| i64 | 43 / 1385 / 576 | **41 / 691 / 229** |
+| i80 | 49 / 1797 / 751 | **41 / 984 / 347** |
+| i100 | 49 / 2313 / 970 | **41 / 1151 / 387** |
+| i128 | 49 / 3046 / 1280 | **49 / 1394 / 454** |
+| i200 | 55 / 5054 / 2142 | **49 / 2320 / 777** |
+
+Sources:
+
+- thermometer: Ours: a Kogge-Stone prefix AND of the negated bits from the counted end (Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read) gives the thermometer N_j = [j < c]; bit k of c is the XOR of N_j over (j + 1) % 2^k = 0, one CX tree per bit, no adder; recorded on a tape, the m = bitlen(W) count bits XORed into o, tape undone (Bennett)
+- priority_tree: Divide-and-conquer priority encoder: W padded below with ones to 2^L; per node z = zH zL and c = zH ? 2^l + cL : cH (a wire and an in-place mux, zH fanned out); the root's c ^= z gives W for 0. Standard leading-zero counter (cf. Oklobdzija, IEEE Trans. VLSI 2 (1994); not read); recorded on a tape, the m = bitlen(W) count bits XORed into o, tape undone (Bennett)
+
+## cttz
+
+o ^= the number of trailing zeros of a, W for 0 (ABI §2.8, CR §2): ctlz on the reversed bits.
+
+| width | thermometer | priority_tree |
+|---|---|---|
+| i1 | **5 / 5 / 3** | 5 / 5 / 3 |
+| i6 | 25 / 77 / 33 | **15 / 55 / 21** |
+| i7 | 25 / 91 / 39 | **15 / 57 / 22** |
+| i8 | 25 / 114 / 48 | **19 / 78 / 30** |
+| i16 | 31 / 271 / 112 | **25 / 165 / 59** |
+| i17 | 37 / 289 / 120 | **25 / 212 / 79** |
+| i24 | 37 / 443 / 183 | **25 / 266 / 93** |
+| i31 | 37 / 585 / 243 | **25 / 307 / 104** |
+| i32 | 37 / 620 / 256 | **33 / 340 / 116** |
+| i48 | 43 / 1000 / 415 | **33 / 549 / 189** |
+| i64 | 43 / 1385 / 576 | **41 / 691 / 229** |
+| i80 | 49 / 1797 / 751 | **41 / 984 / 347** |
+| i100 | 49 / 2313 / 970 | **41 / 1151 / 387** |
+| i128 | 49 / 3046 / 1280 | **49 / 1394 / 454** |
+| i200 | 55 / 5054 / 2142 | **49 / 2320 / 777** |
+
+Sources:
+
+- thermometer: Ours: a Kogge-Stone prefix AND of the negated bits from the counted end (Kogge & Stone, IEEE Trans. Comput. C-22 (1973); not read) gives the thermometer N_j = [j < c]; bit k of c is the XOR of N_j over (j + 1) % 2^k = 0, one CX tree per bit, no adder; recorded on a tape, the m = bitlen(W) count bits XORed into o, tape undone (Bennett)
+- priority_tree: Divide-and-conquer priority encoder: W padded below with ones to 2^L; per node z = zH zL and c = zH ? 2^l + cL : cH (a wire and an in-place mux, zH fanned out); the root's c ^= z gives W for 0. Standard leading-zero counter (cf. Oklobdzija, IEEE Trans. VLSI 2 (1994); not read); recorded on a tape, the m = bitlen(W) count bits XORed into o, tape undone (Bennett)
+
+## mul
+
+o ^= a * b mod 2^W (ABI §2.2).
+
+| width | shift_add | dadda_tree |
+|---|---|---|
+| i1 | **3 / 3 / 4** | 3 / 3 / 4 |
+| i6 | 47 / 220 / 94 | **33 / 246 / 104** |
+| i7 | 61 / 311 / 127 | **39 / 347 / 139** |
+| i8 | 73 / 418 / 165 | **41 / 466 / 179** |
+| i16 | 237 / 2018 / 691 | **63 / 2098 / 687** |
+| i17 | 259 / 2301 / 782 | **63 / 2379 / 772** |
+| i24 | 429 / 4862 / 1592 | **73 / 4878 / 1514** |
+| i31 | 609 / 8375 / 2689 | **81 / 8255 / 2500** |
+| i32 | 635 / 8954 / 2869 | **81 / 8810 / 2661** |
+| i48 | 1083 / 20942 / 6566 | **91 / 20134 / 5916** |
+| i64 | 1561 / 37986 / 11783 | **99 / 36066 / 10451** |
+| i80 | 2073 / 60146 / 18535 | **103 / 56610 / 16267** |
+| i100 | 2719 / 94978 / 29118 | **111 / 88774 / 25338** |
+| i128 | 3671 / 157098 / 47945 | **113 / 145882 / 41393** |
+| i200 | 6277 / 388734 / 117932 | **129 / 357566 / 100686** |
+
+Sources:
+
+- shift_add: Shift-and-add as BACKEND_ABI §2.2 Impl. (BJ lower_mul_wide!, not read): one CCX row of partial products per multiplier bit (bits fanned out), each added by the shipped adder; only the columns below W; recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
+- dadda_tree: Tree multiplier: operand bits fanned out (CX doubling), every partial product in one CCX layer, Dadda reduction (Dadda, Some schemes for parallel multipliers, Alta Frequenza 34 (1965); not read) by depth-3 full adders and half adders, earliest bits first, then one shipped adder; only the columns below W; recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
+
+## umul_overflow
+
+o (i1) ^= [a * b >= 2^W], unsigned (ABI §2.7).
+
+| width | shift_add | dadda_tree |
+|---|---|---|
+| i1 | **2 / 4 / 4** | 2 / 4 / 4 |
+| i6 | 103 / 550 / 197 | **57 / 596 / 206** |
+| i7 | 125 / 770 / 273 | **65 / 826 / 277** |
+| i8 | 157 / 1060 / 361 | **65 / 1088 / 357** |
+| i16 | 381 / 4608 / 1474 | **85 / 4504 / 1363** |
+| i17 | 409 / 5186 / 1667 | **91 / 5102 / 1536** |
+| i24 | 623 / 10652 / 3339 | **97 / 10228 / 3010** |
+| i31 | 805 / 17762 / 5553 | **105 / 17130 / 4977** |
+| i32 | 893 / 19316 / 5987 | **105 / 18256 / 5297** |
+| i48 | 1439 / 44136 / 13540 | **117 / 41228 / 11792** |
+| i64 | 2045 / 79320 / 24196 | **123 / 73416 / 20847** |
+| i80 | 2561 / 124428 / 37845 | **131 / 114824 / 32463** |
+| i100 | 3399 / 195132 / 59206 | **139 / 179548 / 50584** |
+| i128 | 4605 / 321948 / 97413 | **139 / 294336 / 82669** |
+| i200 | 7599 / 789436 / 238207 | **153 / 719140 / 201182** |
+
+Sources:
+
+- shift_add: Shift-and-add as BACKEND_ABI §2.2 Impl. (BJ lower_mul_wide!, not read): one CCX row of partial products per multiplier bit (bits fanned out), each added by the shipped adder; the 2W columns, o ^= OR of the high W bits (NOT of an AND tree); recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
+- dadda_tree: Tree multiplier: operand bits fanned out (CX doubling), every partial product in one CCX layer, Dadda reduction (Dadda, Some schemes for parallel multipliers, Alta Frequenza 34 (1965); not read) by depth-3 full adders and half adders, earliest bits first, then one shipped adder; the 2W columns, o ^= OR of the high W bits (NOT of an AND tree); recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
+
+## smul_overflow
+
+o (i1) ^= [the signed a * b is outside [-2^(W-1), 2^(W-1))] (ABI §2.7).
+
+| width | shift_add | dadda_tree |
+|---|---|---|
+| i1 | 7 / 10 / 6 | **5 / 8 / 5** |
+| i6 | 111 / 604 / 205 | **61 / 636 / 206** |
+| i7 | 131 / 836 / 284 | **69 / 872 / 277** |
+| i8 | 165 / 1134 / 373 | **69 / 1140 / 357** |
+| i16 | 389 / 4760 / 1501 | **89 / 4604 / 1363** |
+| i17 | 417 / 5348 / 1696 | **95 / 5208 / 1536** |
+| i24 | 629 / 10882 / 3381 | **101 / 10376 / 3010** |
+| i31 | 811 / 18064 / 5610 | **109 / 17320 / 4977** |
+| i32 | 901 / 19626 / 6045 | **107 / 18452 / 5297** |
+| i48 | 1445 / 44604 / 13629 | **121 / 41520 / 11792** |
+| i64 | 2053 / 79948 / 24317 | **127 / 73804 / 20847** |
+| i80 | 2567 / 125214 / 37997 | **135 / 115308 / 32463** |
+| i100 | 3405 / 196116 / 59397 | **143 / 180152 / 50584** |
+| i128 | 4613 / 323214 / 97661 | **143 / 295108 / 82669** |
+| i200 | 7605 / 791418 / 238597 | **157 / 720344 / 201182** |
+
+Sources:
+
+- shift_add: Shift-and-add as BACKEND_ABI §2.2 Impl. (BJ lower_mul_wide!, not read): one CCX row of partial products per multiplier bit (bits fanned out), each added by the shipped adder; the 2W columns, o ^= OR over W-1 <= i < 2W-1 of p_i ^ p_(i+1) (all of bits W-1 .. 2W-1 equal); recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
+- dadda_tree: Tree multiplier: operand bits fanned out (CX doubling), every partial product in one CCX layer, Dadda reduction (Dadda, Some schemes for parallel multipliers, Alta Frequenza 34 (1965); not read) by depth-3 full adders and half adders, earliest bits first, then one shipped adder; the 2W columns, o ^= OR over W-1 <= i < 2W-1 of p_i ^ p_(i+1) (all of bits W-1 .. 2W-1 equal); recorded on a tape, signed products as the modified Baugh-Wooley array (Baugh & Wooley, IEEE Trans. Comput. C-22 (1973); not read: complemented sign-row terms plus a constant), result XORed into o, tape undone (Bennett)
