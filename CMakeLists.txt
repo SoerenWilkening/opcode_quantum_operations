@@ -83,9 +83,23 @@ add_test(NAME runtime_no_templates COMMAND sh -c
   "t=$(${CMAKE_NM} \"$1\") && r=$(${CMAKE_NM} \"$2\") || exit 1; echo \"$t\" | grep -q ' T _*cq_template_bswap_i32$' || exit 1; ! echo \"$r\" | grep cq_template_"
   nm_check $<TARGET_FILE:cq_templates> $<TARGET_FILE:cq_runtime>)
 
-# IR calling-convention test (kmgy.29): tests/ir/caller.ll is LLVM IR calling the core entry points
-# the way CQ_lang's compiled code does, so it needs clang. Built at -O0, -O2 and the build's own flags.
-if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+# IR calling-convention test (kmgy.29, kmgy.33): tests/ir/caller.ll is LLVM IR calling the entry points
+# the way CQ_lang's compiled code does. The reference compiler for it is the LLVM CQ_lang pins, 19.1.7
+# (brew llvm@19, docs/ABI_SYMBOLS.md); without it the build's clang compiles it, and without either
+# the ir_abi tests are not built. ir_abi_reference is Skipped, saying why, unless 19.1.7 ran.
+# Built at -O0, -O2 and the build's own flags.
+set(CQ_LLVM_PREFIX "/usr/local/opt/llvm@19" CACHE PATH "LLVM whose clang compiles tests/ir/caller.ll (reference: 19.1.7)")
+set(cq_ir_cc "${CQ_LLVM_PREFIX}/bin/clang")
+if(NOT EXISTS "${cq_ir_cc}")
+  set(cq_ir_cc "")
+  if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    set(cq_ir_cc "${CMAKE_C_COMPILER}")
+  endif()
+endif()
+if(cq_ir_cc)
+  execute_process(COMMAND "${cq_ir_cc}" --version OUTPUT_VARIABLE cq_ir_ver ERROR_QUIET)
+  string(REGEX MATCH "clang version [0-9.]+" cq_ir_ver "${cq_ir_ver}")
+  set(cq_ir_why "tests/ir/caller.ll compiled by ${cq_ir_cc} (${cq_ir_ver}), not the reference LLVM 19.1.7")
   string(TOUPPER "${CMAKE_BUILD_TYPE}" cq_bt)
   separate_arguments(cq_ir_build_flags NATIVE_COMMAND "${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${cq_bt}}")
   foreach(cq_tag IN ITEMS O0 O2 build)
@@ -96,14 +110,22 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     endif()
     set(cq_obj ${CMAKE_BINARY_DIR}/ir_caller_${cq_tag}.o)
     add_custom_command(OUTPUT ${cq_obj}
-      COMMAND ${CMAKE_C_COMPILER} ${cq_flags} -w -c -x ir ${CMAKE_SOURCE_DIR}/tests/ir/caller.ll -o ${cq_obj}
+      COMMAND ${cq_ir_cc} ${cq_flags} -w -c -x ir ${CMAKE_SOURCE_DIR}/tests/ir/caller.ll -o ${cq_obj}
       DEPENDS tests/ir/caller.ll VERBATIM)
     add_executable(test_ir_abi_${cq_tag} tests/ir/driver.c ${cq_obj})
-    target_link_libraries(test_ir_abi_${cq_tag} cq_runtime cq_gates_replay)
+    target_link_libraries(test_ir_abi_${cq_tag} cq_templates cq_runtime cq_gates_replay)
+    set_target_properties(test_ir_abi_${cq_tag} PROPERTIES ENABLE_EXPORTS ON)   # the tape's callee, dlsym
     add_test(NAME ir_abi_${cq_tag} COMMAND test_ir_abi_${cq_tag})
   endforeach()
 else()
-  message(STATUS "ir_abi tests skipped: the C compiler is ${CMAKE_C_COMPILER_ID}, compiling .ll needs clang")
+  set(cq_ir_why "ir_abi tests not built: no ${CQ_LLVM_PREFIX}/bin/clang and the C compiler is ${CMAKE_C_COMPILER_ID}")
+endif()
+if(cq_ir_ver STREQUAL "clang version 19.1.7")
+  add_test(NAME ir_abi_reference COMMAND ${CMAKE_COMMAND} -E echo "tests/ir/caller.ll compiled by ${cq_ir_cc} (19.1.7)")
+else()
+  message(STATUS "${cq_ir_why}")
+  add_test(NAME ir_abi_reference COMMAND sh -c "echo \"$1\"; exit 77" ir "${cq_ir_why}")
+  set_tests_properties(ir_abi_reference PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Integer casts (kmgy.15): src/kernels/cast.c in the runtime, src/templates/cast.c in the templates.

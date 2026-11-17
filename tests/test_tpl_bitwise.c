@@ -57,23 +57,26 @@ typedef void (*unc_fn)(uint32_t o, const int32_t *h, const hx_val *v);
 typedef struct { const char *name; uint32_t w; int nargs, lits; hx_ref_fn ref; fwd_fn fwd; unc_fn unc; } sym;
 
 /* A literal of width bits as its C type, with ones above bit bits-1 that must be ignored. */
-#define NL_(bits, j) ((CQRT_UINT(bits))(hx_u128(v[j]) | ((bits) < 128 ? ~(unsigned __int128)0 << ((bits) % 128) : 0)))
-#define WL_(bits, j) v[j].l[0], v[j].l[1], v[j].l[2], v[j].l[3] | ~0ull << ((bits) % 64)
-#define ARG_q_(L, bits, j) (uint32_t)h[j]
-#define ARG_l_(L, bits, j) L(bits, j)
+#define NL_(bits, j, r) ((CQRT_UINT(bits))(hx_u128(v[j]) | ((bits) < 128 ? ~(unsigned __int128)0 << ((bits) % 128) : 0)))
+/* r: integer registers taken before it; the wide literal starting at r9 takes a placeholder (cq_template.h) */
+#define WL_(bits, j, r) CQ_TPL_AT_R9_(r, 0,) v[j].l[0], v[j].l[1], v[j].l[2], v[j].l[3] | ~0ull << ((bits) % 64)
+#define ARG_q_(L, bits, j, r) (uint32_t)h[j]
+#define ARG_l_(L, bits, j, r) L(bits, j, r)
 #define MASK_q_ 0
 #define MASK_l_ 1
+#define ARGS3_(L, bits, r, s0, s1, s2) ARG_##s0##_(L, bits, 0, r), ARG_##s1##_(L, bits, 1, CQ_TPL_N_(r, s0)), \
+    ARG_##s2##_(L, bits, 2, CQ_TPL_N_(CQ_TPL_N_(r, s0), s1))
 /* symbol cq_template_<op>_<n><sfx>, operand letters s0 s1 [s2] */
 #define SYM2_(op, n, bits, L, s0, s1, sfx) \
     static uint32_t f_##op##_##n##sfx(const int32_t *h, const hx_val *v) { (void)h; (void)v; \
-        return cq_template_##op##_##n##sfx(ARG_##s0##_(L, bits, 0), ARG_##s1##_(L, bits, 1)); } \
+        return cq_template_##op##_##n##sfx(ARG_##s0##_(L, bits, 0, 0), ARG_##s1##_(L, bits, 1, 0)); } \
     static void u_##op##_##n##sfx(uint32_t o, const int32_t *h, const hx_val *v) { (void)h; (void)v; \
-        cq_template_##op##_##n##sfx##_unc(o, ARG_##s0##_(L, bits, 0), ARG_##s1##_(L, bits, 1)); }
+        cq_template_##op##_##n##sfx##_unc(o, ARG_##s0##_(L, bits, 0, 0), ARG_##s1##_(L, bits, 1, 0)); }
 #define SYM3_(op, n, bits, L, s0, s1, s2, sfx) \
     static uint32_t f_##op##_##n##sfx(const int32_t *h, const hx_val *v) { (void)h; (void)v; \
-        return cq_template_##op##_##n##sfx(ARG_##s0##_(L, bits, 0), ARG_##s1##_(L, bits, 1), ARG_##s2##_(L, bits, 2)); } \
+        return cq_template_##op##_##n##sfx(ARGS3_(L, bits, 0, s0, s1, s2)); } \
     static void u_##op##_##n##sfx(uint32_t o, const int32_t *h, const hx_val *v) { (void)h; (void)v; \
-        cq_template_##op##_##n##sfx##_unc(o, ARG_##s0##_(L, bits, 0), ARG_##s1##_(L, bits, 1), ARG_##s2##_(L, bits, 2)); }
+        cq_template_##op##_##n##sfx##_unc(o, ARGS3_(L, bits, 1, s0, s1, s2)); }
 #define ROW2_(op, n, bits, s0, s1, sfx) { "cq_template_" #op "_" #n #sfx, bits, 2, MASK_##s0##_ | MASK_##s1##_ << 1, op##_ref, f_##op##_##n##sfx, u_##op##_##n##sfx },
 #define ROW3_(op, n, bits, s0, s1, s2, sfx) { "cq_template_" #op "_" #n #sfx, bits, 3, \
     MASK_##s0##_ | MASK_##s1##_ << 1 | MASK_##s2##_ << 2, op##_ref, f_##op##_##n##sfx, u_##op##_##n##sfx },

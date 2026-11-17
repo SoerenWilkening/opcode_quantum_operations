@@ -38,7 +38,7 @@ that revision. CR wins over ABI (ABI:4, NORTH_STAR "Goal"). Every disagreement f
   | i80 | `i80` | `unsigned __int128` | `__int128` | two GPRs; read the low 80 bits only; return sign-extended |
   | i100 | `i100` | `unsigned __int128` | `__int128` | read the low 100 bits only; return sign-extended |
   | i128 | `i128` | `unsigned __int128` | `__int128` | |
-  | i200 | `i200` | four `uint64_t` limbs, low first | `cqrt_u256` (32 bytes) | four GPRs; measure returns through a hidden pointer; bits at and above 200 ignored in arguments, 0 in results |
+  | i200 | `i200` | four `uint64_t` limbs, low first | `cqrt_u256` (32 bytes) | registers and stack as in "Calling convention" below (one more unused `uint64_t` where the literal starts at r9); measure returns through a hidden pointer; bits at and above 200 ignored in arguments, 0 in results |
   | f16 | `half` | `_Float16` | `_Float16` | |
   | bf16 | `bfloat` | `_Float16` | `_Float16` | holds the bits; same register (XMM0) as `bfloat`, and clang at -O0 rounds a `__bf16` parameter through float, losing subnormals and NaN payloads |
   | f32 | `float` | `float` | `float` | |
@@ -46,7 +46,7 @@ that revision. CR wins over ABI (ABI:4, NORTH_STAR "Goal"). Every disagreement f
   | f80 | `x86_fp80` | `long double` | `long double` | x86-64 only |
 
   The C column is ours, not the ABI's: the ABI gives LLVM types only. Checked on this machine
-  (x86_64, Apple clang 17) by compiling IR calls: `i7` goes in one GPR, `i80` and `i100` in two GPRs like
+  (x86_64, Apple clang 17, and LLVM 19.1.7 since kmgy.33) by compiling IR calls: `i7` goes in one GPR, `i80` and `i100` in two GPRs like
   `i128` (and comes back in RAX:RDX), `half`/`bfloat` in XMM0, `x86_fp80` on the stack. A C
   `_BitInt(100)` would be passed in memory, so it is not used. The backend reads only the low W
   bits of any narrow integer argument (ABI:87, CR:144), so the unused high bits are garbage.
@@ -55,6 +55,45 @@ that revision. CR wins over ABI (ABI:4, NORTH_STAR "Goal"). Every disagreement f
   `..._controlled` symbol exists, and "literal shapes" lists the `_hl`/`_lh`/`_ll`/ternary
   spellings. Every variant is its own row in the core tables, because the ABI lists them
   separately.
+
+## Calling convention: reference toolchain and wide literals (2026-11-17, kmgy.33)
+
+The reference for how arguments cross is **LLVM 19.1.7** (Homebrew `llvm@19`,
+`/usr/local/opt/llvm@19/bin/clang`): CQ_lang pins exactly it to compile the programs that call this
+library (CQ_lang `CMakeLists.txt:1-22`). LLVM 22 is used for ASan builds only; Apple clang is not a
+reference. `tests/ir/caller.ll` is compiled by `${CQ_LLVM_PREFIX}/bin/clang` (CMake cache variable,
+default `/usr/local/opt/llvm@19`); with another clang the `ir_abi_*` tests run and
+`ir_abi_reference` reports Skipped, without clang they are not built. The library itself needs any
+C11 compiler with `__int128` (built and tested with Apple clang 17, LLVM 19.1.7, LLVM 22, GCC 15).
+
+Measured on x86-64 with IR calls into a register and stack dump stub, at -O0 and -O2. `r` is the
+number of integer argument registers (rdi rsi rdx rcx r8 r9) taken by earlier arguments, the
+hidden result pointer included; `double` arguments go in XMM registers and do not count.
+
+- `i200` (four 64-bit parts, low first). r ≤ 2: four registers. r = 3: limbs 0-2 in rcx r8 r9,
+  limb 3 on the stack. r = 4: limbs 0-1 in r8 r9, limbs 2-3 on the stack. **r = 5: all four on
+  the stack and r9 stays unused, also by every later argument** (they follow on the stack).
+  r = 6: all four on the stack. Four `uint64_t` C parameters agree everywhere except r = 5, where
+  C puts limb 0 in r9 (so does LLVM 22; Apple clang 17 does what LLVM 19 does).
+- `i128` and `i100` (two parts): r ≤ 4: two registers; r = 5: both on the stack, r9 unused by
+  later arguments too. C `unsigned __int128` compiled by clang 19 does the same, so C and IR agree
+  (LLVM 22 differs: it lets a later argument use r9, and splits `i100`). No symbol has a two-part
+  literal starting at r = 5 (the most is `_llq_unc`: `o`, two literals, `k` in r9).
+- Narrow integers: one register; bits above W are undefined (`i8 -1` arrives as `0xff`).
+- Returns: `i200` through a hidden pointer in rdi (a 32-byte slot; LLVM writes 25 bytes), as the
+  C `cqrt_u256`; `i80 i100 i128` in RAX:RDX; `half bfloat float double` in XMM0; `x86_fp80` in
+  ST0. All checked by `tests/ir/`.
+
+So a wide literal that would begin at r = 5 has one unused `uint64_t <x>_r9` before its limbs in
+the C prototype (a C caller passes 0 there): with r9 taken, C puts the limbs and every later
+argument on the stack exactly as LLVM 19 does, whatever compiler builds the library. The
+ternary shape macros (`CQ_TPL_TERN_PARAMS_`, `include/cq_template.h`) count r per operand, so this
+follows the width list and the shapes. Today it is exactly `cq_template_{fshl,fshr}_i200_qll`,
+`_lql` (third operand, r = 1 + 4) and `_llq_unc` (second operand, r = 1 + 4). Core, tape `_lit`,
+bus, rotations, the binary `_hl`/`_lh` shapes and every other ternary shape start a wide literal
+at r ≤ 4 and are unchanged. ABI:1050-1052 ("N/64 registers when all fit, else all on the stack
+with the remaining registers skipped") does not match LLVM 19.1.7 for r = 3 and r = 4, which
+split, and does not say that later arguments do not use a skipped register.
 
 ## Core gates, §1 (all in scope: NORTH_STAR "Core (§1)")
 

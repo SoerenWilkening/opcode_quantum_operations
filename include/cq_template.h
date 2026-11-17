@@ -71,17 +71,48 @@ CQ_WIDTHS_WIDE(CQ_TPL_ARITH_DECL_WIDE_)
  * xor_<W>_hl with all ones). shl, lshr, ashr (a, k): bare, _hl (literal k), _lh (literal a).
  * fshl, fshr (a, b, k): bare and every mixed shape _qql _qlq _qll _lqq _lql _llq, a letter per
  * operand, q a handle and l a literal. The amount k has width W like the value, and every shift
- * is by ⟦k⟧ mod W (CR §2). A literal is <T> as above, at i200 four limbs named a0..a3 (b, k). */
-#define CQ_TPL_NLIT_NARROW_(bits, x) CQRT_UINT(bits) x
-#define CQ_TPL_NLIT_WIDE_(bits, x) uint64_t x##0, uint64_t x##1, uint64_t x##2, uint64_t x##3
-#define CQ_TPL_P_q_(LIT, bits, x) uint32_t x
-#define CQ_TPL_P_l_(LIT, bits, x) LIT(bits, x)
-/* The parameter list (a, b, k) of shape s0 s1 s2 at width bits; LIT is CQ_TPL_NLIT_*. */
-#define CQ_TPL_TERN_PARAMS_(LIT, bits, s0, s1, s2) \
-    CQ_TPL_P_##s0##_(LIT, bits, a), CQ_TPL_P_##s1##_(LIT, bits, b), CQ_TPL_P_##s2##_(LIT, bits, k)
+ * is by ⟦k⟧ mod W (CR §2). A literal is <T> as above, at i200 four limbs named a0..a3 (b, k).
+ * A wide literal that would begin in the last integer argument register, five already taken
+ * (_qll, _lql, _llq_unc), is preceded by an unused uint64_t x_r9: LLVM 19.1.7 passes such a
+ * literal all on the stack and leaves r9 unused (docs/ABI_SYMBOLS.md); a C caller passes 0 there. */
+#define CQ_TPL_NLIT_NARROW_(bits, x, r) CQRT_UINT(bits) x
+#define CQ_TPL_NLIT_WIDE_(bits, x, r) \
+    CQ_TPL_AT_R9_(r, __attribute__((unused)) uint64_t x##_r9,) uint64_t x##0, uint64_t x##1, uint64_t x##2, uint64_t x##3
+/* r: the integer argument registers taken before an operand, as a token; CQ_TPL_N_(r, s) is r after
+ * operand s (a handle takes 1, a wide literal 4). CQ_TPL_AT_R9_(r, ...) is ... where r is 5, else empty. */
+#define CQ_TPL_N_(r, s) CQ_TPL_N2_(r, s)
+#define CQ_TPL_N2_(r, s) CQ_TPL_N_##s##_##r
+#define CQ_TPL_N_q_0 1
+#define CQ_TPL_N_q_1 2
+#define CQ_TPL_N_q_2 3
+#define CQ_TPL_N_q_4 5
+#define CQ_TPL_N_q_5 6
+#define CQ_TPL_N_l_0 4
+#define CQ_TPL_N_l_1 5
+#define CQ_TPL_N_l_2 6
+#define CQ_TPL_N_l_4 8
+#define CQ_TPL_N_l_5 9
+#define CQ_TPL_AT_R9_(r, ...) CQ_TPL_AT_R9_2_(r, __VA_ARGS__)
+#define CQ_TPL_AT_R9_2_(r, ...) CQ_TPL_R9_##r(__VA_ARGS__)
+#define CQ_TPL_R9_0(...)
+#define CQ_TPL_R9_1(...)
+#define CQ_TPL_R9_2(...)
+#define CQ_TPL_R9_3(...)
+#define CQ_TPL_R9_4(...)
+#define CQ_TPL_R9_5(...) __VA_ARGS__
+#define CQ_TPL_R9_6(...)
+#define CQ_TPL_R9_8(...)
+#define CQ_TPL_R9_9(...)
+#define CQ_TPL_P_q_(LIT, bits, x, r) uint32_t x
+#define CQ_TPL_P_l_(LIT, bits, x, r) LIT(bits, x, r)
+/* The parameter list (a, b, k) of shape s0 s1 s2 at width bits, r registers taken before it (0, or
+ * 1 after the _unc result); LIT is CQ_TPL_NLIT_*. */
+#define CQ_TPL_TERN_PARAMS_(LIT, bits, r, s0, s1, s2) \
+    CQ_TPL_P_##s0##_(LIT, bits, a, r), CQ_TPL_P_##s1##_(LIT, bits, b, CQ_TPL_N_(r, s0)), \
+    CQ_TPL_P_##s2##_(LIT, bits, k, CQ_TPL_N_(CQ_TPL_N_(r, s0), s1))
 #define CQ_TPL_TERN_DECL_(op, n, bits, LIT, s0, s1, s2, sfx) \
-    uint32_t cq_template_##op##_##n##sfx(CQ_TPL_TERN_PARAMS_(LIT, bits, s0, s1, s2)); \
-    void cq_template_##op##_##n##sfx##_unc(uint32_t o, CQ_TPL_TERN_PARAMS_(LIT, bits, s0, s1, s2));
+    uint32_t cq_template_##op##_##n##sfx(CQ_TPL_TERN_PARAMS_(LIT, bits, 0, s0, s1, s2)); \
+    void cq_template_##op##_##n##sfx##_unc(uint32_t o, CQ_TPL_TERN_PARAMS_(LIT, bits, 1, s0, s1, s2));
 /* X(args..., s0, s1, s2, suffix) for each of the seven shapes of a ternary op. */
 #define CQ_TPL_TERN_SHAPES(X, ...) \
     X(__VA_ARGS__, q, q, q, ) X(__VA_ARGS__, q, q, l, _qql) X(__VA_ARGS__, q, l, q, _qlq) X(__VA_ARGS__, q, l, l, _qll) \

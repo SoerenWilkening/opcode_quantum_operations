@@ -107,9 +107,9 @@ static inline uint32_t cq_tpl_run_lits(int op, uint32_t w, uint32_t o, uint32_t 
     const unsigned lits = CQ_TPL_M_##s0##_ | CQ_TPL_M_##s1##_ << 1 | CQ_TPL_M_##s2##_ << 2;
 /* One shape: use as CQ_TPL_TERN_SHAPES(CQ_TPL_TERN_, name, kop, n, bits, NLIT, LIMBS). */
 #define CQ_TPL_TERN_(name, kop, n, bits, NLIT, LIMBS, s0, s1, s2, sfx) \
-    uint32_t cq_template_##name##_##n##sfx(CQ_TPL_TERN_PARAMS_(NLIT, bits, s0, s1, s2)) { \
+    uint32_t cq_template_##name##_##n##sfx(CQ_TPL_TERN_PARAMS_(NLIT, bits, 0, s0, s1, s2)) { \
         CQ_TPL_TERN_ARGS_(LIMBS, s0, s1, s2) return cq_tpl_run_lits(kop, bits, 0, h, lits, v, 0); } \
-    void cq_template_##name##_##n##sfx##_unc(uint32_t o, CQ_TPL_TERN_PARAMS_(NLIT, bits, s0, s1, s2)) { \
+    void cq_template_##name##_##n##sfx##_unc(uint32_t o, CQ_TPL_TERN_PARAMS_(NLIT, bits, 1, s0, s1, s2)) { \
         CQ_TPL_TERN_ARGS_(LIMBS, s0, s1, s2) cq_tpl_run_lits(kop, bits, o, h, lits, v, 1); }
 
 #endif

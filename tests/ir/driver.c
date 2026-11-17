@@ -1,5 +1,6 @@
-/* Host side of the IR calling-convention test (kmgy.29): the checked-in caller.ll is compiled by
- * clang, calls every core entry point as LLVM IR would, and prints "FAIL <width>: <symbol> ...".
+/* Host side of the IR calling-convention test (kmgy.29, kmgy.33): the checked-in caller.ll is
+ * compiled by the reference LLVM (CMakeLists.txt, CQ_LLVM_PREFIX), calls the core, template and tape
+ * entry points as LLVM IR would, and prints "FAIL <width>: <symbol> ...".
  * Here: refuse a stale caller.ll (a width added to cq_widths.h without regenerating) and run it. */
 #include <stdio.h>
 #include <string.h>
@@ -7,6 +8,10 @@
 
 extern const char cq_ir_widths[];
 extern int cq_ir_caller(void);
+
+/* The tape's host callee for a wide literal field (found by name, dlsym). */
+#define ECHO_(n, bits) unsigned _BitInt(bits) cq_ir_echo_##n(unsigned _BitInt(bits) x) { return x; }
+CQ_WIDTHS_WIDE(ECHO_)
 
 #define W_(n, bits) #n ","
 #define F_(n, bits, T) #n ","
