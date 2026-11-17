@@ -1,0 +1,27 @@
+QEC bound: yes d=13
+QEC d=13 gates=123522976802 depth=2990073 T=168600 CX=48744666360 H=13085325496 nphys=494291 nlog=930 reserved=2823386 above=147290
+QTG state preparation — KP_20(p, w; 72), b = 5.00, x' = 1110
+  Eq. (2) registers  n=20 |c_bin|=7 |P_bin|=7 Ha=20 -> 54
+  NOT 0  CNOT 0  Toffoli 0  Ry 0  Rz 0
+  T = 0  (7/Toffoli — a LOWER BOUND: the 0 Ry are unsynthesised here; their cost is the qec sink's, at eps = 0.125)
+  peak qubits 930   live at exit 930
+  rotations OK: 20 controlled biased Hadamards, angles bitwise Eq. (3)
+  Ry accuracy eps = 0.125 -> CQOPS_QEC_PRECISION=3 (config epsilon is the FAILURE BUDGET, a different quantity)
+     2263,01 real      2235,92 user         3,16 sys
+            48160768  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+               12064  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   1  voluntary context switches
+              351607  involuntary context switches
+      22804776497520  instructions retired
+       7838012788775  cycles elapsed
+            47353856  peak memory footprint

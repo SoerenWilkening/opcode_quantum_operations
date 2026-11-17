@@ -1,0 +1,48 @@
+% labreport entry 33 — 2026-10-06
+% labreport-to: 27d9b4c
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{33}{field}.
+
+\entry{33}{2026-10-06}{Verify sampled faults in the noisy four-item QTG}
+
+\begin{generated}
+  \gitem{Range}{\texttt{27d9b4c..27d9b4c}}
+  \gitem{Tree}{\emph{dirty at capture} --- 4 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{722} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{723} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 355 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{none in range at capture}
+  \gitem{Beads closed}{\bead{abhl} Measure noisy n=4 F=4 QTG with frame and decoder enabled, \bead{31t6} Measure n=20 QTG F=1 and estimate remaining factory arms, \bead{bw2h} Remeasure n=4 QTG generation with updated QEC}
+  \gitem{Beads filed}{\bead{ezzo} Verify actual sampled faults in noisy n4 F4 QTG run, \bead{abhl} Measure noisy n=4 F=4 QTG with frame and decoder enabled, \bead{31t6} Measure n=20 QTG F=1 and estimate remaining factory arms, \bead{bw2h} Remeasure n=4 QTG generation with updated QEC}
+\end{generated}
+
+
+\field{The ask}
+Verify the maintainer's concern that a long noisy QTG appeared to encounter
+no errors. Entry 32 reported decode invocations but omitted sampled faults.
+
+\field{What landed}
+\bead{ezzo}: a scratch driver reads existing internal QEC noise diagnostics
+and census after the circuit. Exact config and seed from entry 32 were reused;
+resource and PHYS report rows are byte-identical. Instrument and logs are
+archived with \texttt{FAULT\_VERIFICATION.md} beside entry 32's results.
+No library or QEC source was changed.
+
+\field{Measured}
+\begin{figures}
+  \fig{717,119 sampled Pauli faults; 713,544 measurement-bit flips; 2,959,434 sampled rounds}{\texttt{qec\_noise\_diag\_take} in scratch \texttt{qtg\_faults.c}}{Release QEC89d5bf4/cqops27d9b4c, n=4 F=4 seed42, pX=pY=pZ=1e-3/3 pM=1e-3, frame on, union\_find configured}
+  \fig{12,490 accumulator bits dropped, 8,276 unmodelled readout flips, 13,582 injection branch flips}{\texttt{qec\_noise\_census\_take}}{same run; model gaps documented in QEC \texttt{src/noise.h}}
+\end{figures}
+The noise sampler fired. Zero decode calls cannot be read as zero sampled
+errors or successful correction. The model's drop and unmodelled-consequence
+counters also preclude presenting this as a decoded QTG success experiment.
+
+\field{Not taken}
+No QEC changes or circuit-decoder implementation were requested. No logical
+failure-rate estimate was made from these counts.
+
+\field{Verified}
+Release repeat exited zero; ordered rotation checks passed; config hash,
+QEC resource row and PHYS row equal the original seeded run exactly.
+The two sampled-error counters are nonzero. No Debug or general-suite result
+is claimed.

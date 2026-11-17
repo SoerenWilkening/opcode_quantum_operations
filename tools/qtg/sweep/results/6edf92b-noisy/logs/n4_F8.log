@@ -1,0 +1,28 @@
+QEC bound: yes d=9
+QEC d=9 gates=3652645565 depth=300371 T=18840 CX=1430627994 H=398311227 nphys=37223 nlog=126 reserved=261464 above=11529
+PHYS bits=384216741 bits_x=194791536 bits_z=189425205 rounds=1473102 round_max=2591 round_min=80 decodes=0 find=0 union=0 grow=0 peel=0 corr=0 p=(0.001,0.001,0.001,0.001) d=9 decoder=1 seed=42 noise_seed=2949826092126892291 outcome_seed=5139283748462763858 shot=0
+QTG state preparation — KP_4(p, w; 7), b = 1.00, x' = 1110
+  Eq. (2) registers  n=4 |c_bin|=4 |P_bin|=4 Ha=4 -> 16
+  NOT 0  CNOT 0  Toffoli 0  Ry 0  Rz 0
+  T = 0  (7/Toffoli — a LOWER BOUND: the 0 Ry are unsynthesised here; their cost is the qec sink's, at eps = 0.125)
+  peak qubits 126   live at exit 126
+  rotations OK: 4 controlled biased Hadamards, angles bitwise Eq. (3)
+  Ry accuracy eps = 0.125 -> CQOPS_QEC_PRECISION=3 (config epsilon is the FAILURE BUDGET, a different quantity)
+      192,41 real       169,69 user         0,70 sys
+            11505664  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                3110  page reclaims
+                   0  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                   2  voluntary context switches
+              106813  involuntary context switches
+        662093691528  instructions retired
+        470616352338  cycles elapsed
+            10727424  peak memory footprint

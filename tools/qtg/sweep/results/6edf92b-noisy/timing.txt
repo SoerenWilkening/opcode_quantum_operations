@@ -1,0 +1,15 @@
+# wall clock and peak RSS, one core per arm, TWELVE arms in parallel on 6 physical cores
+# NOISY execution: libqec at CQ_lang_hardware 6edf92b, libcqops a78c12b, 2026-09-06
+# seed 42, p_x=p_y=p_z=p_m=1e-3, decoder union_find, frame true
+n4_F1       188,70 real 166,16 user 0,68 sys 7667712 maximum resident set size
+n4_F2       186,79 real 164,02 user 0,67 sys 6651904 maximum resident set size
+n4_F4       188,77 real 165,45 user 0,67 sys 6889472 maximum resident set size
+n4_F8       192,41 real 169,69 user 0,70 sys 11505664 maximum resident set size
+n4_F16      194,32 real 171,55 user 0,71 sys 18345984 maximum resident set size
+n4_F32      203,29 real 180,81 user 0,74 sys 14852096 maximum resident set size
+n20_F1      8153,37 real 3353,42 user 8,89 sys 27291648 maximum resident set size
+n20_F2      8118,48 real 3318,01 user 8,87 sys 27492352 maximum resident set size
+n20_F4      8055,01 real 3255,37 user 8,90 sys 27824128 maximum resident set size
+n20_F8      8051,60 real 3252,11 user 8,75 sys 29384704 maximum resident set size
+n20_F16     8096,28 real 3296,36 user 8,89 sys 60440576 maximum resident set size
+n20_F32     8208,87 real 3408,72 user 8,88 sys 47087616 maximum resident set size

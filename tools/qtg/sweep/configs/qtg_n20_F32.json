@@ -1,0 +1,29 @@
+{
+    "_comment": "QTG factory-size sweep, n20, factory_count=32. Derived from the shipped tools/qtg config; circuit.* MEASURED (counter sink + mint probe with recycling off), d_max = the distance compute_code_distance derives at these figures. Only the literal key `_comment` is accepted per object level.",
+    "schema_version": 1,
+    "layout": "comb",
+    "d_max": 13,
+    "n_gates_hint": 4898,
+    "hardware": {
+        "_comment": "platform and topology each accept EXACTLY ONE value (src/config.c:14-15), so 'superconducting, nearest neighbour' is not a choice to make \u2014 square_lattice IS the nearest-neighbour surface-code lattice, and any other string is a hard config error. floor_plan likewise accepts only fast_block.",
+        "platform": "superconducting",
+        "topology": "square_lattice",
+        "physical_error_rate": 0.001,
+        "factory_count": 32,
+        "floor_plan": "fast_block"
+    },
+    "circuit": {
+        "_comment": "epsilon here is the TOTAL ACCEPTABLE CIRCUIT ERROR (1/3), not the rotation accuracy -- that is QTG_RY_EPSILON in instance.h, reaching the library as CQOPS_QEC_PRECISION. n_logical is MINTED, not peak: the qec sink disables index recycling (PRD 15 D21(b)), so it must cover every qubit the program ever takes -- measured 126 at uniform 4-bit qints, where peak is only 35. n_clifford_estimate and epsilon derive the code distance (COST_SCALING.md: per_clifford_error = (epsilon/2)/(n_clifford*n_logical)); n_t_estimate provably does NOT -- compute_code_distance takes it and discards it.",
+        "n_logical": 930,
+        "n_t_estimate": 11320,
+        "n_clifford_estimate": 3298,
+        "epsilon": 0.3333333333333333
+    },
+    "correction_probs": {
+        "injection_s": 1.0,
+        "lattice_merge_byproduct": 1.0,
+        "lattice_split_byproduct": 1.0,
+        "syndrome_x_correction": 1.0,
+        "syndrome_z_correction": 1.0
+    }
+}

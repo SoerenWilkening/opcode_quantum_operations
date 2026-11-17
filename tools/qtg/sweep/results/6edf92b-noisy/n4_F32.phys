@@ -1,0 +1,1 @@
+PHYS bits=390528531 bits_x=197535060 bits_z=192993471 rounds=1467162 round_max=4211 round_min=80 decodes=0 find=0 union=0 grow=0 peel=0 corr=0 p=(0.001,0.001,0.001,0.001) d=9 decoder=1 seed=42 noise_seed=2949826092126892291 outcome_seed=5139283748462763858 shot=0

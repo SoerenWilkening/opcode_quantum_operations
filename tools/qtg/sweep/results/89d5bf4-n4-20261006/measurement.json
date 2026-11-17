@@ -1,0 +1,76 @@
+{
+  "cqops": "27d9b4cea3e010298982fc1f114211d07a0caf75",
+  "qec": "89d5bf479ab4397d4cc96702ecb1d5bd2ad4e46a",
+  "configuration": "Release, n=4, noiseless, serial QEC, no trace, sequential arms",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.6.4.2)",
+  "date": "2026-10-06 11:12:02 +0200",
+  "instrument": "/usr/bin/time -p; Python perf_counter end-to-end",
+  "rows": [
+    {
+      "factories": 1,
+      "rc": 0,
+      "elapsed_seconds": 14.532779494000351,
+      "config_sha256": "3a31d0d9e4cab4f84af00e5ab68ce2c5abc0cd72f72f60fc88a453856b7df01f",
+      "row": "QEC d=9 gates=4251567606 depth=2713662 T=18840 CX=2716068564 H=757496295 nphys=26585 nlog=126 reserved=128800 above=342",
+      "real_seconds": 14.52,
+      "user_seconds": 14.46,
+      "sys_seconds": 0.03,
+      "rotation_checks_passed": true
+    },
+    {
+      "factories": 2,
+      "rc": 0,
+      "elapsed_seconds": 14.433688683000582,
+      "config_sha256": "08a7fac20b4dfec11f7f080b7c431a19810e51d3df821aaee8bc04bb33f28081",
+      "row": "QEC d=9 gates=4214974920 depth=1357245 T=18840 CX=2693028276 H=750720537 nphys=26585 nlog=126 reserved=149408 above=342",
+      "real_seconds": 14.42,
+      "user_seconds": 14.35,
+      "sys_seconds": 0.03,
+      "rotation_checks_passed": true
+    },
+    {
+      "factories": 4,
+      "rc": 0,
+      "elapsed_seconds": 14.46654795699942,
+      "config_sha256": "9c3d7a02f3fc1dfbe1a70385fae2abd13aa82e23a13baceecf89a44a2659cff5",
+      "row": "QEC d=9 gates=4237223217 depth=679217 T=18840 CX=2706835860 H=755101170 nphys=26585 nlog=126 reserved=186760 above=342",
+      "real_seconds": 14.46,
+      "user_seconds": 14.39,
+      "sys_seconds": 0.03,
+      "rotation_checks_passed": true
+    },
+    {
+      "factories": 8,
+      "rc": 0,
+      "elapsed_seconds": 14.733927596000285,
+      "config_sha256": "574c9a592edaa435d02026185a048a3b3186b8966ec3851dd2b0e2859fc5128a",
+      "row": "QEC d=9 gates=4283419578 depth=341329 T=18840 CX=2736641268 H=762727563 nphys=26585 nlog=126 reserved=261464 above=342",
+      "real_seconds": 14.72,
+      "user_seconds": 14.65,
+      "sys_seconds": 0.03,
+      "rotation_checks_passed": true
+    },
+    {
+      "factories": 16,
+      "rc": 0,
+      "elapsed_seconds": 14.652623519001281,
+      "config_sha256": "71d373035f35f3e3c7d4977e1283b299d5b9377793e035c91ceea5105f3154a4",
+      "row": "QEC d=9 gates=4269033726 depth=211512 T=18840 CX=2727498312 H=760136247 nphys=28088 nlog=126 reserved=513912 above=396",
+      "real_seconds": 14.64,
+      "user_seconds": 14.57,
+      "sys_seconds": 0.03,
+      "rotation_checks_passed": true
+    },
+    {
+      "factories": 32,
+      "rc": 0,
+      "elapsed_seconds": 14.907788607999464,
+      "config_sha256": "4ddf7afe0731218ce0de0cb2ef9cdcebd8013dd830e05f2a4c1f73951516124a",
+      "row": "QEC d=9 gates=4319400561 depth=206784 T=18840 CX=2760302988 H=768057426 nphys=29117 nlog=126 reserved=807576 above=459",
+      "real_seconds": 14.9,
+      "user_seconds": 14.82,
+      "sys_seconds": 0.03,
+      "rotation_checks_passed": true
+    }
+  ]
+}

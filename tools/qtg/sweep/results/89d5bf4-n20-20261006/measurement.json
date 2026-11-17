@@ -1,0 +1,39 @@
+{
+  "cqops": "27d9b4cea3e010298982fc1f114211d07a0caf75",
+  "qec": "89d5bf479ab4397d4cc96702ecb1d5bd2ad4e46a",
+  "compiler": "Apple clang version 17.0.0 (clang-1700.6.4.2)",
+  "configuration": "Release, n=20, noiseless, serial QEC, no trace, sequential arms",
+  "date": "2026-10-06 11:15:40 +0200",
+  "instrument": "/usr/bin/time -p; Python perf_counter end-to-end",
+  "rows": [
+    {
+      "factories": 1,
+      "rc": 0,
+      "elapsed_seconds": 423.0480755129993,
+      "config_sha256": "32c3c3cb69585f309fa0ead655d146b74cebe88f7e6580fcc9aa019c6b2a2fff",
+      "row": "QEC d=13 gates=131088462274 depth=34980350 T=168600 CX=84850969068 H=22866036872 nphys=350173 nlog=930 reserved=1486170 above=1378",
+      "real_seconds": 423.04,
+      "user_seconds": 420.32,
+      "sys_seconds": 1.02,
+      "rotation_checks_passed": true
+    }
+  ],
+  "load_at_start": [
+    5.9189453125,
+    5.7880859375,
+    4.70068359375
+  ],
+  "stopped_by_user": true,
+  "completed_factories": [
+    1
+  ],
+  "interrupted_factories": [
+    2
+  ],
+  "not_run_factories": [
+    4,
+    8,
+    16,
+    32
+  ]
+}

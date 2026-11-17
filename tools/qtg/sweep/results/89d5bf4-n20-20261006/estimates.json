@@ -1,0 +1,38 @@
+[
+  {
+    "factories": 1,
+    "generation_seconds": 423.04,
+    "depth": 34980350,
+    "status": "measured"
+  },
+  {
+    "factories": 2,
+    "generation_seconds": 420.12650137741053,
+    "depth": 17522907.499648977,
+    "status": "estimated"
+  },
+  {
+    "factories": 4,
+    "generation_seconds": 421.2919008264463,
+    "depth": 8761877.804504205,
+    "status": "estimated"
+  },
+  {
+    "factories": 8,
+    "generation_seconds": 428.8669972451791,
+    "depth": 4308566.69132948,
+    "status": "estimated"
+  },
+  {
+    "factories": 16,
+    "generation_seconds": 426.5361983471075,
+    "depth": 2409226.152453658,
+    "status": "estimated"
+  },
+  {
+    "factories": 32,
+    "generation_seconds": 434.1112947658402,
+    "depth": 2355371.897145208,
+    "status": "estimated"
+  }
+]

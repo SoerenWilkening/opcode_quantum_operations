@@ -1,0 +1,49 @@
+% labreport entry 31 — 2026-10-06
+% labreport-to: 27d9b4c
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{31}{field}.
+
+\entry{31}{2026-10-06}{Twenty-item QTG generation timing after QEC updates}
+
+\begin{generated}
+  \gitem{Range}{\texttt{27d9b4c..27d9b4c}}
+  \gitem{Tree}{\emph{dirty at capture} --- 2 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{722} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{723} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 353 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{none in range at capture}
+  \gitem{Beads closed}{\bead{bw2h} Remeasure n=4 QTG generation with updated QEC}
+  \gitem{Beads filed}{\bead{31t6} Remeasure n=20 QTG generation with updated QEC, \bead{bw2h} Remeasure n=4 QTG generation with updated QEC}
+\end{generated}
+
+
+\field{The ask}
+Remeasure the twenty-item QTG and report each completed factory arm. After
+F=1 finished, the maintainer stopped the sweep and requested estimates for
+remaining arms and a comparison of depth.
+
+\field{What landed}
+\bead{31t6}: one complete Release measurement and explicitly marked
+estimates, with logs and provenance preserved in
+\texttt{tools/qtg/sweep/results/89d5bf4-n20-20261006/} (gitignored).
+QEC \texttt{89d5bf4}, cqops \texttt{27d9b4c}; the same libraries as entry 30.
+
+\field{Measured}
+\begin{figures}
+  \fig{F=1 wall 423.04\,s, user 420.32\,s, sys 1.02\,s}{\texttt{/usr/bin/time -p}}{Release, Apple clang 17, n=20, serial noiseless QEC, no trace}
+  \fig{depth 34{,}980{,}350 vs archived 30{,}158{,}209}{\texttt{qtg\_depth.c}, \texttt{qec\_depth}}{same F=1 Release run, d=13; September QEC \texttt{6edf92b}}
+\end{figures}
+Depth grew about 16\%, while host generation is about 7.2 times faster than
+the archived wall measurement; the older cqops revision and concurrent arms
+prevent attributing that ratio solely to QEC. Estimates scale current n=4
+wall ratios onto n=20 F=1 and apply n=4's per-factory depth changes to the
+archived n=20 depth rows. They are extrapolations, especially near the floor.
+
+\field{Not taken}
+The remaining sweep was stopped at the maintainer's request. F=2 was
+interrupted and its partial timing excluded; F=4/8/16/32 were not run.
+
+\field{Verified}
+Only F=1: exit zero, ordered rotation checks passed, QEC bound at d=13,
+930 logical qubits and 168{,}600 T gates. No completed result is claimed for
+another factory count. No Debug or general test-suite result is claimed.

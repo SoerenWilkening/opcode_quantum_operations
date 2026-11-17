@@ -1,0 +1,56 @@
+% labreport entry 30 — 2026-10-06
+% labreport-to: 27d9b4c
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{30}{field}.
+
+\entry{30}{2026-10-06}{Four-item QTG generation timing after QEC updates}
+
+\begin{generated}
+  \gitem{Range}{\texttt{fa1e2f0..27d9b4c}}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{722} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{723} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 353 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{\begin{commitlist}
+    \item \texttt{27d9b4c} Seven lanes: 5u7m CI absent lists, urzt, qi4m Assertion tripwire, Debug -O1, fcmp map, fdiv row table, driver-test exec wait; labreport entry 29
+  \end{commitlist}}
+  \gitem{Beads closed}{none}
+  \gitem{Beads filed}{\bead{bw2h} Remeasure n=4 QTG generation with updated QEC}
+  \gitem{Diff}{\texttt{24 files changed, 870 insertions(+), 279 deletions(-)}}
+\end{generated}
+
+
+\field{The ask}
+Remeasure QTG generation after QEC efficiency improvements, starting with the
+four-item knapsack instance for quick results.
+
+\field{What landed}
+\bead{bw2h}: six noiseless factory configurations were measured sequentially
+with freshly built Release libraries. Raw logs, configuration hashes, CPU and
+wall times, resource rows and revision provenance are preserved under
+\texttt{tools/qtg/sweep/results/89d5bf4-n4-20261006/} (gitignored).
+The source revisions are QEC \texttt{89d5bf4} and cqops \texttt{27d9b4c}.
+
+\field{Measured}
+\begin{figures}
+  \fig{generation wall time 14.42--14.90\,s over six factory counts}{\texttt{/usr/bin/time -p}; raw logs and measurement.json}{Release, Apple clang 17, serial QEC, no trace; F=1/2/4/8/16/32, n=4}
+  \fig{depth at F=8: 341{,}329; F=16: 211{,}512; F=32: 206{,}784}{\texttt{qtg\_depth.c}, \texttt{qec\_depth}}{same Release runs, unchanged configs, d=9}
+\end{figures}
+Generation is roughly nine times faster than the archived September wall
+measurements. Those runs used concurrent arms and cqops \texttt{a78c12b}; this
+comparison does not isolate the contribution of QEC. Depth and gate counts
+also changed. Generation time is host computation time, while depth counts
+circuit layers. The machine had load average 9.33 near the start.
+
+\field{Not taken}
+No twenty-item sweep or noisy run was requested. Worker mode was not used:
+\texttt{qec\_set\_workers} requires two-level factories, whereas these
+unchanged configs select one-level factories. The initial detailed timing
+wrapper failed after a valid circuit because the sandbox refused
+\texttt{sysctl kern.clockrate}; its log is retained and its result is excluded
+from the table. Standard timing completed without that query.
+
+\field{Verified}
+Both libraries built in Release. All six measured runs returned zero,
+bound the QEC sink at d=9, reported 126 logical qubits and 18{,}840 T gates,
+and passed QTG's ordered rotation checks. These are benchmark runs; no Debug
+or general test-suite result is claimed.

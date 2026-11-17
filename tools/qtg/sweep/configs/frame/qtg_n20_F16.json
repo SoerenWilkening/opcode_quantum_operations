@@ -1,0 +1,37 @@
+{
+    "_comment": "QTG factory-size sweep, n20, factory_count=16, NOISY execution with the corrections TRACKED IN THE PAULI FRAME RATHER THAN APPLIED. Identical to configs/noisy/ except syndrome_x_correction = syndrome_z_correction = 0.0. Those two gate src/syndrome.c's per-round stab-shape enumeration, which src/correction.c states is NOT a textbook correction but a VISUALIZATION convention -- a Pauli on every adjacent data qubit of every stabilizer, every round. R-2 leaves them settable alongside `frame: true` precisely because the frame does not touch them, so this is the config the frame's own premise asks for: the byproducts are deferred into the frame and nothing is emitted for them.",
+    "schema_version": 1,
+    "layout": "comb",
+    "d_max": 13,
+    "n_gates_hint": 4898,
+    "hardware": {
+        "_comment": "platform and topology each accept EXACTLY ONE value (src/config.c:14-15), so 'superconducting, nearest neighbour' is not a choice to make \u2014 square_lattice IS the nearest-neighbour surface-code lattice, and any other string is a hard config error. floor_plan likewise accepts only fast_block.",
+        "platform": "superconducting",
+        "topology": "square_lattice",
+        "physical_error_rate": 0.001,
+        "factory_count": 16,
+        "floor_plan": "fast_block"
+    },
+    "circuit": {
+        "_comment": "epsilon here is the TOTAL ACCEPTABLE CIRCUIT ERROR (1/3), not the rotation accuracy -- that is QTG_RY_EPSILON in instance.h, reaching the library as CQOPS_QEC_PRECISION. n_logical is MINTED, not peak: the qec sink disables index recycling (PRD 15 D21(b)), so it must cover every qubit the program ever takes -- measured 126 at uniform 4-bit qints, where peak is only 35. n_clifford_estimate and epsilon derive the code distance (COST_SCALING.md: per_clifford_error = (epsilon/2)/(n_clifford*n_logical)); n_t_estimate provably does NOT -- compute_code_distance takes it and discards it.",
+        "n_logical": 930,
+        "n_t_estimate": 11320,
+        "n_clifford_estimate": 3298,
+        "epsilon": 0.3333333333333333
+    },
+    "correction_probs": {
+        "_comment": "0.0 = the stab-shape enumeration is not emitted; the Pauli is carried in the frame instead.",
+        "syndrome_x_correction": 0.0,
+        "syndrome_z_correction": 0.0
+    },
+    "seed": 42,
+    "noise": {
+        "_comment": "p_x+p_y+p_z = 3e-3 <= 1.0; p_m is independent (schema 3.2).",
+        "p_x": 0.001,
+        "p_y": 0.001,
+        "p_z": 0.001,
+        "p_m": 0.001
+    },
+    "decoder": "union_find",
+    "frame": true
+}

@@ -1,0 +1,37 @@
+{
+    "_comment": "QTG factory-size sweep, n20, factory_count=8, NOISY EXECUTION. The full physics path of schema 4.2's legal-combination table: frame on, union_find decoder, phenomenological noise. circuit.* and d_max are the noiseless run's MEASURED figures, unchanged. Only the literal key `_comment` is accepted per object level.",
+    "schema_version": 1,
+    "layout": "comb",
+    "d_max": 13,
+    "n_gates_hint": 4898,
+    "hardware": {
+        "_comment": "platform and topology each accept EXACTLY ONE value (src/config.c:14-15), so 'superconducting, nearest neighbour' is not a choice to make \u2014 square_lattice IS the nearest-neighbour surface-code lattice, and any other string is a hard config error. floor_plan likewise accepts only fast_block.",
+        "platform": "superconducting",
+        "topology": "square_lattice",
+        "physical_error_rate": 0.001,
+        "factory_count": 8,
+        "floor_plan": "fast_block"
+    },
+    "circuit": {
+        "_comment": "epsilon here is the TOTAL ACCEPTABLE CIRCUIT ERROR (1/3), not the rotation accuracy -- that is QTG_RY_EPSILON in instance.h, reaching the library as CQOPS_QEC_PRECISION. n_logical is MINTED, not peak: the qec sink disables index recycling (PRD 15 D21(b)), so it must cover every qubit the program ever takes -- measured 126 at uniform 4-bit qints, where peak is only 35. n_clifford_estimate and epsilon derive the code distance (COST_SCALING.md: per_clifford_error = (epsilon/2)/(n_clifford*n_logical)); n_t_estimate provably does NOT -- compute_code_distance takes it and discards it.",
+        "n_logical": 930,
+        "n_t_estimate": 11320,
+        "n_clifford_estimate": 3298,
+        "epsilon": 0.3333333333333333
+    },
+    "correction_probs": {
+        "syndrome_x_correction": 1.0,
+        "syndrome_z_correction": 1.0,
+        "_comment": "R-2 (EXECUTION_SEMANTICS_SCHEMA.md 5.2): with `frame: true` the keys injection_s / lattice_merge_byproduct / lattice_split_byproduct / and_uncompute_cz are a HARD LOAD REFUSAL -- the frame supersedes them, so they are REMOVED here, not set to 1.0. syndrome_x/z_correction are explicitly NOT in the refusal set (they gate the stab-shape enumeration, which the frame does not touch) and stay at 1.0."
+    },
+    "seed": 42,
+    "noise": {
+        "_comment": "p_x+p_y+p_z = 3e-3 <= 1.0; p_m is independent (schema 3.2).",
+        "p_x": 0.001,
+        "p_y": 0.001,
+        "p_z": 0.001,
+        "p_m": 0.001
+    },
+    "decoder": "union_find",
+    "frame": true
+}

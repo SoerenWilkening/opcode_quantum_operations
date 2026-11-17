@@ -1,0 +1,14 @@
+# wall clock and peak RSS, one core per arm, ten arms in parallel on 6 physical cores
+# libqec at CQ_lang_hardware 6edf92b, libcqops a78c12b, 2026-09-06
+n4_F1       132,19 real 129,43 user 0,25 sys 7340032 maximum resident set size
+n4_F2       130,57 real 127,84 user 0,24 sys 6385664 maximum resident set size
+n4_F4       131,85 real 129,01 user 0,25 sys 6529024 maximum resident set size
+n4_F8       134,88 real 131,95 user 0,26 sys 11137024 maximum resident set size
+n4_F16      136,24 real 133,39 user 0,27 sys 18100224 maximum resident set size
+n4_F32     
+n20_F1      3043,58 real 2921,73 user 6,72 sys 28606464 maximum resident set size
+n20_F2      3017,96 real 2896,05 user 6,69 sys 28987392 maximum resident set size
+n20_F4      2962,23 real 2840,17 user 6,64 sys 28930048 maximum resident set size
+n20_F8      2960,05 real 2838,08 user 6,65 sys 29405184 maximum resident set size
+n20_F16     3003,33 real 2881,43 user 6,72 sys 63488000 maximum resident set size
+n20_F32     2263,01 real 2235,92 user 3,16 sys 48160768 maximum resident set size (run alone, not in the 10-arm batch)

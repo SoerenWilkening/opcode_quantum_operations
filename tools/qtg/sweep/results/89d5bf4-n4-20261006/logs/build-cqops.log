@@ -1,0 +1,133 @@
+-- The C compiler identification is AppleClang 17.0.0.17000604
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- cqops: qec sink enabled from /Users/sorenwilkening/Desktop/Projects/CQ_lang_hardware/qec
+-- cqops: fp host probe OK — round-to-nearest, FTZ/DAZ off, PRD-v2 §7.4's five NaN cells exact (10 arm(s))
+-- cqops: D20's per-gate pin configured against QEC 89d5bf479ab4397d4cc96702ecb1d5bd2ad4e46a (0 porcelain line(s) under qec/)
+-- cqops: python suites enabled — /Users/sorenwilkening/.pyenv/versions/3.11.9/bin/python3 (python 3.11.9 6.0.3 PyYAML)
+-- cqops: L6 (Step 24) not registered — configure with -DCQOPS_CQLANG_DIR=<a built CQ_lang> to run CQ_lang's e2e fixtures against this archive
+-- cqops: L7 §12(1) not registered — configure with -DCQOPS_CQLANG_DIR=<a built CQ_lang> to compile PRD §12's Grover through cqc and link it against this archive
+-- cqops: installed CQBackend package test not registered — configure with -DCQOPS_CQLANG_DIR=<a CQ_lang checkout whose backend ABI id matches backend-manifest.json> whose build tree has been configured
+-- cqops: sanitizer tripwire armed on 630 death cases
+-- Configuring done (4.2s)
+-- Generating done (2.0s)
+-- Build files have been written to: /tmp/qtg-n4-20261006/build-cqops
+[  0%] Building C object CMakeFiles/cqops.dir/src/version.c.o
+[  0%] Building C object CMakeFiles/cqops.dir/src/shadow.c.o
+[  0%] Building C object CMakeFiles/cqops.dir/src/emit.c.o
+[  0%] Building C object CMakeFiles/cqops.dir/src/qubits.c.o
+[  3%] Building C object CMakeFiles/cqops.dir/src/sink.c.o
+[  3%] Building C object CMakeFiles/cqops.dir/src/ctx.c.o
+[  3%] Building C object CMakeFiles/cqops.dir/src/controlled.c.o
+[  6%] Building C object CMakeFiles/cqops.dir/src/reg.c.o
+[  6%] Building C object CMakeFiles/cqops.dir/src/reg_check.c.o
+[  6%] Building C object CMakeFiles/cqops.dir/src/scratch.c.o
+[  6%] Building C object CMakeFiles/cqops.dir/src/sandwich.c.o
+[ 10%] Building C object CMakeFiles/cqops.dir/src/sink_printf.c.o
+[ 10%] Building C object CMakeFiles/cqops.dir/src/sink_count.c.o
+[ 10%] Building C object CMakeFiles/cqops.dir/src/sink_qec.c.o
+[ 13%] Building C object CMakeFiles/cqops.dir/src/sink_qec_angle.c.o
+[ 13%] Building C object CMakeFiles/cqops.dir/src/kernels/bitwise.c.o
+[ 13%] Building C object CMakeFiles/cqops.dir/src/kernels/shift_const.c.o
+[ 13%] Building C object CMakeFiles/cqops.dir/src/kernels/cast.c.o
+[ 16%] Building C object CMakeFiles/cqops.dir/src/kernels/add.c.o
+[ 16%] Building C object CMakeFiles/cqops.dir/src/kernels/cmp.c.o
+[ 16%] Building C object CMakeFiles/cqops.dir/src/kernels/mux.c.o
+[ 16%] Building C object CMakeFiles/cqops.dir/src/kernels/shift_var.c.o
+[ 20%] Building C object CMakeFiles/cqops.dir/src/kernels/addacc.c.o
+[ 20%] Building C object CMakeFiles/cqops.dir/src/kernels/mul.c.o
+[ 20%] Building C object CMakeFiles/cqops.dir/src/kernels/divrem_u.c.o
+[ 20%] Building C object CMakeFiles/cqops.dir/src/kernels/divrem_s.c.o
+[ 23%] Building C object CMakeFiles/cqops.dir/src/kernels/qrom.c.o
+[ 23%] Building C object CMakeFiles/cqops.dir/src/kernels/qstore.c.o
+[ 23%] Building C object CMakeFiles/cqops.dir/src/kernels/fpfield.c.o
+[ 26%] Building C object CMakeFiles/cqops.dir/src/kernels/fpclass.c.o
+[ 26%] Building C object CMakeFiles/cqops.dir/src/kernels/fconv.c.o
+[ 26%] Building C object CMakeFiles/cqops.dir/src/kernels/fconv_step.c.o
+[ 26%] Building C object CMakeFiles/cqops.dir/src/kernels/fconv_emit.c.o
+[ 30%] Building C object CMakeFiles/cqops.dir/src/kernels/fconv_eval.c.o
+[ 30%] Building C object CMakeFiles/cqops.dir/src/kernels/fdiv.c.o
+[ 30%] Building C object CMakeFiles/cqops.dir/src/kernels/fdiv_step.c.o
+[ 30%] Building C object CMakeFiles/cqops.dir/src/kernels/fdiv_operand.c.o
+[ 33%] Building C object CMakeFiles/cqops.dir/src/kernels/fdiv_emit.c.o
+[ 33%] Building C object CMakeFiles/cqops.dir/src/kernels/fdiv_eval.c.o
+[ 33%] Building C object CMakeFiles/cqops.dir/src/kernels/fcmp.c.o
+[ 33%] Building C object CMakeFiles/cqops.dir/src/kernels/fcmp_step.c.o
+[ 36%] Building C object CMakeFiles/cqops.dir/src/kernels/fpround.c.o
+[ 36%] Building C object CMakeFiles/cqops.dir/src/kernels/fpround_step.c.o
+[ 36%] Building C object CMakeFiles/cqops.dir/src/kernels/fpround_emit.c.o
+[ 40%] Building C object CMakeFiles/cqops.dir/src/kernels/fpround_eval.c.o
+[ 40%] Building C object CMakeFiles/cqops.dir/src/kernels/fmul.c.o
+[ 40%] Building C object CMakeFiles/cqops.dir/src/kernels/fmul_step.c.o
+[ 40%] Building C object CMakeFiles/cqops.dir/src/kernels/fmul_emit.c.o
+[ 43%] Building C object CMakeFiles/cqops.dir/src/kernels/fmul_eval.c.o
+[ 43%] Building C object CMakeFiles/cqops.dir/src/kernels/fsqrt.c.o
+[ 43%] Building C object CMakeFiles/cqops.dir/src/kernels/fsqrt_step.c.o
+[ 43%] Building C object CMakeFiles/cqops.dir/src/kernels/fsqrt_operand.c.o
+[ 46%] Building C object CMakeFiles/cqops.dir/src/kernels/fsqrt_emit.c.o
+[ 46%] Building C object CMakeFiles/cqops.dir/src/kernels/fsqrt_eval.c.o
+[ 46%] Building C object CMakeFiles/cqops.dir/src/kernels/fadd.c.o
+[ 46%] Building C object CMakeFiles/cqops.dir/src/kernels/fadd_step.c.o
+[ 50%] Building C object CMakeFiles/cqops.dir/src/kernels/fadd_operand.c.o
+[ 50%] Building C object CMakeFiles/cqops.dir/src/kernels/fadd_emit.c.o
+[ 53%] Building C object CMakeFiles/cqops.dir/src/kernels/fcmp_pred.c.o
+[ 53%] Building C object CMakeFiles/cqops.dir/src/kernels/fadd_eval.c.o
+[ 53%] Building C object CMakeFiles/cqops.dir/src/kernels/fma.c.o
+[ 53%] Building C object CMakeFiles/cqops.dir/src/kernels/fma_step.c.o
+[ 53%] Building C object CMakeFiles/cqops.dir/src/kernels/fma_operand.c.o
+[ 56%] Building C object CMakeFiles/cqops.dir/src/kernels/fma_emit.c.o
+[ 56%] Building C object CMakeFiles/cqops.dir/src/kernels/fma_eval.c.o
+[ 56%] Building C object CMakeFiles/cqops.dir/src/kernels/iminmax_step.c.o
+[ 56%] Building C object CMakeFiles/cqops.dir/src/kernels/iminmax.c.o
+[ 60%] Building C object CMakeFiles/cqops.dir/src/kernels/ibits.c.o
+[ 60%] Building C object CMakeFiles/cqops.dir/src/kernels/ibits_step.c.o
+[ 60%] Building C object CMakeFiles/cqops.dir/src/kernels/ibits_kernel.c.o
+[ 60%] Building C object CMakeFiles/cqops.dir/src/kernels/fmisc_sign.c.o
+[ 63%] Building C object CMakeFiles/cqops.dir/src/kernels/fmisc_rows.c.o
+[ 63%] Building C object CMakeFiles/cqops.dir/src/kernels/fmisc_step.c.o
+[ 63%] Building C object CMakeFiles/cqops.dir/src/kernels/fmisc_minmax.c.o
+[ 66%] Building C object CMakeFiles/cqops.dir/src/kernels/fround.c.o
+[ 66%] Building C object CMakeFiles/cqops.dir/src/kernels/fround_step.c.o
+[ 66%] Building C object CMakeFiles/cqops.dir/src/kernels/fround_operand.c.o
+[ 66%] Building C object CMakeFiles/cqops.dir/src/kernels/fround_fadd.c.o
+[ 70%] Building C object CMakeFiles/cqops.dir/src/kernels/fround_eval.c.o
+[ 70%] Building C object CMakeFiles/cqops.dir/src/kernels/fround_emit.c.o
+[ 70%] Building C object CMakeFiles/cqops.dir/src/angle.c.o
+[ 70%] Building C object CMakeFiles/cqops.dir/src/rotate.c.o
+[ 73%] Building C object CMakeFiles/cqops.dir/shim/cq_shim_ctx.c.o
+[ 73%] Building C object CMakeFiles/cqops.dir/shim/cq_shim_proof.c.o
+[ 73%] Building C object CMakeFiles/cqops.dir/shim/cq_shim_record.c.o
+[ 73%] Building C object CMakeFiles/cqops.dir/shim/cq_shim_reduce.c.o
+[ 76%] Building C object CMakeFiles/cqops.dir/shim/cq_shim_trace.c.o
+[ 76%] Building C object CMakeFiles/cqops.dir/shim/cq_runtime_rail.c.o
+[ 76%] Building C object CMakeFiles/cqops.dir/shim/cq_runtime_gate.c.o
+[ 80%] Building C object CMakeFiles/cqops.dir/shim/cq_runtime_tape.c.o
+[ 80%] Building C object CMakeFiles/cqops.dir/shim/cq_shim_qram.c.o
+[ 80%] Building C object CMakeFiles/cqops.dir/shim/cq_runtime_qram.c.o
+[ 80%] Building C object CMakeFiles/cqops.dir/shim/cq_runtime_v2.c.o
+[ 83%] Building C object CMakeFiles/cqops.dir/shim/cq_template_dispatch.c.o
+[ 83%] Building C object CMakeFiles/cqops.dir/shim/cq_template_dispatch_unary.c.o
+[ 83%] Building C object CMakeFiles/cqops.dir/shim/cq_template_dispatch_funary.c.o
+[ 83%] Building C object CMakeFiles/cqops.dir/shim/cq_template_impl.c.o
+[ 86%] Building C object CMakeFiles/cqops.dir/shim/cq_template_fp.c.o
+[ 86%] Building C object CMakeFiles/cqops.dir/shim/cq_template_unary.c.o
+[ 86%] Building C object CMakeFiles/cqops.dir/shim/cq_template_ternary.c.o
+[ 86%] Building C object CMakeFiles/cqops.dir/shim/cq_template_fparith.c.o
+[ 90%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_fp_arith.gen.c.o
+[ 90%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_fp_compare.gen.c.o
+[ 90%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_fp_to_int.gen.c.o
+[ 93%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_fp_width.gen.c.o
+[ 93%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_int_arith.gen.c.o
+[ 93%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_int_bitwise.gen.c.o
+[ 93%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_int_compare.gen.c.o
+[ 96%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_int_to_fp.gen.c.o
+[ 96%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_int_width.gen.c.o
+[ 96%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_reinterpret.gen.c.o
+[ 96%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_intrinsic_fp.gen.c.o
+[100%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_intrinsic_int.gen.c.o
+[100%] Building C object CMakeFiles/cqops.dir/shim/generated/cq_template_libm.gen.c.o
+[100%] Linking C static library libcqops.a
+[100%] Built target cqops

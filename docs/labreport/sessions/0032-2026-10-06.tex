@@ -1,0 +1,47 @@
+% labreport entry 32 — 2026-10-06
+% labreport-to: 27d9b4c
+%%
+%% APPEND-ONLY. Once this entry is committed it is never edited: a later
+% correction is a NEW entry carrying \supersedes{32}{field}.
+
+\entry{32}{2026-10-06}{Noisy four-item QTG with four factories, frame and decoder enabled}
+
+\begin{generated}
+  \gitem{Range}{\texttt{27d9b4c..27d9b4c}}
+  \gitem{Tree}{\emph{dirty at capture} --- 3 path(s) uncommitted}
+  \gitem{Tests}{\texttt{ctest -N}. Release \textbf{722} --- \texttt{build-release}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}. Debug \textbf{723} --- \texttt{build-debug}, \texttt{CQOPS\_CQLANG\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang}, \texttt{CQOPS\_QEC\_DIR}=\texttt{/\allowbreak Users/\allowbreak sorenwilkening/\allowbreak Desktop/\allowbreak Projects/\allowbreak CQ\_lang\_hardware/\allowbreak qec}.}
+  \gitem{LOC}{OK — 354 file(s) walked (filesystem, not the git index), limit 300, largest 300 (src/kernels/fconv\_emit.c)}
+  \gitem{Commits}{none in range at capture}
+  \gitem{Beads closed}{\bead{31t6} Measure n=20 QTG F=1 and estimate remaining factory arms, \bead{bw2h} Remeasure n=4 QTG generation with updated QEC}
+  \gitem{Beads filed}{\bead{abhl} Measure noisy n=4 F=4 QTG with frame and decoder enabled, \bead{31t6} Measure n=20 QTG F=1 and estimate remaining factory arms, \bead{bw2h} Remeasure n=4 QTG generation with updated QEC}
+\end{generated}
+
+
+\field{The ask}
+Run n=4 with four factories, noise, Pauli frame and decoder enabled, with
+$p_X=p_Y=p_Z=10^{-3}/3$. Measurement noise $p_M=10^{-3}$ was stated as an
+assumption, matching the earlier noisy sweep's measurement rate.
+
+\field{What landed}
+\bead{abhl}: one seeded Release run, exact config and raw resource/physics
+rows archived in \texttt{tools/qtg/sweep/results/89d5bf4-n4-F4-noisy-20261006/}
+(gitignored). QEC \texttt{89d5bf4}, cqops \texttt{27d9b4c}, seed 42.
+
+\field{Measured}
+\begin{figures}
+  \fig{generation 32.97\,s; CPU user 32.35\,s}{\texttt{/usr/bin/time -p}}{Release, Apple clang 17, n=4 F=4; frame on, union\_find configured; stated noise rates}
+  \fig{depth 674,391; noiseless 679,217}{\texttt{qtg\_depth\_phys.c}, \texttt{qec\_depth}}{same Release libraries, seed 42}
+  \fig{714{,}164{,}994 syndrome bits, 2{,}959{,}434 rounds; decoder invocations zero}{\texttt{qec\_physics\_report\_get}}{same run; decoder=1, frame=true}
+\end{figures}
+
+\field{Not taken}
+No logical-memory experiment or ensemble was requested. Configuring the
+decoder did not execute union-find in this QTG driver: the source's decode
+and apply calls are in \texttt{pl\_memory.c}. A memory experiment would test
+a different workload and cannot provide a decoded QTG failure rate.
+
+\field{Verified}
+One Release run returned zero, bound at d=9, and passed ordered rotation
+checks. The physics report confirmed the four noise rates, seeds, decoder
+configuration and syndrome volume. All decoder work counters were zero.
+No Debug or general suite result, nor circuit reliability estimate, is claimed.

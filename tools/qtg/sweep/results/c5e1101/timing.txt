@@ -1,0 +1,13 @@
+# wall clock and peak RSS, one core per arm, six arms in parallel on 6 physical cores
+n4v2_F1     108,64 real 106,75 user 0,30 sys  7385088 maximum resident set size 
+n4v2_F16    111,87 real 109,92 user 0,32 sys  18092032 maximum resident set size 
+n4v2_F2     106,91 real 104,97 user 0,30 sys  6316032 maximum resident set size 
+n4v2_F32    117,25 real 115,28 user 0,33 sys  14319616 maximum resident set size 
+n4v2_F4     108,05 real 106,12 user 0,30 sys  6569984 maximum resident set size 
+n4v2_F8     110,47 real 108,50 user 0,31 sys  11075584 maximum resident set size 
+n20_F1      4781,18 real 4340,38 user 14,21 sys  26021888 maximum resident set size 
+n20_F16     4673,91 real 4237,51 user 13,85 sys  59129856 maximum resident set size 
+n20_F2      4701,42 real 4264,35 user 13,90 sys  26165248 maximum resident set size 
+n20_F32     5010,18 real 4524,17 user 15,04 sys  45330432 maximum resident set size 
+n20_F4      4600,41 real 4163,94 user 13,61 sys  26550272 maximum resident set size 
+n20_F8      4598,09 real 4161,19 user 13,63 sys  27213824 maximum resident set size 
