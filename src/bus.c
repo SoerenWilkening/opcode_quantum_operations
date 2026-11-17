@@ -136,9 +136,20 @@ static void bus_op(int op, int ctl, uint32_t c, uint32_t m, const uint32_t *ah, 
     access(op, cb, a, hb, w);
 }
 
+/* cq_invert (cq_rt.h): a load or swap is its own inverse and is recorded; a store is a flush
+ * point, performed at its call. h[]: c, m, addr rail, h; n[]: op, ctl, width, _hl; v[0]: addr. */
+static void bus_k(const cq_call *k, int inv) {
+    (void)inv;
+    bus_op((int)k->n[0], (int)k->n[1], k->h[0], k->h[1], k->n[3] ? NULL : &k->h[2], k->v[0], k->h[3], k->n[2]);
+}
+static void bus_do(int op, int ctl, uint32_t c, uint32_t m, const uint32_t *ah, uint64_t a, uint32_t h, uint32_t w) {
+    if (op == STORE) { cq_inv_flush(); bus_op(op, ctl, c, m, ah, a, h, w); return; }
+    cq_call_do(&(cq_call){ .run = bus_k, .h = { c, m, ah ? *ah : 0, h }, .n = { (uint32_t)op, (uint32_t)ctl, w, !ah }, .v = { a } });
+}
+
 static uint32_t load(int ctl, uint32_t c, uint32_t m, const uint32_t *ah, uint64_t a, uint32_t w) {
     uint32_t h = (uint32_t)cq_rail_alloc(w, NULL);
-    bus_op(LOAD, ctl, c, m, ah, a, h, w);
+    bus_do(LOAD, ctl, c, m, ah, a, h, w);
     return h;
 }
 
@@ -148,17 +159,17 @@ static uint32_t load(int ctl, uint32_t c, uint32_t m, const uint32_t *ah, uint64
     uint32_t cqrt_qram_load_##n##_hl(uint32_t m, uint64_t addr) { return load(0, 0, m, NULL, addr, bits); } \
     uint32_t cqrt_qram_load_##n##_controlled(uint32_t c, uint32_t m, uint32_t addr) { return load(1, c, m, &addr, 0, bits); } \
     uint32_t cqrt_qram_load_##n##_hl_controlled(uint32_t c, uint32_t m, uint64_t addr) { return load(1, c, m, NULL, addr, bits); } \
-    void cqrt_qram_load_##n##_unc(uint32_t h, uint32_t m, uint32_t addr) { bus_op(LOAD, 0, 0, m, &addr, 0, h, bits); } \
-    void cqrt_qram_load_##n##_hl_unc(uint32_t h, uint32_t m, uint64_t addr) { bus_op(LOAD, 0, 0, m, NULL, addr, h, bits); } \
-    void cqrt_qram_load_##n##_controlled_unc(uint32_t h, uint32_t c, uint32_t m, uint32_t addr) { bus_op(LOAD, 1, c, m, &addr, 0, h, bits); } \
-    void cqrt_qram_load_##n##_hl_controlled_unc(uint32_t h, uint32_t c, uint32_t m, uint64_t addr) { bus_op(LOAD, 1, c, m, NULL, addr, h, bits); } \
-    void cqrt_qram_store_##n(uint32_t m, uint32_t addr, uint32_t v) { bus_op(STORE, 0, 0, m, &addr, 0, v, bits); } \
-    void cqrt_qram_store_##n##_hl(uint32_t m, uint64_t addr, uint32_t v) { bus_op(STORE, 0, 0, m, NULL, addr, v, bits); } \
-    void cqrt_qram_store_##n##_controlled(uint32_t c, uint32_t m, uint32_t addr, uint32_t v) { bus_op(STORE, 1, c, m, &addr, 0, v, bits); } \
-    void cqrt_qram_store_##n##_hl_controlled(uint32_t c, uint32_t m, uint64_t addr, uint32_t v) { bus_op(STORE, 1, c, m, NULL, addr, v, bits); } \
-    void cqrt_qram_swap_##n(uint32_t m, uint32_t addr, uint32_t h) { bus_op(SWAP, 0, 0, m, &addr, 0, h, bits); } \
-    void cqrt_qram_swap_##n##_hl(uint32_t m, uint64_t addr, uint32_t h) { bus_op(SWAP, 0, 0, m, NULL, addr, h, bits); } \
-    void cqrt_qram_swap_##n##_controlled(uint32_t c, uint32_t m, uint32_t addr, uint32_t h) { bus_op(SWAP, 1, c, m, &addr, 0, h, bits); } \
-    void cqrt_qram_swap_##n##_hl_controlled(uint32_t c, uint32_t m, uint64_t addr, uint32_t h) { bus_op(SWAP, 1, c, m, NULL, addr, h, bits); }
+    void cqrt_qram_load_##n##_unc(uint32_t h, uint32_t m, uint32_t addr) { bus_do(LOAD, 0, 0, m, &addr, 0, h, bits); } \
+    void cqrt_qram_load_##n##_hl_unc(uint32_t h, uint32_t m, uint64_t addr) { bus_do(LOAD, 0, 0, m, NULL, addr, h, bits); } \
+    void cqrt_qram_load_##n##_controlled_unc(uint32_t h, uint32_t c, uint32_t m, uint32_t addr) { bus_do(LOAD, 1, c, m, &addr, 0, h, bits); } \
+    void cqrt_qram_load_##n##_hl_controlled_unc(uint32_t h, uint32_t c, uint32_t m, uint64_t addr) { bus_do(LOAD, 1, c, m, NULL, addr, h, bits); } \
+    void cqrt_qram_store_##n(uint32_t m, uint32_t addr, uint32_t v) { bus_do(STORE, 0, 0, m, &addr, 0, v, bits); } \
+    void cqrt_qram_store_##n##_hl(uint32_t m, uint64_t addr, uint32_t v) { bus_do(STORE, 0, 0, m, NULL, addr, v, bits); } \
+    void cqrt_qram_store_##n##_controlled(uint32_t c, uint32_t m, uint32_t addr, uint32_t v) { bus_do(STORE, 1, c, m, &addr, 0, v, bits); } \
+    void cqrt_qram_store_##n##_hl_controlled(uint32_t c, uint32_t m, uint64_t addr, uint32_t v) { bus_do(STORE, 1, c, m, NULL, addr, v, bits); } \
+    void cqrt_qram_swap_##n(uint32_t m, uint32_t addr, uint32_t h) { bus_do(SWAP, 0, 0, m, &addr, 0, h, bits); } \
+    void cqrt_qram_swap_##n##_hl(uint32_t m, uint64_t addr, uint32_t h) { bus_do(SWAP, 0, 0, m, NULL, addr, h, bits); } \
+    void cqrt_qram_swap_##n##_controlled(uint32_t c, uint32_t m, uint32_t addr, uint32_t h) { bus_do(SWAP, 1, c, m, &addr, 0, h, bits); } \
+    void cqrt_qram_swap_##n##_hl_controlled(uint32_t c, uint32_t m, uint64_t addr, uint32_t h) { bus_do(SWAP, 1, c, m, NULL, addr, h, bits); }
 CQ_WIDTHS(BUS_)
 CQ_FP_WIDTHS(BUS_)

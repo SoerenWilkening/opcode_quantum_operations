@@ -47,31 +47,41 @@ static double angle(uint32_t A, int s) {
     return ldexp((double)cq_angle_k(a, s) * (s == 2 ? 0x1.921fb54442d18p+3 : 0x1.921fb54442d18p+2), -CQ_LADDER_N);
 }
 
+/* Every rotation goes through cq_invert (cq_rt.h): inv = 1 is the same rotation, angle negated.
+ * A recorded _qangle form reads its angle rail when it runs. h[]: h, c, A; n[]: width, has c, has A. */
+static void ry_k(const cq_call *k, int inv) {
+    double theta = k->n[2] ? angle(k->h[2], 2) : k->theta;
+    ry(k->n[1] ? rail(k->h[1], 1) : NULL, k->h[0], k->n[0], inv ? -theta : theta);
+}
+#define RY_(bits, h, c, A, ctl, q, th) cq_call_do(&(cq_call){ .run = ry_k, .h = { h, c, A }, .n = { bits, ctl, q }, .theta = th })
 #define ROT_(n, bits, ...) \
-    void cqrt_ry_##n(uint32_t h, double theta) { ry(NULL, h, bits, theta); } \
-    void cqrt_ry_##n##_controlled(uint32_t c, uint32_t h, double theta) { ry(rail(c, 1), h, bits, theta); } \
-    void cqrt_ry_##n##_qangle(uint32_t h, uint32_t A) { ry(NULL, h, bits, angle(A, 2)); } \
-    void cqrt_ry_##n##_qangle_controlled(uint32_t c, uint32_t h, uint32_t A) { \
-        double theta = angle(A, 2); ry(rail(c, 1), h, bits, theta); }
+    void cqrt_ry_##n(uint32_t h, double theta) { RY_(bits, h, 0, 0, 0, 0, theta); } \
+    void cqrt_ry_##n##_controlled(uint32_t c, uint32_t h, double theta) { RY_(bits, h, c, 0, 1, 0, theta); } \
+    void cqrt_ry_##n##_qangle(uint32_t h, uint32_t A) { RY_(bits, h, 0, A, 0, 1, 0); } \
+    void cqrt_ry_##n##_qangle_controlled(uint32_t c, uint32_t h, uint32_t A) { RY_(bits, h, c, A, 1, 1, 0); }
 CQ_WIDTHS(ROT_)
 CQ_FP_WIDTHS(ROT_)
 
-void cqrt_rz_i1(uint32_t f, double theta) {
-    cq_bit *b = rail(f, 1);
-    if (isfinite(theta)) phase(theta, b);
+static void rz_i1_k(const cq_call *k, int inv) {
+    cq_bit *b = rail(k->h[0], 1);
+    if (isfinite(k->theta)) phase(inv ? -k->theta : k->theta, b);
 }
+void cqrt_rz_i1(uint32_t f, double theta) { cq_call_do(&(cq_call){ .run = rz_i1_k, .h = { f }, .theta = theta }); }
 
 /* A classical A gives every branch the same phase e^{i val(A)}: global, no gate. */
-void cqrt_rz_qangle(uint32_t A) { (void)angle(A, 1); }
+static void rz_qangle_k(const cq_call *k, int inv) { (void)inv; (void)angle(k->h[0], 1); }
+void cqrt_rz_qangle(uint32_t A) { cq_call_do(&(cq_call){ .run = rz_qangle_k, .h = { A } }); }
 
 /* §1.7's bracket with K classical (c AND K is c): t ^= c, P(2*pi*k/2^N) on t, t ^= c. */
-void cqrt_rz_qangle_controlled(uint32_t c, uint32_t A) {
-    double theta = angle(A, 1);
-    const cq_bit *cb = rail(c, 1);
+static void rz_qangle_ctl_k(const cq_call *k, int inv) {
+    double theta = angle(k->h[1], 1);
+    const cq_bit *cb = rail(k->h[0], 1);
     if (!isfinite(theta)) return;
+    if (inv) theta = -theta;
     cq_bit t = cq_bit_const(0);
     cq_cx(cb, &t);
     phase(theta, &t);
     cq_cx(cb, &t);
     if (cq_bit_is_q(t)) cq_pool_give(t.q);   /* back at |0> */
 }
+void cqrt_rz_qangle_controlled(uint32_t c, uint32_t A) { cq_call_do(&(cq_call){ .run = rz_qangle_ctl_k, .h = { c, A } }); }

@@ -62,4 +62,23 @@ cq_bit  *cq_rail_bits(int32_t h);       /* aborts on a bad or freed handle; stab
 uint32_t cq_rail_width(int32_t h);
 void     cq_rail_free(int32_t h);       /* cq_reset_bit on every bit, then drop the handle */
 
+/* ---- cq_invert (ABI §1.13, src/invert.c). Every reversible entry point packs its call into a
+ * cq_call and hands it to cq_call_do: run now, or, inside an open region, recorded and run at the
+ * outermost end, reversed, run(k, 1) for the inverse (only rotations differ: angle negated).
+ * The call, not the gate, is recorded: a classical bit emits no gate. Handles are kept as
+ * numbers (never reused), literals by value. */
+typedef struct cq_call cq_call;
+struct cq_call {
+    void (*run)(const cq_call *k, int inv);
+    uint32_t h[6];      /* handles, as run reads them */
+    uint32_t n[4];      /* small integers: width, op, flags */
+    double   theta;
+    uint64_t v[4];      /* a literal's limbs, or a classical address */
+};
+void cq_call_do(const cq_call *k);
+int  cq_inv_open(void);               /* a region is open */
+void cq_inv_flush(void);              /* a flush point: the recorded calls run forward, now */
+void cq_inv_free(int32_t h);          /* cq_rail_free, after the outermost end inside a region */
+void cq_copy(uint32_t c, int ctl, uint32_t s, uint32_t d, uint32_t w);   /* cqrt_copy_<W>[_controlled] */
+
 #endif

@@ -361,7 +361,7 @@ static event *new_event(uint8_t kind, uint32_t c, int ctl) {
     if (ctl) {
         cq_bit *b = rail(c, 1);
         if (!cq_bit_is_q(*b)) e->pred = (int8_t)b->kind;
-        else { e->pred = -1; e->pr = cq_rail_alloc(1, NULL); cq_cx(b, cq_rail_bits(e->pr)); }
+        else { e->pred = -1; e->pr = cq_rail_alloc(1, NULL); cqrt_xor_i1(c, (uint32_t)e->pr); }   /* a gate: cq_invert records it */
     }
     return e;
 }
@@ -375,6 +375,7 @@ static int complete(event *e, uint64_t out[4]) {
         die("an INPUT call with a quantum predicate, buffer address, length, stream or other field "
             "is not implemented yet (opcode_quantum_operations-kmgy.28)", e->text);
     if (input || (!quantum && live == (uint32_t)(e - ev))) {
+        cq_inv_flush();   /* performed at its call: a flush point of an open cq_invert region (ABI §1.13) */
         e->status = ST_DONE;   /* before the call: a noreturn callee re-enters at exit */
         perform(e, out);
         return 1;
@@ -440,12 +441,12 @@ static uint32_t effect(uint32_t c, uint32_t t, const char *name, uint32_t n, uin
 }
 void cqrt_tape_effect_controlled(uint32_t c, uint32_t t, const char *name, uint32_t n) { effect(c, t, name, n, 0, 0); }
 
+/* The write is an XOR gate (cq_copy, which cq_invert records); the field keeps its place. */
 static uint32_t write_rail(uint32_t c, int ctl, uint32_t t, uint32_t h, uint32_t bits, int fp) {
-    const cq_bit *cb = ctl ? rail(c, 1) : NULL;
-    cq_bit *hb = rail(h, bits);
+    if (ctl) rail(c, 1);
+    rail(h, bits);
     int32_t r = cq_rail_alloc(bits, NULL);
-    cq_bit *rb = cq_rail_bits(r);
-    for (uint32_t i = 0; i < bits; i++) if (cb) cq_ccx(cb, &hb[i], &rb[i]); else cq_cx(&hb[i], &rb[i]);
+    cq_copy(c, ctl, h, (uint32_t)r, bits);
     append(t, (field){ bits, (uint8_t)fp, r, { 0 } });
     return (uint32_t)r;
 }

@@ -153,3 +153,10 @@ add_executable(test_tape tests/test_tape.c)
 target_link_libraries(test_tape cq_test_harness)
 set_target_properties(test_tape PROPERTIES ENABLE_EXPORTS ON)
 add_test(NAME tape COMMAND test_tape)
+
+# cq_invert begin/end (kmgy.8): src/invert.c; every reversible entry point goes through cq_call_do.
+target_sources(cq_runtime PRIVATE src/invert.c)
+add_executable(test_invert tests/test_invert.c)
+target_link_libraries(test_invert cq_templates cq_test_harness)
+set_target_properties(test_invert PROPERTIES ENABLE_EXPORTS ON)   # its effect callee is found by dlsym
+add_test(NAME invert COMMAND test_invert)

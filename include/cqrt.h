@@ -49,6 +49,8 @@ void     cqrt_or_i1(uint32_t a, uint32_t b, uint32_t t);
 void     cqrt_xor_i1(uint32_t a, uint32_t t);
 void     cqrt_push(uint32_t w);
 uint32_t cqrt_pop(void);
+void     cqrt_invert_begin(void);   /* src/invert.c */
+void     cqrt_invert_end(void);
 
 /* Rotations, §1.4-§1.7 (src/rot.c). A is an f64 rail; a quantum A aborts until kmgy.18. */
 #define CQRT_DECL_ROT_(n, ...) \

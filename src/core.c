@@ -21,6 +21,7 @@ static uint32_t alloc(uint32_t w, const uint64_t *v) { return (uint32_t)cq_rail_
 
 /* v: zeroed limbs; gets the outcome. The rail stays allocated and holds it. */
 static void measure(uint32_t h, uint32_t w, uint64_t *v) {
+    cq_inv_flush();   /* a measurement inside a cq_invert region needs the gates before it */
     cq_bit *b = rail(h, w);
     for (uint32_t i = 0; i < w; i++)
         if (cq_measure_bit(&b[i])) v[i / 64] |= 1ull << (i % 64);
@@ -41,15 +42,27 @@ static void xorc(uint32_t c, int ctl, uint32_t h, uint32_t w, const uint64_t *v)
         if ((v[i / 64] >> (i % 64)) & 1) { if (cb) cq_cx(cb, &b[i]); else cq_x(&b[i]); }
 }
 
+/* Through cq_invert (cq_rt.h): each of these is its own inverse. */
+static void copy_k(const cq_call *k, int inv) { (void)inv; copy(k->h[0], (int)k->n[1], k->h[1], k->h[2], k->n[0]); }
+void cq_copy(uint32_t c, int ctl, uint32_t s, uint32_t d, uint32_t w) {
+    cq_call_do(&(cq_call){ .run = copy_k, .h = { c, s, d }, .n = { w, (uint32_t)ctl } });
+}
+static void xorc_k(const cq_call *k, int inv) { (void)inv; xorc(k->h[0], (int)k->n[1], k->h[1], k->n[0], k->v); }
+static void xorc_do(uint32_t c, int ctl, uint32_t h, uint32_t w, const uint64_t *v, size_t nv) {
+    cq_call k = { .run = xorc_k, .h = { c, h }, .n = { w, (uint32_t)ctl } };
+    memcpy(k.v, v, nv);
+    cq_call_do(&k);
+}
+
 /* Per width. LIT is the literal parameter list, RET the measure type. V(bits) declares the
  * limbs v of the literal; OUT(bits, RET) returns the measured limbs v as RET. */
 #define CORE_(n, bits, LIT, RET, V, OUT) \
     uint32_t cqrt_alloc_##n(LIT) { V(bits); return alloc(bits, v); } \
     RET cqrt_measure_##n(uint32_t h) { uint64_t v[4] = { 0 }; measure(h, bits, v); OUT(bits, RET); } \
-    void cqrt_copy_##n(uint32_t s, uint32_t d) { copy(0, 0, s, d, bits); } \
-    void cqrt_copy_##n##_controlled(uint32_t c, uint32_t s, uint32_t d) { copy(c, 1, s, d, bits); } \
-    void cqrt_xorc_##n(uint32_t h, LIT) { V(bits); xorc(0, 0, h, bits, v); } \
-    void cqrt_xorc_##n##_controlled(uint32_t c, uint32_t h, LIT) { V(bits); xorc(c, 1, h, bits, v); }
+    void cqrt_copy_##n(uint32_t s, uint32_t d) { cq_copy(0, 0, s, d, bits); } \
+    void cqrt_copy_##n##_controlled(uint32_t c, uint32_t s, uint32_t d) { cq_copy(c, 1, s, d, bits); } \
+    void cqrt_xorc_##n(uint32_t h, LIT) { V(bits); xorc_do(0, 0, h, bits, v, sizeof v); } \
+    void cqrt_xorc_##n##_controlled(uint32_t c, uint32_t h, LIT) { V(bits); xorc_do(c, 1, h, bits, v, sizeof v); }
 
 static unsigned __int128 sext(const uint64_t *v, uint32_t w) {
     unsigned __int128 x = (unsigned __int128)v[1] << 64 | v[0];
@@ -80,15 +93,26 @@ CQ_WIDTHS_WIDE(WIDE_)
 #define FP_(n, bits, T) CORE_(n, bits, T lit, T, V_FP_, OUT_FP_)
 CQ_FP_WIDTHS(FP_)
 
-void cqrt_free(uint32_t h) { cq_rail_free((int32_t)h); }   /* trusted: m, x on 1, back to the pool */
+void cqrt_free(uint32_t h) { cq_inv_free((int32_t)h); }   /* trusted: m, x on 1, back to the pool */
 
-void cqrt_not_i1(uint32_t h) { cq_x(rail(h, 1)); }
-void cqrt_and_i1(uint32_t a, uint32_t b, uint32_t t) { cq_ccx(rail(a, 1), rail(b, 1), rail(t, 1)); }
-void cqrt_or_i1(uint32_t a, uint32_t b, uint32_t t) {
-    cq_bit *ab = rail(a, 1), *bb = rail(b, 1), *tb = rail(t, 1);
-    cq_cx(ab, tb); cq_cx(bb, tb); cq_ccx(ab, bb, tb);   /* a ^ b ^ ab = a | b */
+/* The i1 logic, t ^= f(a, b): each its own inverse. */
+enum { NOT, AND, OR, XOR };
+static void logic_k(const cq_call *k, int inv) {
+    (void)inv;
+    cq_bit *tb = rail(k->h[2], 1), *ab = k->n[0] != NOT ? rail(k->h[0], 1) : NULL;
+    cq_bit *bb = k->n[0] == AND || k->n[0] == OR ? rail(k->h[1], 1) : NULL;
+    switch (k->n[0]) {
+    case NOT: cq_x(tb); break;
+    case AND: cq_ccx(ab, bb, tb); break;
+    case OR:  cq_cx(ab, tb); cq_cx(bb, tb); cq_ccx(ab, bb, tb); break;   /* a ^ b ^ ab = a | b */
+    default:  cq_cx(ab, tb);
+    }
 }
-void cqrt_xor_i1(uint32_t a, uint32_t t) { cq_cx(rail(a, 1), rail(t, 1)); }
+static void logic(uint32_t op, uint32_t a, uint32_t b, uint32_t t) { cq_call_do(&(cq_call){ .run = logic_k, .h = { a, b, t }, .n = { op } }); }
+void cqrt_not_i1(uint32_t h) { logic(NOT, 0, 0, h); }
+void cqrt_and_i1(uint32_t a, uint32_t b, uint32_t t) { logic(AND, a, b, t); }
+void cqrt_or_i1(uint32_t a, uint32_t b, uint32_t t) { logic(OR, a, b, t); }
+void cqrt_xor_i1(uint32_t a, uint32_t t) { logic(XOR, a, 0, t); }
 
 /* The word stack. Balance is the caller's obligation (ABI §1.12); popping an empty stack aborts. */
 static uint32_t *words;

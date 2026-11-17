@@ -9,6 +9,14 @@
 #include "cq_rt.h"
 #include "kernels.h"
 
+/* cq_invert (cq_rt.h): inside an open region the result rail is made now (a forward form returns
+ * it at the call) and o ^= f(args) is recorded; it is its own inverse. A literal operand is a
+ * classical rail whose free waits for the region (cq_inv_free). */
+static inline uint32_t cq_tpl_run(int op, uint32_t w, uint32_t o, const uint32_t *args, int unc);
+static inline uint32_t cq_tpl_cast_run(int op, uint32_t from, uint32_t to, uint32_t o, uint32_t a, int unc);
+static inline void cq_tpl_run_k_(const cq_call *k, int inv) { (void)inv; cq_tpl_run((int)k->n[0], k->n[1], k->h[0], &k->h[1], (int)k->n[2]); }
+static inline void cq_tpl_cast_k_(const cq_call *k, int inv) { (void)inv; cq_tpl_cast_run((int)k->n[0], k->n[1], k->n[2], k->h[0], k->h[1], (int)k->n[3]); }
+
 /* o ^= f(args) by the kernel of op at width w. o == 0: forward, o is a fresh |0> rail.
  * Every handle must have the width the symbol names (the result: the op's out_width). */
 static inline uint32_t cq_tpl_run(int op, uint32_t w, uint32_t o, const uint32_t *args, int unc) {
@@ -21,6 +29,12 @@ static inline uint32_t cq_tpl_run(int op, uint32_t w, uint32_t o, const uint32_t
     }
     if (!o) o = (uint32_t)cq_rail_alloc(ow, NULL);
     else if (cq_rail_width((int32_t)o) != ow) { fprintf(stderr, "cq_template_%s: result is not i%u\n", kop->name, ow); abort(); }
+    if (cq_inv_open()) {
+        cq_call c = { .run = cq_tpl_run_k_, .h = { o }, .n = { (uint32_t)op, w, (uint32_t)unc } };
+        for (int j = 0; j < kop->nargs; j++) c.h[1 + j] = args[j];
+        cq_call_do(&c);
+        return o;
+    }
     const cq_kernel *k = cq_kernel_pick(op, w);
     (unc && k->unc ? k->unc : k->emit)((int32_t)o, h, w);
     return o;
@@ -37,6 +51,7 @@ static inline uint32_t cq_tpl_cast_run(int op, uint32_t from, uint32_t to, uint3
     if (cq_rail_width((int32_t)a) != from) { fprintf(stderr, "cq_template_%s: operand is not i%u\n", kop->name, from); abort(); }
     if (!o) o = (uint32_t)cq_rail_alloc(to, NULL);
     else if (cq_rail_width((int32_t)o) != to) { fprintf(stderr, "cq_template_%s: result is not i%u\n", kop->name, to); abort(); }
+    if (cq_inv_open()) { cq_call_do(&(cq_call){ .run = cq_tpl_cast_k_, .h = { o, a }, .n = { (uint32_t)op, from, to, (uint32_t)unc } }); return o; }
     int32_t h = (int32_t)a;
     const cq_kernel *k = cq_kernel_pick(op, to);
     (unc && k->unc ? k->unc : k->emit)((int32_t)o, &h, to);
@@ -53,7 +68,7 @@ static inline uint32_t cq_tpl_cast_run(int op, uint32_t from, uint32_t to, uint3
 static inline uint32_t cq_tpl_run_lit(int op, uint32_t w, uint32_t o, uint32_t h, const uint64_t *v, int lit_first, int unc) {
     uint32_t l = (uint32_t)cq_rail_alloc(w, v), args[2] = { lit_first ? l : h, lit_first ? h : l };
     o = cq_tpl_run(op, w, o, args, unc);
-    cq_rail_free((int32_t)l);
+    cq_inv_free((int32_t)l);
     return o;
 }
 #define CQ_TPL_BINARY_(name, kop, n, bits) \
@@ -75,7 +90,7 @@ static inline uint32_t cq_tpl_run_lit(int op, uint32_t w, uint32_t o, uint32_t h
 static inline uint32_t cq_tpl_run_lits(int op, uint32_t w, uint32_t o, uint32_t *h, unsigned lits, const uint64_t (*v)[4], int unc) {
     for (int j = 0; j < 3; j++) if (lits >> j & 1) h[j] = (uint32_t)cq_rail_alloc(w, v[j]);
     o = cq_tpl_run(op, w, o, h, unc);
-    for (int j = 0; j < 3; j++) if (lits >> j & 1) cq_rail_free((int32_t)h[j]);
+    for (int j = 0; j < 3; j++) if (lits >> j & 1) cq_inv_free((int32_t)h[j]);
     return o;
 }
 #define CQ_TPL_LIMBS_NARROW_(x) (uint64_t)(x), (uint64_t)((unsigned __int128)(x) >> 64)
