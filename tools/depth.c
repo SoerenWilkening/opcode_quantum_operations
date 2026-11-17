@@ -232,7 +232,8 @@ int depth_measure(const cq_kernel_op *op, hx_ref_fn ref, depth_cell cell[][CQ_NW
                 }
                 hx_max_samples = 0;
             } else {
-                hx_max_samples = op->samples;
+                /* Cost does not depend on the values (all operands are qubits); the samples only verify the candidate: 100 cover every edge pair first. */
+                hx_max_samples = op->samples && op->samples < 100 ? op->samples : 100;
                 const uint32_t cond[HX_MAX_ARGS] = { 1 };   /* select's condition is i1 (kmgy.14) */
                 d->ok = hx_run_w(&h, cq_kernel_widths[wi], op == &cq_kernel_ops[CQ_KOP_SELECT] ? cond : NULL,
                                  HX_NOABORT, &d->st) == HX_OK;

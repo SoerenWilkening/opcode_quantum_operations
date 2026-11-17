@@ -281,8 +281,9 @@ Examples of the spelling: `cq_template_icmp_slt_i64_hl`, `cq_template_select_i8_
 
 Notes on widths:
 
-- Casts expand over pairs of `INT`: 28 `zext`, 28 `sext`, 28 `trunc` pairs. Every corpus pair
-  (ABI:820) lies inside `INT`.
+- Casts expand over pairs of `INT`: with the 15 widths, 105 `zext`, 105 `sext`, 105 `trunc` pairs
+  (every ordered pair, `include/cq_cast_pairs.h`; the 28 written here first counted the 8 widths
+  of the first list, corrected 2026-11-18, kmgy.23). Every corpus pair (ABI:820) lies inside `INT`.
 - `i1` is in `INT` for every template; the grammar allows it, and the ops degenerate (a shift by
   `k mod 1` is the identity, `icmp_slt_i1` is signed on one bit). §2.12 asks for `abs_i1`,
   `select_i1` and the `i1` bitwise ops (ABI:1034-1047).
@@ -296,6 +297,10 @@ Notes on widths:
   operations in scope (rows 49-88). 65 in-scope operations of 91.
 - Name patterns: 48 core (rows 1-48) and 95 forward template patterns (counting `icmp_<pred>` and
   each cast as one pattern), each with its `_unc`: 190. In total 238 in-scope name patterns.
+- Symbols at the 15 integer widths and 5 fp tokens (2026-11-18, kmgy.23): 618 `cqrt_*` (30 per
+  width token times 20, plus 18 without one) and 3912 `cq_template_*` (1956 forward, each with its
+  `_unc`), 4530 in all. `tests/abi_expected.c` generates the list from the rules above and the
+  `abi_symbols` test compares it with the archives (docs/COMPLETENESS.md).
 
 ## Out of scope (must not be defined)
 
@@ -366,9 +371,11 @@ built from core primitives)." The ABI says nothing more about the split. What fo
 - Shared-library builds need no order (ABI:111-114). Either way one process holds one copy of the
   backend (ABI:116-119).
 
-Not verified: whether Apple ld64 enforces archive order. If it does not, a link test on macOS
-passes even when the runtime references a template, so kmgy.23 should also check with `nm` that
-`libcq_runtime.a` has no undefined `cq_template_*`.
+Apple's ld does not enforce archive order: the order-1 program of kmgy.23 also links and runs as
+`main.o libcq_runtime.a libcq_templates.a` (checked 2026-11-18 on macOS, x86_64). So a link test on
+macOS passes even when the runtime references a template; the `abi_symbols` test checks the
+order-sensitive property with `nm` instead (no undefined `cq_template_*` in `libcq_runtime.a`, every
+`cq*` symbol either archive references defined by the runtime or by itself).
 
 ## Disagreements between ABI and CR
 

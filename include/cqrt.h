@@ -52,7 +52,8 @@ uint32_t cqrt_pop(void);
 void     cqrt_invert_begin(void);   /* src/invert.c */
 void     cqrt_invert_end(void);
 
-/* Rotations, §1.4-§1.7 (src/rot.c). A is an f64 rail; a quantum A aborts until kmgy.18. */
+/* Rotations, §1.4-§1.7 (src/rot.c). A is an f64 rail; a quantum A runs the angle ladder
+ * (src/ladder.c). */
 #define CQRT_DECL_ROT_(n, ...) \
     void cqrt_ry_##n(uint32_t h, double theta); \
     void cqrt_ry_##n##_controlled(uint32_t c, uint32_t h, double theta); \
@@ -65,8 +66,8 @@ void     cqrt_rz_qangle(uint32_t A);
 void     cqrt_rz_qangle_controlled(uint32_t c, uint32_t A);
 
 /* Memory bus, §1.10 (src/bus.c). addr: a 64-bit rail in the plain forms, an address in the _hl
- * forms. The load _unc takes h before c (ABI:397, inventory D2). A quantum address rail aborts
- * until kmgy.21. */
+ * forms. The load _unc takes h before c (ABI:397, inventory D2). A quantum address rail goes through
+ * the fan-out QRAM (src/qram.c), up to CQ_MAX_QADDR_BITS quantum bits. */
 #define CQRT_DECL_BUS_(n, ...) \
     uint32_t cqrt_qram_load_##n(uint32_t m, uint32_t addr); \
     uint32_t cqrt_qram_load_##n##_hl(uint32_t m, uint64_t addr); \
@@ -89,8 +90,8 @@ CQ_FP_WIDTHS(CQRT_DECL_BUS_)
 uint32_t cqrt_qram_alloc_i8(uint32_t n);
 
 /* Tape and abort, §1.11 (src/tape.c). name: a host symbol, or NULL for the address in the first
- * field. abort_i1 of a classical 1 does not return. INPUT calls with a quantum predicate or
- * field abort until kmgy.28. */
+ * field. abort_i1 of a classical 1 does not return. INPUT calls merge under a quantum predicate,
+ * buffer address, length or stream; the fields ABI §1.11 leaves undefined abort (kmgy.36). */
 #define CQRT_DECL_TAPE_(n, LIT) \
     uint32_t cqrt_tape_effect_##n##_controlled(uint32_t c, uint32_t t, const char *name, uint32_t nf); \
     uint32_t cqrt_tape_write_##n(uint32_t t, uint32_t h); \

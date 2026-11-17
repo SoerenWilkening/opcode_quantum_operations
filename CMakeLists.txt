@@ -5,6 +5,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 add_compile_options(-Wall -Wextra)
+# The tests run the replay backend and the sampled harness; unoptimised they take twice as long.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
 # Build-time configuration, passed to the code as compile definitions.
 # Ladder precision N: 53, docs/ANGLE_LADDER.md (kmgy.17). Any N in [1, 128]; another N needs
@@ -225,3 +229,32 @@ target_link_libraries(test_ladder cq_test_harness)
 target_include_directories(test_ladder PRIVATE src)
 target_compile_definitions(test_ladder PRIVATE CQ_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME ladder COMMAND test_ladder)
+
+# Link and completeness check (kmgy.23; NORTH_STAR "Done when" 1-3; docs/COMPLETENESS.md).
+# abi_symbols: nm on the archives against the in-scope list that tests/abi_expected.c writes from the ABI
+# text, the out-of-scope and retired names, the seven operations, the link-order property and the test
+# objects' references. abi_classical: one all-classical program over every family and width emits no gate.
+add_executable(abi_expected tests/abi_expected.c)
+add_test(NAME abi_symbols COMMAND sh ${CMAKE_SOURCE_DIR}/tests/abi_symbols.sh ${CMAKE_NM}
+  $<TARGET_FILE:abi_expected> $<TARGET_FILE:cq_templates> $<TARGET_FILE:cq_runtime> ${CMAKE_BINARY_DIR})
+add_executable(test_abi_classical tests/test_abi_classical.c)
+target_link_libraries(test_abi_classical cq_templates cq_runtime cq_gates_replay)
+add_test(NAME abi_classical COMMAND test_abi_classical)
+# abi_link_*: tests/abi_link.ll, ABI calls only, compiled like tests/ir/caller.ll (above) and linked
+# main.o libcq_templates.a libcq_runtime.a <the seven operations>: the replay archive, then a second,
+# independent definition (tests/abi_link_gates.c).
+if(cq_ir_cc)
+  add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/abi_link.o
+    COMMAND ${cq_ir_cc} -w -c -x ir ${CMAKE_SOURCE_DIR}/tests/abi_link.ll -o ${CMAKE_BINARY_DIR}/abi_link.o
+    DEPENDS tests/abi_link.ll VERBATIM)
+  add_library(cq_abi_count_gates STATIC tests/abi_link_gates.c)
+  foreach(cq_gates IN ITEMS cq_gates_replay cq_abi_count_gates)
+    add_executable(test_abi_link_${cq_gates} ${CMAKE_BINARY_DIR}/abi_link.o)
+    set_target_properties(test_abi_link_${cq_gates} PROPERTIES LINKER_LANGUAGE C)
+    target_link_libraries(test_abi_link_${cq_gates} cq_templates cq_runtime ${cq_gates})
+    add_test(NAME abi_link_${cq_gates} COMMAND test_abi_link_${cq_gates})
+  endforeach()
+else()
+  add_test(NAME abi_link COMMAND sh -c "echo \"$1\"; exit 77" abi_link "${cq_ir_why}")
+  set_tests_properties(abi_link PROPERTIES SKIP_RETURN_CODE 77)
+endif()

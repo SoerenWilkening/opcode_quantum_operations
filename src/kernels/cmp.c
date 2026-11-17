@@ -41,16 +41,17 @@ static void and_all(cq_tape *t, int tree, const cq_bit **v, uint32_t m, cq_bit *
 static void lt_tree(cq_tape *t, int sgn, const cq_bit *a, const cq_bit *b, uint32_t n, cq_bit *f, int rec) {
     cq_bit *L = cq_tape_bits(t, n), *E = cq_tape_bits(t, n);
     cq_bit **l = ptrs(n), **e = ptrs(n);
-    for (uint32_t i = 0; i < n; i++) {
-        const cq_bit *x = &a[i], *y = &b[i];
-        if (sgn && i == n - 1) { x = &b[i]; y = &a[i]; }
-        if (i) cq_tape_cx(t, &a[i], &E[i]);
-        cq_tape_cx(t, y, &L[i]);                       /* L = y ^ (x & y) = ~x & y */
-        if (i) cq_tape_cx(t, &b[i], &E[i]);
-        cq_tape_ccx(t, x, y, &L[i]);
-        if (i) cq_tape_x(t, &E[i]);
-        l[i] = &L[i]; e[i] = &E[i];
-    }
+    for (int p = 0; p < 5; p++)   /* one pass per gate kind, as in cq_select: a and b may overlap */
+        for (uint32_t i = 0; i < n; i++) {
+            const cq_bit *x = &a[i], *y = &b[i];
+            if (sgn && i == n - 1) { x = &b[i]; y = &a[i]; }
+            if (p == 0 && i) cq_tape_cx(t, &a[i], &E[i]);
+            if (p == 1) cq_tape_cx(t, y, &L[i]);               /* L = y ^ (x & y) = ~x & y */
+            if (p == 2 && i) cq_tape_cx(t, &b[i], &E[i]);
+            if (p == 3) cq_tape_ccx(t, x, y, &L[i]);
+            if (p == 4 && i) cq_tape_x(t, &E[i]);
+            l[i] = &L[i]; e[i] = &E[i];
+        }
     uint32_t m = n;
     while (m > 2) {
         cq_bit *x = cq_tape_bits(t, m / 2);
@@ -72,10 +73,9 @@ void cq_cmp(int kind, cq_tape *t, int pred, const cq_bit *a, const cq_bit *b, ui
     if (pred == CQ_CMP_EQ) {
         cq_bit *e = cq_tape_bits(t, n);
         const cq_bit **v = ptrs(n);
-        for (uint32_t i = 0; i < n; i++) {
-            cq_tape_cx(t, &a[i], &e[i]); cq_tape_cx(t, &b[i], &e[i]); cq_tape_x(t, &e[i]);
-            v[i] = &e[i];
-        }
+        for (uint32_t i = 0; i < n; i++) cq_tape_cx(t, &a[i], &e[i]);   /* one pass per gate kind: a, b may overlap */
+        for (uint32_t i = 0; i < n; i++) cq_tape_cx(t, &b[i], &e[i]);
+        for (uint32_t i = 0; i < n; i++) { cq_tape_x(t, &e[i]); v[i] = &e[i]; }
         and_all(t, kind != CQ_CMP_CHAIN, v, n, f, rec);
         free(v);
         return;
@@ -90,18 +90,22 @@ void cq_cmp(int kind, cq_tape *t, int pred, const cq_bit *a, const cq_bit *b, ui
 }
 
 /* o ^= a2 ^ (c & (a1 ^ a2)): per bit CX(a2) and either CCX(c, a1), CCX(c, a2) (CCX2) or one CCX(c, d)
- * on d = a1 ^ a2 in scratch (DIFF); c drives every bit itself or through a fan-out (_FANOUT). */
+ * on d = a1 ^ a2 in scratch (DIFF); c drives every bit itself or through a fan-out (_FANOUT). o must
+ * not overlap the arms; the arms may overlap (slices of one rail: a barrel stage), as they are only read.
+ * Each gate kind is one pass over the bits, so an arm bit read by two positions is read once per pass:
+ * emitted bit by bit, x[i] and x[i+s] chain consecutive positions (kmgy.37). */
 void cq_select(int kind, cq_tape *t, const cq_bit *c, const cq_bit *a1, const cq_bit *a2, cq_bit *o, uint32_t n, int rec) {
     int fan = kind == CQ_SEL_CCX2_FANOUT || kind == CQ_SEL_DIFF_FANOUT, diff = kind >= CQ_SEL_DIFF;
     const cq_bit *F = fan && n > 1 ? cq_tape_fanout(t, c, n - 1) : NULL;
     cq_bit *d = diff ? cq_tape_bits(t, n) : NULL;
-    for (uint32_t i = 0; diff && i < n; i++) { cq_tape_cx(t, &a1[i], &d[i]); cq_tape_cx(t, &a2[i], &d[i]); }
+#define CI_ (F && i ? &F[i - 1] : c)
+    for (uint32_t i = 0; diff && i < n; i++) cq_tape_cx(t, &a1[i], &d[i]);
+    for (uint32_t i = 0; diff && i < n; i++) cq_tape_cx(t, &a2[i], &d[i]);
     for (uint32_t i = 0; i < n; i++) gcx(t, rec, &a2[i], &o[i]);
-    for (uint32_t i = 0; i < n; i++) {
-        const cq_bit *ci = F && i ? &F[i - 1] : c;
-        if (diff) gccx(t, rec, ci, &d[i], &o[i]);
-        else { gccx(t, rec, ci, &a1[i], &o[i]); gccx(t, rec, ci, &a2[i], &o[i]); }
-    }
+    for (uint32_t i = 0; diff && i < n; i++) gccx(t, rec, CI_, &d[i], &o[i]);
+    for (uint32_t i = 0; !diff && i < n; i++) gccx(t, rec, CI_, &a1[i], &o[i]);
+    for (uint32_t i = 0; !diff && i < n; i++) gccx(t, rec, CI_, &a2[i], &o[i]);
+#undef CI_
 }
 
 int cq_cmp_kind(int pred, uint32_t n) {

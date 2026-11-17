@@ -235,6 +235,63 @@ static void check_api(void) {
     printf("cq_cmp, cq_select with recorded targets: ok\n");
 }
 
+/* kmgy.37: cq_select on overlapping slices of one rail x (a barrel stage), m = w - s bits:
+ * o ^= c ? x[i] : x[i+s], every kind, o plain or recorded, both modes, ancillae clean; and its depth
+ * equals the depth on disjoint arms. The public select with both arms one rail: o = that rail. */
+static int ov_kind, ov_rec;
+static uint32_t ov_s;
+static void ov_op(int32_t o, const int32_t *args, uint32_t w) {
+    cq_bit *x = cq_rail_bits(args[1]), *ob = cq_rail_bits(o);
+    cq_tape t = { 0 };
+    cq_bit *y = ov_rec ? cq_tape_bits(&t, w - ov_s) : ob;
+    cq_select(ov_kind, &t, cq_rail_bits(args[0]), x, x + ov_s, y, w - ov_s, ov_rec);
+    for (uint32_t i = 0; ov_rec && i < w - ov_s; i++) cq_cx(&y[i], &ob[i]);
+    cq_tape_undo(&t);
+    clean();
+}
+static hx_val ov_ref(const hx_val *a, uint32_t w) {
+    hx_val r = { { 0 } };
+    for (uint32_t i = 0; i + ov_s < w; i++)
+        if (bitv(&a[1], a[0].l[0] & 1 ? i : i + ov_s)) r.l[i / 64] |= 1ull << (i % 64);
+    return r;
+}
+static int32_t qrail(uint32_t w) {   /* w quantum bits, |0> */
+    int32_t r = cq_rail_alloc(w, NULL);
+    for (uint32_t i = 0; i < w; i++) cq_get_qubit(&cq_rail_bits(r)[i]);
+    return r;
+}
+static uint32_t sel_depth(int kind, uint32_t m, uint32_t s, int overlap) {
+    int32_t c = qrail(1), x = qrail(overlap ? m + s : m), x2 = overlap ? 0 : qrail(m), o = qrail(m);
+    cq_bit *xb = cq_rail_bits(x);
+    cq_tape t = { 0 };
+    cq_replay_reset();
+    cq_select(kind, &t, cq_rail_bits(c), xb, overlap ? xb + s : cq_rail_bits(x2), cq_rail_bits(o), m, 0);
+    cq_tape_undo(&t);
+    uint32_t d = cq_replay_depth();
+    cq_rail_free(c); cq_rail_free(x); cq_rail_free(o);
+    if (x2) cq_rail_free(x2);
+    return d;
+}
+SHAPE_(select_same_i64, i64, 0, 64, 2, cond_w, (void)w; return a[1], NONE_,
+    T_(select, i64)(A0, A1, A1), T_(select, i64_unc)(dst, A0, A1, A1), NONE_, 60)
+static void check_overlap(void) {
+    static const uint32_t ws[] = { 2, 7, 64, 200 }, ss[] = { 0, 1, 3, 32 };
+    for (ov_kind = CQ_SEL_CCX2; ov_kind <= CQ_SEL_DIFF_FANOUT; ov_kind++)
+        for (unsigned i = 0; i < sizeof ws / sizeof *ws; i++)
+            for (unsigned j = 0; j < sizeof ss / sizeof *ss && ss[j] < ws[i]; j++) {
+                ov_s = ss[j];
+                for (ov_rec = 0; ov_rec < 2; ov_rec++) {
+                    const hx_op h = { "cq_select overlapping arms", 2, 0, ov_op, ov_op, ov_ref };
+                    hx_max_samples = 20;
+                    assert(hx_run_w(&h, ws[i], cond_w, 0, NULL) == HX_OK);
+                    hx_max_samples = 0;
+                }
+                assert(sel_depth(ov_kind, ws[i] - ov_s, ov_s, 1) == sel_depth(ov_kind, ws[i] - ov_s, ov_s, 0));
+            }
+    c_select_same_i64();
+    printf("cq_select on overlapping slices of one rail, select(c, x, x): ok\n");
+}
+
 int main(void) {
     assert(sizeof linked / sizeof *linked == 15 * 66);
     for (unsigned i = 0; i < sizeof linked / sizeof *linked; i++) assert(linked[i]);
@@ -263,6 +320,7 @@ int main(void) {
     }
 
     check_api();
+    check_overlap();
     RUN_INV_(i1) RUN_INV_(i7) RUN_INV_(i64) RUN_INV_(i200)
     printf("inverted icmp_slt_hl, icmp_eq, smax, abs, select_ll at i1 i7 i64 i200: ok\n");
     CQ_WIDTHS(RUN_)

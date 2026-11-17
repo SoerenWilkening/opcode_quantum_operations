@@ -19,19 +19,15 @@ static int pi_bit(uint32_t j) { return j < CQ_INV_PI_J && (cq_inv_pi[j / 64] >> 
 static uint32_t base(int s) { return (uint32_t)(CQ_INV_PI_J + 1075 - N + s - CQ_ANGLE_L - 2047); }
 
 /* MSB first: after bit b only WB + 2^b - 1 bits can still reach the window. Each stage is the select
- * o = y_(i+2^b) ^ e1_b (y_i ^ y_(i+2^b)), e1_b fanned out, emitted gate kind by gate kind: cq_select
- * emits per bit, and with overlapping arms that chains every y bit to the next (depth ~m per stage). */
+ * o = e1_b ? y_i : y_(i+2^b) on overlapping arms, e1_b fanned out (cq_select emits pass by pass). */
 static cq_bit *barrel(cq_tape *t, const cq_bit *const *e1, int s) {
     uint32_t n = WB + 2047;
     cq_bit *y = cq_tape_bits(t, n);
     for (uint32_t i = 0; i < n; i++) if (pi_bit(base(s) + i)) cq_tape_x(t, &y[i]);   /* classical: no gate */
     for (int b = 10; b >= 0; b--) {
-        uint32_t m = WB + (1u << b) - 1, sh = 1u << b;
-        cq_bit *c = cq_tape_fanout(t, e1[b], m - 1), *d = cq_tape_bits(t, m), *o = cq_tape_bits(t, m);
-        for (uint32_t i = 0; i < m; i++) cq_tape_cx(t, &y[i], &d[i]);
-        for (uint32_t i = 0; i < m; i++) cq_tape_cx(t, &y[i + sh], &d[i]);
-        for (uint32_t i = 0; i < m; i++) cq_tape_cx(t, &y[i + sh], &o[i]);
-        for (uint32_t i = 0; i < m; i++) cq_tape_ccx(t, i ? &c[i - 1] : e1[b], &d[i], &o[i]);
+        uint32_t m = WB + (1u << b) - 1;
+        cq_bit *o = cq_tape_bits(t, m);
+        cq_select(CQ_SEL_DIFF_FANOUT, t, e1[b], y, y + (1u << b), o, m, 1);
         y = o;
     }
     return y;
