@@ -1,4 +1,4 @@
-/* Public integer templates of BACKEND_ABI §2 (libcq_templates.a), generated per width
+/* Public integer templates of BACKEND_ABI §2 (libcq_backend.a), generated per width
  * from the lists in cq_widths.h. A handle is the ABI's i32.
  *   forward  uint32_t cq_template_X(args...)       a fresh rail o, o ^= f(args), returns o
  *   _unc     void cq_template_X_unc(uint32_t o, args...)   o ^= f(args): back to |0>, not freed

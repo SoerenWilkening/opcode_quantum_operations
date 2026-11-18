@@ -1,5 +1,5 @@
 /* Skeleton test: the width list iterates, and the library links against a
- * test-defined gate backend (the archives define none of the seven). */
+ * test-defined gate backend (the backend archive defines none of the seven). */
 #include <stdio.h>
 #include "cq_gates.h"
 #include "cq_widths.h"

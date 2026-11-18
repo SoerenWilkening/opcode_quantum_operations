@@ -1,4 +1,4 @@
-/* Runtime internals shared by libcq_runtime.a and libcq_templates.a: the
+/* Runtime internals shared by the parts of libcq_backend.a: the
  * tri-valued bit, the qubit pool, the emitter and the handle table.
  * Process-global state, as the ABI has no context parameter; single-threaded.
  *

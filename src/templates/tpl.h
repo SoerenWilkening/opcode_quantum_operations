@@ -1,4 +1,4 @@
-/* Internal to libcq_templates.a: a template is its registry operation's shipped kernel
+/* Internal to libcq_backend.a (src/templates/): a template is its registry operation's shipped kernel
  * (src/kernels/kernels.h) on a fresh result rail. To add a handle-only template:
  * a kernel op in the registry, a declaration line in include/cq_template.h, and one
  * CQ_TPL_UNARY_ (or a sibling for more operands) per width list in its .c file. */

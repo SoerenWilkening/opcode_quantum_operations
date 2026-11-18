@@ -1,15 +1,15 @@
 #!/bin/sh
-# The symbol check of kmgy.23 (NORTH_STAR "Done when" 1-2): the archives against the ABI's
+# The symbol check of kmgy.23 (NORTH_STAR "Done when" 1-2): libcq_backend.a against the ABI's
 # in-scope list (tests/abi_expected.c) and its out-of-scope names, by nm.
-# Usage: abi_symbols.sh <nm> <abi_expected> <libcq_templates.a> <libcq_runtime.a> <build dir>
-# Fails on: an expected symbol not defined in its archive; a public cqrt_*/cq_template_* symbol
+# Usage: abi_symbols.sh <nm> <abi_expected> <libcq_backend.a> <build dir>
+# Fails on: an expected symbol not defined; a public cqrt_*/cq_template_* symbol
 # defined that the list lacks; an out-of-scope or retired name defined; a __quantum__qis__*
 # operation defined, or one referenced that is not one of the seven, or one of the seven never
-# referenced; a cq_template_* referenced by libcq_runtime.a; a symbol libcq_templates.a references
-# that neither archive defines (other than the seven and libc); an expected symbol no test
-# object references. Prints counts per family, and the internal globals nothing else references.
+# referenced; a cq/cqrt symbol the archive references and does not define; an expected symbol no test
+# object references. (That nothing outside src/templates/ references a cq_template_* is the test
+# templates_layering, by object.) Prints counts per family, and the internal globals nothing else references.
 set -u
-NM=$1 EXP=$2 TPL=$3 RT=$4 B=$5
+NM=$1 EXP=$2 LIB=$3 B=$4
 T=$(mktemp -d) || exit 1
 trap 'rm -rf "$T"' EXIT
 fail=0
@@ -24,21 +24,17 @@ syms() {
         NF == 0 { next }
         { t = $(NF-1); s = $NF; if (us) sub(/^_/, "", s); print m, t, s }'
 }
-syms "$TPL" > "$T/tpl" && syms "$RT" > "$T/rt" || { echo "FAIL: $NM"; exit 1; }
+syms "$LIB" > "$T/lib" || { echo "FAIL: $NM"; exit 1; }
 "$EXP" > "$T/exp" || { echo "FAIL: $EXP"; exit 1; }
-awk '$2 != "U" { print $3 }' "$T/tpl" | sort -u > "$T/tpl_def"
-awk '$2 != "U" { print $3 }' "$T/rt" | sort -u > "$T/rt_def"
-cat "$T/tpl_def" "$T/rt_def" | sort -u > "$T/all_def"
+awk '$2 != "U" { print $3 }' "$T/lib" | sort -u > "$T/all_def"
 awk '$1 == "templates" { print $3 }' "$T/exp" | sort > "$T/exp_tpl"
 awk '$1 == "runtime" { print $3 }' "$T/exp" | sort > "$T/exp_rt"
 sort "$T/exp_tpl" "$T/exp_rt" > "$T/exp_all"
 uniq -d "$T/exp_all" > "$T/x"; [ -s "$T/x" ] && bad "the expected list repeats a name" "$T/x"
 
-# 1. Every expected symbol is defined, in its archive (ABI:102-104, inventory (b)).
-comm -23 "$T/exp_tpl" "$T/tpl_def" > "$T/x"; [ -s "$T/x" ] && bad "expected cq_template_* not defined in libcq_templates.a" "$T/x"
-comm -23 "$T/exp_rt" "$T/rt_def" > "$T/x"; [ -s "$T/x" ] && bad "expected cqrt_* not defined in libcq_runtime.a" "$T/x"
-grep '^cqrt_' "$T/tpl_def" > "$T/x"; [ -s "$T/x" ] && bad "cqrt_* defined in libcq_templates.a" "$T/x"
-grep '^cq_template_' "$T/rt_def" > "$T/x"; [ -s "$T/x" ] && bad "cq_template_* defined in libcq_runtime.a" "$T/x"
+# 1. Every expected symbol is defined (ABI:102-104, inventory (b)).
+comm -23 "$T/exp_tpl" "$T/all_def" > "$T/x"; [ -s "$T/x" ] && bad "expected cq_template_* not defined in libcq_backend.a" "$T/x"
+comm -23 "$T/exp_rt" "$T/all_def" > "$T/x"; [ -s "$T/x" ] && bad "expected cqrt_* not defined in libcq_backend.a" "$T/x"
 
 # 2. No public symbol beyond the list.
 grep -E '^(cqrt_|cq_template_)' "$T/all_def" | comm -23 - "$T/exp_all" > "$T/x"
@@ -69,24 +65,19 @@ printf '%s\n' "$OUT" > "$T/out"
 cat "$T/all_def" "$T/exp_all" | sort -u | grep -Ef "$T/out" | grep -vxE 'cqrt_rz_i1|cqrt_qram_alloc_i8' > "$T/x"
 [ -s "$T/x" ] && bad "out-of-scope or retired names defined or expected" "$T/x"
 
-# 4. The seven operations: defined by neither archive, referenced, and nothing else of QIR.
+# 4. The seven operations: not defined by the archive, referenced, and nothing else of QIR.
 SEVEN='__quantum__qis__x__body __quantum__qis__cnot__body __quantum__qis__ccx__body __quantum__qis__ry__body __quantum__qis__ry__ctl __quantum__qis__rz__body __quantum__qis__m__body'
 printf '%s\n' $SEVEN | sort > "$T/seven"
 grep '^__quantum__' "$T/all_def" > "$T/x"; [ -s "$T/x" ] && bad "__quantum__* defined in the archives" "$T/x"
-cat "$T/tpl" "$T/rt" | awk '$2 == "U" && $3 ~ /^__quantum__/ { print $3 }' | sort -u > "$T/qref"
+awk '$2 == "U" && $3 ~ /^__quantum__/ { print $3 }' "$T/lib" | sort -u > "$T/qref"
 comm -23 "$T/qref" "$T/seven" > "$T/x"; [ -s "$T/x" ] && bad "__quantum__* referenced that is not one of the seven" "$T/x"
-awk '$2 == "U" && $3 ~ /^__quantum__/ { print $3 }' "$T/rt" | sort -u | comm -13 - "$T/seven" > "$T/x"
-[ -s "$T/x" ] && bad "one of the seven never referenced by libcq_runtime.a" "$T/x"
+comm -13 "$T/qref" "$T/seven" > "$T/x"
+[ -s "$T/x" ] && bad "one of the seven never referenced by libcq_backend.a" "$T/x"
 
-# 5. Link order main.o libcq_templates.a libcq_runtime.a (ABI:102-104), checked here because Apple's
-#    ld does not enforce it: the runtime references no template, and every cq/cqrt symbol either archive
-#    references is defined by the runtime or by the archive itself.
-awk '$2 == "U" && $3 ~ /^cq_template_/ { print $1, $3 }' "$T/rt" > "$T/x"
-[ -s "$T/x" ] && bad "libcq_runtime.a references cq_template_*" "$T/x"
-awk '$2 == "U" { print $3 }' "$T/tpl" | grep -E '^_*cq' | sort -u | comm -23 - "$T/all_def" > "$T/x"
-[ -s "$T/x" ] && bad "libcq_templates.a references cq symbols no archive defines" "$T/x"
-awk '$2 == "U" { print $3 }' "$T/rt" | grep -E '^_*cq' | sort -u | comm -23 - "$T/rt_def" > "$T/x"
-[ -s "$T/x" ] && bad "libcq_runtime.a references cq symbols it does not define" "$T/x"
+# 5. Link order main.o libcq_backend.a <gate backend>: every cq/cqrt symbol the archive references is
+#    defined by it.
+awk '$2 == "U" { print $3 }' "$T/lib" | grep -E '^_*cq' | sort -u | comm -23 - "$T/all_def" > "$T/x"
+[ -s "$T/x" ] && bad "libcq_backend.a references cq symbols it does not define" "$T/x"
 
 # 6. Done-when 2, the cheap form: every expected symbol is referenced by some test object (the sampled
 #    harness tests, tests/test_*.c, and the harness itself; not this check's own abi_* programs).
@@ -104,9 +95,9 @@ awk 'FILENAME == ARGV[1] { d[$1] = 1; next } FILENAME == ARGV[2] { r[$1] = 1; ne
 
 # Internal globals (no public prefix) that no other member of the archives, no test and no tool
 # references: candidates for static. Information, not a failure.
-find "$B/CMakeFiles" -name '*.o' ! -path '*/cq_runtime.dir/*' ! -path '*/cq_templates.dir/*' ! -path '*/cq_gates_replay.dir/*' |
+find "$B/CMakeFiles" -name '*.o' ! -path '*/cq_backend.dir/*' ! -path '*/cq_gates_replay.dir/*' |
     while read -r o; do syms "$o"; done | awk '$2 == "U" { print $3 }' > "$T/uref"
-cat "$T/tpl" "$T/rt" | awk '$2 == "U" { print $3 }' >> "$T/uref"
+awk '$2 == "U" { print $3 }' "$T/lib" >> "$T/uref"
 sort -u -o "$T/uref" "$T/uref"
 grep -vE '^(cqrt_|cq_template_)' "$T/all_def" | comm -23 - "$T/uref" > "$T/x"
 echo "internal globals referenced by nothing outside their own object: $(wc -l < "$T/x" | tr -d ' ')"

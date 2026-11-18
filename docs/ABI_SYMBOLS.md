@@ -355,32 +355,37 @@ No re-cut beyond G1 and G2 is needed.
 
 ## (b) Link order and archive split
 
-ABI:102-104: "A referencing archive comes before the archive it references:
-`main.o [lowered libraries (rule 27)] libcq_templates.a libcq_runtime.a` (template circuits are
-built from core primitives)." The ABI says nothing more about the split. What follows from it:
+ABI:102-104 names two archives in the order `main.o [lowered libraries (rule 27)] libcq_templates.a
+libcq_runtime.a` (a referencing archive before the one it references). User decision 2026-11-18
+(kmgy.42): one archive, `libcq_backend.a`, holds both, so the link is
+`main.o [lowered libraries] libcq_backend.a <gate backend>` and no order between the two exists. The
+layering the split enforced stays a source rule, tested by `templates_layering`:
 
-- `libcq_templates.a`: every `cq_template_*` symbol (rows 49-88 and their `_unc`).
-- `libcq_runtime.a`: every `cqrt_*` symbol (rows 1-48).
-- `libcq_templates.a` may reference `libcq_runtime.a`; `libcq_runtime.a` must not reference any
-  `cq_template_*` symbol, or a one-pass linker (GNU ld) leaves it undefined. But the runtime needs
-  integer circuits itself (G6: the angle ladder, the tape INPUT merge). So the integer kernels
-  (the gate emitters) belong in `libcq_runtime.a` under internal names, and the `cq_template_*`
-  entry points in `libcq_templates.a` call them.
-- `libcq_gates_replay.a` (the seven `__quantum__qis__*` operations) comes after
-  `libcq_runtime.a`; NORTH_STAR "Done when" 1 allows any other definition there.
+- `libcq_backend.a`: every `cqrt_*` symbol (rows 1-48) and every `cq_template_*` symbol (rows 49-88
+  and their `_unc`).
+- Nothing compiled from outside `src/templates/` references a `cq_template_*` symbol. The runtime
+  needs integer circuits itself (G6: the angle ladder, the tape INPUT merge), so the integer
+  kernels (the gate emitters) are in `src/kernels/` under internal names, and the `cq_template_*`
+  entry points in `src/templates/` call them.
+- `libcq_gates_replay.a` (the seven `__quantum__qis__*` operations) stays separate and comes
+  after `libcq_backend.a`; NORTH_STAR "Done when" 1 allows any other definition there.
 - Shared-library builds need no order (ABI:111-114). Either way one process holds one copy of the
   backend (ABI:116-119).
 
-Apple's ld does not enforce archive order: the order-1 program of kmgy.23 also links and runs as
-`main.o libcq_runtime.a libcq_templates.a` (checked 2026-11-18 on macOS, x86_64). So a link test on
-macOS passes even when the runtime references a template; the `abi_symbols` test checks the
-order-sensitive property with `nm` instead (no undefined `cq_template_*` in `libcq_runtime.a`, every
-`cq*` symbol either archive references defined by the runtime or by itself).
+Apple's ld does not enforce archive order, so a link test on macOS passes even when the archive
+references a symbol defined later; the `abi_symbols` test checks with `nm` that every `cq*` symbol
+`libcq_backend.a` references is defined by it, and `templates_layering` checks the source rule.
 
 ## Disagreements between ABI and CR
 
 No symbol name or C-level argument list differs between the two. What differs or is
 inconsistent:
+
+> **Resolved in the ABI, 2026-11-18** (working tree of CQ_lang `spec/`, not yet committed there):
+> D1-D5 below, the wide-literal paragraph (it now gives the LLVM 19.1.7 table and names that
+> version normative), the single archive `libcq_backend.a`, the ladder and classical rotation
+> angles, P up to a global phase, and the resource limits. The notes are kept as the record of
+> what was found; line numbers refer to the older revision.
 
 - **D1.** ABI:96 says the backend's integer templates are §2.2-§2.7, but §2.8 (bit counting) is
   integer too, is not on the compiler's list (ABI:97), and is in §4 (ABI:1138). CR does not split

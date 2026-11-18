@@ -1,4 +1,4 @@
-/* Public core entry points of BACKEND_ABI §1 (libcq_runtime.a): alloc, free,
+/* Public core entry points of BACKEND_ABI §1 (libcq_backend.a): alloc, free,
  * measure, the i1 logic, copy, xorc and their _controlled forms, push/pop.
  * Generated per width from CQ_WIDTHS and CQ_FP_WIDTHS (cq_widths.h).
  *

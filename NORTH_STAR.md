@@ -130,13 +130,14 @@ Classical arithmetic only. Rotations are never tested.
 
 ## Deliverables
 
-`libcq_templates.a`, `libcq_runtime.a` (the ABI's link order), `libcq_gates_replay.a`, and the
-test suite. C11, CMake.
+`libcq_backend.a`, `libcq_gates_replay.a` and the test suite. C11, CMake. The one backend archive
+replaces the two (`libcq_templates.a`, `libcq_runtime.a`) the ABI used to name; user decision
+2026-11-18.
 
 ## Done when
 
-1. A program that calls only ABI symbols links against the two archives plus any definition
-   of the seven operations.
+1. A program that calls only ABI symbols links against `libcq_backend.a` plus any definition
+   of the seven operations (user decision 2026-11-18: one archive, not the ABI's two).
 2. Every in-scope symbol at every listed width passes its sampled test, forced-quantum and
    all-classical.
 3. All-classical programs emit no gate.

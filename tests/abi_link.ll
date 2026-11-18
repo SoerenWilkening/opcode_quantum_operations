@@ -2,7 +2,7 @@
 ; written as LLVM IR the way CQ_lang's lowered code calls the backend. It uses every family once:
 ; alloc, a template with a literal and its _unc, an i1 compare, a rotation, the core i1 logic, a bus
 ; store and load at a classical address, a tape write and a performed effect entry, an invert region,
-; push/pop, measure and free. Linked as main.o libcq_templates.a libcq_runtime.a <the seven
+; push/pop, measure and free. Linked as main.o libcq_backend.a <the seven
 ; operations> (ABI:102-104), once with libcq_gates_replay.a and once with tests/abi_link_gates.c.
 ; Exit status 0 iff every measured value is the expected one.
 

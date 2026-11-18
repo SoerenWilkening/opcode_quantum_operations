@@ -32,12 +32,11 @@ cmake --build build -j
 ctest --test-dir build -j4        # optional, about 40 s
 ```
 
-This produces three static archives in `build/`:
+This produces two static archives in `build/`:
 
 | archive | contents |
 |---|---|
-| `libcq_templates.a` | the `cq_template_*` integer operations |
-| `libcq_runtime.a` | the `cqrt_*` runtime: allocation, measurement, rotations, memory bus, tape, invert regions |
+| `libcq_backend.a` | the `cq_template_*` integer operations and the `cqrt_*` runtime: allocation, measurement, rotations, memory bus, tape, invert regions |
 | `libcq_gates_replay.a` | a classical definition of the seven operations, with gate and depth counters |
 
 The build type defaults to Release with asserts on. Build-time settings (`-D<name>=<value>` at
@@ -56,21 +55,21 @@ Tested on x86-64 macOS only.
 cmake --install build --prefix /usr/local
 ```
 
-This copies the three archives to `<prefix>/lib` and the public headers (`cqrt.h`,
+This copies the two archives to `<prefix>/lib` and the public headers (`cqrt.h`,
 `cq_template.h`, `cq_gates.h`, `cq_replay.h`, `cq_widths.h`, `cq_cast_pairs.h`) to
 `<prefix>/include`.
 
 ## Link
 
-Link a lowered program against the two library archives, in this order, followed by a
-definition of the seven operations:
+Link a lowered program against the backend archive, followed by a definition of the seven
+operations:
 
 ```sh
-clang program.o -L<prefix>/lib -lcq_templates -lcq_runtime -lcq_gates_replay -o program
+clang program.o -L<prefix>/lib -lcq_backend -lcq_gates_replay -o program
 ```
 
 Replace `-lcq_gates_replay` with your own gate backend. The order matters with GNU ld:
-templates call into the runtime, and the runtime calls the seven operations. On Linux add
+the backend calls the seven operations. On Linux add
 `-ldl -lm`.
 
 ## How the circuits are built

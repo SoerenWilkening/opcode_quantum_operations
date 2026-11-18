@@ -147,7 +147,7 @@ static void and_aa(int32_t o, const int32_t *a, uint32_t w) { (void)w; cqrt_and_
 static void or_aa(int32_t o, const int32_t *a, uint32_t w) { (void)w; cqrt_or_i1(a[0], a[0], o); }
 
 /* The link check: every in-scope §1 name of docs/ABI_SYMBOLS.md (rows 1-3, 7-16) at every
- * width is defined in libcq_runtime.a, the only archive besides the replay gates and the
+ * width is defined in libcq_backend.a, the only archive besides the replay gates and the
  * harness this test links. */
 typedef void (*fn)(void);
 #define ADDR_(n, ...) (fn)cqrt_alloc_##n, (fn)cqrt_measure_##n, (fn)cqrt_copy_##n, \

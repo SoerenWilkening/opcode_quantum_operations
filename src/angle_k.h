@@ -1,5 +1,5 @@
 /* The angle-ladder index k(a) on the host (BACKEND_ABI §1.5, §1.7; docs/ANGLE_LADDER.md).
- * Internal to libcq_runtime.a; the quantum angle rail (kmgy.18, src/kernels/ladder.c) builds its
+ * Internal to libcq_backend.a; the quantum angle rail (kmgy.18, src/kernels/ladder.c) builds its
  * circuit from the same constant and window. */
 #ifndef CQ_ANGLE_K_H
 #define CQ_ANGLE_K_H

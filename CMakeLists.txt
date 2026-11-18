@@ -25,13 +25,12 @@ endif()
 
 include_directories(include)
 
-add_library(cq_templates STATIC src/templates/bits.c src/templates/cast.c)
-add_library(cq_runtime STATIC src/emit.c src/rails.c)
+add_library(cq_backend STATIC src/templates/bits.c src/templates/cast.c src/emit.c src/rails.c)
 add_library(cq_gates_replay STATIC src/gates_replay.c)
 
 enable_testing()
 add_executable(test_skeleton tests/test_skeleton.c)
-target_link_libraries(test_skeleton cq_templates cq_runtime cq_gates_replay)
+target_link_libraries(test_skeleton cq_backend cq_gates_replay)
 add_test(NAME skeleton COMMAND test_skeleton)
 
 # Tests always assert, whatever the build type.
@@ -41,13 +40,13 @@ target_link_libraries(test_replay cq_gates_replay)
 add_test(NAME replay COMMAND test_replay)
 
 add_executable(test_emit tests/test_emit.c)
-target_link_libraries(test_emit cq_runtime cq_gates_replay)
+target_link_libraries(test_emit cq_backend cq_gates_replay)
 add_test(NAME emit COMMAND test_emit)
 
 # The sampled operation harness every operation test links (tests/harness.h).
 add_library(cq_test_harness STATIC tests/harness.c)
 target_include_directories(cq_test_harness PUBLIC tests)
-target_link_libraries(cq_test_harness PUBLIC cq_runtime cq_gates_replay)
+target_link_libraries(cq_test_harness PUBLIC cq_backend cq_gates_replay)
 
 add_executable(test_harness tests/test_harness.c)
 target_link_libraries(test_harness cq_test_harness)
@@ -55,8 +54,8 @@ add_test(NAME harness COMMAND test_harness)
 
 # Integer kernels and their per-width choice (kmgy.9). kernel_choice.c is generated and
 # checked in; regenerate it and docs/DEPTH.md with: cmake --build <build> --target depth_tables
-target_sources(cq_runtime PRIVATE src/kernels/registry.c src/kernels/parity.c src/kernels/kernel_choice.c)
-target_include_directories(cq_runtime PUBLIC src/kernels)
+target_sources(cq_backend PRIVATE src/kernels/registry.c src/kernels/parity.c src/kernels/kernel_choice.c)
+target_include_directories(cq_backend PUBLIC src/kernels)
 add_library(cq_depth STATIC tools/depth.c)
 target_include_directories(cq_depth PUBLIC tools)
 target_link_libraries(cq_depth PUBLIC cq_test_harness)
@@ -71,21 +70,23 @@ target_compile_definitions(test_depth PRIVATE CQ_SOURCE_DIR="${CMAKE_SOURCE_DIR}
 add_test(NAME depth COMMAND test_depth)
 
 # Core §1 entry points (kmgy.6): public header include/cqrt.h.
-target_sources(cq_runtime PRIVATE src/core.c)
+target_sources(cq_backend PRIVATE src/core.c)
 add_executable(test_core tests/test_core.c)
 target_link_libraries(test_core cq_test_harness)
 add_test(NAME core COMMAND test_core)
 
 # Integer templates §2 (kmgy.25 on): public header include/cq_template.h, sources src/templates/,
-# each calling its registry kernel. The runtime never references a template.
-target_link_libraries(cq_templates PUBLIC cq_runtime)
-target_sources(cq_runtime PRIVATE src/kernels/bits.c)
+# each calling its registry kernel. Nothing outside src/templates/ references a template (templates_layering).
+target_sources(cq_backend PRIVATE src/kernels/bits.c)
 add_executable(test_tpl_bits tests/test_tpl_bits.c)
-target_link_libraries(test_tpl_bits cq_templates cq_test_harness)
+target_link_libraries(test_tpl_bits cq_test_harness)
 add_test(NAME tpl_bits COMMAND test_tpl_bits)
-add_test(NAME runtime_no_templates COMMAND sh -c
-  "t=$(${CMAKE_NM} \"$1\") && r=$(${CMAKE_NM} \"$2\") || exit 1; echo \"$t\" | grep -q ' T _*cq_template_bswap_i32$' || exit 1; ! echo \"$r\" | grep cq_template_"
-  nm_check $<TARGET_FILE:cq_templates> $<TARGET_FILE:cq_runtime>)
+# Layering inside the one archive: no object outside src/templates/ mentions a cq_template_* symbol, and
+# the template objects do define some (the check cannot pass vacuously). By object, not archive member:
+# src/kernels/bits.c and src/templates/bits.c share a member name.
+add_test(NAME templates_layering COMMAND sh -c
+  "nm=$1; IFS=';'; set -- $2; unset IFS; t=0; for o; do s=$($nm \"$o\") || exit 1; case $o in */src/templates/*) echo \"$s\" | grep -q ' T _*cq_template_' && t=1;; *) echo \"$s\" | grep cq_template_ && { echo \"$o\"; exit 1; };; esac; done; [ $t = 1 ]"
+  nm_check ${CMAKE_NM} "$<TARGET_OBJECTS:cq_backend>")
 
 # IR calling-convention test (kmgy.29, kmgy.33): tests/ir/caller.ll is LLVM IR calling the entry points
 # the way CQ_lang's compiled code does. The reference compiler for it is the LLVM CQ_lang pins, 19.1.7
@@ -117,7 +118,7 @@ if(cq_ir_cc)
       COMMAND ${cq_ir_cc} ${cq_flags} -w -c -x ir ${CMAKE_SOURCE_DIR}/tests/ir/caller.ll -o ${cq_obj}
       DEPENDS tests/ir/caller.ll VERBATIM)
     add_executable(test_ir_abi_${cq_tag} tests/ir/driver.c ${cq_obj})
-    target_link_libraries(test_ir_abi_${cq_tag} cq_templates cq_runtime cq_gates_replay)
+    target_link_libraries(test_ir_abi_${cq_tag} cq_backend cq_gates_replay)
     set_target_properties(test_ir_abi_${cq_tag} PROPERTIES ENABLE_EXPORTS ON)   # the tape's callee, dlsym
     add_test(NAME ir_abi_${cq_tag} COMMAND test_ir_abi_${cq_tag})
   endforeach()
@@ -133,17 +134,17 @@ else()
 endif()
 
 # Integer casts (kmgy.15): src/kernels/cast.c in the runtime, src/templates/cast.c in the templates.
-target_sources(cq_runtime PRIVATE src/kernels/cast.c)
+target_sources(cq_backend PRIVATE src/kernels/cast.c)
 add_executable(test_tpl_cast tests/test_tpl_cast.c)
-target_link_libraries(test_tpl_cast cq_templates cq_test_harness)
+target_link_libraries(test_tpl_cast cq_test_harness)
 add_test(NAME tpl_cast COMMAND test_tpl_cast)
 # Exactly the listed pairs are defined: 3 ops x 2 forms x pair count, no other cast symbol.
 add_test(NAME tpl_cast_symbols COMMAND sh -c
   "n=$(\"$1\" --count) && c=$(${CMAKE_NM} \"$2\" | grep -cE ' T _*cq_template_(zext|sext|trunc)_i[0-9]+_to_i[0-9]+(_unc)?$') && [ \"$n\" = \"$c\" ]"
-  nm_check $<TARGET_FILE:test_tpl_cast> $<TARGET_FILE:cq_templates>)
+  nm_check $<TARGET_FILE:test_tpl_cast> $<TARGET_FILE:cq_backend>)
 
 # Rotations with a classical angle (kmgy.7): src/rot.c, the host k(a) in src/angle_k.c.
-target_sources(cq_runtime PRIVATE src/rot.c src/angle_k.c)
+target_sources(cq_backend PRIVATE src/rot.c src/angle_k.c)
 add_executable(test_rot tests/test_rot.c)
 target_link_libraries(test_rot cq_test_harness)
 target_include_directories(test_rot PRIVATE src)
@@ -151,79 +152,79 @@ target_compile_definitions(test_rot PRIVATE CQ_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME rot COMMAND test_rot)
 
 # Memory bus, classical address (kmgy.19): src/bus.c, the non-faulting host access in src/hostmem.c.
-target_sources(cq_runtime PRIVATE src/bus.c src/hostmem.c)
+target_sources(cq_backend PRIVATE src/bus.c src/hostmem.c)
 add_executable(test_bus tests/test_bus.c)
 target_link_libraries(test_bus cq_test_harness)
 add_test(NAME bus COMMAND test_bus)
 
 # Bitwise and shifts (kmgy.13): src/kernels/{bitwise,shift}.c in the runtime, src/templates/{bitwise,shift}.c.
-target_sources(cq_runtime PRIVATE src/kernels/bitwise.c src/kernels/shift.c)
-target_sources(cq_templates PRIVATE src/templates/bitwise.c src/templates/shift.c)
+target_sources(cq_backend PRIVATE src/kernels/bitwise.c src/kernels/shift.c)
+target_sources(cq_backend PRIVATE src/templates/bitwise.c src/templates/shift.c)
 add_executable(test_tpl_bitwise tests/test_tpl_bitwise.c)
-target_link_libraries(test_tpl_bitwise cq_templates cq_test_harness)
+target_link_libraries(test_tpl_bitwise cq_test_harness)
 add_test(NAME tpl_bitwise COMMAND test_tpl_bitwise)
 
 # Add, sub, overflow and saturating ops (kmgy.10): the adder and tape in src/kernels/adder.c, the op
 # kernels in src/kernels/arith.c (runtime), the templates in src/templates/arith.c.
-target_sources(cq_runtime PRIVATE src/kernels/adder.c src/kernels/arith.c)
-target_sources(cq_templates PRIVATE src/templates/arith.c)
+target_sources(cq_backend PRIVATE src/kernels/adder.c src/kernels/arith.c)
+target_sources(cq_backend PRIVATE src/templates/arith.c)
 add_executable(test_tpl_arith tests/test_tpl_arith.c)
-target_link_libraries(test_tpl_arith cq_templates cq_test_harness)
+target_link_libraries(test_tpl_arith cq_test_harness)
 add_test(NAME tpl_arith COMMAND test_tpl_arith)
 
 # Tape and abort (kmgy.22): src/tape.c. Host callees are found by name (dlsym); the test exports
 # its own callees for that.
-target_sources(cq_runtime PRIVATE src/tape.c)
-target_link_libraries(cq_runtime PUBLIC ${CMAKE_DL_LIBS})
+target_sources(cq_backend PRIVATE src/tape.c)
+target_link_libraries(cq_backend PUBLIC ${CMAKE_DL_LIBS})
 add_executable(test_tape tests/test_tape.c)
 target_link_libraries(test_tape cq_test_harness)
 set_target_properties(test_tape PROPERTIES ENABLE_EXPORTS ON)
 add_test(NAME tape COMMAND test_tape)
 
 # cq_invert begin/end (kmgy.8): src/invert.c; every reversible entry point goes through cq_call_do.
-target_sources(cq_runtime PRIVATE src/invert.c)
+target_sources(cq_backend PRIVATE src/invert.c)
 add_executable(test_invert tests/test_invert.c)
-target_link_libraries(test_invert cq_templates cq_test_harness)
+target_link_libraries(test_invert cq_test_harness)
 set_target_properties(test_invert PROPERTIES ENABLE_EXPORTS ON)   # its effect callee is found by dlsym
 add_test(NAME invert COMMAND test_invert)
 
 # Bit counting ctpop, ctlz, cttz (kmgy.16): src/kernels/count.c in the runtime, src/templates/count.c.
-target_sources(cq_runtime PRIVATE src/kernels/count.c)
-target_sources(cq_templates PRIVATE src/templates/count.c)
+target_sources(cq_backend PRIVATE src/kernels/count.c)
+target_sources(cq_backend PRIVATE src/templates/count.c)
 add_executable(test_tpl_count tests/test_tpl_count.c)
-target_link_libraries(test_tpl_count cq_templates cq_test_harness)
+target_link_libraries(test_tpl_count cq_test_harness)
 add_test(NAME tpl_count COMMAND test_tpl_count)
 
 # Divide and remainder (kmgy.12): src/kernels/div.c in the runtime, src/templates/div.c in the templates.
-target_sources(cq_runtime PRIVATE src/kernels/div.c)
-target_sources(cq_templates PRIVATE src/templates/div.c)
+target_sources(cq_backend PRIVATE src/kernels/div.c)
+target_sources(cq_backend PRIVATE src/templates/div.c)
 add_executable(test_tpl_div tests/test_tpl_div.c)
-target_link_libraries(test_tpl_div cq_templates cq_test_harness)
+target_link_libraries(test_tpl_div cq_test_harness)
 add_test(NAME tpl_div COMMAND test_tpl_div)
 
 # Multiply (kmgy.11): the multiplier and its kernels in src/kernels/mul.c (runtime), src/templates/mul.c.
-target_sources(cq_runtime PRIVATE src/kernels/mul.c)
-target_sources(cq_templates PRIVATE src/templates/mul.c)
+target_sources(cq_backend PRIVATE src/kernels/mul.c)
+target_sources(cq_backend PRIVATE src/templates/mul.c)
 add_executable(test_tpl_mul tests/test_tpl_mul.c)
-target_link_libraries(test_tpl_mul cq_templates cq_test_harness)
+target_link_libraries(test_tpl_mul cq_test_harness)
 add_test(NAME tpl_mul COMMAND test_tpl_mul)
 
 # Memory bus, quantum address (kmgy.21): the fan-out QRAM of docs/QRAM_CONSTRUCTION.md, src/qram.c.
-target_sources(cq_runtime PRIVATE src/qram.c)
+target_sources(cq_backend PRIVATE src/qram.c)
 add_executable(test_qram tests/test_qram.c)
 target_link_libraries(test_qram cq_test_harness)
 add_test(NAME qram COMMAND test_qram)
 
 # Compare, select, min/max, abs (kmgy.14): src/kernels/cmp.c in the runtime, src/templates/cmp.c.
-target_sources(cq_runtime PRIVATE src/kernels/cmp.c)
-target_sources(cq_templates PRIVATE src/templates/cmp.c)
+target_sources(cq_backend PRIVATE src/kernels/cmp.c)
+target_sources(cq_backend PRIVATE src/templates/cmp.c)
 add_executable(test_tpl_cmp tests/test_tpl_cmp.c)
-target_link_libraries(test_tpl_cmp cq_templates cq_test_harness)
+target_link_libraries(test_tpl_cmp cq_test_harness)
 add_test(NAME tpl_cmp COMMAND test_tpl_cmp)
 
 # Angle ladder, quantum angle rail (kmgy.18): the reduction kernel in src/kernels/ladder.c, the rotations in
 # src/ladder.c. CQ_LADDER_FULL=1 in the environment runs every vector fully quantum (slow; see the test).
-target_sources(cq_runtime PRIVATE src/ladder.c src/kernels/ladder.c)
+target_sources(cq_backend PRIVATE src/ladder.c src/kernels/ladder.c)
 add_executable(test_ladder tests/test_ladder.c)
 target_link_libraries(test_ladder cq_test_harness)
 target_include_directories(test_ladder PRIVATE src)
@@ -231,17 +232,17 @@ target_compile_definitions(test_ladder PRIVATE CQ_SOURCE_DIR="${CMAKE_SOURCE_DIR
 add_test(NAME ladder COMMAND test_ladder)
 
 # Link and completeness check (kmgy.23; NORTH_STAR "Done when" 1-3; docs/COMPLETENESS.md).
-# abi_symbols: nm on the archives against the in-scope list that tests/abi_expected.c writes from the ABI
-# text, the out-of-scope and retired names, the seven operations, the link-order property and the test
+# abi_symbols: nm on libcq_backend.a against the in-scope list that tests/abi_expected.c writes from the ABI
+# text, the out-of-scope and retired names, the seven operations, the references-nothing-undefined property and the test
 # objects' references. abi_classical: one all-classical program over every family and width emits no gate.
 add_executable(abi_expected tests/abi_expected.c)
 add_test(NAME abi_symbols COMMAND sh ${CMAKE_SOURCE_DIR}/tests/abi_symbols.sh ${CMAKE_NM}
-  $<TARGET_FILE:abi_expected> $<TARGET_FILE:cq_templates> $<TARGET_FILE:cq_runtime> ${CMAKE_BINARY_DIR})
+  $<TARGET_FILE:abi_expected> $<TARGET_FILE:cq_backend> ${CMAKE_BINARY_DIR})
 add_executable(test_abi_classical tests/test_abi_classical.c)
-target_link_libraries(test_abi_classical cq_templates cq_runtime cq_gates_replay)
+target_link_libraries(test_abi_classical cq_backend cq_gates_replay)
 add_test(NAME abi_classical COMMAND test_abi_classical)
 # abi_link_*: tests/abi_link.ll, ABI calls only, compiled like tests/ir/caller.ll (above) and linked
-# main.o libcq_templates.a libcq_runtime.a <the seven operations>: the replay archive, then a second,
+# main.o libcq_backend.a <the seven operations>: the replay archive, then a second,
 # independent definition (tests/abi_link_gates.c).
 if(cq_ir_cc)
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/abi_link.o
@@ -251,7 +252,7 @@ if(cq_ir_cc)
   foreach(cq_gates IN ITEMS cq_gates_replay cq_abi_count_gates)
     add_executable(test_abi_link_${cq_gates} ${CMAKE_BINARY_DIR}/abi_link.o)
     set_target_properties(test_abi_link_${cq_gates} PROPERTIES LINKER_LANGUAGE C)
-    target_link_libraries(test_abi_link_${cq_gates} cq_templates cq_runtime ${cq_gates})
+    target_link_libraries(test_abi_link_${cq_gates} cq_backend ${cq_gates})
     add_test(NAME abi_link_${cq_gates} COMMAND test_abi_link_${cq_gates})
   endforeach()
 else()
@@ -259,9 +260,9 @@ else()
   set_tests_properties(abi_link PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
-# Install: the three archives and the public headers.
+# Install: the two archives and the public headers.
 include(GNUInstallDirs)
-install(TARGETS cq_templates cq_runtime cq_gates_replay ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS cq_backend cq_gates_replay ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES include/cqrt.h include/cq_template.h include/cq_gates.h include/cq_replay.h
               include/cq_widths.h include/cq_cast_pairs.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
