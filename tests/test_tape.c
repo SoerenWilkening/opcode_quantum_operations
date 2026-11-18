@@ -85,6 +85,8 @@ static void expect_abort(void (*s)(void), const char *name, const char *msg) {
     printf("%s: ok\n", name);
 }
 
+#define LIM ": not implemented, a backend limit ABI §1.11 Limits permits"   /* every Limits message */
+
 static uint32_t qbit(int v) {   /* an i1 rail forced to a qubit holding v */
     uint32_t h = cqrt_alloc_i1(v);
     cq_get_qubit(cq_rail_bits((int32_t)h));
@@ -375,12 +377,47 @@ static void s_cap_va(void) {   /* vprintf whose %s string has a QUANTUM cell: de
     s[0] = '-';
     printf("live\n");
 }
-static void s_cap_fmt_gap(void) {   /* a format with a QUANTUM cell: kmgy.36 */
+/* A format with a QUANTUM cell: deferred; the conversions that decide the
+ * capture come from the host bytes, the performed call prints the captured (measured) bytes. */
+static void s_cap_fmt_q(void) {
     uint32_t t = cqrt_tape_alloc(), M = cqrt_qram_alloc_i8(0);
-    char f[] = "%d\n";
-    cqrt_qram_store_i8_hl_controlled(qbit(1), M, ptr(f + 1), cqrt_alloc_i8('s'));
-    cqrt_tape_write_i64_lit(t, ptr(stdout)); cqrt_tape_write_i64_lit(t, ptr(f)); cqrt_tape_write_i32_lit(t, 1);
-    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "fprintf", 3);
+    char f[] = "A%d|%s\n", s[] = "str";
+    cqrt_qram_store_i8_hl_controlled(qbit(1), M, ptr(f + 3), cqrt_alloc_i8('#'));
+    cqrt_tape_write_i64_lit(t, ptr(stdout)); cqrt_tape_write_i64_lit(t, ptr(f));
+    cqrt_tape_write_i32_lit(t, 7); cqrt_tape_write_i64_lit(t, ptr(s));
+    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "fprintf", 4);
+    strcpy(f, "%p%p%p"); strcpy(s, "-");   /* captured at the call */
+    printf("live\n");
+}
+static void s_cap_fmt_qaddr(void) {   /* printf's format at an address rail reaching qbuf + 16k, k < 4 */
+    uint32_t t = cqrt_tape_alloc();
+    for (int k = 0; k < 4; k++) snprintf(qbuf + 16 * k, 16, "F%d %%d\n", k);
+    cqrt_tape_write_i64(t, qmask64(ptr(qbuf) + 16 * N_, 0x30)); cqrt_tape_write_i32_lit(t, 7);
+    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "printf", 2);
+    memset(qbuf, 0, 64);
+    printf("live\n");
+}
+static void vdefer_q(uint32_t t, const char *f, ...) {   /* the va_list's first byte made QUANTUM, same value */
+    va_list ap;
+    va_start(ap, f);
+    cqrt_qram_store_i8_hl_controlled(qbit(1), cqrt_qram_alloc_i8(0), ptr(ap), cqrt_alloc_i8(*(uint8_t *)(void *)ap));
+    cqrt_tape_write_i64_lit(t, ptr(f)); cqrt_tape_write_i64_lit(t, ptr(ap));
+    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "vprintf", 2);
+    va_end(ap);
+}
+static void s_cap_va_bytes_q(void) { vdefer_q(cqrt_tape_alloc(), "V %s %d\n", "vs", 5); printf("live\n"); }
+static void s_gap_va_ptr(void) {   /* a deferred vprintf whose va_list pointer is a rail: no rule, kmgy.43 */
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr("%d\n")); cqrt_tape_write_i64(t, q64(ptr(qbuf)));
+    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "vprintf", 2);
+}
+static void s_positional(void) {   /* Limits: positional %n$ fails loudly */
+    cqrt_tape_fmt(cqrt_tape_alloc(), "%1$d\n");
+}
+static void s_stack17(void) {   /* Limits: more than 16 stack slots fails loudly */
+    uint32_t t = cqrt_tape_alloc();
+    for (int k = 0; k < 23; k++) cqrt_tape_write_i64_lit(t, (uint64_t)k);
+    cqrt_tape_effect_controlled(cqrt_alloc_i1(1), t, "sum10", 23);
 }
 
 static void capture_tests(void) {
@@ -400,7 +437,16 @@ static void capture_tests(void) {
         expect_n(s_cap_len, "capture: rail length", 0, w, (size_t)k);
     }
     expect(s_cap_va, "capture: va_list string with a QUANTUM cell", 0, "live\nV vQ 5\n");
-    expect_abort(s_cap_fmt_gap, "capture: format with a QUANTUM cell (ABI gap)", "kmgy.36");
+    expect(s_cap_fmt_q, "capture: format with a QUANTUM cell", 0, "live\nA7#str\n");
+    for (N_ = 0; N_ < 4; N_++) {
+        char w[64];
+        snprintf(w, sizeof w, "live\nF%d 7\n", (int)N_);
+        expect(s_cap_fmt_qaddr, "capture: format at an address rail", 0, w);
+    }
+    expect(s_cap_va_bytes_q, "capture: va_list bytes QUANTUM", 0, "live\nV vs 5\n");
+    expect_abort(s_gap_va_ptr, "capture: va_list pointer a rail (ABI open)", "deferred v-form's va_list pointer that is a quantum rail: not defined by ABI §1.11 (opcode_quantum_operations-kmgy.43)");
+    expect_abort(s_positional, "Limits: positional %n$", "positional %n$ conversions" LIM);
+    expect_abort(s_stack17, "Limits: more than 16 stack slots", "a host call with more than 16 stack slots of arguments" LIM);
 }
 
 /* ---- INPUT merge rows (kmgy.28, §1.11 host-boundary table). Each child prints r, the bus's view
@@ -544,36 +590,97 @@ static void s_stream_fd(void) {   /* the identifier row on a descriptor: fds 10 
     rest_fd(10); rest_fd(11);
     printf("\n");
 }
-static void s_classical_in(void) {   /* the classical INPUT row: no gate */
+static void s_classical_in(void) {   /* the classical INPUT row: no gate; gets is fgets at K2 without the newline */
     cq_replay_reset();
     uint32_t t = cqrt_tape_alloc();
     cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i32_lit(t, 16); cqrt_tape_write_i64_lit(t, ptr(stdin));
     cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "fgets", 3);
-    assert(cq_replay_gates() == 0 && cq_pool_live() == 0);
     printf("%s", dst);
+    cqrt_tape_write_i64_lit(t, ptr(dst));
+    assert(cqrt_measure_i64(cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "gets", 1)) == ptr(dst));
+    assert(cq_replay_gates() == 0 && cq_pool_live() == 0);
+    printf("%s|", dst);
+    rest_stdio();
 }
-/* The fields no INPUT row covers (kmgy.36). */
+/* pread's offset row: off a rail whose bits 2 and 3 are qubits (0, 4, 8 or 12 into a 10-byte file),
+ * under predicate P_; the descriptor's position is untouched. */
+static void s_pread_off(void) {
+    fill();
+    FILE *fp = tmpfile();
+    int fd = fileno(fp);
+    assert(write(fd, "0123456789", 10) == 10);
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i32_lit(t, (uint32_t)fd); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64_lit(t, 4);
+    cqrt_tape_write_i64(t, qmask64(N_, 0xc));
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "pread", 4);
+    balanced(ptr(dst), 8);
+    printf("r=%d", (int)peekr(r));
+    showm(ptr(dst), 8);
+    printf(" rest=%lld|\n", (long long)lseek(fd, 0, SEEK_CUR));
+}
+static void s_pread_cap(void) {   /* Limits: an enumerated rail above the cap fails loudly */
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i32_lit(t, 0); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64_lit(t, 4);
+    cqrt_tape_write_i64(t, qmask64(0, (1ull << (CQ_MAX_QADDR_BITS + 1)) - 1));
+    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "pread", 4);
+}
+/* getdelim's delimiter row: d a rail holding D_ with the bits of DM_ as qubits, under P_. Prints
+ * the result, the line and size the cells name, and the input left. */
+static uint64_t D_, DM_;
+static FILE *gd_in;
+static void s_getdelim_d(void) {
+    struct { char *line; size_t cap; } lc = { NULL, 0 };
+    uint32_t t = cqrt_tape_alloc(), d = cqrt_alloc_i32((uint32_t)D_);
+    for (int i = 0; i < 32; i++) if (DM_ >> i & 1) cq_get_qubit(&cq_rail_bits((int32_t)d)[i]);
+    FILE *in = gd_in ? gd_in : stdin;
+    cqrt_tape_write_i64_lit(t, ptr(&lc.line)); cqrt_tape_write_i64_lit(t, ptr(&lc.cap)); cqrt_tape_write_i32(t, d);
+    cqrt_tape_write_i64_lit(t, ptr(in));
+    uint32_t r = cqrt_tape_effect_i64_controlled(qbit(P_), t, "getdelim", 4);
+    balanced(ptr(&lc), sizeof lc);
+    uint64_t l = 0, c = 0;
+    for (int j = 7; j >= 0; j--) l = l << 8 | peekc(ptr(&lc.line) + j), c = c << 8 | peekc(ptr(&lc.cap) + j);
+    printf("r=%lld line=%.12s cap=%llu", (long long)peekr(r), l ? (char *)(uintptr_t)l : "null", (unsigned long long)c);
+    if (gd_in) printf(" pos=%ld\n", ftell(in)); else rest_stdio();
+}
+static void s_getdelim_long(void) {   /* K2 + 5 bytes in a file: the K2 call's position on every branch */
+    gd_in = tmpfile();
+    for (int k = 0; k < CQ_K2 + 5; k++) fputc(k == 2 ? ',' : 'x', gd_in);
+    rewind(gd_in);
+    s_getdelim_d();
+}
+/* A scanf whose format has a QUANTUM cell after its first conversion: no abort, no fault; the
+ * text defines the first conversion only. P_ 2: a classical predicate (the host call as it stands). */
+static void s_scanf_fmt_q(void) {
+    fill();
+    char f[] = "%d,%d";
+    cqrt_qram_store_i8_hl_controlled(qbit(1), cqrt_qram_alloc_i8(0), ptr(f + 2), cqrt_alloc_i8('#'));
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr(f)); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64_lit(t, ptr(dst + 4));
+    uint32_t r = cqrt_tape_effect_i32_controlled(P_ == 2 ? cqrt_alloc_i1(1) : qbit(P_), t, "scanf", 3);
+    int a = 0;
+    for (int j = 3; j >= 0; j--) a = a << 8 | peekc(ptr(dst) + j);
+    printf("a=%d ok=%d\n", a, P_ ? peekr(r) == 1 || peekr(r) == 2 : peekr(r) == 0);
+}
+static void s_scanf_positional(void) {   /* Limits: a scanf row's positional %n$ fails loudly */
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr("%1$d")); cqrt_tape_write_i64_lit(t, ptr(dst));
+    cqrt_tape_effect_i32_controlled(qbit(1), t, "scanf", 2);
+}
+/* Limits: what ABI §1.11 lets this backend leave unimplemented, failing loudly. */
 static void s_gap_ungetc(void) {
     uint32_t t = cqrt_tape_alloc();
     cqrt_tape_write_i32(t, q32('a')); cqrt_tape_write_i64_lit(t, ptr(stdin));
     cqrt_tape_effect_i32_controlled(cqrt_alloc_i1(1), t, "ungetc", 2);
 }
-static void s_gap_pread(void) {
-    uint32_t t = cqrt_tape_alloc();
-    cqrt_tape_write_i32_lit(t, 0); cqrt_tape_write_i64_lit(t, ptr(dst)); cqrt_tape_write_i64_lit(t, 4); cqrt_tape_write_i64(t, q64(0));
-    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "pread", 4);
-}
-static void s_gap_getdelim(void) {
-    char *l = NULL;
-    size_t n = 0;
-    uint32_t t = cqrt_tape_alloc();
-    cqrt_tape_write_i64_lit(t, ptr(&l)); cqrt_tape_write_i64_lit(t, ptr(&n)); cqrt_tape_write_i32(t, q32(',')); cqrt_tape_write_i64_lit(t, ptr(stdin));
-    cqrt_tape_effect_i64_controlled(cqrt_alloc_i1(1), t, "getdelim", 4);
-}
 static void s_gap_scanf_fmt(void) {
     uint32_t t = cqrt_tape_alloc();
     cqrt_tape_write_i64(t, q64(ptr("%d"))); cqrt_tape_write_i64_lit(t, ptr(dst));
     cqrt_tape_effect_i32_controlled(cqrt_alloc_i1(1), t, "scanf", 2);
+}
+static void s_gap_vscanf_ap(void) {
+    uint32_t t = cqrt_tape_alloc();
+    cqrt_tape_write_i64_lit(t, ptr("%d")); cqrt_tape_write_i64(t, q64(ptr(dst)));
+    cqrt_tape_effect_i32_controlled(cqrt_alloc_i1(1), t, "vscanf", 2);
 }
 
 static void model(char *w, int r, const void *m, size_t n, const char *rest) {   /* "r=.. m=.. rest=..|" */
@@ -657,13 +764,53 @@ static void merge_tests(void) {
             snprintf(strstr(w, " rest="), 32, " rest=56| rest=ef|\n");
             expect(s_stream_fd, "INPUT, quantum stream: descriptor", 0, w);
         }
-    in_text = "line\n";
-    expect(s_classical_in, "INPUT, classical: no gate", 0, "line\n");
+    in_text = "line\nnext\nrest";
+    expect(s_classical_in, "INPUT, classical: no gate; gets", 0, "line\nnext| rest=rest|\n");
     in_text = NULL;
-    expect_abort(s_gap_ungetc, "INPUT gap: ungetc's character", "kmgy.36");
-    expect_abort(s_gap_pread, "INPUT gap: pread's offset", "kmgy.36");
-    expect_abort(s_gap_getdelim, "INPUT gap: getdelim's delimiter", "kmgy.36");
-    expect_abort(s_gap_scanf_fmt, "INPUT gap: scanf's format pointer", "kmgy.36");
+    for (P_ = 0; P_ < 2; P_++)
+        for (N_ = 0; N_ < 16; N_ += 4) {   /* the model: pread on the 10-byte file */
+            int k = P_ && N_ < 10 ? (int)(10 - N_ < 4 ? 10 - N_ : 4) : 0;
+            memset(m, 'X', 8); memcpy(m, &"0123456789"[N_ < 10 ? N_ : 0], (size_t)k);
+            model(w, k, m, 8, "10");
+            expect(s_pread_off, "INPUT, quantum offset: pread", 0, w);
+        }
+    expect_abort(s_pread_cap, "Limits: enumerated rail above the cap", "more quantum bits than CQ_MAX_QADDR_BITS to enumerate, the build-time cap" LIM);
+    /* getdelim: two candidates (',' and '<', which does not occur) and four (',' '-' '<' '='), input
+     * shorter than K2; then the empty input; then K2 + 5 bytes in a file. Model: memchr. */
+    const char *gin[] = { "ab-cd,ef=g", "" };
+    const uint64_t masks[] = { 0x10, 0x11 };
+    for (int s = 0; s < 2; s++)
+        for (int mk = 0; mk < 2; mk++)
+            for (P_ = 0; P_ < 2; P_++)
+                for (uint64_t a = 0; a < 4; a++) {
+                    if (a & ~(uint64_t)(mk ? 3 : 2)) continue;
+                    D_ = 0x2c | (a & 1) | (a >> 1 & 1) << 4, DM_ = masks[mk];
+                    in_text = gin[s];
+                    size_t n = strlen(gin[s]);
+                    const char *at = memchr(gin[s], (int)D_, n);
+                    size_t len = at ? (size_t)(at - gin[s]) + 1 : n;
+                    if (!P_) snprintf(w, sizeof w, "r=0 line=null cap=0 rest=|\n");
+                    else snprintf(w, sizeof w, "r=%lld line=%.*s cap=%zu rest=|\n", n ? (long long)len : -1LL, (int)len, gin[s], len + 1);
+                    expect(s_getdelim_d, "INPUT, quantum delimiter: getdelim", 0, w);
+                }
+    in_text = NULL;
+    for (P_ = 0; P_ < 2; P_++)
+        for (uint64_t a = 0; a < 2; a++) {
+            D_ = 0x2c | a << 4, DM_ = 0x10;
+            if (!P_) snprintf(w, sizeof w, "r=0 line=null cap=0 pos=%d\n", CQ_K2);
+            else snprintf(w, sizeof w, "r=%d line=%.12s cap=%d pos=%d\n", a ? CQ_K2 : 3, a ? "xx,xxxxxxxxx" : "xx,", (a ? CQ_K2 : 3) + 1, CQ_K2);
+            expect(s_getdelim_long, "INPUT, quantum delimiter: getdelim past K2", 0, w);
+        }
+    in_text = "42,7";
+    for (P_ = 0; P_ < 3; P_++) {
+        snprintf(w, sizeof w, "a=%d ok=1\n", P_ ? 42 : 0x58585858);
+        expect(s_scanf_fmt_q, "INPUT, scanf format with a QUANTUM cell", 0, w);
+    }
+    expect_abort(s_scanf_positional, "Limits: scanf positional %n$", "positional %n$ conversions" LIM);
+    in_text = NULL;
+    expect_abort(s_gap_ungetc, "Limits: ungetc's quantum character", "ungetc/ungetwc with a quantum character" LIM);
+    expect_abort(s_gap_scanf_fmt, "Limits: scanf's quantum format pointer", "an INPUT call's format pointer that is a quantum rail" LIM);
+    expect_abort(s_gap_vscanf_ap, "Limits: vscanf's quantum va_list pointer", "an INPUT call's va_list pointer that is a quantum rail" LIM);
 }
 /* ---- tape_write through the sampled harness: h' ^= h (controlled: c ? h : 0), h unchanged.
  * h' is never freed by the ABI; the test frees it once copied out so the leak check holds. */

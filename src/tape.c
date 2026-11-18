@@ -3,14 +3,17 @@
  * and fields, every cell of a buffer it reads HOST, every earlier event done); otherwise it is
  * deferred, its buffers captured through the bus at the call, and performed at the end of the
  * shot (process exit, or a classical-1 abort flag). An INPUT call is never deferred: classical, it
- * is performed at once; with a quantum predicate, buffer address, length or stream it is merged
+ * is performed at once (gets: always as fgets at K2); with a quantum predicate, buffer address,
+ * length, stream, pread offset or getdelim delimiter it is merged
  * (performed into temporary buffers, its bytes bus-stored and its result XORed under flags). A
  * host call is made with the x86-64 SysV convention by name (dlsym), its fields as arguments; a
  * format entry is the host printf.
  *
- * What the ABI leaves open aborts naming opcode_quantum_operations-kmgy.36: an INPUT call's quantum
- * field that is none of predicate, buffer address, length, stream; a format (or va_list) that is
- * not classical. */
+ * Backend limits the ABI permits (§1.11 Limits) fail loudly, each with its own message (LIMIT):
+ * ungetc's quantum character, an INPUT call's quantum format or va_list pointer, positional %n$,
+ * more than 16 stack slots, a rail with too many quantum bits to enumerate. What the ABI does not
+ * rule aborts naming opcode_quantum_operations-kmgy.43: a deferred v-form's va_list pointer that
+ * is a quantum rail. */
 #if defined(__linux__)
 #define _GNU_SOURCE
 #endif
@@ -27,7 +30,7 @@
 #include "cqrt.h"
 #include "kernels.h"
 
-#define GAP "not defined by ABI §1.11 (opcode_quantum_operations-kmgy.36)"
+#define LIMIT ": not implemented, a backend limit ABI §1.11 Limits permits"
 
 static void die(const char *msg, const char *what) {
     fprintf(stderr, "cq_runtime: tape: %s%s%s\n", msg, what ? ": " : "", what ? what : "");
@@ -162,7 +165,7 @@ static reach reach_of(const cq_bit *x, uint32_t n) {
     reach r = { 0 };
     for (uint32_t i = 0; i < n; i++)
         if (cq_bit_is_q(x[i])) r.pos[r.q++] = i; else r.base |= (uint64_t)x[i].kind << i;
-    if (r.q > CQ_MAX_QADDR_BITS) die("a rail with more qubits than CQ_MAX_QADDR_BITS, the build-time cap on enumerated values", NULL);
+    if (r.q > CQ_MAX_QADDR_BITS) die("a rail with more quantum bits than CQ_MAX_QADDR_BITS to enumerate, the build-time cap" LIMIT, NULL);
     return r;
 }
 static uint64_t reach_at(const reach *r, uint64_t a) {
@@ -179,17 +182,21 @@ static uint64_t reach_max(const cq_bit *x, uint32_t n) {   /* the largest value,
 
 /* ---- Formats: the arguments a printf/wprintf format consumes, in order. cls: 'i' an integer or
  * pointer, 'd' a double, 'L' a long double, 's' a string, 'S' a wide string; prec: a literal
- * precision, else -1. shortcut: positional %n$ is not parsed; add it if a program uses it. */
+ * precision, else -1. Positional %n$ fails loudly (§1.11 Limits): POSITIONAL
+ * is at a conversion's first character; a format numbers all its conversions or none. */
 typedef void (*arg_fn)(void *ctx, char cls, long prec);
 
 static int in(const char *set, uint32_t c) { return c && c < 128 && strchr(set, (int)c); }
 
 #define AT(i) (wide ? (uint32_t)((const wchar_t *)p)[i] : (uint32_t)((const unsigned char *)p)[i])
+#define POSITIONAL(i) for (size_t j_ = (i); AT(j_) >= '0' && AT(j_) <= '9'; j_++) \
+    if (AT(j_ + 1) == '$') die("positional %n$ conversions" LIMIT, NULL)
 static uint32_t walk(const void *p, int wide, arg_fn arg, void *ctx) {
 #define ARG(c, pr) do { n++; if (arg) arg(ctx, c, pr); } while (0)
     uint32_t n = 0;
     for (size_t i = 0; AT(i); i++) {
         if (AT(i) != '%' || AT(++i) == '%') continue;
+        POSITIONAL(i);
         while (in("-+ #0'", AT(i))) i++;
         if (AT(i) == '*') { ARG('i', -1); i++; }
         while (AT(i) >= '0' && AT(i) <= '9') i++;
@@ -308,15 +315,31 @@ static ext str_ext(int wide, long prec) {
     return (ext){ wide ? (uint32_t)sizeof(wchar_t) : 1, prec >= 0 && prec < CQ_K2 ? (uint64_t)prec : CQ_K2, NULL, 0 };
 }
 
-/* A format the capture walks: its conversions decide what else is captured, so it must be
- * classical-valued now. */
-static uint8_t *cap_fmt(uint32_t k, int wide) {
-    if (fq(fld(cev, k))) die("a format string at an address rail: its conversions are " GAP, cev->text);
-    uint32_t n0 = cev->ncb;
-    uint8_t *p = cap_field(k, str_ext(wide, -1));
-    for (uint32_t j = 0; p && j < cev->cb[n0].n; j++)
-        if (cev->cb[n0].q[j]) die("a format string with a QUANTUM cell: its conversions are " GAP, cev->text);
-    return p;
+/* A string as host code reads it (CR rule 16): its host bytes, at a QUANTUM cell the host byte
+ * under the overlay, up to its first zero unit or K2 units; an unreadable unit reads 0. The
+ * caller frees it. */
+static void *str_host(uint64_t a, uint32_t u) {
+    uint8_t *s = zalloc((size_t)CQ_K2 + 1, u);
+    for (uint64_t j = 0; a && j < CQ_K2; j++) {
+        uint8_t *c = s + j * u;
+        if (!cq_host_read(a + j * u, c, u)) { memset(c, 0, u); break; }
+        int zero = 1;
+        for (uint32_t i = 0; i < u; i++) zero &= !c[i];
+        if (zero) break;
+    }
+    return s;
+}
+
+/* A format a deferred entry reads: captured as a string; its conversions, which decide what else
+ * is captured, are read from its host bytes at the call (§1.11 Capture). Those bytes are
+ * unspecified at a QUANTUM cell (here: the host byte under the overlay) and for a format at an
+ * address rail (here: at the address with its qubits read as 0). The caller frees the result. */
+static void *cap_fmt(uint32_t k, int wide) {
+    cq_bit t[256];
+    field *f = fld(cev, k);
+    void *h = str_host(low64(fbits(f, t), f->bits), wide ? (uint32_t)sizeof(wchar_t) : 1);
+    cap_field(k, str_ext(wide, -1));
+    return h;
 }
 
 /* The %s arguments of a format at field k, its arguments from field k + 1. */
@@ -330,12 +353,12 @@ static void cap_fmt_arg(void *ctx, char cls, long prec) {
 /* A va_list (x86-64 SysV) and the slots its format takes, copied into a fresh va_list whose
  * arguments all sit in its overflow area, as the lowered caller's do (CR rule 16). */
 typedef struct { uint32_t gp, fp; uint64_t over, regs; } valist;
+/* Its 24 bytes as host code reads them: at a QUANTUM cell unspecified (§1.11 Capture), here the
+ * host byte under the overlay; unreadable: 0. */
 static void rd_va(uint64_t a, valist *v) {
     cq_bit c[8 * sizeof *v];
-    if (cq_cells_read(a, c, sizeof *v)) die("a va_list held in QUANTUM cells: the slots its format takes are " GAP, cev->text);
-    uint8_t b[sizeof *v];
-    for (uint32_t j = 0; j < sizeof *v; j++) b[j] = (uint8_t)low64(&c[8 * j], 8);
-    memcpy(v, b, sizeof *v);
+    cqcell |= cq_cells_read(a, c, sizeof *v);
+    if (!cq_host_read(a, (uint8_t *)v, sizeof *v)) memset(v, 0, sizeof *v);
 }
 typedef struct { valist *src; uint32_t k, n; } va_ctx;   /* k: the area buffer, n: slots used */
 static void cap_va_arg(void *ctx, char cls, long prec) {
@@ -392,14 +415,15 @@ static void capture(event *e) {
         uint32_t k = (uint32_t)(*s++ - '0');
         if (op == 's' || op == 'w') cap_field(k, str_ext(op == 'w', -1));
         else if (op == 'f' || op == 'F') {
-            const uint8_t *p = cap_fmt(k, op == 'F');
+            void *p = cap_fmt(k, op == 'F');
             fmt_ctx c = { e, k + 1 };
-            if (p) walk(p, op == 'F', cap_fmt_arg, &c);
+            walk(p, op == 'F', cap_fmt_arg, &c);
+            free(p);
         } else if (op == 'v' || op == 'V') {
-            const uint8_t *p = cap_fmt(k, op == 'V');
+            void *p = cap_fmt(k, op == 'V');
             field *ap = fld(e, k + 1);
-            if (fq(ap)) die("a va_list pointer that is a quantum rail: the slots its format takes are " GAP, e->text);
-            if (p && fval(ap)) {
+            if (fq(ap)) die("a deferred v-form's va_list pointer that is a quantum rail: not defined by ABI §1.11 (opcode_quantum_operations-kmgy.43)", e->text);
+            if (fval(ap)) {
                 valist src;
                 rd_va(fval(ap), &src);
                 va_ctx c = { &src, new_buf(8 * (uint64_t)CQ_K2), 0 };
@@ -408,6 +432,7 @@ static void capture(event *e) {
                 *(valist *)(void *)e->cb[kv].b = (valist){ 48, 176, (uint64_t)(uintptr_t)e->cb[c.k].b, 0 };
                 set_ptr(ap, e->cb[kv].b);
             }
+            free(p);
         } else if (op == 'b' || op == 'm') {
             uint32_t L = (uint32_t)(*s++ - '0'), M = op == 'm' ? (uint32_t)(*s++ - '0') : 0;
             field *fl = fld(e, L), *fm = op == 'm' ? fld(e, M) : NULL;
@@ -445,11 +470,11 @@ static void drop_bufs(event *e) {
 /* ---- The host call, x86-64 SysV: six integer registers, eight vector registers, then the
  * stack in argument order. Every callee is called through one variadic prototype that fills
  * exactly those: f(g0..g5, d0..d7, s0..s15). A variadic callee gets al = 8, a fixed one
- * ignores it. shortcut: x86-64 only (the ABI's target, CR §1); at most 16 stack slots. */
+ * ignores it. shortcut: x86-64 only (the ABI's target, CR §1). At most 16 stack slots (§1.11 Limits). */
 typedef struct { uint64_t g[6], s[16]; double d[8]; int ng, nd, ns, maxg; } args;
 
 static void slot(args *a, uint64_t x) {
-    if (a->ns == 16) die("more than 16 stack slots of arguments", NULL);
+    if (a->ns == 16) die("a host call with more than 16 stack slots of arguments" LIMIT, NULL);
     a->s[a->ns++] = x;
 }
 
@@ -460,8 +485,8 @@ static void push(args *a, uint32_t bits, int fp, const uint64_t *v) {
         for (int k = 0; k < (fp ? 2 : 4); k++) slot(a, v[k]);
     } else if (bits <= 64) {
         uint64_t x = v[0];
-        /* shortcut: the callee's signedness is not in the entry; a narrow field is sign-extended
-         * (char and short are signed on x86-64), i1 zero-extended. */
+        /* The callee's signedness is not in the entry: a field narrower than 32 bits is
+         * sign-extended, an i1 zero-extended (§1.11 Resolved). */
         if (bits > 1 && bits < 32 && (x >> (bits - 1)) & 1) x |= ~0ull << bits;
         if (a->ng < a->maxg) a->g[a->ng++] = x; else slot(a, x);
     } else if (a->ng + 2 <= a->maxg) { a->g[a->ng++] = v[0]; a->g[a->ng++] = v[1]; }
@@ -550,8 +575,8 @@ static void perform(event *e, uint64_t out[4]) {
         f++, nf--;
     } else if (!strcmp(e->text, "__builtin_trap")) __builtin_trap();
     else if (exiting && !strcmp(e->text, "exit")) {
-        /* exit from inside an atexit handler is undefined: stdio flushed, then _Exit.
-         * shortcut: handlers registered before ours do not run; keep a status and return if that matters. */
+        /* A deferred exit performed at the end of the shot (process exit or a classical-1 abort) is
+         * fflush(NULL) then _Exit(code) (§1.11 Deferred); exit inside an atexit handler is undefined. */
         uint64_t v[4] = { 0 };
         if (nf) value(f, v);
         fflush(NULL);
@@ -572,7 +597,8 @@ static void perform_now(event *e) {
 }
 
 /* ---- INPUT calls (§1.11 host-boundary table, the INPUT rows). cls: what the call writes; id:
- * the stream field (-1: stdin); other: a field with no merge row of its own (-1: none). */
+ * the stream field (-1: stdin); other: the field of the pread offset, getdelim delimiter and
+ * ungetc character rows (-1: none). */
 enum { IN_NONE, IN_FGETS, IN_FREAD, IN_READ, IN_GETS, IN_GETLINE, IN_FGETLN, IN_SCANF };
 static const struct { const char *name; uint8_t cls; int8_t id, other; uint8_t wide, va; } inputs[] = {
     { "fgetc", IN_NONE, 0, -1, 0, 0 }, { "getc", IN_NONE, 0, -1, 0, 0 }, { "getchar", IN_NONE, -1, -1, 0, 0 },
@@ -625,23 +651,10 @@ static void store_k(const cq_bit *A, uint64_t off, const void *b, uint64_t n, co
     }
 }
 
-/* A string the call reads, through the bus; it must be classical (the scanf format). */
-static void *str_host(uint64_t a, uint32_t u, const char *who) {
-    uint8_t *s = zalloc((size_t)CQ_K2 + 1, u);
-    cq_bit c[8 * sizeof(wchar_t)];
-    for (uint64_t j = 0; a && j < CQ_K2; j++) {
-        if (cq_cells_read(a + j * u, c, u)) die("an INPUT call's format with a QUANTUM cell: " GAP, who);
-        int zero = 1;
-        for (uint32_t i = 0; i < u; i++) zero &= !(s[j * u + i] = (uint8_t)low64(&c[8 * i], 8));
-        if (zero) break;
-    }
-    return s;
-}
-
 /* The conversions of a scanf format that store through a pointer. kind 'f': sz bytes; 'n': %n,
  * sz bytes; 's': a string of sz-byte units; 'c': exactly sz bytes. tsz: the temporary's size.
  * The format is rewritten into o with a width K2 - 1 on each unbounded %s and %[, so the
- * temporary holds it (a cut at K2, as gets has). shortcut: positional %n$ is not parsed. */
+ * temporary holds it (a cut at K2, as gets has). Positional %n$ fails loudly, as in walk. */
 typedef struct { char kind; uint32_t sz, tsz; } conv;
 static uint32_t scan_walk(const void *p, int wide, conv *cv, void *o) {
 #define PUT(c) (wide ? (void)(((wchar_t *)o)[no++] = (wchar_t)(c)) : (void)(((char *)o)[no++] = (char)(c)))
@@ -652,6 +665,7 @@ static uint32_t scan_walk(const void *p, int wide, conv *cv, void *o) {
         PUT(ch);
         if (ch != '%') continue;
         if (AT(i) == '%') { PUT(AT(i++)); continue; }
+        POSITIONAL(i);
         int sup = AT(i) == '*';
         if (sup) PUT(AT(i++));
         long w = -1;
@@ -688,6 +702,7 @@ static uint32_t scan_walk(const void *p, int wide, conv *cv, void *o) {
     return n;
 #undef PUT
 }
+#undef POSITIONAL
 #undef AT
 static size_t u_len(const void *p, uint32_t u) { return u == 1 ? strlen(p) : wcslen(p); }
 
@@ -841,9 +856,36 @@ static void run(event *e, int ix, uint64_t idv, const cq_bit *g, void *fn) {
         break;
     }
     case IN_GETLINE: {   /* getline(lp, np, f): the line goes to a fresh host buffer (as if *lp were
-                          * NULL); the pointer cell and the size cell are stored. */
+                          * NULL; the ABI has not ruled on a non-NULL *lp); the pointer cell and the
+                          * size cell are stored. */
         char *line = NULL;
         size_t cap = 0;
+        if (inputs[ix].other >= 0 && fq(&f[2])) {
+            /* getdelim's delimiter a rail d (§1.11, the delimiter row): K2 bytes read once; for each
+             * value v of d, what getdelim with delimiter v gives from them (the bytes up to and
+             * including the first (unsigned char)v, as memchr compares, else all of them; -1 and an
+             * empty line at end of input) in a fresh host buffer of len + 1 bytes, its pointer and
+             * size cells and the result under [d == v]. */
+            tmp = zalloc(CQ_K2, 1);
+            size_t got = fread(tmp, 1, CQ_K2, (FILE *)(uintptr_t)idv);
+            const cq_bit *D = cq_rail_bits(f[2].rail);
+            reach r = reach_of(D, f[2].bits);
+            for (uint64_t i = 0; i < 1ull << r.q; i++) {
+                uint64_t v = reach_at(&r, i);
+                const uint8_t *at = memchr(tmp, (uint8_t)v, got);
+                size_t len = at ? (size_t)(at - (uint8_t *)tmp) + 1 : got;
+                uint64_t res[4] = { got ? len : (uint64_t)-1 };
+                cap = len + 1;
+                line = memcpy(zalloc(cap, 1), tmp, len);
+                cq_tape T = { 0 };
+                cq_bit kb[64];
+                const cq_bit *gv = eq_(&T, D, f[2].bits, v, g, kb);
+                store_k(fbits(&f[0], t0), 0, &line, 8, gv), store_k(fbits(&f[1], t1), 0, &cap, 8, gv);
+                res_k(e, gv, res);
+                cq_tape_undo(&T);
+            }
+            break;
+        }
         setv(&a[0], (uintptr_t)&line), setv(&a[1], (uintptr_t)&cap);
         host_call(fn, a, e->nf, 64, 0, out);
         if (line) store_k(fbits(&f[0], t0), 0, &line, 8, g), store_k(fbits(&f[1], t1), 0, &cap, 8, g);
@@ -860,8 +902,8 @@ static void run(event *e, int ix, uint64_t idv, const cq_bit *g, void *fn) {
     }
     case IN_SCANF: {
         uint32_t fk = inputs[ix].id < 0 ? 0 : (uint32_t)inputs[ix].id + 1, u = inputs[ix].wide ? (uint32_t)sizeof(wchar_t) : 1;
-        if (fq(fld(e, fk))) die("an INPUT call's format pointer that is a quantum rail: " GAP, e->text);
-        void *fmt = str_host(fval(&f[fk]), u, e->text), *fmt2 = zalloc(3 * (size_t)CQ_K2 + 1, u);
+        if (fq(fld(e, fk))) die("an INPUT call's format pointer that is a quantum rail" LIMIT, e->text);
+        void *fmt = str_host(fval(&f[fk]), u), *fmt2 = zalloc(3 * (size_t)CQ_K2 + 1, u);
         conv *cv = zalloc(CQ_K2, sizeof *cv);
         uint32_t nc = scan_walk(fmt, inputs[ix].wide, cv, fmt2);
         setv(&a[fk], (uintptr_t)fmt2);
@@ -882,7 +924,7 @@ static void run(event *e, int ix, uint64_t idv, const cq_bit *g, void *fn) {
             }
         } else {
             field *ap = fld(e, fk + 1);
-            if (fq(ap)) die("an INPUT call's va_list pointer that is a quantum rail: " GAP, e->text);
+            if (fq(ap)) die("an INPUT call's va_list pointer that is a quantum rail" LIMIT, e->text);
             valist src;
             cev = e;
             rd_va(fval(ap), &src);
@@ -915,17 +957,12 @@ static void run(event *e, int ix, uint64_t idv, const cq_bit *g, void *fn) {
     free(a);
 }
 
-static void merge(event *e, int ix) {
-    const cq_bit *P = e->pred < 0 ? cq_rail_bits(e->pr) : &ONE_;
-    if (inputs[ix].other >= 0 && fq(fld(e, (uint32_t)inputs[ix].other)))
-        die("an INPUT call with a quantum field that is no predicate, buffer address, length or stream: " GAP, e->text);
-    void *fn = inputs[ix].cls == IN_GETS ? NULL : dlsym(RTLD_DEFAULT, e->text);
-    if (inputs[ix].cls != IN_GETS && !fn) die("no host function of that name", e->text);
+/* The identifier row (§1.11): one call per value that names an open stream, under [id == v]. */
+static void by_id(event *e, int ix, const cq_bit *P, void *fn) {
     int id = inputs[ix].id;
     if (id < 0) { run(e, ix, (uintptr_t)stdin, P, fn); return; }
     field *f = fld(e, (uint32_t)id);
     if (!fq(f)) { run(e, ix, fval(f), P, fn); return; }
-    /* The identifier row (ABI:518): one call per value that names an open stream, under [id == v]. */
     cq_bit t[256];
     const cq_bit *x = fbits(f, t);
     reach r = reach_of(x, f->bits);
@@ -939,11 +976,37 @@ static void merge(event *e, int ix) {
     }
 }
 
+static void merge(event *e, int ix) {
+    const cq_bit *P = e->pred < 0 ? cq_rail_bits(e->pr) : &ONE_;
+    void *fn = inputs[ix].cls == IN_GETS ? NULL : dlsym(RTLD_DEFAULT, e->text);
+    if (inputs[ix].cls != IN_GETS && !fn) die("no host function of that name", e->text);
+    field *o = inputs[ix].other >= 0 ? fld(e, (uint32_t)inputs[ix].other) : NULL;
+    if (!o || !fq(o) || inputs[ix].cls == IN_GETLINE) { by_id(e, ix, P, fn); return; }   /* getdelim's d: in run */
+    if (inputs[ix].cls == IN_NONE)
+        die("ungetc/ungetwc with a quantum character" LIMIT, e->text);
+    /* pread's offset row (§1.11): one call per value v of off, under [off == v]; the field holds v
+     * meanwhile, so the rows above compose with it. */
+    field q = *o;
+    const cq_bit *x = cq_rail_bits(q.rail);
+    reach r = reach_of(x, q.bits);
+    for (uint64_t i = 0; i < 1ull << r.q; i++) {
+        uint64_t v = reach_at(&r, i);
+        cq_tape T = { 0 };
+        cq_bit kb[64];
+        const cq_bit *g = eq_(&T, x, q.bits, v, P, kb);
+        *o = (field){ q.bits, 0, 0, { v } };
+        by_id(e, ix, g, fn);
+        cq_tape_undo(&T);
+    }
+    *o = q;
+}
+
 /* ---- The sequence */
 
 /* The end of the shot: measure the deferred events, perform them in order until an abort flag
  * reads 1. Reentrant: an event is done before it is performed. */
 static void end_shot(void) {
+    exiting = 1;
     for (; live < nev; live++) {
         event *e = &ev[live];
         if (e->status != ST_DEFERRED) { e->status = ST_DONE; continue; }   /* an unfinished format prints nothing */
@@ -961,7 +1024,7 @@ static void end_shot(void) {
     }
 }
 
-static void at_exit(void) { exiting = 1; end_shot(); }
+static void at_exit(void) { end_shot(); }
 
 static void init(void) {
     if (!inited && atexit(at_exit)) die("atexit failed", NULL);
@@ -991,7 +1054,8 @@ static void complete(event *e) {
     if (ix >= 0 || quantum) cq_inv_flush();
     if (ix >= 0) {
         e->status = ST_DONE;
-        if (quantum) merge(e, ix); else perform_now(e);
+        if (quantum || inputs[ix].cls == IN_GETS) merge(e, ix);   /* gets is always fgets at K2 (the table) */
+        else perform_now(e);
         return;
     }
     if (!quantum && live == (uint32_t)(e - ev)) {   /* resolved if every cell it reads is HOST */

@@ -91,7 +91,9 @@ uint32_t cqrt_qram_alloc_i8(uint32_t n);
 
 /* Tape and abort, §1.11 (src/tape.c). name: a host symbol, or NULL for the address in the first
  * field. abort_i1 of a classical 1 does not return. INPUT calls merge under a quantum predicate,
- * buffer address, length or stream; the fields ABI §1.11 leaves undefined abort (kmgy.36). */
+ * buffer address, length, stream, pread offset or getdelim delimiter. The limits ABI §1.11 Limits
+ * permits fail loudly (docs/COMPLETENESS.md); a deferred v-form's quantum va_list pointer, which
+ * the ABI does not rule, aborts (kmgy.43). */
 #define CQRT_DECL_TAPE_(n, LIT) \
     uint32_t cqrt_tape_effect_##n##_controlled(uint32_t c, uint32_t t, const char *name, uint32_t nf); \
     uint32_t cqrt_tape_write_##n(uint32_t t, uint32_t h); \

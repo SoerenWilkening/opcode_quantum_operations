@@ -87,7 +87,7 @@ void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint
         if (cq_bit_is_q(addr[i])) pos[q++] = i; else base |= (uint64_t)addr[i].kind << i;
     if (q > CQ_MAX_QADDR_BITS) {
         fprintf(stderr, "cq_runtime: bus: the address rail has %u quantum bits, above the cap CQ_MAX_QADDR_BITS = %d. "
-                "The cap is this library's build-time resource limit (ancilla cost is O(w 2^q)), not the ABI's\n",
+                "The cap is this library's build-time resource limit (ancilla cost is O(w 2^q)), which ABI §1.10 permits\n",
                 q, CQ_MAX_QADDR_BITS);
         abort();
     }

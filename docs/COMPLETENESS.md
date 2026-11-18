@@ -57,18 +57,23 @@ No symbol is missing, none extra, none out of scope; no `__quantum__*` defined; 
 
 ## Shortfalls
 
-- **ABI rows that abort.** The ABI leaves them undefined; open issue kmgy.36 (for the ABI owner):
-  src/tape.c aborts naming kmgy.36 on an INPUT call's quantum field that is no predicate, buffer
-  address, length or stream (ABI:514-518 name only those), on a format string or `va_list` at an
-  address rail or in QUANTUM cells (ABI:576-586 capture a format's conversions only from a
-  classical format), and on an INPUT call's quantum format pointer.
-- **Build-time cap instead of the ABI's any-superset R.** More than `CQ_MAX_QADDR_BITS` (16,
-  provisional) quantum address bits aborts (src/qram.c), as does a tape rail with more qubits
-  than the cap where values are enumerated (src/tape.c); ABI:414-419 has no limit. A recorded
-  decision (inventory C5), no issue.
-- **Tape host call** (kmgy.38): more than 16 stack argument slots aborts; a narrow field is always
-  sign-extended (ABI:500-502).
-- **Positional `%n$` formats** (kmgy.39): not parsed in format capture or scanf rows (ABI:576-586).
+- **Tape rows ruled 2026-11-18** (kmgy.36, closed; line numbers from the ABI working tree of
+  that day). Built: `pread`'s quantum offset (ABI:536), `getdelim`'s quantum delimiter
+  (ABI:537), an INPUT call that reads a QUANTUM cell, the `scanf` format (ABI:538), and a deferred
+  format or `va_list` with QUANTUM cells or a format at an address rail (ABI:613-616). Not ruled,
+  no abort: `getline`/`getdelim` with `*lineptr` not NULL gets a fresh host buffer as if it were
+  NULL. Not ruled, aborts naming kmgy.43: a deferred v-form's `va_list` pointer that is a quantum
+  rail (Capture names only a format at an address rail).
+- **Permitted backend limits, failing loudly** (ABI:590-594, the §1.11 Limits bullet, and
+  ABI:434-435 for the bus). Each aborts with its own message and has a forked-child test:
+  1. `ungetc`/`ungetwc` with a quantum character (test_tape);
+  2. a quantum format or `va_list` pointer on an INPUT call (test_tape, one each);
+  3. positional `%n$` conversions in a format the backend parses: format capture and the scanf
+     rows (test_tape, one each);
+  4. a host call with more than 16 stack argument slots (test_tape);
+  5. more than `CQ_MAX_QADDR_BITS` (16, provisional) quantum bits in a rail an INPUT row
+     enumerates (stream, `pread` offset, `getdelim` delimiter) or a capture enumerates (test_tape);
+  6. more than `CQ_MAX_QADDR_BITS` quantum address bits in one bus access, src/qram.c (test_qram).
 - **Namespace** (kmgy.41): about 190 internal globals named `cq_*`, the prefix CR §1.1 gives to
   CQ.h; four could be static (`cq_angle_window`, `cq_clz`, `cq_count_width`, `cq_popcount`).
 - Stale comments in include/cqrt.h say quantum angle rails, quantum addresses and INPUT rows
