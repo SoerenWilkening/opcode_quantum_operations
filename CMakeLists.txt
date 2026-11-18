@@ -258,3 +258,10 @@ else()
   add_test(NAME abi_link COMMAND sh -c "echo \"$1\"; exit 77" abi_link "${cq_ir_why}")
   set_tests_properties(abi_link PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+
+# Install: the three archives and the public headers.
+include(GNUInstallDirs)
+install(TARGETS cq_templates cq_runtime cq_gates_replay ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES include/cqrt.h include/cq_template.h include/cq_gates.h include/cq_replay.h
+              include/cq_widths.h include/cq_cast_pairs.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
