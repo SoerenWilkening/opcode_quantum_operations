@@ -15,8 +15,8 @@ int  __quantum__qis__m__body   (uint32_t q);
 ```
 
 The library does not define these. Whatever is linked last does: a simulator, a resource
-counter, a hardware compiler. The repository ships one definition, a classical replay backend
-used by the tests.
+counter, a hardware compiler. The repository ships two definitions: a classical replay backend
+used by the tests, and a trace backend that prints the circuit.
 
 The repository is independent of CQ_lang: it vendors nothing from it and builds without it.
 Scope and goals are in [NORTH_STAR.md](NORTH_STAR.md); what is verified and what is not is in
@@ -38,6 +38,7 @@ This produces two static archives in `build/`:
 |---|---|
 | `libcq_backend.a` | the `cq_template_*` integer operations and the `cqrt_*` runtime: allocation, measurement, rotations, memory bus, tape, invert regions |
 | `libcq_gates_replay.a` | a classical definition of the seven operations, with gate and depth counters |
+| `libcq_gates_trace.a` | a definition that keeps no state and prints a qec-trace-viewer trace: to the file named by `CQ_TRACE`, else stdout |
 
 The build type defaults to Release with asserts on. Build-time settings (`-D<name>=<value>` at
 configure time): `CQ_LADDER_N` (angle precision, default 53), `CQ_K2` (input bound, default
@@ -55,7 +56,7 @@ Tested on x86-64 macOS only.
 cmake --install build --prefix /usr/local
 ```
 
-This copies the two archives to `<prefix>/lib` and the public headers (`cqrt.h`,
+This copies the three archives to `<prefix>/lib` and the public headers (`cqrt.h`,
 `cq_template.h`, `cq_gates.h`, `cq_replay.h`, `cq_widths.h`, `cq_cast_pairs.h`) to
 `<prefix>/include`.
 
@@ -67,6 +68,14 @@ operations:
 ```sh
 clang program.o -L<prefix>/lib -lcq_backend -lcq_gates_replay -o program
 ```
+
+To draw the circuit instead of replaying it, link `-lcq_gates_trace` and run with
+`CQ_TRACE=program.trace`; qec-trace-viewer's `verify_view.py program.trace` renders it. That
+backend measures 0 always, writes no angles, and its controlled-`ry` line (`CRY c t`) is not
+in the viewer's contract yet, so the viewer skips it. Each ABI call is one collapsible box
+(`add`, `ry`, `measure`) over registers named after their handles (`h1`, `h2`); the backend
+tells the gate backend about them through three optional functions in `cq_gates.h`, which
+other gate backends can ignore. The trace is written when the program exits.
 
 Replace `-lcq_gates_replay` with your own gate backend. The order matters with GNU ld:
 the backend calls the seven operations. On Linux add

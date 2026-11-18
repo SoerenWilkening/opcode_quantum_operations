@@ -23,8 +23,10 @@ static uint32_t alloc(uint32_t w, const uint64_t *v) { return (uint32_t)cq_rail_
 static void measure(uint32_t h, uint32_t w, uint64_t *v) {
     cq_inv_flush();   /* a measurement inside a cq_invert region needs the gates before it */
     cq_bit *b = rail(h, w);
+    cq_op_begin("measure", 0, &h, 1);
     for (uint32_t i = 0; i < w; i++)
         if (cq_measure_bit(&b[i])) v[i / 64] |= 1ull << (i % 64);
+    cq_op_end();
 }
 
 /* ctl == 0: the uncontrolled form, c unused. */
@@ -45,11 +47,11 @@ static void xorc(uint32_t c, int ctl, uint32_t h, uint32_t w, const uint64_t *v)
 /* Through cq_invert (cq_rt.h): each of these is its own inverse. */
 static void copy_k(const cq_call *k, int inv) { (void)inv; copy(k->h[0], (int)k->n[1], k->h[1], k->h[2], k->n[0]); }
 void cq_copy(uint32_t c, int ctl, uint32_t s, uint32_t d, uint32_t w) {
-    cq_call_do(&(cq_call){ .run = copy_k, .h = { c, s, d }, .n = { w, (uint32_t)ctl } });
+    cq_call_do(&(cq_call){ .run = copy_k, .name = "copy", .h = { c, s, d }, .n = { w, (uint32_t)ctl } });
 }
 static void xorc_k(const cq_call *k, int inv) { (void)inv; xorc(k->h[0], (int)k->n[1], k->h[1], k->n[0], k->v); }
 static void xorc_do(uint32_t c, int ctl, uint32_t h, uint32_t w, const uint64_t *v, size_t nv) {
-    cq_call k = { .run = xorc_k, .h = { c, h }, .n = { w, (uint32_t)ctl } };
+    cq_call k = { .run = xorc_k, .name = "xorc", .h = { c, h }, .n = { w, (uint32_t)ctl } };
     memcpy(k.v, v, nv);
     cq_call_do(&k);
 }
@@ -108,7 +110,7 @@ static void logic_k(const cq_call *k, int inv) {
     default:  cq_cx(ab, tb);
     }
 }
-static void logic(uint32_t op, uint32_t a, uint32_t b, uint32_t t) { cq_call_do(&(cq_call){ .run = logic_k, .h = { a, b, t }, .n = { op } }); }
+static void logic(uint32_t op, uint32_t a, uint32_t b, uint32_t t) { cq_call_do(&(cq_call){ .run = logic_k, .name = (const char *[]){ "not", "and", "or", "xor" }[op], .h = { a, b, t }, .n = { op } }); }
 void cqrt_not_i1(uint32_t h) { logic(NOT, 0, 0, h); }
 void cqrt_and_i1(uint32_t a, uint32_t b, uint32_t t) { logic(AND, a, b, t); }
 void cqrt_or_i1(uint32_t a, uint32_t b, uint32_t t) { logic(OR, a, b, t); }

@@ -1,0 +1,30 @@
+#TRACE v1
+#PATCH logical=1 d=0 data=1-1 ancilla=2-1
+#PATCH logical=2 d=0 data=2-2 ancilla=3-2
+#PATCH logical=3 d=0 data=3-3 ancilla=4-3
+#PATCH logical=4 d=0 data=4-4 ancilla=5-4
+#PATCH logical=5 d=0 data=5-5 ancilla=6-5
+#PATCH logical=0 d=0 data=0-0 ancilla=1-0
+#PATCH logical=6 d=0 data=6-6 ancilla=7-6
+#REGISTER name=h1 type=i2 qubits=1,2
+#REGISTER name=h2 type=i2 qubits=3,4
+#REGISTER name=h3 type=i1 qubits=5
+# STAGE: op begin (name=other)
+# STAGE: logical X begin (q=0)
+# STAGE: logical X end
+# STAGE: op end
+# STAGE: op begin (name=add, in=h1, out=h2)
+# STAGE: logical CX begin (control=1, target=3)
+# STAGE: logical CX end
+# STAGE: logical CCX begin (control=1, control2=2, target=4)
+# STAGE: logical CCX end
+# STAGE: op end
+# STAGE: op begin (name=measure, in=h1)
+MZ 1
+MZ 2
+# STAGE: op end
+# STAGE: op begin (name=ry, out=h3)
+RY 5
+CRY 3 5
+RZ 6
+# STAGE: op end

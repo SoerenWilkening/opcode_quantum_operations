@@ -37,3 +37,4 @@ docs/labreport/*.log
 docs/labreport/*.out
 docs/labreport/*.toc
 docs/labreport/data/.probe_scratch
+examples/

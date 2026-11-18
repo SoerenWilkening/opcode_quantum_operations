@@ -37,7 +37,11 @@ static inline uint32_t cq_tpl_run(int op, uint32_t w, uint32_t o, const uint32_t
         return o;
     }
     const cq_kernel *k = cq_kernel_pick(op, w);
+    uint32_t oh[5] = { o };
+    for (int j = 0; j < kop->nargs; j++) oh[1 + j] = args[j];
+    cq_op_begin(kop->name, unc, oh, 1 + kop->nargs);
     (unc && k->unc ? k->unc : k->emit)((int32_t)o, h, w);
+    cq_op_end();
     return o;
 }
 
@@ -55,7 +59,9 @@ static inline uint32_t cq_tpl_cast_run(int op, uint32_t from, uint32_t to, uint3
     if (cq_inv_open()) { cq_call_do(&(cq_call){ .run = cq_tpl_cast_k_, .h = { o, a }, .n = { (uint32_t)op, from, to, (uint32_t)unc } }); return o; }
     int32_t h = (int32_t)a;
     const cq_kernel *k = cq_kernel_pick(op, to);
+    cq_op_begin(kop->name, unc, (uint32_t[]){ o, a }, 2);
     (unc && k->unc ? k->unc : k->emit)((int32_t)o, &h, to);
+    cq_op_end();
     return o;
 }
 /* cq_template_<name>_<f>_to_<t> and its _unc, for registry op kop. */

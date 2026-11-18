@@ -27,6 +27,8 @@ include_directories(include)
 
 add_library(cq_backend STATIC src/templates/bits.c src/templates/cast.c src/emit.c src/rails.c)
 add_library(cq_gates_replay STATIC src/gates_replay.c)
+# Second gate backend: prints a qec-trace-viewer trace instead of replaying (src/gates_trace.c).
+add_library(cq_gates_trace STATIC src/gates_trace.c)
 
 enable_testing()
 add_executable(test_skeleton tests/test_skeleton.c)
@@ -38,6 +40,10 @@ string(REGEX REPLACE "-DNDEBUG" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEAS
 add_executable(test_replay tests/test_replay.c)
 target_link_libraries(test_replay cq_gates_replay)
 add_test(NAME replay COMMAND test_replay)
+add_executable(test_trace tests/test_trace.c)
+target_link_libraries(test_trace cq_gates_trace)
+add_test(NAME trace COMMAND sh -c "CQ_TRACE=test_trace.out \"$1\" && cmp test_trace.out \"$2\""
+  trace $<TARGET_FILE:test_trace> ${CMAKE_SOURCE_DIR}/tests/trace_expected.txt)
 
 add_executable(test_emit tests/test_emit.c)
 target_link_libraries(test_emit cq_backend cq_gates_replay)
@@ -260,9 +266,18 @@ else()
   set_tests_properties(abi_link PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
-# Install: the two archives and the public headers.
+# Local examples (examples/ is not in the repository): each examples/<name>.c is built against the
+# trace backend as example_<name>.
+file(GLOB cq_examples examples/*.c)
+foreach(cq_ex IN LISTS cq_examples)
+  get_filename_component(cq_ex_name ${cq_ex} NAME_WE)
+  add_executable(example_${cq_ex_name} ${cq_ex})
+  target_link_libraries(example_${cq_ex_name} cq_backend cq_gates_trace)
+endforeach()
+
+# Install: the three archives and the public headers.
 include(GNUInstallDirs)
-install(TARGETS cq_backend cq_gates_replay ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS cq_backend cq_gates_replay cq_gates_trace ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES include/cqrt.h include/cq_template.h include/cq_gates.h include/cq_replay.h
               include/cq_widths.h include/cq_cast_pairs.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

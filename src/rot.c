@@ -59,7 +59,7 @@ static void ry_k(const cq_call *k, int inv) {
     double theta = k->n[2] ? angle(k->h[2], 2) : k->theta;
     ry(k->n[1] ? rail(k->h[1], 1) : NULL, k->h[0], k->n[0], inv ? -theta : theta);
 }
-#define RY_(bits, h, c, A, ctl, q, th) cq_call_do(&(cq_call){ .run = ry_k, .h = { h, c, A }, .n = { bits, ctl, q }, .theta = th })
+#define RY_(bits, h, c, A, ctl, q, th) cq_call_do(&(cq_call){ .run = ry_k, .name = "ry", .h = { h, c, A }, .n = { bits, ctl, q }, .theta = th })
 #define ROT_(n, bits, ...) \
     void cqrt_ry_##n(uint32_t h, double theta) { RY_(bits, h, 0, 0, 0, 0, theta); } \
     void cqrt_ry_##n##_controlled(uint32_t c, uint32_t h, double theta) { RY_(bits, h, c, 0, 1, 0, theta); } \
@@ -72,14 +72,14 @@ static void rz_i1_k(const cq_call *k, int inv) {
     cq_bit *b = rail(k->h[0], 1);
     if (isfinite(k->theta)) phase(inv ? -k->theta : k->theta, b);
 }
-void cqrt_rz_i1(uint32_t f, double theta) { cq_call_do(&(cq_call){ .run = rz_i1_k, .h = { f }, .theta = theta }); }
+void cqrt_rz_i1(uint32_t f, double theta) { cq_call_do(&(cq_call){ .run = rz_i1_k, .name = "rz", .h = { f }, .theta = theta }); }
 
 /* A classical A gives every branch the same phase e^{i val(A)}: global, no gate. */
 static void rz_qangle_k(const cq_call *k, int inv) {
     const cq_bit *qa = qangle(k->h[0]);
     if (qa) cq_ladder(NULL, NULL, 0, qa, 1, inv);
 }
-void cqrt_rz_qangle(uint32_t A) { cq_call_do(&(cq_call){ .run = rz_qangle_k, .h = { A } }); }
+void cqrt_rz_qangle(uint32_t A) { cq_call_do(&(cq_call){ .run = rz_qangle_k, .name = "rz_qangle", .h = { A } }); }
 
 /* §1.7's bracket with K classical (c AND K is c): t ^= c, P(2*pi*k/2^N) on t, t ^= c. */
 static void rz_qangle_ctl_k(const cq_call *k, int inv) {
@@ -95,4 +95,4 @@ static void rz_qangle_ctl_k(const cq_call *k, int inv) {
     cq_cx(cb, &t);
     if (cq_bit_is_q(t)) cq_pool_give(t.q);   /* back at |0> */
 }
-void cqrt_rz_qangle_controlled(uint32_t c, uint32_t A) { cq_call_do(&(cq_call){ .run = rz_qangle_ctl_k, .h = { c, A } }); }
+void cqrt_rz_qangle_controlled(uint32_t c, uint32_t A) { cq_call_do(&(cq_call){ .run = rz_qangle_ctl_k, .name = "rz_qangle", .h = { c, A } }); }

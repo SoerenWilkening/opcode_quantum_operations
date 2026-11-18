@@ -70,6 +70,7 @@ void     cq_rail_free(int32_t h);       /* cq_reset_bit on every bit, then drop 
 typedef struct cq_call cq_call;
 struct cq_call {
     void (*run)(const cq_call *k, int inv);
+    const char *name;   /* noted as an operation when it runs (cq_op_begin); NULL: run notes itself */
     uint32_t h[6];      /* handles, as run reads them */
     uint32_t n[4];      /* small integers: width, op, flags */
     double   theta;
@@ -80,5 +81,11 @@ int  cq_inv_open(void);               /* a region is open */
 void cq_inv_flush(void);              /* a flush point: the recorded calls run forward, now */
 void cq_inv_free(int32_t h);          /* cq_rail_free, after the outermost end inside a region */
 void cq_copy(uint32_t c, int ctl, uint32_t s, uint32_t d, uint32_t w);   /* cqrt_copy_<W>[_controlled] */
+
+/* ---- Operation notes for the gate backend (cq_gates.h, src/rails.c). The gates between begin and
+ * end are operation `name` (with "_unc" appended if unc) on the rails h[0..nh); 0 entries are
+ * skipped. Nested pairs are not noted. */
+void cq_op_begin(const char *name, int unc, const uint32_t *h, int nh);
+void cq_op_end(void);
 
 #endif

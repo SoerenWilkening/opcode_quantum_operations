@@ -28,8 +28,14 @@ static void *grow(void *p, uint32_t *cap, uint32_t n, size_t sz) {
 
 int cq_inv_open(void) { return depth > 0; }
 
+static void run(const cq_call *k, int inv) {
+    if (k->name) cq_op_begin(k->name, 0, k->h, 6);
+    k->run(k, inv);
+    if (k->name) cq_op_end();
+}
+
 void cq_call_do(const cq_call *k) {
-    if (!depth) { k->run(k, 0); return; }
+    if (!depth) { run(k, 0); return; }
     recs = grow(recs, &caprecs, nrecs, sizeof *recs);
     recs[nrecs++] = (rec){ *k, 0 };
 }
@@ -38,7 +44,7 @@ void cq_call_do(const cq_call *k) {
 static void run_all(void) {
     uint32_t d = depth;
     depth = 0;
-    for (uint32_t i = 0; i < nrecs; i++) recs[i].k.run(&recs[i].k, recs[i].inv);
+    for (uint32_t i = 0; i < nrecs; i++) run(&recs[i].k, recs[i].inv);
     nrecs = 0;
     depth = d;
     for (uint32_t i = 0; i < d; i++) starts[i] = 0;

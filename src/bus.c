@@ -161,8 +161,9 @@ static void bus_k(const cq_call *k, int inv) {
     bus_op((int)k->n[0], (int)k->n[1], k->h[0], k->h[1], k->n[3] ? NULL : &k->h[2], k->v[0], k->h[3], k->n[2]);
 }
 static void bus_do(int op, int ctl, uint32_t c, uint32_t m, const uint32_t *ah, uint64_t a, uint32_t h, uint32_t w) {
-    if (op == STORE) { cq_inv_flush(); bus_op(op, ctl, c, m, ah, a, h, w); return; }
-    cq_call_do(&(cq_call){ .run = bus_k, .h = { c, m, ah ? *ah : 0, h }, .n = { (uint32_t)op, (uint32_t)ctl, w, !ah }, .v = { a } });
+    const uint32_t hs[4] = { c, m, ah ? *ah : 0, h };
+    if (op == STORE) { cq_inv_flush(); cq_op_begin("store", 0, hs, 4); bus_op(op, ctl, c, m, ah, a, h, w); cq_op_end(); return; }
+    cq_call_do(&(cq_call){ .run = bus_k, .name = op == LOAD ? "load" : "swap", .h = { c, m, ah ? *ah : 0, h }, .n = { (uint32_t)op, (uint32_t)ctl, w, !ah }, .v = { a } });
 }
 
 static uint32_t load(int ctl, uint32_t c, uint32_t m, const uint32_t *ah, uint64_t a, uint32_t w) {
