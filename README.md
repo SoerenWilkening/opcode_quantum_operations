@@ -15,8 +15,8 @@ int  __quantum__qis__m__body   (uint32_t q);
 ```
 
 The library does not define these. Whatever is linked last does: a simulator, a resource
-counter, a hardware compiler. The repository ships two definitions: a classical replay backend
-used by the tests, and a trace backend that prints the circuit.
+counter, a hardware compiler. The repository ships three definitions: a classical replay backend
+used by the tests, a trace backend that prints the circuit, and a counting backend.
 
 The repository is independent of CQ_lang: it vendors nothing from it and builds without it.
 Scope and goals are in [NORTH_STAR.md](NORTH_STAR.md); what is verified and what is not is in
@@ -39,6 +39,7 @@ This produces two static archives in `build/`:
 | `libcq_backend.a` | the `cq_template_*` integer operations and the `cqrt_*` runtime: allocation, measurement, rotations, memory bus, tape, invert regions |
 | `libcq_gates_replay.a` | a classical definition of the seven operations, with gate and depth counters |
 | `libcq_gates_trace.a` | a definition that keeps no state and prints a qec-trace-viewer trace: to the file named by `CQ_TRACE`, else stdout |
+| `libcq_gates_count.a` | a definition that stores nothing but counters and reports gates, depth and qubits: to the file named by `CQ_COUNT`, else stdout |
 
 The build type defaults to Release with asserts on. Build-time settings (`-D<name>=<value>` at
 configure time): `CQ_LADDER_N` (angle precision, default 53), `CQ_K2` (input bound, default
@@ -56,7 +57,7 @@ Tested on x86-64 macOS only.
 cmake --install build --prefix /usr/local
 ```
 
-This copies the three archives to `<prefix>/lib` and the public headers (`cqrt.h`,
+This copies the four archives to `<prefix>/lib` and the public headers (`cqrt.h`,
 `cq_template.h`, `cq_gates.h`, `cq_replay.h`, `cq_widths.h`, `cq_cast_pairs.h`) to
 `<prefix>/include`.
 
@@ -76,6 +77,41 @@ in the viewer's contract yet, so the viewer skips it. Each ABI call is one colla
 (`add`, `ry`, `measure`) over registers named after their handles (`h1`, `h2`); the backend
 tells the gate backend about them through three optional functions in `cq_gates.h`, which
 other gate backends can ignore. The trace is written when the program exits.
+
+### Counting gates, depth and qubits
+
+To get the cost of a program without running or drawing it, link the counting backend:
+
+```sh
+clang program.o -L<prefix>/lib -lcq_backend -lcq_gates_count -o program
+./program                      # the report goes to stdout when the program exits
+CQ_COUNT=counts.txt ./program  # or to a file
+```
+
+The report is one `name value` line each:
+
+```
+gates 88
+x 0
+cnot 40
+ccx 18
+ry 12
+ry_ctl 0
+rz 0
+m 18
+depth 19
+qubits 29
+```
+
+`gates` is the total and the seven lines after it are the count per operation. `depth` is the
+number of layers when every gate is placed as early as its qubits allow. `qubits` is the number
+of distinct qubit indices a gate touched; the backend reuses the index of a freed qubit, so
+this is the width of the circuit, not the number of allocations. To read one number in a
+script: `awk '$1 == "depth" { print $2 }' counts.txt`.
+
+The backend keeps one number per qubit and no circuit, so memory does not grow with the gate
+count. It measures 0 always, so a program that branches on a measurement is counted along the
+0 branch, and a program that aborts writes no report.
 
 Replace `-lcq_gates_replay` with your own gate backend. The order matters with GNU ld:
 the backend calls the seven operations. On Linux add

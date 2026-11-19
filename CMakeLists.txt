@@ -29,6 +29,8 @@ add_library(cq_backend STATIC src/templates/bits.c src/templates/cast.c src/emit
 add_library(cq_gates_replay STATIC src/gates_replay.c)
 # Second gate backend: prints a qec-trace-viewer trace instead of replaying (src/gates_trace.c).
 add_library(cq_gates_trace STATIC src/gates_trace.c)
+# Third: only counts gates, depth and qubits (src/gates_count.c).
+add_library(cq_gates_count STATIC src/gates_count.c)
 
 enable_testing()
 add_executable(test_skeleton tests/test_skeleton.c)
@@ -44,6 +46,10 @@ add_executable(test_trace tests/test_trace.c)
 target_link_libraries(test_trace cq_gates_trace)
 add_test(NAME trace COMMAND sh -c "CQ_TRACE=test_trace.out \"$1\" && cmp test_trace.out \"$2\""
   trace $<TARGET_FILE:test_trace> ${CMAKE_SOURCE_DIR}/tests/trace_expected.txt)
+add_executable(test_count tests/test_count.c)
+target_link_libraries(test_count cq_gates_count)
+add_test(NAME count COMMAND sh -c "CQ_COUNT=test_count.out \"$1\" && cmp test_count.out \"$2\""
+  count $<TARGET_FILE:test_count> ${CMAKE_SOURCE_DIR}/tests/count_expected.txt)
 
 add_executable(test_emit tests/test_emit.c)
 target_link_libraries(test_emit cq_backend cq_gates_replay)
@@ -275,9 +281,9 @@ foreach(cq_ex IN LISTS cq_examples)
   target_link_libraries(example_${cq_ex_name} cq_backend cq_gates_trace)
 endforeach()
 
-# Install: the three archives and the public headers.
+# Install: the four archives and the public headers.
 include(GNUInstallDirs)
-install(TARGETS cq_backend cq_gates_replay cq_gates_trace ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS cq_backend cq_gates_replay cq_gates_trace cq_gates_count ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES include/cqrt.h include/cq_template.h include/cq_gates.h include/cq_replay.h
               include/cq_widths.h include/cq_cast_pairs.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

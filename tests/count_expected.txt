@@ -1,0 +1,10 @@
+gates 9
+x 3
+cnot 1
+ccx 1
+ry 1
+ry_ctl 1
+rz 1
+m 1
+depth 4
+qubits 6
