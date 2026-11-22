@@ -10,15 +10,20 @@
     X(i6, 6) \
     X(i7, 7) \
     X(i8, 8) \
+    X(i14, 14) \
+    X(i15, 15) \
     X(i16, 16) \
     X(i17, 17) \
     X(i24, 24) \
     X(i31, 31) \
     X(i32, 32) \
     X(i48, 48) \
+    X(i50, 50) \
+    X(i63, 63) \
     X(i64, 64) \
     X(i80, 80) \
     X(i100, 100) \
+    X(i112, 112) \
     X(i128, 128)
 #define CQ_WIDTHS_WIDE(X) \
     X(i200, 200)
@@ -31,6 +36,7 @@
     X(i48, 48) \
     X(i64, 64) \
     X(i80, 80) \
+    X(i112, 112) \
     X(i128, 128)
 
 /* The fp width tokens core gates accept as bit patterns (inventory C7). X(name, bits, C type).

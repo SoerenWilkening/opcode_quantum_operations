@@ -329,7 +329,7 @@ static void no_fault(uint8_t *ro) {
 int main(void) {
     M = cqrt_qram_alloc_i8(0);
     assert(M && cqrt_qram_alloc_i8(0) == M);
-    assert(NT == 20);
+    assert(NT == 25);
     printf("%u bus symbols linked\n", (unsigned)(16 * NT + 1));
 
     uint8_t *ro = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
