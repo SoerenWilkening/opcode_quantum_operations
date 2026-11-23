@@ -166,11 +166,20 @@ static void invert(void) {
     one(u, X, 0);
 }
 
+/* cqrt_qram_unbound: no note from then on, for a quantum rail, a classical one and a later rule. */
+static void unbound(void) {
+    uint32_t d = noted(X + 8), k = cqrt_alloc_i64(X + 8), z = cqrt_alloc_i64(0);
+    cqrt_qram_unbound(d); none(d);
+    one(k, X, 0); cqrt_qram_unbound(k); none(k);
+    cqrt_qram_unbound(z); cqrt_copy_i64(noted(X + 8), z); none(z);
+    one(cq_template_add_i64_hl(noted(X + 8), 8), X, 0);   /* other rails are untouched */
+}
+
 int main(void) {
     X = (uint64_t)(uintptr_t)mem; Y = X + 64; Z = X + 256; ZE = Z + 64;
     cqrt_qram_object((int64_t)X, 64); cqrt_qram_object((int64_t)Y, 64); cqrt_qram_object((int64_t)Z, 64);
     M = cqrt_qram_alloc_i8(0);
-    value_rule(); keep(); drops(); end_flag(); loads(); invert();
+    value_rule(); keep(); drops(); end_flag(); loads(); invert(); unbound();
     printf("note ok\n");
     return 0;
 }

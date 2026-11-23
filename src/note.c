@@ -4,10 +4,11 @@
  * emitter's stamps), so every operation without a rule drops it, in place ones included. */
 #include <stdio.h>
 #include <stdlib.h>
+#include "cqrt.h"
 #include "cq_bus.h"
 #include "kernels.h"
 
-typedef struct { cq_note t; uint64_t stamp; cq_bit b[64]; } stored;
+typedef struct { cq_note t; uint64_t stamp; cq_bit b[64]; int dead; } stored;   /* dead: cqrt_qram_unbound */
 static const cq_note none = { -1, { { 0, 0 } } };
 
 int cq_rail_zero(int32_t h) {
@@ -41,12 +42,12 @@ cq_note cq_note_union(cq_note a, cq_note b) {
 
 cq_note cq_note_get(int32_t h) {
     const cq_bit *b = cq_rail_bits(h);
-    if (cq_rail_width(h) != 64) return none;
+    const stored *s = *cq_rail_note(h);
+    if (cq_rail_width(h) != 64 || (s && s->dead)) return none;
     uint64_t v = 0;
     int q = 0;
     for (int i = 0; i < 64; i++) { q |= cq_bit_is_q(b[i]); v |= (uint64_t)(b[i].kind & 1) << i; }
     if (!q) return cq_note_value(v);
-    const stored *s = *cq_rail_note(h);
     if (!s) return none;
     for (int i = 0; i < 64; i++)
         if (b[i].kind != s->b[i].kind || (cq_bit_is_q(b[i]) && (b[i].q != s->b[i].q || cq_qubit_stamp(b[i].q) > s->stamp)))
@@ -56,7 +57,8 @@ cq_note cq_note_get(int32_t h) {
 
 void cq_note_set(int32_t h, const cq_note *t) {
     stored **s = (stored **)cq_rail_note(h);
-    if (!*s && !(*s = malloc(sizeof **s))) { fprintf(stderr, "cq_runtime: note: out of memory\n"); abort(); }
+    if (!*s && !(*s = calloc(1, sizeof **s))) { fprintf(stderr, "cq_runtime: note: out of memory\n"); abort(); }
+    if ((*s)->dead) return;
     (*s)->t = *t;
     (*s)->stamp = cq_gate_stamp();
     for (int i = 0; i < 64; i++) (*s)->b[i] = cq_rail_bits(h)[i];
@@ -79,4 +81,11 @@ cq_note cq_note_cells(const cq_bit *rb, int quantum) {
     uint64_t v = 0;
     for (int i = 0; i < 64; i++) v |= (uint64_t)(rb[i].kind & 1) << i;   /* HOST cells: classical bits */
     return quantum ? none : cq_note_value(v);
+}
+
+/* ABI §1.10 "No object": h carries no note from now on, whatever its value or a later rule says. */
+void cqrt_qram_unbound(uint32_t h) {
+    if (cq_rail_width((int32_t)h) != 64) return;
+    cq_note_set((int32_t)h, &none);
+    (*(stored **)cq_rail_note((int32_t)h))->dead = 1;
 }
