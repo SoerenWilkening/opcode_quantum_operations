@@ -464,6 +464,10 @@ them; otherwise the bit-pattern path above runs unchanged (same gates, same cap 
   bits. The offset grows with the assignment, so the kept ones are a prefix [0, cnt); the decoder
   of §2.2 never splits a node whose 1-child holds no kept leaf. That node's flag then also covers
   offsets ≥ n, which for one object lie outside the domain (CR §0).
+- Intersection with the bit pattern: the ripple loses a classical address bit above a quantum
+  one (the borrow is unknown), so of the cnt offsets only those whose address s + offset agrees
+  with every classical address bit become leaves. A dropped offset's flag is still in the tree
+  (two gates, one qubit) but never fires in the domain, reads no cell and marks none QUANTUM.
 - m ≥ 2 objects with leaves: the address fanned out, the subtractions side by side, and each root
   token is c ∧ [d <u n] (a tree compare): it stops an address in one object from reaching a leaf
   of another, including through an unsplit node. [d >> k = 0] alone would not.

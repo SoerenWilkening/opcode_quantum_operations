@@ -111,8 +111,10 @@ static void decode(cq_tape *A, cq_bit **f, const cq_bit *const *b, uint32_t q, u
  * d = addr - s, k = ceil(log2 n). Gate-free, the bits of d are tracked the way the adder folds them:
  * ripple carries over 0/1/unknown, unknown exactly where the bit is not constant in the address
  * qubits, so a bit known here is that constant in every basis state. The leaves are the offsets
- * L | (assignment of the unknown bits below k) that are < n: a prefix of the assignments, cnt of them. */
-typedef struct { uint64_t s, n, L, cnt; uint32_t k, qn, P[64]; } object;
+ * L | (assignment of the unknown bits below k) that are < n: a prefix of the assignments, cnt of them.
+ * The ripple loses classical address bits above a quantum one, so of those cnt only the keep leaves
+ * whose address agrees with every classical address bit are built (the intersection the ABI states). */
+typedef struct { uint64_t s, n, L, cnt, keep; uint32_t k, qn, P[64]; } object;
 int cq_qram_force_bits;   /* test only: every access takes the bit-pattern bound */
 uint32_t cq_qram_leaves;  /* test only: the leaves the last access built */
 
@@ -123,7 +125,9 @@ static uint64_t spread(uint64_t x, const object *o) {
 }
 
 /* The objects that bound addr (0: none, take the bit pattern); *tot their leaves. */
-static int objects(int32_t ah, const cq_bit *addr, object *X, uint64_t *tot) {
+static int fits(const object *o, uint64_t x, uint64_t base, uint64_t qm) { return !(((o->s + spread(x, o)) ^ base) & ~qm); }
+
+static int objects(int32_t ah, const cq_bit *addr, uint64_t base, uint64_t qm, object *X, uint64_t *tot) {
     cq_note nt = cq_note_get(ah);
     int m = 0;
     *tot = 0;
@@ -135,7 +139,7 @@ static int objects(int32_t ah, const cq_bit *addr, object *X, uint64_t *tot) {
         for (int i = 0; i < m; i++) dup |= X[i].s == s;   /* registrations merged since noted */
         if (dup) continue;
         object *o = &X[m++];
-        *o = (object){ s, n, 0, 0, n > 1 ? 64 - (uint32_t)__builtin_clzll(n - 1) : 0, 0, { 0 } };
+        *o = (object){ s, n, 0, 0, 0, n > 1 ? 64 - (uint32_t)__builtin_clzll(n - 1) : 0, 0, { 0 } };
         int c = 1, out = 0;   /* d = addr + ~s + 1; 2: unknown */
         for (uint32_t i = 0; i < 64; i++) {
             int a = cq_bit_is_q(addr[i]) ? 2 : addr[i].kind, b = !(s >> i & 1), d = a == 2 || c == 2 ? 2 : a ^ b ^ c;
@@ -148,7 +152,9 @@ static int objects(int32_t ah, const cq_bit *addr, object *X, uint64_t *tot) {
         if (o->qn > 62) return 0;   /* a merged range of 2^63 cells or more: the bit pattern */
         uint64_t lo = 1, hi = 1ull << o->qn;   /* spread(0) = L < n; cnt: the first x with spread >= n */
         while (lo < hi) { uint64_t x = lo + (hi - lo) / 2; if (spread(x, o) < n) lo = x + 1; else hi = x; }
-        *tot += o->cnt = lo;
+        o->cnt = o->keep = lo;   /* above the cap nothing is built: no need to count */
+        if (lo <= 1ull << CQ_MAX_QADDR_BITS) for (uint64_t x = o->keep = 0; x < lo; x++) o->keep += fits(o, x, base, qm);
+        *tot += o->keep;
     }
     return *tot ? m : 0;
 }
@@ -157,12 +163,12 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
     const cq_bit *addr = cq_rail_bits((int32_t)ah);
     cq_bit *h = cq_rail_bits((int32_t)hh);
     uint32_t pos[64], q = 0;
-    uint64_t base = 0, tot;
+    uint64_t base = 0, qm = 0, tot, tree = 0;
     for (uint32_t i = 0; i < 64; i++)
-        if (cq_bit_is_q(addr[i])) pos[q++] = i; else base |= (uint64_t)addr[i].kind << i;
+        if (cq_bit_is_q(addr[i])) { pos[q++] = i; qm |= 1ull << i; } else base |= (uint64_t)addr[i].kind << i;
     object ob[CQ_NOTE_MAX];
     cq_bit av[CQ_NOTE_MAX][64], sb[CQ_NOTE_MAX][64], nb[CQ_NOTE_MAX][64];   /* operands the tape reads again at the undo */
-    int m = objects((int32_t)ah, addr, ob, &tot);
+    int m = objects((int32_t)ah, addr, base, qm, ob, &tot);
     if (m && ((q < 64 && tot >= 1ull << q) || tot > 1ull << CQ_MAX_QADDR_BITS)) m = 0;   /* not fewer leaves, or above the cap */
     if (!m && q > CQ_MAX_QADDR_BITS) {
         fprintf(stderr, "cq_runtime: bus: the address rail has %u quantum bits, above the cap CQ_MAX_QADDR_BITS = %d. "
@@ -173,8 +179,9 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
     uint32_t S = (w + 7) / 8, N = m ? (uint32_t)tot : 1u << q;
     cq_tape A = { 0 };
     qram r = { N, S, op == CQ_BUS_STORE ? 8 * S : w, NULL, NULL, NULL, &A };
+    for (int j = 0; j < m; j++) if (ob[j].keep) tree += ob[j].cnt;   /* decode fills cnt flags before the keep are picked */
     uint64_t *la = alloc(N, sizeof *la);   /* leaf addresses */
-    cq_bit **f = alloc(N, sizeof *f);      /* their flags */
+    cq_bit **f = alloc(m ? (size_t)tree : N, sizeof *f);      /* their flags */
 
     if (!m) {   /* the bit pattern: token at the root, address bit q-1-l at level l */
         const cq_bit *b[64];
@@ -195,7 +202,7 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
          * one root fires. One object: in the domain d < n, so neither can happen. */
         static const cq_bit one = { CQ_BIT_ONE, 0 };
         int sub = (int)(cq_kernel_pick(CQ_KOP_ARITH_sub, 64) - cq_kernel_ops[CQ_KOP_ARITH_sub].cand), live = 0;
-        for (int j = 0; j < m; j++) live += ob[j].cnt > 0;
+        for (int j = 0; j < m; j++) live += ob[j].keep > 0;
         for (uint32_t i = 0; i < 64; i++) {
             const cq_bit *cp = live > 1 && cq_bit_is_q(addr[i]) ? cq_tape_fanout(&A, &addr[i], (uint32_t)live - 1) : NULL;
             for (int j = 0; j < live; j++) av[j][i] = cp && j ? cp[j - 1] : addr[i];
@@ -203,7 +210,7 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
         uint32_t off = 0;
         for (int j = 0, u = 0; j < m; j++) {
             const object *o = &ob[j];
-            if (!o->cnt) continue;
+            if (!o->keep) continue;
             for (uint32_t i = 0; i < 64; i++) { sb[u][i] = cq_bit_const((int)(o->s >> i & 1)); nb[u][i] = cq_bit_const((int)(o->n >> i & 1)); }
             const cq_bit *d = cq_adder(sub, &A, av[u], sb[u], 1, &one, 64, CQ_ADD_SUM).s, *b[64];
             f[off] = cq_tape_bits(&A, 1);
@@ -215,14 +222,15 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
             u++;
             for (uint32_t l = 0; l < o->qn; l++) b[l] = &d[o->P[o->qn - 1 - l]];
             decode(&A, &f[off], b, o->qn, (uint32_t)o->cnt);
-            for (uint32_t x = 0; x < o->cnt; x++) la[off + x] = o->s + spread(x, o);
-            off += (uint32_t)o->cnt;
+            for (uint32_t x = 0, o0 = off; x < o->cnt; x++)   /* a dropped leaf's flag never fires and reads nothing */
+                if (fits(o, x, base, qm)) { f[off] = f[o0 + x]; la[off++] = o->s + spread(x, o); }
+
         }
     }
     cq_qram_leaves = N;
     if (getenv("CQ_QRAM_DEBUG")) {
         fprintf(stderr, "cq_qram: %s w=%u q=%u objects", op == CQ_BUS_LOAD ? "load" : op == CQ_BUS_STORE ? "store" : "swap", w, q);
-        for (int j = 0; j < m; j++) if (ob[j].cnt) fprintf(stderr, " [0x%llx +%llu]", (unsigned long long)ob[j].s, (unsigned long long)ob[j].n);
+        for (int j = 0; j < m; j++) if (ob[j].keep) fprintf(stderr, " [0x%llx +%llu]", (unsigned long long)ob[j].s, (unsigned long long)ob[j].n);
         fprintf(stderr, "%s leaves=%u\n", m ? "" : " none (bit pattern)", N);
     }
 

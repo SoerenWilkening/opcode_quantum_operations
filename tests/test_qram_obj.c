@@ -389,12 +389,30 @@ static void problem(uint32_t N) {
     printf("table of %u pointers: %u leaves, then %u through the loaded pointer: ok\n", N, N, want2);
 }
 
+/* The leaves are the intersection with the bit pattern: struct { i64 x, y; } arr[3] at +0x28, address
+ * bits 4 and 5 quantum, bit 6 classical 0. arr[2].x (bit 6 = 1) is not reachable; the ripple of
+ * d = addr - start alone would keep it and a store would hide a later host write to it. */
+static void strict(void) {
+    uint64_t s = 0x57, X = new_block(&s) + 0x28;
+    cqrt_qram_object((int64_t)X, 48);
+    cq_replay_reset();
+    uint32_t a = qrail(X, 4, 6), v = cqrt_alloc_i64(0xaaaa);
+    cq_note_set((int32_t)a, &(cq_note){ 1, { { X, 0 } } });
+    cqrt_qram_store_i64(M, a, v);
+    assert(cq_qram_leaves == 2);
+    *(uint64_t *)(uintptr_t)(X + 32) = 0x7777;
+    assert(peek(cqrt_qram_load_i64_hl(M, X + 32)) == 0x7777);
+    assert(peek(cqrt_qram_load_i64_hl(M, X)) == 0xaaaa);
+    printf("strict intersection (a cell of the object the address bits cannot reach stays HOST): ok\n");
+}
+
 int main(void) {
     M = cqrt_qram_alloc_i8(0);
     uint8_t *m = mmap(NULL, 2 * HSIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     assert(m != MAP_FAILED);
     H = m + (-(uintptr_t)m & (HSIZE - 1));
     fallbacks();
+    strict();
     problem(2); problem(4); problem(64);
     unions();
     singles();
