@@ -3,7 +3,7 @@
 # template and tape entry points whose literals cross the calling convention (kmgy.33).
 import random
 random.seed(7)
-ints=[1,3,4,5,6,7,8,13,14,15,16,17,24,28,29,31,32,33,40,43,48,50,56,63,64,80,100,112,128,200]
+ints=[1,3,4,5,6,7,8,10,13,14,15,16,17,24,26,28,29,31,32,33,40,43,48,50,56,63,64,80,100,112,128,200]
 fps=[('f16','half',16),('bf16','bfloat',16),('f32','float',32),('f64','double',64),('f80','x86_fp80',80)]
 ext={1:'zeroext ',8:'signext ',16:'signext '}
 out=[]; decl=set(); strs=[]

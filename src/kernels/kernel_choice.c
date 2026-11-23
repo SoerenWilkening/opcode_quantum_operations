@@ -11,12 +11,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 chain */
         0, /* i7 chain */
         1, /* i8 tree_inplace */
+        1, /* i10 tree_inplace */
         1, /* i13 tree_inplace */
         1, /* i14 tree_inplace */
         1, /* i15 tree_inplace */
         1, /* i16 tree_inplace */
         1, /* i17 tree_inplace */
         1, /* i24 tree_inplace */
+        1, /* i26 tree_inplace */
         1, /* i28 tree_inplace */
         1, /* i29 tree_inplace */
         1, /* i31 tree_inplace */
@@ -43,12 +45,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6: not defined */
         0, /* i7: not defined */
         0, /* i8: not defined */
+        0, /* i10: not defined */
         0, /* i13: not defined */
         0, /* i14: not defined */
         0, /* i15: not defined */
         0, /* i16 wiring */
         0, /* i17: not defined */
         0, /* i24: not defined */
+        0, /* i26: not defined */
         0, /* i28: not defined */
         0, /* i29: not defined */
         0, /* i31: not defined */
@@ -75,12 +79,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 wiring */
         0, /* i7 wiring */
         0, /* i8 wiring */
+        0, /* i10 wiring */
         0, /* i13 wiring */
         0, /* i14 wiring */
         0, /* i15 wiring */
         0, /* i16 wiring */
         0, /* i17 wiring */
         0, /* i24 wiring */
+        0, /* i26 wiring */
         0, /* i28 wiring */
         0, /* i29 wiring */
         0, /* i31 wiring */
@@ -107,12 +113,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 wiring */
         0, /* i7 wiring */
         0, /* i8 wiring */
+        0, /* i10 wiring */
         0, /* i13 wiring */
         0, /* i14 wiring */
         0, /* i15 wiring */
         0, /* i16 wiring */
         0, /* i17 wiring */
         0, /* i24 wiring */
+        0, /* i26 wiring */
         0, /* i28 wiring */
         0, /* i29 wiring */
         0, /* i31 wiring */
@@ -139,12 +147,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 fanout_tree */
         1, /* i7 fanout_tree */
         1, /* i8 fanout_tree */
+        1, /* i10 fanout_tree */
         1, /* i13 fanout_tree */
         1, /* i14 fanout_tree */
         1, /* i15 fanout_tree */
         1, /* i16 fanout_tree */
         1, /* i17 fanout_tree */
         1, /* i24 fanout_tree */
+        1, /* i26 fanout_tree */
         1, /* i28 fanout_tree */
         1, /* i29 fanout_tree */
         1, /* i31 fanout_tree */
@@ -171,12 +181,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 wiring */
         0, /* i7 wiring */
         0, /* i8 wiring */
+        0, /* i10 wiring */
         0, /* i13 wiring */
         0, /* i14 wiring */
         0, /* i15 wiring */
         0, /* i16 wiring */
         0, /* i17 wiring */
         0, /* i24 wiring */
+        0, /* i26 wiring */
         0, /* i28 wiring */
         0, /* i29 wiring */
         0, /* i31 wiring */
@@ -203,12 +215,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 ripple */
         0, /* i7 ripple */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -235,12 +249,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -267,12 +283,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -299,12 +317,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -331,12 +351,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -363,12 +385,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -395,12 +419,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -427,12 +453,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 ripple */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -459,12 +487,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -491,12 +521,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i10 lookahead */
         1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i26 lookahead */
         1, /* i28 lookahead */
         1, /* i29 lookahead */
         1, /* i31 lookahead */
@@ -523,12 +555,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 ccx */
         0, /* i7 ccx */
         0, /* i8 ccx */
+        0, /* i10 ccx */
         0, /* i13 ccx */
         0, /* i14 ccx */
         0, /* i15 ccx */
         0, /* i16 ccx */
         0, /* i17 ccx */
         0, /* i24 ccx */
+        0, /* i26 ccx */
         0, /* i28 ccx */
         0, /* i29 ccx */
         0, /* i31 ccx */
@@ -555,12 +589,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 cx_cx_ccx */
         0, /* i7 cx_cx_ccx */
         0, /* i8 cx_cx_ccx */
+        0, /* i10 cx_cx_ccx */
         0, /* i13 cx_cx_ccx */
         0, /* i14 cx_cx_ccx */
         0, /* i15 cx_cx_ccx */
         0, /* i16 cx_cx_ccx */
         0, /* i17 cx_cx_ccx */
         0, /* i24 cx_cx_ccx */
+        0, /* i26 cx_cx_ccx */
         0, /* i28 cx_cx_ccx */
         0, /* i29 cx_cx_ccx */
         0, /* i31 cx_cx_ccx */
@@ -587,12 +623,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6 cx_cx */
         0, /* i7 cx_cx */
         0, /* i8 cx_cx */
+        0, /* i10 cx_cx */
         0, /* i13 cx_cx */
         0, /* i14 cx_cx */
         0, /* i15 cx_cx */
         0, /* i16 cx_cx */
         0, /* i17 cx_cx */
         0, /* i24 cx_cx */
+        0, /* i26 cx_cx */
         0, /* i28 cx_cx */
         0, /* i29 cx_cx */
         0, /* i31 cx_cx */
@@ -619,12 +657,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i10 barrel_fanout_fold */
         2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i26 barrel_fanout_fold */
         2, /* i28 barrel_fanout_fold */
         2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
@@ -651,12 +691,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i10 barrel_fanout_fold */
         2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i26 barrel_fanout_fold */
         2, /* i28 barrel_fanout_fold */
         2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
@@ -683,12 +725,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i10 barrel_fanout_fold */
         2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i26 barrel_fanout_fold */
         2, /* i28 barrel_fanout_fold */
         2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
@@ -715,12 +759,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i10 barrel_fanout_fold */
         2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i26 barrel_fanout_fold */
         2, /* i28 barrel_fanout_fold */
         2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
@@ -747,12 +793,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i10 barrel_fanout_fold */
         2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i26 barrel_fanout_fold */
         2, /* i28 barrel_fanout_fold */
         2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
@@ -779,12 +827,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 restoring_lookahead */
         3, /* i7 radix8_lookahead */
         3, /* i8 radix8_lookahead */
+        3, /* i10 radix8_lookahead */
         3, /* i13 radix8_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         3, /* i17 radix8_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i26 radix8_lookahead */
         3, /* i28 radix8_lookahead */
         3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
@@ -811,12 +861,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 restoring_lookahead */
         2, /* i7 radix4_lookahead */
         1, /* i8 restoring_lookahead */
+        3, /* i10 radix8_lookahead */
         2, /* i13 radix4_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         2, /* i17 radix4_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i26 radix8_lookahead */
         3, /* i28 radix8_lookahead */
         3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
@@ -843,12 +895,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 restoring_lookahead */
         3, /* i7 radix8_lookahead */
         3, /* i8 radix8_lookahead */
+        3, /* i10 radix8_lookahead */
         3, /* i13 radix8_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         3, /* i17 radix8_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i26 radix8_lookahead */
         3, /* i28 radix8_lookahead */
         3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
@@ -875,12 +929,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 restoring_lookahead */
         2, /* i7 radix4_lookahead */
         2, /* i8 radix4_lookahead */
+        3, /* i10 radix8_lookahead */
         2, /* i13 radix4_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         2, /* i17 radix4_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i26 radix8_lookahead */
         3, /* i28 radix8_lookahead */
         3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
@@ -907,12 +963,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 tree */
         1, /* i7 tree */
         1, /* i8 tree */
+        1, /* i10 tree */
         1, /* i13 tree */
         1, /* i14 tree */
         1, /* i15 tree */
         1, /* i16 tree */
         1, /* i17 tree */
         1, /* i24 tree */
+        1, /* i26 tree */
         1, /* i28 tree */
         1, /* i29 tree */
         1, /* i31 tree */
@@ -939,12 +997,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 tree */
         1, /* i7 tree */
         1, /* i8 tree */
+        1, /* i10 tree */
         1, /* i13 tree */
         1, /* i14 tree */
         1, /* i15 tree */
         1, /* i16 tree */
         1, /* i17 tree */
         1, /* i24 tree */
+        1, /* i26 tree */
         1, /* i28 tree */
         1, /* i29 tree */
         1, /* i31 tree */
@@ -971,12 +1031,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1003,12 +1065,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1035,12 +1099,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1067,12 +1133,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1099,12 +1167,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1131,12 +1201,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1163,12 +1235,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1195,12 +1269,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i10 tree */
         2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i26 tree */
         2, /* i28 tree */
         2, /* i29 tree */
         2, /* i31 tree */
@@ -1227,12 +1303,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         3, /* i6 diff_fanout */
         3, /* i7 diff_fanout */
         3, /* i8 diff_fanout */
+        3, /* i10 diff_fanout */
         3, /* i13 diff_fanout */
         3, /* i14 diff_fanout */
         3, /* i15 diff_fanout */
         3, /* i16 diff_fanout */
         3, /* i17 diff_fanout */
         3, /* i24 diff_fanout */
+        3, /* i26 diff_fanout */
         3, /* i28 diff_fanout */
         3, /* i29 diff_fanout */
         3, /* i31 diff_fanout */
@@ -1259,12 +1337,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i10 tree_fanout */
         5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i26 tree_fanout */
         5, /* i28 tree_fanout */
         5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
@@ -1291,12 +1371,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i10 tree_fanout */
         5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i26 tree_fanout */
         5, /* i28 tree_fanout */
         5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
@@ -1323,12 +1405,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i10 tree_fanout */
         5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i26 tree_fanout */
         5, /* i28 tree_fanout */
         5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
@@ -1355,12 +1439,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i10 tree_fanout */
         5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i26 tree_fanout */
         5, /* i28 tree_fanout */
         5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
@@ -1387,12 +1473,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         3, /* i6 lookahead_fanout */
         3, /* i7 lookahead_fanout */
         3, /* i8 lookahead_fanout */
+        3, /* i10 lookahead_fanout */
         3, /* i13 lookahead_fanout */
         3, /* i14 lookahead_fanout */
         3, /* i15 lookahead_fanout */
         3, /* i16 lookahead_fanout */
         3, /* i17 lookahead_fanout */
         3, /* i24 lookahead_fanout */
+        3, /* i26 lookahead_fanout */
         3, /* i28 lookahead_fanout */
         3, /* i29 lookahead_fanout */
         3, /* i31 lookahead_fanout */
@@ -1419,12 +1507,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 csa_tree */
         1, /* i7 csa_tree */
         1, /* i8 csa_tree */
+        1, /* i10 csa_tree */
         1, /* i13 csa_tree */
         1, /* i14 csa_tree */
         1, /* i15 csa_tree */
         1, /* i16 csa_tree */
         1, /* i17 csa_tree */
         1, /* i24 csa_tree */
+        1, /* i26 csa_tree */
         1, /* i28 csa_tree */
         1, /* i29 csa_tree */
         1, /* i31 csa_tree */
@@ -1451,12 +1541,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 priority_tree */
         1, /* i7 priority_tree */
         1, /* i8 priority_tree */
+        1, /* i10 priority_tree */
         1, /* i13 priority_tree */
         1, /* i14 priority_tree */
         1, /* i15 priority_tree */
         1, /* i16 priority_tree */
         1, /* i17 priority_tree */
         1, /* i24 priority_tree */
+        1, /* i26 priority_tree */
         1, /* i28 priority_tree */
         1, /* i29 priority_tree */
         1, /* i31 priority_tree */
@@ -1483,12 +1575,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 priority_tree */
         1, /* i7 priority_tree */
         1, /* i8 priority_tree */
+        1, /* i10 priority_tree */
         1, /* i13 priority_tree */
         1, /* i14 priority_tree */
         1, /* i15 priority_tree */
         1, /* i16 priority_tree */
         1, /* i17 priority_tree */
         1, /* i24 priority_tree */
+        1, /* i26 priority_tree */
         1, /* i28 priority_tree */
         1, /* i29 priority_tree */
         1, /* i31 priority_tree */
@@ -1515,12 +1609,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 dadda_tree */
         1, /* i7 dadda_tree */
         1, /* i8 dadda_tree */
+        1, /* i10 dadda_tree */
         1, /* i13 dadda_tree */
         1, /* i14 dadda_tree */
         1, /* i15 dadda_tree */
         1, /* i16 dadda_tree */
         1, /* i17 dadda_tree */
         1, /* i24 dadda_tree */
+        1, /* i26 dadda_tree */
         1, /* i28 dadda_tree */
         1, /* i29 dadda_tree */
         1, /* i31 dadda_tree */
@@ -1547,12 +1643,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 dadda_tree */
         1, /* i7 dadda_tree */
         1, /* i8 dadda_tree */
+        1, /* i10 dadda_tree */
         1, /* i13 dadda_tree */
         1, /* i14 dadda_tree */
         1, /* i15 dadda_tree */
         1, /* i16 dadda_tree */
         1, /* i17 dadda_tree */
         1, /* i24 dadda_tree */
+        1, /* i26 dadda_tree */
         1, /* i28 dadda_tree */
         1, /* i29 dadda_tree */
         1, /* i31 dadda_tree */
@@ -1579,12 +1677,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         1, /* i6 dadda_tree */
         1, /* i7 dadda_tree */
         1, /* i8 dadda_tree */
+        1, /* i10 dadda_tree */
         1, /* i13 dadda_tree */
         1, /* i14 dadda_tree */
         1, /* i15 dadda_tree */
         1, /* i16 dadda_tree */
         1, /* i17 dadda_tree */
         1, /* i24 dadda_tree */
+        1, /* i26 dadda_tree */
         1, /* i28 dadda_tree */
         1, /* i29 dadda_tree */
         1, /* i31 dadda_tree */
@@ -1611,12 +1711,14 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
         0, /* i6: not defined */
         0, /* i7: not defined */
         0, /* i8: not defined */
+        0, /* i10: not defined */
         0, /* i13: not defined */
         0, /* i14: not defined */
         0, /* i15: not defined */
         0, /* i16: not defined */
         0, /* i17: not defined */
         0, /* i24: not defined */
+        0, /* i26: not defined */
         0, /* i28: not defined */
         0, /* i29: not defined */
         0, /* i31: not defined */

@@ -13,5 +13,5 @@ int main(void) {
 #undef X
     __quantum__qis__x__body(0);
     printf("K2=%d MAX_QADDR_BITS=%d\n", CQ_K2, CQ_MAX_QADDR_BITS);
-    return (n == 30 && bits == 1270 && cq_replay_gates() == 1) ? 0 : 1;
+    return (n == 32 && bits == 1306 && cq_replay_gates() == 1) ? 0 : 1;
 }

@@ -212,7 +212,7 @@ static void window(int kind, uint32_t nx, uint32_t ny, int sgn, int yq, uint32_t
 }
 
 int main(void) {
-    assert(sizeof linked / sizeof *linked == 30 * 3 * 4);
+    assert(sizeof linked / sizeof *linked == 32 * 3 * 4);
     for (unsigned i = 0; i < sizeof linked / sizeof *linked; i++) assert(linked[i]);
     uint32_t base = cq_pool_live();
 
