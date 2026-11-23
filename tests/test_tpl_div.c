@@ -192,7 +192,7 @@ INV_(i7, 7, lit_i7)
 INV_(i32, 32, lit_i32)
 
 int main(void) {
-    assert(sizeof linked / sizeof *linked == 29 * 4 * 6);
+    assert(sizeof linked / sizeof *linked == 30 * 4 * 6);
     for (unsigned i = 0; i < sizeof linked / sizeof *linked; i++) assert(linked[i]);
 
     /* A literal operand folds: cheaper than two quantum operands; an all-classical call takes no qubit

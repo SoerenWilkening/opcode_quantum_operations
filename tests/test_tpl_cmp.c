@@ -293,7 +293,7 @@ static void check_overlap(void) {
 }
 
 int main(void) {
-    assert(sizeof linked / sizeof *linked == 29 * 66);
+    assert(sizeof linked / sizeof *linked == 30 * 66);
     for (unsigned i = 0; i < sizeof linked / sizeof *linked; i++) assert(linked[i]);
 
     /* The pinned pairs are what they claim. */
