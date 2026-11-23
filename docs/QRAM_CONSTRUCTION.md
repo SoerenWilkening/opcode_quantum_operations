@@ -447,3 +447,46 @@ Measured at w = 8 (S = 1), all cells QUANTUM, uncontrolled (controlled is identi
   Filed as kmgy.27.
 - **QRAM.md.** Its swap and store rows and the ancilla bound should be brought in line with §7
   by whoever owns that file. This note supersedes them for the construction.
+
+## 11. The object bound [ours]
+
+ABI §1.10 "Objects": where the address rail's note names objects X_1..X_m (end entries dropped)
+and that gives fewer leaves than 2^q (and at most 2^CQ_MAX_QADDR_BITS), src/qram.c bounds R by
+them; otherwise the bit-pattern path above runs unchanged (same gates, same cap and abort).
+
+- Per object X = [s, s + n): d = addr − s by the adder `sub` ships at i64 (s classical), recorded
+  on tape A, k = ⌈log2 n⌉. Which bits of d are known is decided before any gate, by ripple
+  carries over {0, 1, unknown}: with independent address qubits and a classical s, a bit is
+  unknown exactly where it is not constant, so a known bit holds that constant in every basis
+  state (the adder may leave it a qubit; it is then not read). A known 1 at or above k: the
+  address is never in X (m = 1: the bit pattern).
+- Leaves: offsets L | (assignment of the unknown bits below k) that are < n, L the known low
+  bits. The offset grows with the assignment, so the kept ones are a prefix [0, cnt); the decoder
+  of §2.2 never splits a node whose 1-child holds no kept leaf. That node's flag then also covers
+  offsets ≥ n, which for one object lie outside the domain (CR §0).
+- m ≥ 2 objects with leaves: the address fanned out, the subtractions side by side, and each root
+  token is c ∧ [d <u n] (a tree compare): it stops an address in one object from reaching a leaf
+  of another, including through an unsplit node. [d >> k = 0] alone would not.
+- All kept leaves form one list: §3's operations, the §4.4 sharing, the overlay (exactly the kept
+  leaves' cells) and the load rule's note (kept leaves only) run on it unchanged. The undo of
+  tape A takes back decode, compare and subtraction and returns their qubits unmeasured.
+
+Measured (counting backend, one uncontrolled i64 load, address = s + offset as the add
+template leaves it with s 8-aligned but not 2^k-aligned: quantum bits 3..k, or 0..k for byte
+addresses with s odd; depth / qubits, object path vs bit pattern):
+
+| object | address | leaves | depth | qubits | bit pattern: leaves, depth, qubits |
+|---|---|---|---|---|---|
+| 2 B | byte | 2 | 30 | 330 | 4, 26, 317 |
+| 64 B | low 3 known | 8 | 49 | 735 | 16, 38, 1103 |
+| 64 B | byte | 64 | 69 | 4382 | 128, 56, 8383 |
+| 100 B | low 3 known | 13 | 55 | 1061 | 32, 44, 2143 |
+| 100 B | byte | 100 | 73 | 6722 | 256, 62, 16703 |
+| 4096 B | low 3 known | 512 | 89 | 33499 | 1024, 74, 66623 |
+| 4096 B | byte | 4096 | 109 | 266465 | 8192, 92, 532543 |
+| 64 KiB | low 3 known | 8192 | 113 | 532702 | 16384, 98, 1065023 |
+| 2 × 64 B | low 3 known | 16 | 82 | 1662 | 32, 44, 2143 |
+| 4 × 64 B | low 3 known | 32 | 87 | 3264 | 64, 50, 4223 |
+
+Depth grows by about 6 per doubling of the leaves, as §4 (6 per address bit); the subtraction
+and its undo add a constant 11 to 17 layers for one object; the compare of a union about 30 more.

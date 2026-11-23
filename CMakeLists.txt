@@ -229,6 +229,9 @@ add_test(NAME qram COMMAND test_qram)
 add_executable(test_objects tests/test_objects.c)   # the object registry, ABI §1.10 "Objects"
 target_link_libraries(test_objects cq_test_harness)
 add_test(NAME objects COMMAND test_objects)
+add_executable(test_qram_obj tests/test_qram_obj.c)   # the object-bounded access against the bit pattern
+target_link_libraries(test_qram_obj cq_test_harness)
+add_test(NAME qram_obj COMMAND test_qram_obj)
 add_executable(test_note tests/test_note.c)   # the derivation note and its rules
 target_link_libraries(test_note cq_test_harness)
 add_test(NAME note COMMAND test_note)
