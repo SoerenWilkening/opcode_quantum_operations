@@ -5,6 +5,7 @@
  * call: a reused qubit would carry its last layer and break the note's schedule. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "cq_config.h"
 #include "cq_bus.h"
 #include "kernels.h"
@@ -159,4 +160,44 @@ void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint
     }
     cq_tape_undo(&A);   /* PLANE and DECODE reversed; every ancilla back to the pool */
     free(X); free(n); free(r.G); free(r.cell); free(r.at); free(rs);
+}
+
+/* Objects (ABI §1.10 "Objects"): disjoint [start, end) ranges sorted by start, so ends are sorted too.
+ * A registration that reaches 2^64 (start + size wraps) is ignored, not clamped: no C object does, and
+ * a missing object only costs qubits. So end = start + size always fits and is > 0. */
+typedef struct { uint64_t s, e; } obj;
+static obj *O;
+static size_t nO, capO;
+
+static size_t end_above(uint64_t a) {   /* the first object with end > a */
+    size_t lo = 0, hi = nO;
+    while (lo < hi) { size_t m = (lo + hi) / 2; if (O[m].e > a) hi = m; else lo = m + 1; }
+    return lo;
+}
+
+void cqrt_qram_object(int64_t addr, int64_t size) {
+    uint64_t s = (uint64_t)addr, e = s + (uint64_t)size;
+    if (size <= 0 || e < s) return;
+    size_t i = end_above(s), j = i;   /* O[i..j): the overlapping ones; touching ones stay separate */
+    while (j < nO && O[j].s < e) j++;
+    if (i < j) { if (O[i].s < s) s = O[i].s; if (O[j - 1].e > e) e = O[j - 1].e; }
+    else if (nO == capO) O = realloc(O, (capO = capO ? 2 * capO : 64) * sizeof *O);
+    if (!O) die("bus: out of memory, objects", nO);
+    memmove(&O[i + 1], &O[j], (nO - j) * sizeof *O);
+    nO += 1 - (j - i);
+    O[i] = (obj){ s, e };
+}
+
+int cq_object_at(uint64_t a, uint64_t *start, uint64_t *size) {
+    size_t i = end_above(a);
+    if (i == nO || O[i].s > a) return 0;
+    *start = O[i].s; *size = O[i].e - O[i].s;
+    return 1;
+}
+
+int cq_object_ending_at(uint64_t a, uint64_t *start, uint64_t *size) {
+    size_t i = a ? end_above(a - 1) : nO;
+    if (i == nO || O[i].e != a) return 0;
+    *start = O[i].s; *size = O[i].e - O[i].s;
+    return 1;
 }

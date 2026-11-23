@@ -35,4 +35,9 @@ void cq_bus_store_at(const cq_bit *c, uint64_t a, cq_bit *v, uint32_t w, cq_bit 
 enum { CQ_BUS_LOAD, CQ_BUS_STORE, CQ_BUS_SWAP };
 void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint32_t w);
 
+/* Objects registered by cqrt_qram_object (src/qram.c), disjoint after merging. The object containing
+ * a, and the object whose end (start + size) is a (at most one): 1 and its start and size, or 0. */
+int cq_object_at(uint64_t a, uint64_t *start, uint64_t *size);
+int cq_object_ending_at(uint64_t a, uint64_t *start, uint64_t *size);
+
 #endif

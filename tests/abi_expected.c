@@ -39,6 +39,7 @@ static const struct { const char *fam, *name; } CORE[] = {
     { "rot", "rz_i1" },                                               /* §1.6 ABI:308 */
     { "ladder", "rz_qangle" }, { "ladder", "rz_qangle_controlled" },  /* §1.7 ABI:323 */
     { "bus", "qram_alloc_i8" },                                       /* §1.10 ABI:394 */
+    { "bus", "qram_object" },                                         /* §1.10 "Objects" (CQ_lang 6055f5b4) */
     { "tape", "tape_alloc" }, { "tape", "tape_fmt" }, { "tape", "tape_fmt_controlled" },   /* ABI:595-596 */
     { "tape", "tape_effect_controlled" },                             /* ABI:597 */
     { "tape", "abort_i1" },                                           /* ABI:600 */

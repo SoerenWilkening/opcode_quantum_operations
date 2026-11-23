@@ -226,6 +226,9 @@ target_sources(cq_backend PRIVATE src/qram.c)
 add_executable(test_qram tests/test_qram.c)
 target_link_libraries(test_qram cq_test_harness)
 add_test(NAME qram COMMAND test_qram)
+add_executable(test_objects tests/test_objects.c)   # the object registry, ABI §1.10 "Objects"
+target_link_libraries(test_objects cq_test_harness)
+add_test(NAME objects COMMAND test_objects)
 
 # Compare, select, min/max, abs (kmgy.14): src/kernels/cmp.c in the runtime, src/templates/cmp.c.
 target_sources(cq_backend PRIVATE src/kernels/cmp.c)

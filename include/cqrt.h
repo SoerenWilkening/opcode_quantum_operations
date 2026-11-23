@@ -88,6 +88,9 @@ void     cqrt_rz_qangle_controlled(uint32_t c, uint32_t A);
 CQ_WIDTHS(CQRT_DECL_BUS_)
 CQ_FP_WIDTHS(CQRT_DECL_BUS_)
 uint32_t cqrt_qram_alloc_i8(uint32_t n);
+/* An object [addr, addr + size) for the access bound (src/qram.c): no gate, no qubit; size <= 0 and a
+ * range reaching 2^64 register nothing; overlapping registrations merge. */
+void     cqrt_qram_object(int64_t addr, int64_t size);
 
 /* Tape and abort, §1.11 (src/tape.c). name: a host symbol, or NULL for the address in the first
  * field. abort_i1 of a classical 1 does not return. INPUT calls merge under a quantum predicate,
