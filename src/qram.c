@@ -145,6 +145,7 @@ static int objects(int32_t ah, const cq_bit *addr, object *X, uint64_t *tot) {
             else o->L |= (uint64_t)d << i;
         }
         if (out || o->L >= n) continue;   /* the address is never in X: no leaf */
+        if (o->qn > 62) return 0;   /* a merged range of 2^63 cells or more: the bit pattern */
         uint64_t lo = 1, hi = 1ull << o->qn;   /* spread(0) = L < n; cnt: the first x with spread >= n */
         while (lo < hi) { uint64_t x = lo + (hi - lo) / 2; if (spread(x, o) < n) lo = x + 1; else hi = x; }
         *tot += o->cnt = lo;
