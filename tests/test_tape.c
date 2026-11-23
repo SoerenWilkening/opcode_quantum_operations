@@ -838,7 +838,7 @@ static const fn linked[] = { CQ_WIDTHS(ADDR_) CQ_FP_WIDTHS(ADDR_)
     (fn)cqrt_abort_i1 };
 
 int main(void) {
-    assert(sizeof linked / sizeof *linked == 4 * 25 + 5);
+    assert(sizeof linked / sizeof *linked == 4 * 34 + 5);
     for (unsigned k = 0; k < sizeof linked / sizeof *linked; k++) assert(linked[k]);
 
     expect(s_classical, "classical rows", 0,

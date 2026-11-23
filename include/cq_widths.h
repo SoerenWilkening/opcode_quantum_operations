@@ -7,18 +7,27 @@
 #define CQ_WIDTHS(X) CQ_WIDTHS_NARROW(X) CQ_WIDTHS_WIDE(X)
 #define CQ_WIDTHS_NARROW(X) \
     X(i1, 1) \
+    X(i3, 3) \
+    X(i4, 4) \
+    X(i5, 5) \
     X(i6, 6) \
     X(i7, 7) \
     X(i8, 8) \
+    X(i13, 13) \
     X(i14, 14) \
     X(i15, 15) \
     X(i16, 16) \
     X(i17, 17) \
     X(i24, 24) \
+    X(i28, 28) \
+    X(i29, 29) \
     X(i31, 31) \
     X(i32, 32) \
+    X(i33, 33) \
+    X(i43, 43) \
     X(i48, 48) \
     X(i50, 50) \
+    X(i56, 56) \
     X(i63, 63) \
     X(i64, 64) \
     X(i80, 80) \

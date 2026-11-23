@@ -140,7 +140,7 @@ static uint32_t rail(uint64_t v, uint32_t w, int quantum) {
 }
 
 int main(void) {
-    assert(sizeof linked / sizeof *linked == 20 * 2 * 25);
+    assert(sizeof linked / sizeof *linked == 29 * 2 * 25);
     for (unsigned i = 0; i < sizeof linked / sizeof *linked; i++) assert(linked[i]);
 
     /* Aliasing (ABI §0): one rail in both operand slots. a + a = 2a, a - a = 0, borrow 0. */

@@ -5,18 +5,27 @@
 const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     { /* parity */
         0, /* i1 chain */
+        0, /* i3 chain */
+        0, /* i4 chain */
+        0, /* i5 chain */
         0, /* i6 chain */
         0, /* i7 chain */
         1, /* i8 tree_inplace */
+        1, /* i13 tree_inplace */
         1, /* i14 tree_inplace */
         1, /* i15 tree_inplace */
         1, /* i16 tree_inplace */
         1, /* i17 tree_inplace */
         1, /* i24 tree_inplace */
+        1, /* i28 tree_inplace */
+        1, /* i29 tree_inplace */
         1, /* i31 tree_inplace */
         1, /* i32 tree_inplace */
+        1, /* i33 tree_inplace */
+        1, /* i43 tree_inplace */
         1, /* i48 tree_inplace */
         1, /* i50 tree_inplace */
+        1, /* i56 tree_inplace */
         1, /* i63 tree_inplace */
         1, /* i64 tree_inplace */
         1, /* i80 tree_inplace */
@@ -27,18 +36,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* bswap */
         0, /* i1: not defined */
+        0, /* i3: not defined */
+        0, /* i4: not defined */
+        0, /* i5: not defined */
         0, /* i6: not defined */
         0, /* i7: not defined */
         0, /* i8: not defined */
+        0, /* i13: not defined */
         0, /* i14: not defined */
         0, /* i15: not defined */
         0, /* i16 wiring */
         0, /* i17: not defined */
         0, /* i24: not defined */
+        0, /* i28: not defined */
+        0, /* i29: not defined */
         0, /* i31: not defined */
         0, /* i32 wiring */
+        0, /* i33: not defined */
+        0, /* i43: not defined */
         0, /* i48 wiring */
         0, /* i50: not defined */
+        0, /* i56: not defined */
         0, /* i63: not defined */
         0, /* i64 wiring */
         0, /* i80 wiring */
@@ -49,18 +67,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* bitreverse */
         0, /* i1 wiring */
+        0, /* i3 wiring */
+        0, /* i4 wiring */
+        0, /* i5 wiring */
         0, /* i6 wiring */
         0, /* i7 wiring */
         0, /* i8 wiring */
+        0, /* i13 wiring */
         0, /* i14 wiring */
         0, /* i15 wiring */
         0, /* i16 wiring */
         0, /* i17 wiring */
         0, /* i24 wiring */
+        0, /* i28 wiring */
+        0, /* i29 wiring */
         0, /* i31 wiring */
         0, /* i32 wiring */
+        0, /* i33 wiring */
+        0, /* i43 wiring */
         0, /* i48 wiring */
         0, /* i50 wiring */
+        0, /* i56 wiring */
         0, /* i63 wiring */
         0, /* i64 wiring */
         0, /* i80 wiring */
@@ -71,18 +98,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* zext */
         0, /* i1: not defined */
+        0, /* i3 wiring */
+        0, /* i4 wiring */
+        0, /* i5 wiring */
         0, /* i6 wiring */
         0, /* i7 wiring */
         0, /* i8 wiring */
+        0, /* i13 wiring */
         0, /* i14 wiring */
         0, /* i15 wiring */
         0, /* i16 wiring */
         0, /* i17 wiring */
         0, /* i24 wiring */
+        0, /* i28 wiring */
+        0, /* i29 wiring */
         0, /* i31 wiring */
         0, /* i32 wiring */
+        0, /* i33 wiring */
+        0, /* i43 wiring */
         0, /* i48 wiring */
         0, /* i50 wiring */
+        0, /* i56 wiring */
         0, /* i63 wiring */
         0, /* i64 wiring */
         0, /* i80 wiring */
@@ -93,18 +129,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* sext */
         0, /* i1: not defined */
+        0, /* i3 chain */
+        0, /* i4 chain */
+        0, /* i5 chain */
         1, /* i6 fanout_tree */
         1, /* i7 fanout_tree */
         1, /* i8 fanout_tree */
+        1, /* i13 fanout_tree */
         1, /* i14 fanout_tree */
         1, /* i15 fanout_tree */
         1, /* i16 fanout_tree */
         1, /* i17 fanout_tree */
         1, /* i24 fanout_tree */
+        1, /* i28 fanout_tree */
+        1, /* i29 fanout_tree */
         1, /* i31 fanout_tree */
         1, /* i32 fanout_tree */
+        1, /* i33 fanout_tree */
+        1, /* i43 fanout_tree */
         1, /* i48 fanout_tree */
         1, /* i50 fanout_tree */
+        1, /* i56 fanout_tree */
         1, /* i63 fanout_tree */
         1, /* i64 fanout_tree */
         1, /* i80 fanout_tree */
@@ -115,18 +160,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* trunc */
         0, /* i1 wiring */
+        0, /* i3 wiring */
+        0, /* i4 wiring */
+        0, /* i5 wiring */
         0, /* i6 wiring */
         0, /* i7 wiring */
         0, /* i8 wiring */
+        0, /* i13 wiring */
         0, /* i14 wiring */
         0, /* i15 wiring */
         0, /* i16 wiring */
         0, /* i17 wiring */
         0, /* i24 wiring */
+        0, /* i28 wiring */
+        0, /* i29 wiring */
         0, /* i31 wiring */
         0, /* i32 wiring */
+        0, /* i33 wiring */
+        0, /* i43 wiring */
         0, /* i48 wiring */
         0, /* i50 wiring */
+        0, /* i56 wiring */
         0, /* i63 wiring */
         0, /* i64 wiring */
         0, /* i80 wiring */
@@ -137,18 +191,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* add */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        0, /* i4 ripple */
+        0, /* i5 ripple */
         0, /* i6 ripple */
         0, /* i7 ripple */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -159,18 +222,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* sub */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        0, /* i4 ripple */
+        0, /* i5 ripple */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -181,18 +253,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* uadd_overflow */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        0, /* i4 ripple */
+        0, /* i5 ripple */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -203,18 +284,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* sadd_overflow */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        0, /* i4 ripple */
+        0, /* i5 ripple */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -225,18 +315,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* usub_overflow */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        1, /* i4 lookahead */
+        1, /* i5 lookahead */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -247,18 +346,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* ssub_overflow */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        1, /* i4 lookahead */
+        1, /* i5 lookahead */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -269,18 +377,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* uadd_sat */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        0, /* i4 ripple */
+        0, /* i5 ripple */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -291,18 +408,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* sadd_sat */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        0, /* i4 ripple */
+        0, /* i5 ripple */
         0, /* i6 ripple */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -313,18 +439,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* usub_sat */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        1, /* i4 lookahead */
+        1, /* i5 lookahead */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -335,18 +470,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* ssub_sat */
         0, /* i1 ripple */
+        0, /* i3 ripple */
+        0, /* i4 ripple */
+        1, /* i5 lookahead */
         1, /* i6 lookahead */
         1, /* i7 lookahead */
         1, /* i8 lookahead */
+        1, /* i13 lookahead */
         1, /* i14 lookahead */
         1, /* i15 lookahead */
         1, /* i16 lookahead */
         1, /* i17 lookahead */
         1, /* i24 lookahead */
+        1, /* i28 lookahead */
+        1, /* i29 lookahead */
         1, /* i31 lookahead */
         1, /* i32 lookahead */
+        1, /* i33 lookahead */
+        1, /* i43 lookahead */
         1, /* i48 lookahead */
         1, /* i50 lookahead */
+        1, /* i56 lookahead */
         1, /* i63 lookahead */
         1, /* i64 lookahead */
         1, /* i80 lookahead */
@@ -357,18 +501,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* and */
         0, /* i1 ccx */
+        0, /* i3 ccx */
+        0, /* i4 ccx */
+        0, /* i5 ccx */
         0, /* i6 ccx */
         0, /* i7 ccx */
         0, /* i8 ccx */
+        0, /* i13 ccx */
         0, /* i14 ccx */
         0, /* i15 ccx */
         0, /* i16 ccx */
         0, /* i17 ccx */
         0, /* i24 ccx */
+        0, /* i28 ccx */
+        0, /* i29 ccx */
         0, /* i31 ccx */
         0, /* i32 ccx */
+        0, /* i33 ccx */
+        0, /* i43 ccx */
         0, /* i48 ccx */
         0, /* i50 ccx */
+        0, /* i56 ccx */
         0, /* i63 ccx */
         0, /* i64 ccx */
         0, /* i80 ccx */
@@ -379,18 +532,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* or */
         0, /* i1 cx_cx_ccx */
+        0, /* i3 cx_cx_ccx */
+        0, /* i4 cx_cx_ccx */
+        0, /* i5 cx_cx_ccx */
         0, /* i6 cx_cx_ccx */
         0, /* i7 cx_cx_ccx */
         0, /* i8 cx_cx_ccx */
+        0, /* i13 cx_cx_ccx */
         0, /* i14 cx_cx_ccx */
         0, /* i15 cx_cx_ccx */
         0, /* i16 cx_cx_ccx */
         0, /* i17 cx_cx_ccx */
         0, /* i24 cx_cx_ccx */
+        0, /* i28 cx_cx_ccx */
+        0, /* i29 cx_cx_ccx */
         0, /* i31 cx_cx_ccx */
         0, /* i32 cx_cx_ccx */
+        0, /* i33 cx_cx_ccx */
+        0, /* i43 cx_cx_ccx */
         0, /* i48 cx_cx_ccx */
         0, /* i50 cx_cx_ccx */
+        0, /* i56 cx_cx_ccx */
         0, /* i63 cx_cx_ccx */
         0, /* i64 cx_cx_ccx */
         0, /* i80 cx_cx_ccx */
@@ -401,18 +563,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* xor */
         0, /* i1 cx_cx */
+        0, /* i3 cx_cx */
+        0, /* i4 cx_cx */
+        0, /* i5 cx_cx */
         0, /* i6 cx_cx */
         0, /* i7 cx_cx */
         0, /* i8 cx_cx */
+        0, /* i13 cx_cx */
         0, /* i14 cx_cx */
         0, /* i15 cx_cx */
         0, /* i16 cx_cx */
         0, /* i17 cx_cx */
         0, /* i24 cx_cx */
+        0, /* i28 cx_cx */
+        0, /* i29 cx_cx */
         0, /* i31 cx_cx */
         0, /* i32 cx_cx */
+        0, /* i33 cx_cx */
+        0, /* i43 cx_cx */
         0, /* i48 cx_cx */
         0, /* i50 cx_cx */
+        0, /* i56 cx_cx */
         0, /* i63 cx_cx */
         0, /* i64 cx_cx */
         0, /* i80 cx_cx */
@@ -423,18 +594,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* shl */
         0, /* i1 barrel */
+        0, /* i3 barrel */
+        1, /* i4 barrel_fanout */
+        2, /* i5 barrel_fanout_fold */
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i28 barrel_fanout_fold */
+        2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
+        2, /* i33 barrel_fanout_fold */
+        2, /* i43 barrel_fanout_fold */
         2, /* i48 barrel_fanout_fold */
         2, /* i50 barrel_fanout_fold */
+        2, /* i56 barrel_fanout_fold */
         2, /* i63 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
         2, /* i80 barrel_fanout_fold */
@@ -445,18 +625,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* lshr */
         0, /* i1 barrel */
+        0, /* i3 barrel */
+        1, /* i4 barrel_fanout */
+        2, /* i5 barrel_fanout_fold */
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i28 barrel_fanout_fold */
+        2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
+        2, /* i33 barrel_fanout_fold */
+        2, /* i43 barrel_fanout_fold */
         2, /* i48 barrel_fanout_fold */
         2, /* i50 barrel_fanout_fold */
+        2, /* i56 barrel_fanout_fold */
         2, /* i63 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
         2, /* i80 barrel_fanout_fold */
@@ -467,18 +656,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* ashr */
         0, /* i1 barrel */
+        1, /* i3 barrel_fanout */
+        1, /* i4 barrel_fanout */
+        2, /* i5 barrel_fanout_fold */
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i28 barrel_fanout_fold */
+        2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
+        2, /* i33 barrel_fanout_fold */
+        2, /* i43 barrel_fanout_fold */
         2, /* i48 barrel_fanout_fold */
         2, /* i50 barrel_fanout_fold */
+        2, /* i56 barrel_fanout_fold */
         2, /* i63 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
         2, /* i80 barrel_fanout_fold */
@@ -489,18 +687,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* fshl */
         0, /* i1 barrel */
+        1, /* i3 barrel_fanout */
+        1, /* i4 barrel_fanout */
+        2, /* i5 barrel_fanout_fold */
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i28 barrel_fanout_fold */
+        2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
+        2, /* i33 barrel_fanout_fold */
+        2, /* i43 barrel_fanout_fold */
         2, /* i48 barrel_fanout_fold */
         2, /* i50 barrel_fanout_fold */
+        2, /* i56 barrel_fanout_fold */
         2, /* i63 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
         2, /* i80 barrel_fanout_fold */
@@ -511,18 +718,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* fshr */
         0, /* i1 barrel */
+        1, /* i3 barrel_fanout */
+        1, /* i4 barrel_fanout */
+        2, /* i5 barrel_fanout_fold */
         2, /* i6 barrel_fanout_fold */
         2, /* i7 barrel_fanout_fold */
         1, /* i8 barrel_fanout */
+        2, /* i13 barrel_fanout_fold */
         2, /* i14 barrel_fanout_fold */
         2, /* i15 barrel_fanout_fold */
         1, /* i16 barrel_fanout */
         2, /* i17 barrel_fanout_fold */
         2, /* i24 barrel_fanout_fold */
+        2, /* i28 barrel_fanout_fold */
+        2, /* i29 barrel_fanout_fold */
         2, /* i31 barrel_fanout_fold */
         1, /* i32 barrel_fanout */
+        2, /* i33 barrel_fanout_fold */
+        2, /* i43 barrel_fanout_fold */
         2, /* i48 barrel_fanout_fold */
         2, /* i50 barrel_fanout_fold */
+        2, /* i56 barrel_fanout_fold */
         2, /* i63 barrel_fanout_fold */
         1, /* i64 barrel_fanout */
         2, /* i80 barrel_fanout_fold */
@@ -533,18 +749,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* udiv */
         0, /* i1 restoring_ripple */
+        0, /* i3 restoring_ripple */
+        0, /* i4 restoring_ripple */
+        2, /* i5 radix4_lookahead */
         1, /* i6 restoring_lookahead */
         3, /* i7 radix8_lookahead */
         3, /* i8 radix8_lookahead */
+        3, /* i13 radix8_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         3, /* i17 radix8_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i28 radix8_lookahead */
+        3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
         3, /* i32 radix8_lookahead */
+        3, /* i33 radix8_lookahead */
+        3, /* i43 radix8_lookahead */
         3, /* i48 radix8_lookahead */
         3, /* i50 radix8_lookahead */
+        3, /* i56 radix8_lookahead */
         3, /* i63 radix8_lookahead */
         3, /* i64 radix8_lookahead */
         3, /* i80 radix8_lookahead */
@@ -555,18 +780,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* urem */
         0, /* i1 restoring_ripple */
+        0, /* i3 restoring_ripple */
+        0, /* i4 restoring_ripple */
+        2, /* i5 radix4_lookahead */
         1, /* i6 restoring_lookahead */
         2, /* i7 radix4_lookahead */
         1, /* i8 restoring_lookahead */
+        2, /* i13 radix4_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         2, /* i17 radix4_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i28 radix8_lookahead */
+        3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
         3, /* i32 radix8_lookahead */
+        3, /* i33 radix8_lookahead */
+        3, /* i43 radix8_lookahead */
         3, /* i48 radix8_lookahead */
         3, /* i50 radix8_lookahead */
+        3, /* i56 radix8_lookahead */
         3, /* i63 radix8_lookahead */
         3, /* i64 radix8_lookahead */
         3, /* i80 radix8_lookahead */
@@ -577,18 +811,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* sdiv */
         0, /* i1 restoring_ripple */
+        0, /* i3 restoring_ripple */
+        0, /* i4 restoring_ripple */
+        2, /* i5 radix4_lookahead */
         1, /* i6 restoring_lookahead */
         3, /* i7 radix8_lookahead */
         3, /* i8 radix8_lookahead */
+        3, /* i13 radix8_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         3, /* i17 radix8_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i28 radix8_lookahead */
+        3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
         3, /* i32 radix8_lookahead */
+        3, /* i33 radix8_lookahead */
+        3, /* i43 radix8_lookahead */
         3, /* i48 radix8_lookahead */
         3, /* i50 radix8_lookahead */
+        3, /* i56 radix8_lookahead */
         3, /* i63 radix8_lookahead */
         3, /* i64 radix8_lookahead */
         3, /* i80 radix8_lookahead */
@@ -599,18 +842,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* srem */
         0, /* i1 restoring_ripple */
+        2, /* i3 radix4_lookahead */
+        0, /* i4 restoring_ripple */
+        2, /* i5 radix4_lookahead */
         1, /* i6 restoring_lookahead */
         2, /* i7 radix4_lookahead */
         2, /* i8 radix4_lookahead */
+        2, /* i13 radix4_lookahead */
         3, /* i14 radix8_lookahead */
         2, /* i15 radix4_lookahead */
         3, /* i16 radix8_lookahead */
         2, /* i17 radix4_lookahead */
         3, /* i24 radix8_lookahead */
+        3, /* i28 radix8_lookahead */
+        3, /* i29 radix8_lookahead */
         3, /* i31 radix8_lookahead */
         3, /* i32 radix8_lookahead */
+        3, /* i33 radix8_lookahead */
+        3, /* i43 radix8_lookahead */
         3, /* i48 radix8_lookahead */
         3, /* i50 radix8_lookahead */
+        3, /* i56 radix8_lookahead */
         3, /* i63 radix8_lookahead */
         3, /* i64 radix8_lookahead */
         3, /* i80 radix8_lookahead */
@@ -621,18 +873,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_eq */
         0, /* i1 chain */
+        0, /* i3 chain */
+        1, /* i4 tree */
+        1, /* i5 tree */
         1, /* i6 tree */
         1, /* i7 tree */
         1, /* i8 tree */
+        1, /* i13 tree */
         1, /* i14 tree */
         1, /* i15 tree */
         1, /* i16 tree */
         1, /* i17 tree */
         1, /* i24 tree */
+        1, /* i28 tree */
+        1, /* i29 tree */
         1, /* i31 tree */
         1, /* i32 tree */
+        1, /* i33 tree */
+        1, /* i43 tree */
         1, /* i48 tree */
         1, /* i50 tree */
+        1, /* i56 tree */
         1, /* i63 tree */
         1, /* i64 tree */
         1, /* i80 tree */
@@ -643,18 +904,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_ne */
         0, /* i1 chain */
+        0, /* i3 chain */
+        1, /* i4 tree */
+        1, /* i5 tree */
         1, /* i6 tree */
         1, /* i7 tree */
         1, /* i8 tree */
+        1, /* i13 tree */
         1, /* i14 tree */
         1, /* i15 tree */
         1, /* i16 tree */
         1, /* i17 tree */
         1, /* i24 tree */
+        1, /* i28 tree */
+        1, /* i29 tree */
         1, /* i31 tree */
         1, /* i32 tree */
+        1, /* i33 tree */
+        1, /* i43 tree */
         1, /* i48 tree */
         1, /* i50 tree */
+        1, /* i56 tree */
         1, /* i63 tree */
         1, /* i64 tree */
         1, /* i80 tree */
@@ -665,18 +935,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_ult */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -687,18 +966,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_ugt */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -709,18 +997,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_uge */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -731,18 +1028,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_ule */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -753,18 +1059,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_slt */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -775,18 +1090,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_sgt */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -797,18 +1121,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_sge */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -819,18 +1152,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* icmp_sle */
         2, /* i1 tree */
+        2, /* i3 tree */
+        2, /* i4 tree */
+        2, /* i5 tree */
         2, /* i6 tree */
         2, /* i7 tree */
         2, /* i8 tree */
+        2, /* i13 tree */
         2, /* i14 tree */
         2, /* i15 tree */
         2, /* i16 tree */
         2, /* i17 tree */
         2, /* i24 tree */
+        2, /* i28 tree */
+        2, /* i29 tree */
         2, /* i31 tree */
         2, /* i32 tree */
+        2, /* i33 tree */
+        2, /* i43 tree */
         2, /* i48 tree */
         2, /* i50 tree */
+        2, /* i56 tree */
         2, /* i63 tree */
         2, /* i64 tree */
         2, /* i80 tree */
@@ -841,18 +1183,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* select */
         0, /* i1 ccx2 */
+        1, /* i3 ccx2_fanout */
+        1, /* i4 ccx2_fanout */
+        3, /* i5 diff_fanout */
         3, /* i6 diff_fanout */
         3, /* i7 diff_fanout */
         3, /* i8 diff_fanout */
+        3, /* i13 diff_fanout */
         3, /* i14 diff_fanout */
         3, /* i15 diff_fanout */
         3, /* i16 diff_fanout */
         3, /* i17 diff_fanout */
         3, /* i24 diff_fanout */
+        3, /* i28 diff_fanout */
+        3, /* i29 diff_fanout */
         3, /* i31 diff_fanout */
         3, /* i32 diff_fanout */
+        3, /* i33 diff_fanout */
+        3, /* i43 diff_fanout */
         3, /* i48 diff_fanout */
         3, /* i50 diff_fanout */
+        3, /* i56 diff_fanout */
         3, /* i63 diff_fanout */
         3, /* i64 diff_fanout */
         3, /* i80 diff_fanout */
@@ -863,18 +1214,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* smax */
         4, /* i1 tree */
+        4, /* i3 tree */
+        4, /* i4 tree */
+        4, /* i5 tree */
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i28 tree_fanout */
+        5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
         5, /* i32 tree_fanout */
+        5, /* i33 tree_fanout */
+        5, /* i43 tree_fanout */
         5, /* i48 tree_fanout */
         5, /* i50 tree_fanout */
+        5, /* i56 tree_fanout */
         5, /* i63 tree_fanout */
         5, /* i64 tree_fanout */
         5, /* i80 tree_fanout */
@@ -885,18 +1245,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* smin */
         4, /* i1 tree */
+        4, /* i3 tree */
+        4, /* i4 tree */
+        4, /* i5 tree */
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i28 tree_fanout */
+        5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
         5, /* i32 tree_fanout */
+        5, /* i33 tree_fanout */
+        5, /* i43 tree_fanout */
         5, /* i48 tree_fanout */
         5, /* i50 tree_fanout */
+        5, /* i56 tree_fanout */
         5, /* i63 tree_fanout */
         5, /* i64 tree_fanout */
         5, /* i80 tree_fanout */
@@ -907,18 +1276,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* umax */
         4, /* i1 tree */
+        4, /* i3 tree */
+        4, /* i4 tree */
+        4, /* i5 tree */
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i28 tree_fanout */
+        5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
         5, /* i32 tree_fanout */
+        5, /* i33 tree_fanout */
+        5, /* i43 tree_fanout */
         5, /* i48 tree_fanout */
         5, /* i50 tree_fanout */
+        5, /* i56 tree_fanout */
         5, /* i63 tree_fanout */
         5, /* i64 tree_fanout */
         5, /* i80 tree_fanout */
@@ -929,18 +1307,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* umin */
         4, /* i1 tree */
+        4, /* i3 tree */
+        4, /* i4 tree */
+        4, /* i5 tree */
         4, /* i6 tree */
         4, /* i7 tree */
         5, /* i8 tree_fanout */
+        5, /* i13 tree_fanout */
         5, /* i14 tree_fanout */
         5, /* i15 tree_fanout */
         5, /* i16 tree_fanout */
         5, /* i17 tree_fanout */
         5, /* i24 tree_fanout */
+        5, /* i28 tree_fanout */
+        5, /* i29 tree_fanout */
         5, /* i31 tree_fanout */
         5, /* i32 tree_fanout */
+        5, /* i33 tree_fanout */
+        5, /* i43 tree_fanout */
         5, /* i48 tree_fanout */
         5, /* i50 tree_fanout */
+        5, /* i56 tree_fanout */
         5, /* i63 tree_fanout */
         5, /* i64 tree_fanout */
         5, /* i80 tree_fanout */
@@ -951,18 +1338,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* abs */
         0, /* i1 ripple */
+        1, /* i3 ripple_fanout */
+        1, /* i4 ripple_fanout */
+        1, /* i5 ripple_fanout */
         3, /* i6 lookahead_fanout */
         3, /* i7 lookahead_fanout */
         3, /* i8 lookahead_fanout */
+        3, /* i13 lookahead_fanout */
         3, /* i14 lookahead_fanout */
         3, /* i15 lookahead_fanout */
         3, /* i16 lookahead_fanout */
         3, /* i17 lookahead_fanout */
         3, /* i24 lookahead_fanout */
+        3, /* i28 lookahead_fanout */
+        3, /* i29 lookahead_fanout */
         3, /* i31 lookahead_fanout */
         3, /* i32 lookahead_fanout */
+        3, /* i33 lookahead_fanout */
+        3, /* i43 lookahead_fanout */
         3, /* i48 lookahead_fanout */
         3, /* i50 lookahead_fanout */
+        3, /* i56 lookahead_fanout */
         3, /* i63 lookahead_fanout */
         3, /* i64 lookahead_fanout */
         3, /* i80 lookahead_fanout */
@@ -973,18 +1369,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* ctpop */
         1, /* i1 csa_tree */
+        1, /* i3 csa_tree */
+        1, /* i4 csa_tree */
+        1, /* i5 csa_tree */
         1, /* i6 csa_tree */
         1, /* i7 csa_tree */
         1, /* i8 csa_tree */
+        1, /* i13 csa_tree */
         1, /* i14 csa_tree */
         1, /* i15 csa_tree */
         1, /* i16 csa_tree */
         1, /* i17 csa_tree */
         1, /* i24 csa_tree */
+        1, /* i28 csa_tree */
+        1, /* i29 csa_tree */
         1, /* i31 csa_tree */
         1, /* i32 csa_tree */
+        1, /* i33 csa_tree */
+        1, /* i43 csa_tree */
         1, /* i48 csa_tree */
         1, /* i50 csa_tree */
+        1, /* i56 csa_tree */
         1, /* i63 csa_tree */
         1, /* i64 csa_tree */
         1, /* i80 csa_tree */
@@ -995,18 +1400,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* ctlz */
         0, /* i1 thermometer */
+        1, /* i3 priority_tree */
+        1, /* i4 priority_tree */
+        1, /* i5 priority_tree */
         1, /* i6 priority_tree */
         1, /* i7 priority_tree */
         1, /* i8 priority_tree */
+        1, /* i13 priority_tree */
         1, /* i14 priority_tree */
         1, /* i15 priority_tree */
         1, /* i16 priority_tree */
         1, /* i17 priority_tree */
         1, /* i24 priority_tree */
+        1, /* i28 priority_tree */
+        1, /* i29 priority_tree */
         1, /* i31 priority_tree */
         1, /* i32 priority_tree */
+        1, /* i33 priority_tree */
+        1, /* i43 priority_tree */
         1, /* i48 priority_tree */
         1, /* i50 priority_tree */
+        1, /* i56 priority_tree */
         1, /* i63 priority_tree */
         1, /* i64 priority_tree */
         1, /* i80 priority_tree */
@@ -1017,18 +1431,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* cttz */
         0, /* i1 thermometer */
+        1, /* i3 priority_tree */
+        1, /* i4 priority_tree */
+        1, /* i5 priority_tree */
         1, /* i6 priority_tree */
         1, /* i7 priority_tree */
         1, /* i8 priority_tree */
+        1, /* i13 priority_tree */
         1, /* i14 priority_tree */
         1, /* i15 priority_tree */
         1, /* i16 priority_tree */
         1, /* i17 priority_tree */
         1, /* i24 priority_tree */
+        1, /* i28 priority_tree */
+        1, /* i29 priority_tree */
         1, /* i31 priority_tree */
         1, /* i32 priority_tree */
+        1, /* i33 priority_tree */
+        1, /* i43 priority_tree */
         1, /* i48 priority_tree */
         1, /* i50 priority_tree */
+        1, /* i56 priority_tree */
         1, /* i63 priority_tree */
         1, /* i64 priority_tree */
         1, /* i80 priority_tree */
@@ -1039,18 +1462,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* mul */
         0, /* i1 shift_add */
+        0, /* i3 shift_add */
+        0, /* i4 shift_add */
+        1, /* i5 dadda_tree */
         1, /* i6 dadda_tree */
         1, /* i7 dadda_tree */
         1, /* i8 dadda_tree */
+        1, /* i13 dadda_tree */
         1, /* i14 dadda_tree */
         1, /* i15 dadda_tree */
         1, /* i16 dadda_tree */
         1, /* i17 dadda_tree */
         1, /* i24 dadda_tree */
+        1, /* i28 dadda_tree */
+        1, /* i29 dadda_tree */
         1, /* i31 dadda_tree */
         1, /* i32 dadda_tree */
+        1, /* i33 dadda_tree */
+        1, /* i43 dadda_tree */
         1, /* i48 dadda_tree */
         1, /* i50 dadda_tree */
+        1, /* i56 dadda_tree */
         1, /* i63 dadda_tree */
         1, /* i64 dadda_tree */
         1, /* i80 dadda_tree */
@@ -1061,18 +1493,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* umul_overflow */
         0, /* i1 shift_add */
+        1, /* i3 dadda_tree */
+        1, /* i4 dadda_tree */
+        1, /* i5 dadda_tree */
         1, /* i6 dadda_tree */
         1, /* i7 dadda_tree */
         1, /* i8 dadda_tree */
+        1, /* i13 dadda_tree */
         1, /* i14 dadda_tree */
         1, /* i15 dadda_tree */
         1, /* i16 dadda_tree */
         1, /* i17 dadda_tree */
         1, /* i24 dadda_tree */
+        1, /* i28 dadda_tree */
+        1, /* i29 dadda_tree */
         1, /* i31 dadda_tree */
         1, /* i32 dadda_tree */
+        1, /* i33 dadda_tree */
+        1, /* i43 dadda_tree */
         1, /* i48 dadda_tree */
         1, /* i50 dadda_tree */
+        1, /* i56 dadda_tree */
         1, /* i63 dadda_tree */
         1, /* i64 dadda_tree */
         1, /* i80 dadda_tree */
@@ -1083,18 +1524,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* smul_overflow */
         1, /* i1 dadda_tree */
+        1, /* i3 dadda_tree */
+        1, /* i4 dadda_tree */
+        1, /* i5 dadda_tree */
         1, /* i6 dadda_tree */
         1, /* i7 dadda_tree */
         1, /* i8 dadda_tree */
+        1, /* i13 dadda_tree */
         1, /* i14 dadda_tree */
         1, /* i15 dadda_tree */
         1, /* i16 dadda_tree */
         1, /* i17 dadda_tree */
         1, /* i24 dadda_tree */
+        1, /* i28 dadda_tree */
+        1, /* i29 dadda_tree */
         1, /* i31 dadda_tree */
         1, /* i32 dadda_tree */
+        1, /* i33 dadda_tree */
+        1, /* i43 dadda_tree */
         1, /* i48 dadda_tree */
         1, /* i50 dadda_tree */
+        1, /* i56 dadda_tree */
         1, /* i63 dadda_tree */
         1, /* i64 dadda_tree */
         1, /* i80 dadda_tree */
@@ -1105,18 +1555,27 @@ const uint8_t cq_kernel_choice[CQ_KOP_COUNT][CQ_NWIDTHS] = {
     },
     { /* angle_k */
         0, /* i1: not defined */
+        0, /* i3: not defined */
+        0, /* i4: not defined */
+        0, /* i5: not defined */
         0, /* i6: not defined */
         0, /* i7: not defined */
         0, /* i8: not defined */
+        0, /* i13: not defined */
         0, /* i14: not defined */
         0, /* i15: not defined */
         0, /* i16: not defined */
         0, /* i17: not defined */
         0, /* i24: not defined */
+        0, /* i28: not defined */
+        0, /* i29: not defined */
         0, /* i31: not defined */
         0, /* i32: not defined */
+        0, /* i33: not defined */
+        0, /* i43: not defined */
         0, /* i48: not defined */
         0, /* i50: not defined */
+        0, /* i56: not defined */
         0, /* i63: not defined */
         0, /* i64 barrel */
         0, /* i80: not defined */

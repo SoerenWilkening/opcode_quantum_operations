@@ -160,7 +160,7 @@ int main(void) {
     unsigned nw = 0;
 #define COUNT_(...) nw++;
     CQ_WIDTHS(COUNT_) CQ_FP_WIDTHS(COUNT_)
-    assert(nw == 25 && sizeof linked / sizeof *linked == 6 * nw + 7);
+    assert(nw == 34 && sizeof linked / sizeof *linked == 6 * nw + 7);
     for (unsigned k = 0; k < sizeof linked / sizeof *linked; k++) assert(linked[k]);
 
     const hx_op i1ops[] = {
