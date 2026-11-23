@@ -39,9 +39,13 @@ static inline uint32_t cq_tpl_run(int op, uint32_t w, uint32_t o, const uint32_t
     const cq_kernel *k = cq_kernel_pick(op, w);
     uint32_t oh[5] = { o };
     for (int j = 0; j < kop->nargs; j++) oh[1 + j] = args[j];
+    /* The derivation note (cq_rt.h) of a forward add, sub or select into a |0> o, from the operands as they are now. */
+    int note = !unc && w == 64 && (op == CQ_KOP_ARITH_add || op == CQ_KOP_ARITH_sub || op == CQ_KOP_SELECT) && cq_rail_zero((int32_t)o);
+    cq_note nt = note ? cq_note_tpl(op, args) : (cq_note){ -1, { { 0, 0 } } };
     cq_op_begin(kop->name, unc, oh, 1 + kop->nargs);
     (unc && k->unc ? k->unc : k->emit)((int32_t)o, h, w);
     cq_op_end();
+    if (note) cq_note_set((int32_t)o, &nt);
     return o;
 }
 

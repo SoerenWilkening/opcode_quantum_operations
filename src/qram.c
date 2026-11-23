@@ -81,7 +81,9 @@ static void bcast(const qram *r, const cq_bit *s, cq_bit *U) {
     cq_tape_undo(&C);
 }
 
-void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint32_t w) {
+void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t w) {
+    const cq_bit *addr = cq_rail_bits((int32_t)ah);
+    cq_bit *h = cq_rail_bits((int32_t)hh);
     uint32_t pos[64], q = 0;
     uint64_t base = 0;
     for (uint32_t i = 0; i < 64; i++)
@@ -107,10 +109,21 @@ void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint
     r.cell = alloc((size_t)8 * N * S, sizeof *r.cell);
     r.at = alloc((size_t)N * S, sizeof *r.at);
     uint32_t nc = 0;
+    uint8_t *cq = alloc((size_t)N * S, 1);   /* per distinct cell: QUANTUM */
     for (size_t k = 0; k < (size_t)N * S; k++) {
-        if (!k || rs[k].a != rs[k - 1].a) cq_cell_read(rs[k].a, &r.cell[8 * nc++]);
+        if (!k || rs[k].a != rs[k - 1].a) { cq[nc] = (uint8_t)cq_cell_read(rs[k].a, &r.cell[8 * nc]); nc++; }
         r.at[rs[k].k] = nc - 1;
     }
+    /* The load rule (cq_rt.h): into a |0> h, the union over the leaves of their 8 cells' notes. */
+    int note = op == CQ_BUS_LOAD && w == 64 && cq_rail_zero((int32_t)hh);
+    cq_note nt = { 0 };
+    for (uint32_t a = 0; note && a < N && nt.n >= 0; a++) {
+        cq_bit v[64];
+        int quantum = 0;
+        for (uint32_t i = 0; i < 64; i++) { v[i] = *kappa(&r, a, i); quantum |= cq[r.at[a * S + i / 8]]; }
+        nt = cq_note_union(nt, cq_note_cells(v, quantum));
+    }
+    free(cq);
 
     /* FO-DECODE: token at the root, address bit q-1-l copied to the 2^l nodes of level l, then
      * per node y = f ∧ bit, f ^= y: f becomes child 2j (bit 0) and y child 2j+1. */
@@ -159,6 +172,7 @@ void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint
             if (!k || rs[k].a != rs[k - 1].a) cq_cell_write(rs[k].a, &r.cell[8 * r.at[rs[k].k]], 1);
     }
     cq_tape_undo(&A);   /* PLANE and DECODE reversed; every ancilla back to the pool */
+    if (note) cq_note_set((int32_t)hh, &nt);
     free(X); free(n); free(r.G); free(r.cell); free(r.at); free(rs);
 }
 

@@ -62,6 +62,26 @@ cq_bit  *cq_rail_bits(int32_t h);       /* aborts on a bad or freed handle; stab
 uint32_t cq_rail_width(int32_t h);
 void     cq_rail_free(int32_t h);       /* cq_reset_bit on every bit, then drop the handle */
 
+/* ---- Derivation notes (ABI §1.10 "Objects", src/note.c): a classical note beside a 64-bit rail naming
+ * the objects its value derives from; never a gate. An entry names an object by its start when noted
+ * (resolve it with cq_object_at at use: registrations merge); end = 1: the value is at or past that
+ * object's end, so an access ignores the entry. n = -1: no note (unknown value, no rule, stale, not
+ * 64 bits wide); n = 0: null, the rail is classical 0 (adds nothing to a union). */
+#define CQ_NOTE_MAX 4
+typedef struct { uint64_t a; uint32_t end; } cq_note_ent;
+typedef struct { int n; cq_note_ent e[CQ_NOTE_MAX]; } cq_note;
+/* The valid note of rail h: an all-classical rail by the value rule; otherwise the stored note while the
+ * rail's bits equal its snapshot and no gate has targeted one of its qubits since it was set. */
+cq_note  cq_note_get(int32_t h);
+void     cq_note_set(int32_t h, const cq_note *t);   /* stores t with the snapshot and the gate stamp */
+cq_note  cq_note_value(uint64_t v);                   /* the value rule */
+cq_note  cq_note_union(cq_note a, cq_note b);
+cq_note  cq_note_tpl(int op, const uint32_t *args);   /* template op (64 bits, forward) on args: the result's note */
+int      cq_rail_zero(int32_t h);                     /* every bit classical 0 */
+void   **cq_rail_note(int32_t h);                     /* the note's storage in the rail slot (src/rails.c) */
+uint64_t cq_gate_stamp(void);                         /* gates emitted so far (src/emit.c) */
+uint64_t cq_qubit_stamp(uint32_t q);                  /* the stamp of the last gate that targeted q; 0: none */
+
 /* ---- cq_invert (ABI §1.13, src/invert.c). Every reversible entry point packs its call into a
  * cq_call and hands it to cq_call_do: run now, or, inside an open region, recorded and run at the
  * outermost end, reversed, run(k, 1) for the inverse (only rotations differ: angle negated).

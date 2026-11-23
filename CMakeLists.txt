@@ -222,13 +222,16 @@ target_link_libraries(test_tpl_mul cq_test_harness)
 add_test(NAME tpl_mul COMMAND test_tpl_mul)
 
 # Memory bus, quantum address (kmgy.21): the fan-out QRAM of docs/QRAM_CONSTRUCTION.md, src/qram.c.
-target_sources(cq_backend PRIVATE src/qram.c)
+target_sources(cq_backend PRIVATE src/qram.c src/note.c)   # note.c: the derivation note, ABI §1.10 "Objects"
 add_executable(test_qram tests/test_qram.c)
 target_link_libraries(test_qram cq_test_harness)
 add_test(NAME qram COMMAND test_qram)
 add_executable(test_objects tests/test_objects.c)   # the object registry, ABI §1.10 "Objects"
 target_link_libraries(test_objects cq_test_harness)
 add_test(NAME objects COMMAND test_objects)
+add_executable(test_note tests/test_note.c)   # the derivation note and its rules
+target_link_libraries(test_note cq_test_harness)
+add_test(NAME note COMMAND test_note)
 
 # Compare, select, min/max, abs (kmgy.14): src/kernels/cmp.c in the runtime, src/templates/cmp.c.
 target_sources(cq_backend PRIVATE src/kernels/cmp.c)

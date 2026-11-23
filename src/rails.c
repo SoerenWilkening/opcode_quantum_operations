@@ -5,7 +5,7 @@
 #include "cq_gates.h"
 #include "cq_rt.h"
 
-typedef struct { uint32_t width; cq_bit *bits; } rail;   /* bits == NULL: free or never made */
+typedef struct { uint32_t width; cq_bit *bits; void *note; } rail;   /* bits == NULL: free or never made */
 
 static rail   *slot;
 /* shortcut: a freed slot keeps its 16 bytes forever; reuse slots if handle churn ever matters. */
@@ -27,7 +27,7 @@ int32_t cq_rail_alloc(uint32_t width, const uint64_t *v) {
     if (!b) die("out of memory", width);
     for (uint32_t i = 0; i < width; i++)
         b[i] = cq_bit_const(v && (v[i / 64] >> (i % 64)) & 1);
-    slot[n] = (rail){ width, b };
+    slot[n] = (rail){ width, b, NULL };
     return n++;
 }
 
@@ -38,6 +38,7 @@ static rail *get(int32_t h) {
 
 cq_bit  *cq_rail_bits(int32_t h)  { return get(h)->bits; }
 uint32_t cq_rail_width(int32_t h) { return get(h)->width; }
+void   **cq_rail_note(int32_t h)  { return &get(h)->note; }
 
 /* ---- Operation notes (cq_rt.h). The defaults; a gate backend's own definitions replace them. */
 __attribute__((weak)) int  cq_gates_op_begin(const char *name) { (void)name; return 0; }
@@ -78,6 +79,8 @@ void cq_rail_free(int32_t h) {
     cq_op_begin("free", 0, &(uint32_t){ (uint32_t)h }, 1);
     for (uint32_t i = 0; i < r->width; i++) cq_reset_bit(&r->bits[i]);
     free(r->bits);
+    free(r->note);
     r->bits = NULL;
+    r->note = NULL;
     cq_op_end();
 }

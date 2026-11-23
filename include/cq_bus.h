@@ -29,11 +29,15 @@ int  cq_cells_read(uint64_t a, cq_bit *b, uint32_t n);
  * by the stores of one quantum-address access; NULL: a fresh slot rail, as the ABI's store takes. */
 void cq_bus_store_at(const cq_bit *c, uint64_t a, cq_bit *v, uint32_t w, cq_bit *t);
 
-/* One access whose address rail (64 bits) holds a qubit: the QRAM of docs/QRAM_CONSTRUCTION.md
+/* One access whose address rail addr (64 bits) holds a qubit: the QRAM of docs/QRAM_CONSTRUCTION.md
  * (src/qram.c). c: a qubit control, or NULL for none. h: the loaded or swapped rail, or the value
- * v of a store, w bits. A store takes its tape slot here. Aborts above CQ_MAX_QADDR_BITS qubits. */
+ * v of a store, w bits (handles: the derivation note, cq_rt.h). A store takes its tape slot here.
+ * Aborts above CQ_MAX_QADDR_BITS qubits. */
 enum { CQ_BUS_LOAD, CQ_BUS_STORE, CQ_BUS_SWAP };
-void cq_qram_access(int op, const cq_bit *c, const cq_bit *addr, cq_bit *h, uint32_t w);
+void cq_qram_access(int op, const cq_bit *c, uint32_t addr, uint32_t h, uint32_t w);
+/* The load rule's note of the 8 cells read at a, rb their bits: null/objects by the value rule; none if
+ * quantum (a QUANTUM cell among them) or the value is unknown. */
+cq_note cq_note_cells(const cq_bit *rb, int quantum);
 
 /* Objects registered by cqrt_qram_object (src/qram.c), disjoint after merging. The object containing
  * a, and the object whose end (start + size) is a (at most one): 1 and its start and size, or 0. */

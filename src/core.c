@@ -33,8 +33,11 @@ static void measure(uint32_t h, uint32_t w, uint64_t *v) {
 static void copy(uint32_t c, int ctl, uint32_t s, uint32_t d, uint32_t w) {
     const cq_bit *cb = ctl ? rail(c, 1) : NULL;
     cq_bit *sb = rail(s, w), *db = rail(d, w);
+    int note = w == 64 && cq_rail_zero((int32_t)d);   /* into |0>: d gets s's note (or null under c = 0) */
+    cq_note nt = note ? cq_note_get((int32_t)s) : (cq_note){ 0 };
     for (uint32_t i = 0; i < w; i++)
         if (cb) cq_ccx(cb, &sb[i], &db[i]); else cq_cx(&sb[i], &db[i]);
+    if (note) cq_note_set((int32_t)d, &nt);
 }
 
 static void xorc(uint32_t c, int ctl, uint32_t h, uint32_t w, const uint64_t *v) {

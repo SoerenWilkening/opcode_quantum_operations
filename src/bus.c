@@ -139,11 +139,16 @@ static void bus_op(int op, int ctl, uint32_t c, uint32_t m, const uint32_t *ah, 
         const cq_bit *ab = rail(*ah, 64);
         a = 0;
         for (int i = 0; i < 64; i++) {
-            if (cq_bit_is_q(ab[i])) { cq_qram_access(op, cb, ab, hb, w); return; }
+            if (cq_bit_is_q(ab[i])) { cq_qram_access(op, cb, *ah, h, w); return; }
             a |= (uint64_t)ab[i].kind << i;
         }
     }
+    /* The load rule (cq_rt.h): h = c ? the cells : 0. Uncontrolled, h ends classical and needs no note. */
+    int note = op == LOAD && w == 64 && cb && cq_rail_zero((int32_t)h);
+    cq_bit cb8[64];
+    cq_note nt = note ? cq_note_cells(cb8, cq_cells_read(a, cb8, 8)) : (cq_note){ 0 };
     access(op, cb, a, hb, w, NULL);
+    if (note) cq_note_set((int32_t)h, &nt);
 }
 
 void cq_bus_store_at(const cq_bit *c, uint64_t a, cq_bit *v, uint32_t w, cq_bit *t) {
