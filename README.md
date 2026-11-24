@@ -17,6 +17,9 @@ int  __quantum__qis__m__body   (uint32_t q);
 The library does not define these. Whatever is linked last does: a simulator, a resource
 counter, a hardware compiler. The repository ships three definitions: a classical replay backend
 used by the tests, a trace backend that prints the circuit, and a counting backend.
+For quantum error correction, the recommended definition is the surface-code executor
+[C_quantum_error_correction](https://github.com/SoerenWilkening/C_quantum_error_correction),
+which lives in its own repository ([below](#quantum-error-correction)).
 
 The repository is independent of CQ_lang: it vendors nothing from it and builds without it.
 Scope and goals are in [NORTH_STAR.md](NORTH_STAR.md); what is verified and what is not is in
@@ -114,6 +117,50 @@ script: `awk '$1 == "depth" { print $2 }' counts.txt`.
 The backend keeps one number per qubit and no circuit, so memory does not grow with the gate
 count. It measures 0 always, so a program that branches on a measurement is counted along the
 0 branch, and a program that aborts writes no report.
+
+### Quantum error correction
+
+The recommended QEC backend is the surface-code executor
+[C_quantum_error_correction](https://github.com/SoerenWilkening/C_quantum_error_correction).
+Its archive `libqec_qir.a` defines the seven operations with this library's signatures, so it
+links in place of the gate backends above with no glue code. It runs every logical gate as
+physical gates on the rotated surface code (lattice surgery, 15-to-1 distillation for T) under
+Pauli noise, decodes, and reports the physical operation counts, the depth and the logical
+failures as JSON.
+
+Build and install it once (a C11 compiler, `make`, POSIX threads):
+
+```sh
+git clone https://github.com/SoerenWilkening/C_quantum_error_correction
+make -C C_quantum_error_correction install PREFIX=$HOME/qec
+```
+
+Then link the program against it:
+
+```sh
+clang program.o -L<prefix>/lib -lcq_backend -L$HOME/qec/lib -lqec_qir -lm -lpthread -o program_qec
+QEC_D=7 QEC_P="1e-4 1e-4 1e-4" QEC_LOGICAL_QUBITS=<n> ./program_qec > result.json
+```
+
+`QEC_D` (code distance), `QEC_P` (X, Y and Z error probability per physical operation) and
+`QEC_LOGICAL_QUBITS` are required; there are no defaults. `<n>` is the `qubits` line of the
+counting backend's report for the same program: this library numbers its qubits 0, 1, 2, ...
+and reuses freed ones, so the width is also the number of indices. A larger value gives the
+same result; a smaller one stops the run with a message. The other settings (`QEC_FACTORIES`,
+`QEC_PRECISION`, `QEC_OUT`, `QEC_TRACE`, ...), the result's fields and how to choose d are in
+that repository's README.
+
+Measured here with `examples/superposition_add.c` (88 logical gates, 29 qubits): without noise
+at d = 3, under 1 s, 1095 T states, depth 56273, no failure; at d = 7 with
+`QEC_P="1e-4 1e-4 1e-4" QEC_FACTORIES=4`, 7 s, depth 56547, no failure in the one shot.
+
+The executor tracks Pauli errors, not the state: every measurement returns 0, as with the trace
+and counting backends, so a program that branches on a measurement runs the 0 branch. One run
+is one shot; repeat the program with another `QEC_SEED` for more. Each rotation that is not a
+multiple of π/4 is synthesised into about 60 T gates (`QEC_PRECISION`, default 20), so
+rotations and Toffolis dominate the cost.
+
+### Your own gate backend
 
 Replace `-lcq_gates_replay` with your own gate backend. The order matters with GNU ld:
 the backend calls the seven operations. On Linux add
