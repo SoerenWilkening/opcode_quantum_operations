@@ -319,6 +319,25 @@ int main(void) {
         assert(cq_pool_live() == base);
     }
 
+    /* A compare the operands' ranges decide emits no gate: n has 3 qubits, 0..7 (and -4..3 at i3). */
+    {
+        uint32_t n3 = cqrt_alloc_i3(0);
+        cqrt_ry_i3(n3, 1.0);
+        uint32_t n = cq_template_zext_i3_to_i64(n3);
+        cq_replay_reset();
+        uint32_t r[] = { cq_template_icmp_ugt_i64_hl(n, 93), cq_template_icmp_ugt_i64_hl(n, 7),
+                         cq_template_icmp_ule_i64_hl(n, 7), cq_template_icmp_slt_i64_hl(n, 8),
+                         cq_template_icmp_sgt_i64_hl(n, -1), cq_template_icmp_slt_i3_hl(n3, -4) };
+        assert(cq_replay_gates() == 0);
+        static const int want[] = { 0, 0, 1, 1, 1, 0 };
+        for (int i = 0; i < 6; i++) assert((int)cqrt_measure_i1(r[i]) == want[i]);
+        assert(cq_replay_gates_of(CQ_G_M) == 0);
+        cq_replay_reset();
+        uint32_t q = cq_template_icmp_ugt_i64_hl(n, 6);   /* true at 7 only: a qubit */
+        cqrt_measure_i1(q);
+        assert(cq_replay_gates_of(CQ_G_M) == 1);
+    }
+
     check_api();
     check_overlap();
     RUN_INV_(i1) RUN_INV_(i7) RUN_INV_(i64) RUN_INV_(i200)

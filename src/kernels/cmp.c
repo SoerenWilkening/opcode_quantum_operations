@@ -80,6 +80,18 @@ void cq_cmp(int kind, cq_tape *t, int pred, const cq_bit *a, const cq_bit *b, ui
         free(v);
         return;
     }
+    /* Range: a known bit is its value, a qubit is 0 for the minimum and 1 for the maximum. If
+     * max(a) < min(b) the flag is 1 on every branch, if min(a) >= max(b) it is 0: no gate. */
+    int always = -1, never = -1;
+    for (uint32_t i = n; i-- && (always < 0 || never < 0);) {
+        int s = pred == CQ_CMP_SLT && i == n - 1;   /* the sign bit orders the other way round */
+        int ak = !cq_bit_is_q(a[i]), bk = !cq_bit_is_q(b[i]), av = a[i].kind ^ s, bv = b[i].kind ^ s;
+        int ahi = ak ? av : 1, alo = ak ? av : 0, bhi = bk ? bv : 1, blo = bk ? bv : 0;
+        if (always < 0 && ahi != blo) always = ahi < blo;
+        if (never < 0 && alo != bhi) never = alo > bhi;
+    }
+    if (always > 0) { gx(t, rec, f); return; }
+    if (never) return;   /* -1: min(a) == max(b) */
     if (kind == CQ_CMP_TREE) { lt_tree(t, pred == CQ_CMP_SLT, a, b, n, f, rec); return; }
     /* [a <u b] = no carry out of a + ~b + 1; [a <s b] = [a <u b] ^ sign(a) ^ sign(b). The gates on f
      * that need no carry go first, so they run beside the adder. */
