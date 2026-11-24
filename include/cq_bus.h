@@ -42,11 +42,18 @@ extern uint32_t cq_qram_leaves;
 /* Q, the cap on quantum address bits and the memory size: the registered objects hold at most 2^Q cells
  * (cqrt_qram_object aborts above). Environment CQ_MAX_QADDR_BITS, default the build's CQ_MAX_QADDR_BITS. */
 uint32_t cq_qaddr_bits(void);
-/* The note of the 8 cells read at a, rb their bits: null/objects by the value rule; if quantum (a QUANTUM
- * cell among them) the union of the cells' notes, none where one is HOST or has none. */
+/* What cell a can hold ("Data"), in *t as cq_note_content gives it. QUANTUM: what the last store left;
+ * returns 1 if that note is weak: it came with a rail that had no address note (a narrow or integer-typed
+ * copy), so it counts for the pointer rule only. HOST: by its aligned 8-byte word, read now: the objects of
+ * its value, or data if it is in none (zero included); returns 0. m: the caller's memo of the last word,
+ * { 0 } at first. */
+typedef struct { uint64_t a; int have; cq_note t; } cq_word;
+int cq_cell_kind(uint64_t a, cq_note *t, cq_word *m);
+/* The address note of the 8 cells read at a, rb their bits: null/objects by the value rule; if quantum (a
+ * QUANTUM cell among them) the union of the cells' notes, none where one is not noted or weak. */
 cq_note cq_note_cells(uint64_t a, const cq_bit *rb, int quantum);
-/* The cell rule: the note of QUANTUM cell a (cq_cell_write leaves none); nothing on a HOST cell. */
-void cq_cell_note_set(uint64_t a, const cq_note *t);
+/* The cell rule: what QUANTUM cell a can hold (cq_cell_write leaves unknown); nothing on a HOST cell. */
+void cq_cell_note_set(uint64_t a, const cq_note *t, int weak);
 
 /* Objects registered by cqrt_qram_object (src/qram.c), disjoint after merging. The object containing
  * a, and the object whose end (start + size) is a (at most one): 1 and its start and size, or 0. */

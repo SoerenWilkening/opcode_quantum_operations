@@ -42,10 +42,16 @@ static inline uint32_t cq_tpl_run(int op, uint32_t w, uint32_t o, const uint32_t
     /* The derivation note (cq_rt.h) of a forward add, sub or select into a |0> o, from the operands as they are now. */
     int note = !unc && w == 64 && (op == CQ_KOP_ARITH_add || op == CQ_KOP_ARITH_sub || op == CQ_KOP_SELECT) && cq_rail_zero((int32_t)o);
     cq_note nt = note ? cq_note_tpl(op, args) : (cq_note){ -1, { { 0, 0 } } };
+    /* ABI §1.10 "Data": what the result can hold. select: either arm; add, sub: the kept note; any template:
+     * data if every operand is, else unknown. */
+    cq_note ct = cq_content_all(args, kop->nargs);
+    if (op == CQ_KOP_SELECT) ct = cq_note_union(cq_note_content((int32_t)args[1]), cq_note_content((int32_t)args[2]));
+    else if (ct.n < 0 && nt.n > 0) ct = nt;
     cq_op_begin(kop->name, unc, oh, 1 + kop->nargs);
     (unc && k->unc ? k->unc : k->emit)((int32_t)o, h, w);
     cq_op_end();
     if (note) cq_note_set((int32_t)o, &nt);
+    if (!unc) cq_content_set((int32_t)o, &ct);
     return o;
 }
 
@@ -63,9 +69,11 @@ static inline uint32_t cq_tpl_cast_run(int op, uint32_t from, uint32_t to, uint3
     if (cq_inv_open()) { cq_call_do(&(cq_call){ .run = cq_tpl_cast_k_, .h = { o, a }, .n = { (uint32_t)op, from, to, (uint32_t)unc } }); return o; }
     int32_t h = (int32_t)a;
     const cq_kernel *k = cq_kernel_pick(op, to);
+    cq_note ct = cq_note_content(h);   /* ABI §1.10 "Data": a cast passes on what its operand can hold */
     cq_op_begin(kop->name, unc, (uint32_t[]){ o, a }, 2);
     (unc && k->unc ? k->unc : k->emit)((int32_t)o, &h, to);
     cq_op_end();
+    if (!unc) cq_content_set((int32_t)o, &ct);
     return o;
 }
 /* cq_template_<name>_<f>_to_<t> and its _unc, for registry op kop. */

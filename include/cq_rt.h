@@ -71,15 +71,20 @@ void     cq_rail_free(int32_t h);       /* cq_reset_bit on every bit, then drop 
 typedef struct { uint64_t a; uint32_t end; } cq_note_ent;
 typedef struct { int n; cq_note_ent e[CQ_NOTE_MAX]; } cq_note;
 /* A QUANTUM cell carries a note too (the cell rule, cq_bus.h): a store or swap leaves the rail's with the
- * cells it can reach, and a load or a swap into a |0> rail takes the cells'.
+ * cells it can reach, and a load or a swap into a |0> rail takes the cells'. That note is the content
+ * ("Data"), which every rail of any width has; only a 64-bit rail has an address note beside it, and a
+ * content that reached a cell without one (a narrow copy) never becomes an address note by a plain load.
  * The valid note of rail h: an all-classical rail by the value rule; otherwise the stored note while the
  * rail's bits equal its snapshot and no gate has targeted one of its qubits since it was set. */
 cq_note  cq_note_get(int32_t h);
+cq_note  cq_note_content(int32_t h);                  /* ABI §1.10 "Data": what h can hold. n = 0 data, n > 0 bytes of a pointer into those objects, n < 0 unknown */
+void     cq_content_set(int32_t h, const cq_note *c); /* after cq_note_set, if any */
+cq_note  cq_content_all(const uint32_t *h, int n);    /* data if every one of the rails is, else unknown */
 void     cq_note_set(int32_t h, const cq_note *t);   /* stores t with the snapshot and the gate stamp */
-void     cq_note_alt(int32_t h, const cq_note *p);   /* after cq_note_set by a load: its note under the pointer rule */
 cq_note  cq_note_value(uint64_t v);                   /* the value rule */
 cq_note  cq_note_union(cq_note a, cq_note b);
 cq_note  cq_note_tpl(int op, const uint32_t *args);   /* template op (64 bits, forward) on args: the result's note */
+int      cq_data(int32_t h);                          /* cq_note_content(h) is data */
 int      cq_rail_zero(int32_t h);                     /* every bit classical 0 */
 void   **cq_rail_note(int32_t h);                     /* the note's storage in the rail slot (src/rails.c) */
 uint64_t cq_gate_stamp(void);                         /* gates emitted so far (src/emit.c) */

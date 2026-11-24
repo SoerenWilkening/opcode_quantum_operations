@@ -14,8 +14,7 @@ static void die(const char *msg, uint64_t v) {
 
 /* ---- The overlay: QUANTUM cells, open addressing keyed by address. An entry that goes back to
  * HOST stays as a non-quantum slot, so nothing is ever deleted. */
-/* t: a QUANTUM cell's note (ABI §1.10 Derivation, the cell rule); every write leaves none until noted. */
-typedef struct { uint64_t a; uint8_t used, quantum; cq_bit b[8]; cq_note t; } cell;
+typedef struct { uint64_t a; uint8_t used, quantum, weak; cq_bit b[8]; cq_note t; } cell;   /* t, weak: cq_cell_kind */
 static const cq_note none = { -1, { { 0, 0 } } };
 static cell  *tab;
 static size_t cap, used;    /* cap is 0 or a power of two */
@@ -79,23 +78,39 @@ void cq_cell_write(uint64_t a, const cq_bit b[8], int quantum) {
     }
     cell *e = find(a, 1);
     e->quantum = 1;
+    e->weak = 0;
     e->t.n = -1;
     memcpy(e->b, b, sizeof e->b);
 }
 
-void cq_cell_note_set(uint64_t a, const cq_note *t) {
+void cq_cell_note_set(uint64_t a, const cq_note *t, int weak) {
     cell *e = find(a, 0);
-    if (e && e->quantum) e->t = *t;
+    if (e && e->quantum) { e->t = *t; e->weak = weak != 0; }
+}
+
+int cq_cell_kind(uint64_t a, cq_note *t, cq_word *m) {
+    cell *e = find(a, 0);
+    if (e && e->quantum) { *t = e->t; return e->weak; }
+    if (!m->have || m->a != (a & ~7ull)) {
+        uint64_t v = 0;   /* little-endian host, as the bus is (x86-64) */
+        m->a = a & ~7ull; m->have = 1;
+        if (!cq_host_read(m->a, (uint8_t *)&v, 8)) v = 0;
+        m->t = cq_note_value(v);
+        if (m->t.n < 0) m->t.n = 0;   /* a value in no object: data */
+    }
+    *t = m->t;
+    return 0;
 }
 
 cq_note cq_note_cells(uint64_t a, const cq_bit *rb, int quantum) {
-    cq_note t = { 0 };
+    cq_note t = { 0, { { 0, 0 } } }, ct;
+    cq_word m = { 0 };
     uint64_t v = 0;
     for (int i = 0; i < 64; i++) v |= (uint64_t)(rb[i].kind & 1) << i;   /* HOST cells: classical bits */
     if (!quantum) return cq_note_value(v);
-    for (int j = 0; j < 8 && t.n >= 0; j++) {   /* a HOST cell among QUANTUM ones: part of a value, no note */
-        cell *e = find(a + (uint64_t)j, 0);
-        if (e && e->quantum) t = cq_note_union(t, e->t); else t.n = -1;
+    for (int j = 0; j < 8; j++) {
+        int weak = cq_cell_kind(a + (uint64_t)j, &ct, &m);
+        t = ct.n > 0 && !weak ? cq_note_union(t, ct) : none;
     }
     return t;
 }
@@ -106,15 +121,20 @@ enum { LOAD = CQ_BUS_LOAD, STORE = CQ_BUS_STORE, SWAP = CQ_BUS_SWAP };
 
 /* h is the loaded or swapped rail, or the value v of a store; w bits. c: a qubit control, or
  * NULL for none (a classical control has been resolved by the caller). */
-/* rn: the note of a stored or swapped 64-bit rail, or NULL. The cell rule: the QUANTUM cells get it,
- * under a control (they keep their content on c = 0) in union with what they had. */
-static void access(int op, const cq_bit *c, uint64_t a, cq_bit *h, uint32_t w, cq_bit *slot, const cq_note *rn) {
+/* cn, weak: what the stored or swapped rail can hold ("Data") and whether it has no address note. The cell
+ * rule, for the cells left QUANTUM: they get cn, under a control (they keep their content on c = 0) in
+ * union with what they had: data adds nothing, unknown leaves unknown. */
+static void access(int op, const cq_bit *c, uint64_t a, cq_bit *h, uint32_t w, cq_bit *slot, const cq_note *cn, int weak) {
     uint32_t s = (w + 7) / 8;
     cq_bit cells[8 * MAX_CELLS];
     uint8_t host[MAX_CELLS];
     int all = cq_host_read(a, host, s), pq = 0;   /* one read for the common case; else per cell */
     for (uint32_t j = 0; j < s; j++) pq |= cell_bits(a + j, &cells[8 * j], all ? &host[j] : NULL);   /* a + j wraps mod 2^64 */
-    cq_note nt = !rn ? none : c ? cq_note_union(cq_note_cells(a, cells, pq), *rn) : *rn;
+    cq_note ot[MAX_CELLS];
+    uint8_t ow[MAX_CELLS];
+    cq_word m = { 0 };
+    (void)pq;
+    for (uint32_t j = 0; j < s && op != LOAD && c; j++) ow[j] = (uint8_t)cq_cell_kind(a + j, &ot[j], &m);
     if (op == LOAD) {   /* the cells are controls only: nothing to put back */
         for (uint32_t i = 0; i < w; i++)
             if (c) cq_ccx(c, &cells[i], &h[i]); else cq_cx(&cells[i], &h[i]);
@@ -130,7 +150,12 @@ static void access(int op, const cq_bit *c, uint64_t a, cq_bit *h, uint32_t w, c
     /* Overlay: a qubit control, or a qubit left anywhere in the cells, makes them all QUANTUM. */
     int quantum = c != NULL;
     for (uint32_t i = 0; i < 8 * s; i++) quantum |= cq_bit_is_q(cells[i]);
-    for (uint32_t j = 0; j < s; j++) { cq_cell_write(a + j, &cells[8 * j], quantum); cq_cell_note_set(a + j, &nt); }
+    for (uint32_t j = 0; j < s; j++) {
+        cq_cell_write(a + j, &cells[8 * j], quantum);
+        cq_note u = c ? cq_note_union(ot[j], *cn) : *cn;
+        int was = c && ot[j].n > 0, covered = was && !ow[j] && u.n == ot[j].n;   /* an address cell that already names them stays one */
+        cq_cell_note_set(a + j, &u, (was && ow[j]) || (cn->n > 0 && weak && !covered));
+    }
 }
 
 /* ---- The bus handle. It takes a rail slot only to get a handle number no rail has. */
@@ -167,13 +192,18 @@ static void bus_op(int op, int ctl, uint32_t c, uint32_t m, const uint32_t *ah, 
         }
     }
     /* The load rule (cq_rt.h): h = c ? the cells : 0, the cells' notes if QUANTUM. The cell rule: access. */
-    int note = op != STORE && w == 64 && cq_rail_zero((int32_t)h);   /* a swap into |0> is a load too */
+    /* The load rule (cq_rt.h): into a |0> h the address note of the 8 cells, and at any width cu, what the
+     * cells read can hold; a swap leaves h with what it had or theirs. The cell rule: access. */
+    int zero = cq_rail_zero((int32_t)h), note = op != STORE && w == 64 && zero, dh = op == SWAP || (op == LOAD && zero);
     cq_bit cb8[64];
-    cq_note rn = op != LOAD && w == 64 ? cq_note_get((int32_t)h) : none;
-    int cq8 = note && cq_cells_read(a, cb8, 8);
-    cq_note nt = note ? cq_note_cells(a, cb8, cq8) : none, np = cq8 || nt.n >= 0 ? nt : (cq_note){ 0, { { 0, 0 } } };
-    access(op, cb, a, hb, w, NULL, op != LOAD && w == 64 ? &rn : NULL);
-    if (note) { cq_note_set((int32_t)h, &nt); cq_note_alt((int32_t)h, &np); }   /* np: the pointer rule */
+    cq_note cn = cq_note_content((int32_t)h), ct, cu = zero ? (cq_note){ 0, { { 0, 0 } } } : cn;
+    cq_note nt = note ? cq_note_cells(a, cb8, cq_cells_read(a, cb8, 8)) : none;
+    int weak = !(w == 64 && cq_note_get((int32_t)h).n > 0);
+    cq_word wm = { 0 };
+    for (uint32_t j = 0; dh && j < (w + 7) / 8; j++) { cq_cell_kind(a + j, &ct, &wm); cu = cq_note_union(cu, ct); }
+    access(op, cb, a, hb, w, NULL, &cn, weak);
+    if (note) cq_note_set((int32_t)h, &nt);
+    if (dh) cq_content_set((int32_t)h, &cu);
 }
 
 void cq_bus_store_at(const cq_bit *c, uint64_t a, cq_bit *v, uint32_t w, cq_bit *t) {
@@ -181,7 +211,7 @@ void cq_bus_store_at(const cq_bit *c, uint64_t a, cq_bit *v, uint32_t w, cq_bit 
         if (c->kind == CQ_BIT_ZERO) { if (!t) cq_rail_alloc(8 * ((w + 7) / 8), NULL); return; }
         c = NULL;
     }
-    access(STORE, c, a, v, w, t, NULL);
+    access(STORE, c, a, v, w, t, &none, 0);   /* bytes the backend stores itself (§1.11): unknown */
 }
 
 /* cq_invert (cq_rt.h): a load or swap is its own inverse and is recorded; a store is a flush

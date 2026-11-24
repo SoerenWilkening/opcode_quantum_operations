@@ -18,7 +18,7 @@ a line there). Platform: macOS, x86_64, Apple clang 17, LLVM 19.1.7 for the IR p
 | # | NORTH_STAR item | verified by | not verified |
 |---|---|---|---|
 | 1 | an ABI-only program links against `libcq_backend.a` plus any definition of the seven operations (one archive replaces the ABI's two, user decision 2026-11-18) | `abi_link_*` (two gate definitions), `abi_symbols` (order property by nm), `templates_layering` (no non-template object references `cq_template_*`), `ir_abi_*` (the calling convention of every core entry point and the literal-carrying templates) | Apple's ld does not enforce archive order, so the one-pass link is only checked by nm; GNU ld untested (kmgy.40). The shared-library form (ABI:111-114) is not built. |
-| 2 | every in-scope symbol at every listed width passes its sampled test, forced-quantum and all-classical | all 4531 defined; all 4531 referenced by a sampled test object (`abi_symbols`); the per-family tests run the harness forced-quantum and all-classical | that a reference is a sampled call is not proven per symbol (nm shows a reference, not a call path). Samples are reduced at wide widths (as few as 2 for the barrel shifts and 6 for division at the widest; 200 per cast pair; 100 in test_invert at i200). The quantum-address bus is sampled at i8 i16 i17 i64 only (test_qram), every other width at a classical address. Rotations: the replay backend ignores angles, so rotation controls and the ladder's rotation list are not checked by replay (the ladder's K register is, test_ladder). |
+| 2 | every in-scope symbol at every listed width passes its sampled test, forced-quantum and all-classical | all 4532 defined; all 4532 referenced by a sampled test object (`abi_symbols`); the per-family tests run the harness forced-quantum and all-classical | that a reference is a sampled call is not proven per symbol (nm shows a reference, not a call path). Samples are reduced at wide widths (as few as 2 for the barrel shifts and 6 for division at the widest; 200 per cast pair; 100 in test_invert at i200). The quantum-address bus is sampled at i8 i16 i17 i64 only (test_qram), every other width at a classical address. Rotations: the replay backend ignores angles, so rotation controls and the ladder's rotation list are not checked by replay (the ladder's K register is, test_ladder). |
 | 3 | all-classical programs emit no gate | `abi_classical`; each sampled test also asserts it per call | the exceptions below, which the ABI requires |
 | 4 | quantum-address bus access passes replay against a host byte array at depth O(q) | `qram` (load, store, swap and `_controlled`, q = 1..6, depth formula and linear growth) | widths other than i8 i16 i17 i64; q above 6 (Q, environment `CQ_MAX_QADDR_BITS`, default 22) |
 | 5 | every integer operation has its depth table, the shallowest shipped | `depth` (docs/DEPTH.md and kernel_choice.c fresh); every template operation has a section | see "Depth tables" |
@@ -35,7 +35,7 @@ appends Ry(P k/2^N) (ABI:304-305).
 | runtime | core (alloc, measure, copy, xorc, free, i1 logic, push/pop) | 127 | 127 | 127 |
 | runtime | rot (ry, ry_controlled, rz_i1) | 41 | 41 | 41 |
 | runtime | ladder (ry_qangle, rz_qangle) | 42 | 42 | 42 |
-| runtime | bus | 322 | 322 | 322 |
+| runtime | bus | 323 | 323 | 323 |
 | runtime | tape and abort | 85 | 85 | 85 |
 | runtime | invert | 2 | 2 | 2 |
 | templates | arith (add, sub) | 150 | 150 | 150 |
@@ -51,7 +51,7 @@ appends Ry(P k/2^N) (ABI:304-305).
 | templates | count (ctlz cttz ctpop) | 90 | 90 | 90 |
 | templates | bits (bswap, bitreverse) | 42 | 42 | 42 |
 | templates | cast | 630 | 630 | 630 |
-| | total | 4531 | 4531 | 4531 |
+| | total | 4532 | 4532 | 4532 |
 
 No symbol is missing, none extra, none out of scope; no `__quantum__*` defined; all seven referenced.
 

@@ -163,6 +163,7 @@ rotated rail `h`. CR retires the argument order `(A, h)` (CR:72).
 | 39 | `cqrt_qram_swap_<W>_hl_controlled` | `void cqrt_qram_swap_<W>_hl_controlled(uint32_t c, uint32_t m, uint64_t addr, uint32_t h)` | 1.10 (ABI:399) | INT+FP |
 | 39a | `cqrt_qram_object` | `void cqrt_qram_object(int64_t addr, int64_t size)` (no gate) | 1.10 "Objects" (CQ_lang `6055f5b4`, after this inventory's revision) | none |
 | 39b | `cqrt_qram_unbound` | `void cqrt_qram_unbound(uint32_t h)` (no gate) | 1.10 "No object" (CQ_lang `5840036e`) | none |
+| 39d | `cqrt_qram_data` | `void cqrt_qram_data(uint32_t h)` (no gate) | 1.10 "Data" (CQ_lang `f650cd26`) | none |
 | 39c | `cqrt_qram_pointer` | `void cqrt_qram_pointer(uint32_t h)` (no gate) | 1.10 "A pointer load" (CQ_lang `1a2cdc19`) | none |
 
 No store or swap `_unc` exists (ABI:398-399; `cqrt_qram_store_<W>*_unc` is retired, ABI:138).
@@ -300,9 +301,9 @@ Notes on widths:
   operations in scope (rows 49-88). 65 in-scope operations of 91.
 - Name patterns: 48 core (rows 1-48) and 95 forward template patterns (counting `icmp_<pred>` and
   each cast as one pattern), each with its `_unc`: 190. In total 238 in-scope name patterns.
-- Symbols at the 15 integer widths and 5 fp tokens (2026-11-18, kmgy.23): 619 `cqrt_*` (30 per
-  width token times 20, plus 19 without one; 21 since `cqrt_qram_object`, `cqrt_qram_unbound` and `cqrt_qram_pointer`, 2026-11-24) and 3912 `cq_template_*` (1956 forward, each with its
-  `_unc`), 4531 in all. `tests/abi_expected.c` generates the list from the rules above and the
+- Symbols at the 15 integer widths and 5 fp tokens (2026-11-18, kmgy.23): 620 `cqrt_*` (30 per
+  width token times 20, plus 20 without one; 22 since `cqrt_qram_object`, `cqrt_qram_unbound`, `cqrt_qram_pointer` and `cqrt_qram_data`, 2026-11-24) and 3912 `cq_template_*` (1956 forward, each with its
+  `_unc`), 4532 in all. `tests/abi_expected.c` generates the list from the rules above and the
   `abi_symbols` test compares it with the archives (docs/COMPLETENESS.md).
 
 ## Out of scope (must not be defined)

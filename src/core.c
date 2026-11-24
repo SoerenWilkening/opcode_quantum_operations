@@ -33,18 +33,23 @@ static void measure(uint32_t h, uint32_t w, uint64_t *v) {
 static void copy(uint32_t c, int ctl, uint32_t s, uint32_t d, uint32_t w) {
     const cq_bit *cb = ctl ? rail(c, 1) : NULL;
     cq_bit *sb = rail(s, w), *db = rail(d, w);
-    int note = w == 64 && cq_rail_zero((int32_t)d);   /* into |0>: d gets s's note (or null under c = 0) */
+    int zero = cq_rail_zero((int32_t)d), note = w == 64 && zero;   /* into |0>: d gets s's note (or null under c = 0) */
     cq_note nt = note ? cq_note_get((int32_t)s) : (cq_note){ 0 };
+    /* "Data": into |0> what s can hold; d ^= s otherwise: data only if both are. */
+    cq_note ct = zero ? cq_note_content((int32_t)s) : cq_content_all((uint32_t[]){ s, d }, 2);
     for (uint32_t i = 0; i < w; i++)
         if (cb) cq_ccx(cb, &sb[i], &db[i]); else cq_cx(&sb[i], &db[i]);
     if (note) cq_note_set((int32_t)d, &nt);
+    cq_content_set((int32_t)d, &ct);
 }
 
 static void xorc(uint32_t c, int ctl, uint32_t h, uint32_t w, const uint64_t *v) {
     const cq_bit *cb = ctl ? rail(c, 1) : NULL;
     cq_bit *b = rail(h, w);
+    cq_note ct = cq_content_all(&h, 1);   /* "Data": data stays data */
     for (uint32_t i = 0; i < w; i++)
         if ((v[i / 64] >> (i % 64)) & 1) { if (cb) cq_cx(cb, &b[i]); else cq_x(&b[i]); }
+    cq_content_set((int32_t)h, &ct);
 }
 
 /* Through cq_invert (cq_rt.h): each of these is its own inverse. */
@@ -106,12 +111,14 @@ static void logic_k(const cq_call *k, int inv) {
     (void)inv;
     cq_bit *tb = rail(k->h[2], 1), *ab = k->n[0] != NOT ? rail(k->h[0], 1) : NULL;
     cq_bit *bb = k->n[0] == AND || k->n[0] == OR ? rail(k->h[1], 1) : NULL;
+    cq_note ct = cq_content_all((uint32_t[]){ k->h[2], ab ? k->h[0] : k->h[2], bb ? k->h[1] : k->h[2] }, 3);   /* "Data" */
     switch (k->n[0]) {
     case NOT: cq_x(tb); break;
     case AND: cq_ccx(ab, bb, tb); break;
     case OR:  cq_cx(ab, tb); cq_cx(bb, tb); cq_ccx(ab, bb, tb); break;   /* a ^ b ^ ab = a | b */
     default:  cq_cx(ab, tb);
     }
+    cq_content_set((int32_t)k->h[2], &ct);
 }
 static void logic(uint32_t op, uint32_t a, uint32_t b, uint32_t t) { cq_call_do(&(cq_call){ .run = logic_k, .name = (const char *[]){ "not", "and", "or", "xor" }[op], .h = { a, b, t }, .n = { op } }); }
 void cqrt_not_i1(uint32_t h) { logic(NOT, 0, 0, h); }

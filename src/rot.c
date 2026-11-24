@@ -55,9 +55,13 @@ static double angle(uint32_t A, int s) {
  * A recorded _qangle form reads its angle rail when it runs. h[]: h, c, A; n[]: width, has c, has A. */
 static void ry_k(const cq_call *k, int inv) {
     const cq_bit *qa = k->n[2] ? qangle(k->h[2]) : NULL;
-    if (qa) { cq_ladder(k->n[1] ? rail(k->h[1], 1) : NULL, rail(k->h[0], k->n[0]), k->n[0], qa, 2, inv); return; }
-    double theta = k->n[2] ? angle(k->h[2], 2) : k->theta;
-    ry(k->n[1] ? rail(k->h[1], 1) : NULL, k->h[0], k->n[0], inv ? -theta : theta);
+    cq_note ct = cq_content_all(&k->h[0], 1);   /* ABI §1.10 "Data": a prepared input register is data */
+    if (qa) cq_ladder(k->n[1] ? rail(k->h[1], 1) : NULL, rail(k->h[0], k->n[0]), k->n[0], qa, 2, inv);
+    else {
+        double theta = k->n[2] ? angle(k->h[2], 2) : k->theta;
+        ry(k->n[1] ? rail(k->h[1], 1) : NULL, k->h[0], k->n[0], inv ? -theta : theta);
+    }
+    cq_content_set((int32_t)k->h[0], &ct);
 }
 #define RY_(bits, h, c, A, ctl, q, th) cq_call_do(&(cq_call){ .run = ry_k, .name = "ry", .h = { h, c, A }, .n = { bits, ctl, q }, .theta = th })
 #define ROT_(n, bits, ...) \

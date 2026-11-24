@@ -270,23 +270,27 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
     r.at = alloc((size_t)N * S, sizeof *r.at);
     uint32_t nc = 0;
     uint8_t *cq = alloc((size_t)N * S, 1);   /* per distinct cell: QUANTUM */
+    /* "Data": cn, what the stored or swapped rail can hold, weak if it has no address note; cu, what h
+     * takes from the cells: the union over those it reads (a swap: or what it had). */
+    const cq_note null = { 0, { { 0, 0 } } };
+    int zero = cq_rail_zero((int32_t)hh), dh = op == CQ_BUS_SWAP || (op == CQ_BUS_LOAD && zero);
+    cq_note cn = cq_note_content((int32_t)hh), ct, cu = zero ? null : cn;
+    int weak = !(w == 64 && cq_note_get((int32_t)hh).n > 0);
+    cq_word wm = { 0 };
     for (size_t k = 0; k < (size_t)N * S; k++) {
+        if (dh && cu.n >= 0 && (!k || rs[k].a != rs[k - 1].a)) { cq_cell_kind(rs[k].a, &ct, &wm); cu = cq_note_union(cu, ct); }
         if (!k || rs[k].a != rs[k - 1].a) { cq[nc] = (uint8_t)cq_cell_read(rs[k].a, &r.cell[8 * nc]); nc++; }
         r.at[rs[k].k] = nc - 1;
     }
-    /* The load rule (cq_rt.h): a |0> h that a load or swap fills gets hn, the union over the leaves of
-     * their 8 cells' notes. The cell rule: a store or swap of a noted rail (a |0> one: null) leaves
-     * ln[a] = the leaf's note ∪ the rail's with leaf a. */
-    cq_note rn = op == CQ_BUS_LOAD ? (cq_note){ -1, { { 0, 0 } } } : cq_note_get((int32_t)hh), hn = { 0, { { 0, 0 } } }, hp = hn;   /* hp: the pointer rule */
-    int toh = w == 64 && op != CQ_BUS_STORE && cq_rail_zero((int32_t)hh), note = w == 64 && rn.n >= 0;
-    cq_note *ln = alloc(note ? N : 0, sizeof *ln);
-    for (uint32_t a = 0; (toh || note) && a < N; a++) {
+    /* The load rule (cq_rt.h): a |0> 64-bit h that a load or swap fills gets hn, the union over the leaves
+     * of their 8 cells' address notes. */
+    cq_note hn = null;
+    int toh = w == 64 && op != CQ_BUS_STORE && zero;
+    for (uint32_t a = 0; toh && hn.n >= 0 && a < N; a++) {
         cq_bit v[64];
         int quantum = 0;
         for (uint32_t i = 0; i < 64; i++) { v[i] = *kappa(&r, a, i); quantum |= cq[r.at[a * S + i / 8]]; }
-        cq_note t = cq_note_cells(la[a], v, quantum);
-        if (toh) { hn = cq_note_union(hn, t); if (quantum || t.n >= 0) hp = cq_note_union(hp, t); }
-        if (note) ln[a] = cq_note_union(t, rn);
+        hn = cq_note_union(hn, cq_note_cells(la[a], v, quantum));
     }
     free(cq);
 
@@ -314,18 +318,23 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
             bcast(&r, ts, U);
             for (uint32_t i = 0; i < w; i++) cq_cx(&h[i], &ts[i]);
         }
-        cq_note acc = { 0 };   /* a cell several leaves share: the union of theirs */
+        /* The cell rule, per reached cell: the union of what it could hold and what the rail can. Data
+         * adds nothing, so a data rail leaves it as it was; an unknown rail leaves it unknown (cq_cell_write). */
+        wm.have = 0;
         for (size_t k = 0; k < (size_t)N * S; k++) {
-            int first = !k || rs[k].a != rs[k - 1].a;
-            if (first) cq_cell_write(rs[k].a, &r.cell[8 * r.at[rs[k].k]], 1);
-            if (!note) continue;
-            acc = first ? ln[rs[k].k / S] : cq_note_union(acc, ln[rs[k].k / S]);
-            if (k + 1 == (size_t)N * S || rs[k + 1].a != rs[k].a) cq_cell_note_set(rs[k].a, &acc);
+            if (k && rs[k].a == rs[k - 1].a) continue;
+            int ow = cn.n >= 0 && cq_cell_kind(rs[k].a, &ct, &wm);
+            cq_cell_write(rs[k].a, &r.cell[8 * r.at[rs[k].k]], 1);
+            if (cn.n < 0) continue;
+            cq_note u = cq_note_union(ct, cn);
+            int covered = ct.n > 0 && !ow && u.n == ct.n;   /* an address cell that already names them stays one */
+            cq_cell_note_set(rs[k].a, &u, (ct.n > 0 && ow) || (cn.n > 0 && weak && !covered));
         }
     }
     cq_tape_undo(&A);   /* PLANE and DECODE reversed; every ancilla back to the pool */
-    if (toh) { cq_note_set((int32_t)hh, &hn); cq_note_alt((int32_t)hh, &hp); }
-    free(ln); free(X); free(n); free(r.G); free(r.cell); free(r.at); free(rs);
+    if (toh) cq_note_set((int32_t)hh, &hn);
+    if (dh) cq_content_set((int32_t)hh, &cu);
+    free(X); free(n); free(r.G); free(r.cell); free(r.at); free(rs);
 }
 
 /* Objects (ABI §1.10 "Objects"): disjoint [start, end) ranges sorted by start, so ends are sorted too.

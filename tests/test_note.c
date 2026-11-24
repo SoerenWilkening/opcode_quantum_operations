@@ -31,6 +31,8 @@ static void is_(uint32_t h, int n, uint64_t a0, int e0, uint64_t a1, int e1) {
 }
 #define none(h) is(h, -1, 0, 0, 0, 0)
 #define one(h, a, e) is(h, 1, a, e, 0, 0)
+/* What the rail can hold (ABI §1.10 "Data"): exactly the object at a. */
+static void cone(uint32_t h, uint64_t o) { cq_note c = cq_note_content((int32_t)h); assert(c.n == 1 && c.e[0].a == o); }
 
 static uint32_t qbit(void) { uint32_t c = cqrt_alloc_i1(0); cq_get_qubit(cq_rail_bits((int32_t)c)); return c; }
 /* A quantum rail holding v with no note: bits lo..hi-1 qubits (by replay, no gate), the rest classical. */
@@ -157,7 +159,8 @@ static void loads(void) {
     P[8] = ZE + 1;
     none(cqrt_qram_load_i64_hl_controlled(qbit(), M, (uint64_t)(uintptr_t)&P[8]));
     P[8] = Z + 8;
-    none(cqrt_qram_load_i32_hl_controlled(qbit(), M, (uint64_t)(uintptr_t)&P[8]));   /* not 64 bits */
+    p = cqrt_qram_load_i32_hl_controlled(qbit(), M, (uint64_t)(uintptr_t)&P[8]);
+    none(p); cone(p, Z);                                                         /* narrower: no address, bytes of a pointer into Z */
     uint32_t h = noted(X);   /* a load _unc into a rail that is not |0> sets nothing */
     cqrt_qram_load_i64_hl_controlled_unc(h, qbit(), M, (uint64_t)(uintptr_t)&P[8]);
     none(h);
@@ -198,6 +201,62 @@ static void cells(void) {
     none(cqrt_qram_load_i64_hl(M, T));
 }
 
+/* "Data": every rail is data, noted or unknown by what it is made of. A store or swap of a data rail leaves
+ * the notes of the cells it reaches as they were, a noted one adds its note, an unknown one wipes. */
+static void data(void) {
+    uint64_t T = (uint64_t)(uintptr_t)&P[4];
+    P[4] = X + 8; P[5] = 7;                                          /* a pointer and an integer beside it */
+    uint32_t v = cqrt_alloc_i64(5), p, b = cqrt_alloc_i8(1);
+    cqrt_ry_i64(v, 0.25); cqrt_ry_i8(b, 0.25);                       /* seeds, prepared: data */
+    assert(cq_data((int32_t)v) && cq_data((int32_t)b) && cq_data((int32_t)cqrt_alloc_i64(0)));
+    assert(!cq_data((int32_t)noted(X)) && !cq_data((int32_t)cqrt_alloc_i64(X)) && cq_note_content((int32_t)qrail(5, 0, 3)).n < 0);
+    assert(cq_data((int32_t)cq_template_add_i64_hl(v, 3)) && cq_data((int32_t)cq_template_zext_i8_to_i64(b)));
+    assert(cq_note_content((int32_t)cq_template_mul_i64_hl(noted(X), 3)).n < 0);   /* bits computed from a pointer */
+    cone(cq_template_add_i64(noted(X), v), X);
+    cqrt_qram_store_i64(M, qrail(T, 3, 4), v);                       /* reaches both words */
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);                          /* the pointer cell kept its note */
+    uint32_t n = cqrt_qram_load_i64_hl(M, T + 8);
+    none(n); assert(cq_data((int32_t)n));                            /* loaded from data cells: data */
+    p = cqrt_qram_load_i64(M, qrail(T, 3, 4));
+    none(p); cone(p, X);                                             /* an integer may be among them: no address */
+    cqrt_qram_pointer(p); one(p, X, 0);                              /* a pointer load: what it can hold */
+    cqrt_qram_store_i8(M, qrail(T, 0, 4), b);                        /* a narrower data rail, every byte of both */
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);
+    uint32_t l = cqrt_qram_load_i8(M, qrail(T + 8, 0, 3)), c2 = cqrt_alloc_i8(0), pb;   /* a byte of the integer */
+    assert(cq_data((int32_t)l));
+    cqrt_copy_i8(l, c2);
+    assert(cq_data((int32_t)c2) && cq_data((int32_t)cq_template_select_i8(qbit(), l, c2)));
+    cqrt_qram_store_i8(M, qrail(T, 0, 4), c2);
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);
+    cqrt_qram_store_i64_hl_controlled(qbit(), M, T, n);              /* classical address, controlled: as it was */
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);
+    pb = cqrt_qram_load_i8(M, qrail(T, 0, 3));                       /* a byte of the pointer: noted */
+    uint32_t sel = cq_template_select_i8(qbit(), l, pb), cp = cqrt_alloc_i8(0);
+    cqrt_copy_i8(pb, cp);
+    cone(pb, X); cone(sel, X); cone(cp, X); cone(cq_template_zext_i8_to_i32(pb), X);
+    cqrt_qram_store_i8(M, qrail(T, 0, 4), pb);                       /* a narrow copy: every reached cell may hold it */
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);                          /* the pointer cell is still an address */
+    n = cqrt_qram_load_i64_hl(M, T + 8);
+    none(n); cone(n, X);                                             /* the integer cell: for the pointer rule only */
+    uint32_t in = cqrt_qram_load_i64(M, qrail(T, 3, 4));
+    none(in); cone(in, X);
+    cqrt_qram_swap_i64_controlled(qbit(), M, qrail(T, 3, 4), cqrt_alloc_i64(0));   /* the in-place form's swap-out: |0> is data */
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);
+    cqrt_qram_store_i64(M, qrail(T, 3, 4), in);                      /* an integer-typed copy of a pointer passes its note */
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);
+    cqrt_qram_swap_i8_controlled(qbit(), M, qrail(T, 0, 4), b);      /* a swap leaves h with what it had or theirs */
+    cone(b, X);
+    uint32_t u = cqrt_alloc_i8(0), k = cq_template_mul_i64_hl(in, 3);
+    cq_get_qubit(cq_rail_bits((int32_t)u));
+    assert(cq_note_content((int32_t)k).n < 0);
+    cqrt_qram_data(k);                                               /* the compiler's call: data whatever it was made of */
+    assert(cq_data((int32_t)k));
+    cqrt_qram_store_i64(M, qrail(T, 3, 4), k);
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);
+    cqrt_qram_store_i8(M, qrail(T, 0, 4), u);                        /* unknown: wipes */
+    none(cqrt_qram_load_i64_hl(M, T));
+}
+
 static void invert(void) {
     uint32_t d = noted(X + 8), t, u;
     cqrt_invert_begin();
@@ -225,7 +284,7 @@ int main(void) {
     cqrt_qram_object((int64_t)X, 64); cqrt_qram_object((int64_t)Y, 64); cqrt_qram_object((int64_t)Z, 64);
     cqrt_qram_object((int64_t)(uintptr_t)P, sizeof P);   /* a quantum address reaches registered memory only */
     M = cqrt_qram_alloc_i8(0);
-    value_rule(); keep(); drops(); end_flag(); loads(); cells(); invert(); unbound();
+    value_rule(); keep(); drops(); end_flag(); loads(); cells(); data(); invert(); unbound();
     printf("note ok\n");
     return 0;
 }

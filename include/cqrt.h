@@ -92,6 +92,7 @@ uint32_t cqrt_qram_alloc_i8(uint32_t n);
  * range reaching 2^64 register nothing; overlapping registrations merge. */
 void     cqrt_qram_object(int64_t addr, int64_t size);
 void     cqrt_qram_pointer(uint32_t h);   /* §1.10 "A pointer load": h's load ignores the non-address cells of its bound */
+void     cqrt_qram_data(uint32_t h);      /* §1.10 "Data": h is data from now on, whatever it was derived from */
 void     cqrt_qram_unbound(uint32_t h);   /* §1.10 "No object": h carries no note from now on */
 
 /* Tape and abort, §1.11 (src/tape.c). name: a host symbol, or NULL for the address in the first
