@@ -141,6 +141,22 @@ static void loads(void) {
     cqrt_qram_pointer(p = qrail(X, 0, 3)); none(p);
     p = cqrt_qram_load_i64_hl_controlled(qbit(), M, (uint64_t)(uintptr_t)&P[3]); /* classical address too */
     none(p); cqrt_qram_pointer(p); is(p, 0, 0, 0, 0, 0);
+    uint32_t nz = cq_template_add_i64_hl(p, 56);                                 /* "Null": null and data stay null */
+    is(nz, 0, 0, 0, 0, 0);
+    is(cq_template_sub_i64_hl(p, 8), 0, 0, 0, 0, 0);
+    one(cq_template_add_i64(p, noted(X)), X, 0);                                 /* null and noted: the note */
+    none(cq_template_add_i64(p, qrail(8, 0, 3)));                                /* null and unknown */
+    none(cq_template_sub_i64(cqrt_alloc_i64(16), p));
+    is(cq_template_select_i64(qbit(), p, nz), 0, 0, 0, 0, 0);
+    uint32_t nc = cqrt_alloc_i64(0), nv;
+    cqrt_copy_i64(nz, nc);
+    is(nc, 0, 0, 0, 0, 0);
+    cq_qram_leaves = 99;
+    nv = cqrt_qram_load_i64(M, nz);                                              /* an access at a null address reaches no cell */
+    assert(cq_qram_leaves == 0 && cq_rail_zero((int32_t)nv));
+    cqrt_qram_store_i64(M, nz, noted(X));
+    cqrt_qram_swap_i64(M, nz, nv);
+    assert(cq_qram_leaves == 0 && cq_rail_zero((int32_t)nv) && P[3] == 7);
     p = cqrt_alloc_i64(0);                                                       /* the call before the load runs */
     cqrt_invert_begin(); cqrt_qram_load_i64_unc(p, M, qrail((uint64_t)(uintptr_t)P, 3, 5)); cqrt_qram_pointer(p); cqrt_invert_end();
     is(p, 2, X, 0, Z, 0);

@@ -66,7 +66,8 @@ void     cq_rail_free(int32_t h);       /* cq_reset_bit on every bit, then drop 
  * the objects its value derives from; never a gate. An entry names an object by its start when noted
  * (resolve it with cq_object_at at use: registrations merge); end = 1: the value is at or past that
  * object's end, so an access ignores the entry. n = -1: no note (unknown value, no rule, stale, not
- * 64 bits wide); n = 0: null, the rail is classical 0 (adds nothing to a union). */
+ * 64 bits wide); n = 0: null, an empty note: the rail holds a pointer into no object (classical 0, or every source was; adds
+ * nothing to a union) and an access at it reaches no cell. */
 #define CQ_NOTE_MAX 4
 typedef struct { uint64_t a; uint32_t end; } cq_note_ent;
 typedef struct { int n; cq_note_ent e[CQ_NOTE_MAX]; } cq_note;

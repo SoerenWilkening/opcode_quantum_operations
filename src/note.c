@@ -119,12 +119,15 @@ cq_note cq_content_all(const uint32_t *h, int n) {
     return t;
 }
 
-/* add keeps the note of its one noted operand (null and unknown are not noted), the end flags only when
+/* add keeps the note of its one noted operand (null and unknown are not noted; null with data is null), the end flags only when
  * the other operand's bit 63 is classical 0; sub the minuend's, flags cleared; select the arms' union. */
 cq_note cq_note_tpl(int op, const uint32_t *args) {
     if (op == CQ_KOP_SELECT) return cq_note_union(cq_note_get((int32_t)args[1]), cq_note_get((int32_t)args[2]));
     if (op != CQ_KOP_ARITH_add && op != CQ_KOP_ARITH_sub) return none;
     cq_note a = cq_note_get((int32_t)args[0]), b = cq_note_get((int32_t)args[1]);
+    /* "Null": a null rail and data stay null (an empty bound, not no note); null and unknown is none. */
+    if (a.n <= 0 && b.n <= 0)
+        return (a.n == 0 && cq_data((int32_t)args[1])) || (op == CQ_KOP_ARITH_add && b.n == 0 && cq_data((int32_t)args[0])) ? a.n ? b : a : none;
     if ((a.n > 0) == (b.n > 0) || (op == CQ_KOP_ARITH_sub && b.n > 0)) return none;
     int keep = op == CQ_KOP_ARITH_add && cq_rail_bits((int32_t)args[a.n > 0])[63].kind == CQ_BIT_ZERO;
     cq_note t = a.n > 0 ? a : b;

@@ -196,10 +196,12 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
     int m = objects((int32_t)ah, addr, base, qm, ob, &tot);
     if (m && q < 64 && tot >= 1ull << q) m = 0;   /* not fewer leaves than the bit pattern */
     uint32_t S = (w + 7) / 8, N = (uint32_t)tot;
-    uint64_t *la;   /* leaf addresses */
-    if (!m) N = memory(base, qm, pos, q, &la); else la = alloc(N, sizeof *la);
-    if (!N) {   /* nothing registered that the address can be: no cell is reached; a store still takes its slot */
-        if (getenv("CQ_QRAM_DEBUG")) fprintf(stderr, "cq_qram: w=%u q=%u objects none (memory) leaves=0\n", w, q);
+    uint64_t *la = NULL;   /* leaf addresses */
+    /* "Null": an empty note is an empty bound, the address of an access the program never makes. */
+    int nul = !cq_qram_force_bits && cq_note_get((int32_t)ah).n == 0;
+    if (m) la = alloc(N, sizeof *la); else N = nul ? 0 : memory(base, qm, pos, q, &la);
+    if (!N) {   /* nothing the address can be: no cell is reached; a store still takes its slot */
+        if (getenv("CQ_QRAM_DEBUG")) fprintf(stderr, "cq_qram: w=%u q=%u objects none (%s) leaves=0\n", w, q, nul ? "null" : "memory");
         if (op == CQ_BUS_STORE) cq_rail_alloc(8 * S, NULL);
         cq_qram_leaves = 0;
         free(la);
