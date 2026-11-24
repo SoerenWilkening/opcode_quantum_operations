@@ -451,15 +451,19 @@ Measured at w = 8 (S = 1), all cells QUANTUM, uncontrolled (controlled is identi
 ## 11. The object bound [ours]
 
 ABI §1.10 "Objects": where the address rail's note names objects X_1..X_m (end entries dropped)
-and that gives fewer leaves than 2^q (and at most 2^CQ_MAX_QADDR_BITS), src/qram.c bounds R by
-them; otherwise the bit-pattern path above runs unchanged (same gates, same cap and abort).
+and that gives fewer leaves than 2^q, src/qram.c bounds R by them. Otherwise R is the memory bound
+(ABI §1.10 "The memory size"): every registered cell that agrees with the classical address bits, at
+most 2^Q, decoded by the tree of §2.2 over the q address qubits with every node that has leaves on
+one side only left unsplit (no gate; in the domain the address is a leaf). Where all 2^q
+assignments are registered that is the bit-pattern path above, gate for gate. No access aborts on
+its bit count: a registration that takes the objects above 2^Q cells does.
 
 - Per object X = [s, s + n): d = addr − s by the adder `sub` ships at i64 (s classical), recorded
   on tape A, k = ⌈log2 n⌉. Which bits of d are known is decided before any gate, by ripple
   carries over {0, 1, unknown}: with independent address qubits and a classical s, a bit is
   unknown exactly where it is not constant, so a known bit holds that constant in every basis
   state (the adder may leave it a qubit; it is then not read). A known 1 at or above k: the
-  address is never in X (m = 1: the bit pattern).
+  address is never in X (m = 1: the memory bound).
 - Leaves: offsets L | (assignment of the unknown bits below k) that are < n, L the known low
   bits. The offset grows with the assignment, so the kept ones are a prefix [0, cnt); the decoder
   of §2.2 never splits a node whose 1-child holds no kept leaf. That node's flag then also covers

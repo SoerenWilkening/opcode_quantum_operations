@@ -15,8 +15,8 @@ endif()
 # tests/ref/k_vectors.txt regenerated for it.
 set(CQ_LADDER_N 53 CACHE STRING "Angle-ladder precision N (docs/ANGLE_LADDER.md)")
 set(CQ_K2 4096 CACHE STRING "Input bound K2")
-# PROVISIONAL default; revisit when the memory bus (QRAM) is designed.
-set(CQ_MAX_QADDR_BITS 16 CACHE STRING "Cap on quantum address bits (provisional)")
+# PROVISIONAL default of Q, the run-time cap and memory size (environment CQ_MAX_QADDR_BITS, src/qram.c).
+set(CQ_MAX_QADDR_BITS 22 CACHE STRING "Default cap on quantum address bits (provisional)")
 
 add_compile_definitions(CQ_K2=${CQ_K2} CQ_MAX_QADDR_BITS=${CQ_MAX_QADDR_BITS})
 if(NOT CQ_LADDER_N STREQUAL "")

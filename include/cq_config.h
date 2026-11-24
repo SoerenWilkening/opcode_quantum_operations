@@ -8,6 +8,6 @@
 #define CQ_K2 4096
 #endif
 #ifndef CQ_MAX_QADDR_BITS
-#define CQ_MAX_QADDR_BITS 16 /* provisional */
+#define CQ_MAX_QADDR_BITS 22 /* provisional */
 #endif
 #endif

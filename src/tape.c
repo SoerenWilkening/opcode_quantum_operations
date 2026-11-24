@@ -165,7 +165,7 @@ static reach reach_of(const cq_bit *x, uint32_t n) {
     reach r = { 0 };
     for (uint32_t i = 0; i < n; i++)
         if (cq_bit_is_q(x[i])) r.pos[r.q++] = i; else r.base |= (uint64_t)x[i].kind << i;
-    if (r.q > CQ_MAX_QADDR_BITS) die("a rail with more quantum bits than CQ_MAX_QADDR_BITS to enumerate, the build-time cap" LIMIT, NULL);
+    if (r.q > cq_qaddr_bits()) die("a rail with more quantum bits than CQ_MAX_QADDR_BITS to enumerate, the cap" LIMIT, NULL);
     return r;
 }
 static uint64_t reach_at(const reach *r, uint64_t a) {

@@ -43,7 +43,9 @@ This produces two static archives in `build/`:
 
 The build type defaults to Release with asserts on. Build-time settings (`-D<name>=<value>` at
 configure time): `CQ_LADDER_N` (angle precision, default 53), `CQ_K2` (input bound, default
-4096), `CQ_MAX_QADDR_BITS` (cap on quantum address bits, default 16).
+4096), `CQ_MAX_QADDR_BITS` (the default of Q, 22). Q is the cap on quantum address bits and the
+memory size (ABI §1.10): the registered objects hold at most 2^Q cells. It is a run-time setting,
+the environment variable `CQ_MAX_QADDR_BITS` (0..24).
 
 The calling-convention tests compile LLVM IR with LLVM 19.1.7, the version CQ_lang pins. They
 look for it at `/usr/local/opt/llvm@19` (override with `-DCQ_LLVM_PREFIX=<prefix>`) and are

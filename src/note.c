@@ -1,5 +1,5 @@
 /* Derivation notes (BACKEND_ABI §1.10 "Objects", Derivation): the value rule, the union and the template
- * rules; the copy rule is in src/core.c, the load rule in src/bus.c and src/qram.c. A stored note is valid
+ * rules; the copy rule is in src/core.c, the load and cell rules in src/bus.c and src/qram.c. A stored note is valid
  * only while the rail's bits equal its snapshot and no gate has targeted one of its qubits since (the
  * emitter's stamps), so every operation without a rule drops it, in place ones included. */
 #include <stdio.h>
@@ -8,7 +8,8 @@
 #include "cq_bus.h"
 #include "kernels.h"
 
-typedef struct { cq_note t; uint64_t stamp; cq_bit b[64]; int dead; } stored;   /* dead: cqrt_qram_unbound */
+/* dead: cqrt_qram_unbound. p, alt: the note a load would leave under the pointer rule; ptr: cqrt_qram_pointer. */
+typedef struct { cq_note t, p; uint64_t stamp; cq_bit b[64]; int dead, alt, ptr; } stored;
 static const cq_note none = { -1, { { 0, 0 } } };
 
 int cq_rail_zero(int32_t h) {
@@ -60,6 +61,7 @@ void cq_note_set(int32_t h, const cq_note *t) {
     if (!*s && !(*s = calloc(1, sizeof **s))) { fprintf(stderr, "cq_runtime: note: out of memory\n"); abort(); }
     if ((*s)->dead) return;
     (*s)->t = *t;
+    (*s)->alt = 0;
     (*s)->stamp = cq_gate_stamp();
     for (int i = 0; i < 64; i++) (*s)->b[i] = cq_rail_bits(h)[i];
 }
@@ -77,10 +79,22 @@ cq_note cq_note_tpl(int op, const uint32_t *args) {
     return t;
 }
 
-cq_note cq_note_cells(const cq_bit *rb, int quantum) {
-    uint64_t v = 0;
-    for (int i = 0; i < 64; i++) v |= (uint64_t)(rb[i].kind & 1) << i;   /* HOST cells: classical bits */
-    return quantum ? none : cq_note_value(v);
+/* ABI §1.10 "A pointer load": p is the note of the load that just set h's, its non-address cells taken
+ * as null. cqrt_qram_pointer makes it the note, whichever of the two comes first (inside a cq_invert
+ * region the load runs after the call). */
+void cq_note_alt(int32_t h, const cq_note *p) {
+    stored *s = *cq_rail_note(h);
+    if (!s || s->dead) return;
+    s->p = *p; s->alt = 1;
+    if (s->ptr) s->t = *p;
+}
+
+void cqrt_qram_pointer(uint32_t h) {
+    if (cq_rail_width((int32_t)h) != 64) return;
+    stored **s = (stored **)cq_rail_note((int32_t)h);
+    if (!*s) cq_note_set((int32_t)h, &none);
+    (*s)->ptr = 1;
+    if ((*s)->alt && !(*s)->dead) (*s)->t = (*s)->p;
 }
 
 /* ABI §1.10 "No object": h carries no note from now on, whatever its value or a later rule says. */

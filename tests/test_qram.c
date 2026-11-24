@@ -286,6 +286,7 @@ static uint64_t positions(int kind, uint32_t q, uint32_t *pos, uint64_t *s) {
 
 static void sweep(void) {
     uint64_t s = 0x6b6d67792e3231ull;
+    cq_qram_force_bits = 1;   /* the sweep's addresses are mostly outside H: every bit-pattern leaf, registered or not */
     int cs = 0;
     for (unsigned t = 0; t < sizeof T / sizeof *T; t++)
         for (uint32_t q = 1; q <= 6; q++)
@@ -332,7 +333,7 @@ static void linear(void) {
         }
 }
 
-/* q above the cap aborts, naming the cap as this library's resource limit. */
+/* With the memory filled to 2^Q cells, one more registered cell aborts at the registration, naming Q and the total. */
 static void cap_abort(void) {
     int fd[2];
     assert(pipe(fd) == 0);
@@ -341,10 +342,10 @@ static void cap_abort(void) {
     assert(pid >= 0);
     if (pid == 0) {
         dup2(fd[1], 2);
-        uint32_t r = prep(0, 64, 0);
-        cq_bit *b = cq_rail_bits((int32_t)r);
-        for (int i = 0; i < CQ_MAX_QADDR_BITS + 1; i++) cq_get_qubit(&b[i]);
-        cqrt_qram_load_i8(M, r);
+        cqrt_qram_object((int64_t)(uintptr_t)H, HSIZE);   /* again: idempotent */
+        cqrt_qram_object(0x7a0000000000ll, (1ll << CQ_MAX_QADDR_BITS) - HSIZE);   /* full: no abort */
+        fprintf(stderr, "full\n");
+        cqrt_qram_object(0x7b0000000000ll, 1);
         _exit(0);
     }
     close(fd[1]);
@@ -355,8 +356,11 @@ static void cap_abort(void) {
     close(fd[0]);
     int st;
     assert(waitpid(pid, &st, 0) == pid && WIFSIGNALED(st) && WTERMSIG(st) == SIGABRT);
-    assert(strstr(out, "CQ_MAX_QADDR_BITS") && strstr(out, "resource limit"));
-    printf("q = %d > CQ_MAX_QADDR_BITS aborts: ok\n", CQ_MAX_QADDR_BITS + 1);
+    char want[2][64];
+    snprintf(want[0], sizeof want[0], "2^%d", CQ_MAX_QADDR_BITS);
+    snprintf(want[1], sizeof want[1], "%lld cells", (1ll << CQ_MAX_QADDR_BITS) + 1);
+    assert(strstr(out, "full\n") && strstr(out, "CQ_MAX_QADDR_BITS") && strstr(out, want[0]) && strstr(out, want[1]));
+    printf("a registration above 2^CQ_MAX_QADDR_BITS cells aborts: ok\n");
 }
 
 /* cq_invert: X; invert{X} restores the state, for a swap and a load _unc. */
@@ -390,6 +394,8 @@ int main(void) {
     uint8_t *m = mmap(NULL, 2 * HSIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     assert(m != MAP_FAILED);
     H = m + (-(uintptr_t)m & (HSIZE - 1));   /* aligned: the quantum positions are 0 in H's address */
+    assert(CQ_MAX_QADDR_BITS >= 16 && !getenv("CQ_MAX_QADDR_BITS"));   /* H fits; cap_abort's numbers */
+    cqrt_qram_object((int64_t)(uintptr_t)H, HSIZE);   /* a quantum address reaches registered memory only */
     cap_abort();
     invert();
     linear();

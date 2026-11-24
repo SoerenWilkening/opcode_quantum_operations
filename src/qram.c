@@ -1,7 +1,8 @@
 /* The memory bus with a quantum address (BACKEND_ABI §1.10, issue kmgy.21): the fan-out decoder
  * and the leaf operations of docs/QRAM_CONSTRUCTION.md §2.2, §2.3 and §3, in that note's names.
- * The reachable set is the 2^q assignments of the address rail's q qubits, or, where the rail's note
- * names objects and that gives fewer leaves, the object bound (§11). Every ancilla is
+ * The reachable set is the object bound (§11) where the rail's note names objects and that gives fewer
+ * leaves than the 2^q assignments of its q qubits; else the memory bound: every registered cell the
+ * bit pattern can reach (ABI §1.10 "The memory size"). Every ancilla is
  * taken from one tape A and released only when the call ends, so no ancilla is reused within the
  * call: a reused qubit would carry its last layer and break the note's schedule. */
 #include <stdio.h>
@@ -20,6 +21,20 @@ static void *alloc(size_t n, size_t size) {
     void *p = calloc(n ? n : 1, size);
     if (!p) die("bus: out of memory, elements", n);
     return p;
+}
+
+/* Q (ABI §1.10 "The memory size"): the user's run-time setting, environment CQ_MAX_QADDR_BITS.
+ * shortcut: Q <= 24, leaf counts times cell bits (<= 200) are 32-bit here; widen them to raise it. */
+uint32_t cq_qaddr_bits(void) {
+    static int Q = -1;
+    if (Q < 0) {
+        const char *s = getenv("CQ_MAX_QADDR_BITS");
+        char *e = "";
+        unsigned long v = s ? strtoul(s, &e, 10) : CQ_MAX_QADDR_BITS;
+        if ((s && !*s) || *e || v > 24) die("CQ_MAX_QADDR_BITS must be an integer 0..24, got", v);
+        Q = (int)v;
+    }
+    return (uint32_t)Q;
 }
 
 typedef struct { uint64_t a; uint32_t k; } ref;   /* a cell address and its (leaf, byte) index */
@@ -82,29 +97,39 @@ static void bcast(const qram *r, const cq_bit *s, cq_bit *U) {
     cq_tape_undo(&C);
 }
 
-/* FO-DECODE of the leaves x < n of the q bits b[0..q-1] (level l splits on b[l], so leaf x's bit q-1-l
- * is b[l]) from the token f[0]: f[x] = token ∧ [bits = x]. A node whose leaves are all >= n is never
- * split: it reads nothing and takes no gate. With n = 2^q this is the tree of §2.2 gate for gate. */
-static void decode(cq_tape *A, cq_bit **f, const cq_bit *const *b, uint32_t q, uint32_t n) {
+/* FO-DECODE of the n leaves x[0] < x[1] < ... (NULL: x[i] = i) of the q bits b[0..q-1] (level l splits
+ * on b[l], so a leaf's bit q-1-l is b[l]) from the token f[0]: f[i] = token ∧ [bits = x[i]]. A node with
+ * leaves on one side only is never split: it reads nothing and takes no gate (in the domain the address
+ * is a leaf). With every x < 2^q a leaf this is the tree of §2.2 gate for gate. */
+static void decode(cq_tape *A, cq_bit **f, const cq_bit *const *b, uint32_t q, const uint64_t *x, uint32_t n) {
     cq_bit *fb = cq_tape_bits(A, n);
     const cq_bit **B = alloc(n, sizeof *B);
+    uint32_t *lo = alloc((size_t)n + 1, sizeof *lo), *mid = alloc(n, sizeof *mid);   /* node j: leaves lo[j]..lo[j+1) */
+    lo[1] = n;
     for (uint32_t l = 0, nl = 1, k = 0; l < q; l++) {
-        uint32_t sh = q - 1 - l, nx = (uint32_t)((n + (1ull << sh) - 1) >> sh), ns = nx - nl;   /* nodes next level; splits */
+        uint32_t sh = q - 1 - l, ns = 0;   /* ns: the nodes that split; mid: a node's first leaf with the bit set */
+        for (uint32_t j = 0; j < nl; j++) {
+            uint32_t m = lo[j];
+            while (m < lo[j + 1] && !((x ? x[m] : m) >> sh & 1)) m++;
+            mid[j] = m;
+            ns += m > lo[j] && m < lo[j + 1];
+        }
         const cq_bit *cp = ns > 1 ? cq_tape_fanout(A, b[l], ns - 1) : NULL;
         B[0] = b[l];
         for (uint32_t j = 1; j < ns; j++) B[j] = &cp[j - 1];
-        for (uint32_t j = nl; j-- > 0;) {   /* per node y = f ∧ bit, f ^= y: f becomes child 2j (bit 0), y child 2j+1 */
-            if (j < ns) {
+        lo[nl + ns] = n;
+        for (uint32_t j = nl, w = nl + ns, r = ns; j-- > 0;) {   /* in place from the top: w > j */
+            if (mid[j] > lo[j] && mid[j] < lo[j + 1]) {   /* y = f ∧ bit, f ^= y: f the 0 side, y the 1 side */
                 cq_bit *y = &fb[k++];
-                cq_tape_ccx(A, f[j], B[j], y);
+                cq_tape_ccx(A, f[j], B[--r], y);
                 cq_tape_cx(A, y, f[j]);
-                f[2 * j + 1] = y;
+                f[--w] = y; lo[w] = mid[j];
             }
-            f[2 * j] = f[j];
+            f[--w] = f[j]; lo[w] = lo[j];
         }
-        nl = nx;
+        nl += ns;
     }
-    free(B);
+    free(B); free(lo); free(mid);
 }
 
 /* The object bound (ABI §1.10 "Objects"): per object X = [s, s + n) of the address's note,
@@ -116,6 +141,7 @@ static void decode(cq_tape *A, cq_bit **f, const cq_bit *const *b, uint32_t q, u
  * whose address agrees with every classical address bit are built (the intersection the ABI states). */
 typedef struct { uint64_t s, n, L, cnt, keep; uint32_t k, qn, P[64]; } object;
 int cq_qram_force_bits;   /* test only: every access takes the bit-pattern bound */
+static uint32_t memory(uint64_t base, uint64_t qm, const uint32_t *pos, uint32_t q, uint64_t **la);
 uint32_t cq_qram_leaves;  /* test only: the leaves the last access built */
 
 static uint64_t spread(uint64_t x, const object *o) {
@@ -124,7 +150,7 @@ static uint64_t spread(uint64_t x, const object *o) {
     return v;
 }
 
-/* The objects that bound addr (0: none, take the bit pattern); *tot their leaves. */
+/* The objects that bound addr (0: none, take the memory bound); *tot their leaves. */
 static int fits(const object *o, uint64_t x, uint64_t base, uint64_t qm) { return !(((o->s + spread(x, o)) ^ base) & ~qm); }
 
 static int objects(int32_t ah, const cq_bit *addr, uint64_t base, uint64_t qm, object *X, uint64_t *tot) {
@@ -149,11 +175,10 @@ static int objects(int32_t ah, const cq_bit *addr, uint64_t base, uint64_t qm, o
             else o->L |= (uint64_t)d << i;
         }
         if (out || o->L >= n) continue;   /* the address is never in X: no leaf */
-        if (o->qn > 62) return 0;   /* a merged range of 2^63 cells or more: the bit pattern */
         uint64_t lo = 1, hi = 1ull << o->qn;   /* spread(0) = L < n; cnt: the first x with spread >= n */
         while (lo < hi) { uint64_t x = lo + (hi - lo) / 2; if (spread(x, o) < n) lo = x + 1; else hi = x; }
-        o->cnt = o->keep = lo;   /* above the cap nothing is built: no need to count */
-        if (lo <= 1ull << CQ_MAX_QADDR_BITS) for (uint64_t x = o->keep = 0; x < lo; x++) o->keep += fits(o, x, base, qm);
+        o->cnt = lo;   /* at most n <= 2^Q: a registration is capped */
+        for (uint64_t x = 0; x < lo; x++) o->keep += fits(o, x, base, qm);
         *tot += o->keep;
     }
     return *tot ? m : 0;
@@ -169,30 +194,32 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
     object ob[CQ_NOTE_MAX];
     cq_bit av[CQ_NOTE_MAX][64], sb[CQ_NOTE_MAX][64], nb[CQ_NOTE_MAX][64];   /* operands the tape reads again at the undo */
     int m = objects((int32_t)ah, addr, base, qm, ob, &tot);
-    if (m && ((q < 64 && tot >= 1ull << q) || tot > 1ull << CQ_MAX_QADDR_BITS)) m = 0;   /* not fewer leaves, or above the cap */
-    if (!m && q > CQ_MAX_QADDR_BITS) {
-        fprintf(stderr, "cq_runtime: bus: the address rail has %u quantum bits, above the cap CQ_MAX_QADDR_BITS = %d. "
-                "The cap is this library's build-time resource limit (ancilla cost is O(w 2^q)), which ABI §1.10 permits\n",
-                q, CQ_MAX_QADDR_BITS);
-        abort();
+    if (m && q < 64 && tot >= 1ull << q) m = 0;   /* not fewer leaves than the bit pattern */
+    uint32_t S = (w + 7) / 8, N = (uint32_t)tot;
+    uint64_t *la;   /* leaf addresses */
+    if (!m) N = memory(base, qm, pos, q, &la); else la = alloc(N, sizeof *la);
+    if (!N) {   /* nothing registered that the address can be: no cell is reached; a store still takes its slot */
+        if (getenv("CQ_QRAM_DEBUG")) fprintf(stderr, "cq_qram: w=%u q=%u objects none (memory) leaves=0\n", w, q);
+        if (op == CQ_BUS_STORE) cq_rail_alloc(8 * S, NULL);
+        cq_qram_leaves = 0;
+        free(la);
+        return;
     }
-    uint32_t S = (w + 7) / 8, N = m ? (uint32_t)tot : 1u << q;
     cq_tape A = { 0 };
     qram r = { N, S, op == CQ_BUS_STORE ? 8 * S : w, NULL, NULL, NULL, &A };
     for (int j = 0; j < m; j++) if (ob[j].keep) tree += ob[j].cnt;   /* decode fills cnt flags before the keep are picked */
-    uint64_t *la = alloc(N, sizeof *la);   /* leaf addresses */
     cq_bit **f = alloc(m ? (size_t)tree : N, sizeof *f);      /* their flags */
 
-    if (!m) {   /* the bit pattern: token at the root, address bit q-1-l at level l */
+    if (!m) {   /* the memory bound: token at the root, address bit q-1-l at level l */
         const cq_bit *b[64];
+        uint64_t *lx = alloc(N, sizeof *lx);   /* a leaf's quantum address bits */
+        for (uint32_t a = 0; a < N; a++)
+            for (uint32_t k = 0; k < q; k++) lx[a] |= (la[a] >> pos[k] & 1) << k;
         for (uint32_t l = 0; l < q; l++) b[l] = &addr[pos[q - 1 - l]];
         f[0] = cq_tape_bits(&A, 1);
         if (c) cq_tape_cx(&A, c, f[0]); else cq_tape_x(&A, f[0]);
-        decode(&A, f, b, q, N);
-        for (uint32_t a = 0; a < N; a++) {
-            la[a] = base;
-            for (uint32_t k = 0; k < q; k++) la[a] |= (uint64_t)(a >> k & 1) << pos[k];
-        }
+        decode(&A, f, b, q, lx, N);
+        free(lx);
     } else {
         /* Per object: d = addr - s by the adder sub ships at i64, recorded on A so the undo below
          * returns its qubits to the pool unmeasured. Several objects: the address fanned out so the
@@ -221,7 +248,7 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
             } else if (c) cq_tape_cx(&A, c, f[off]); else cq_tape_x(&A, f[off]);
             u++;
             for (uint32_t l = 0; l < o->qn; l++) b[l] = &d[o->P[o->qn - 1 - l]];
-            decode(&A, &f[off], b, o->qn, (uint32_t)o->cnt);
+            decode(&A, &f[off], b, o->qn, NULL, (uint32_t)o->cnt);
             for (uint32_t x = 0, o0 = off; x < o->cnt; x++)   /* a dropped leaf's flag never fires and reads nothing */
                 if (fits(o, x, base, qm)) { f[off] = f[o0 + x]; la[off++] = o->s + spread(x, o); }
 
@@ -231,7 +258,7 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
     if (getenv("CQ_QRAM_DEBUG")) {
         fprintf(stderr, "cq_qram: %s w=%u q=%u objects", op == CQ_BUS_LOAD ? "load" : op == CQ_BUS_STORE ? "store" : "swap", w, q);
         for (int j = 0; j < m; j++) if (ob[j].keep) fprintf(stderr, " [0x%llx +%llu]", (unsigned long long)ob[j].s, (unsigned long long)ob[j].n);
-        fprintf(stderr, "%s leaves=%u\n", m ? "" : " none (bit pattern)", N);
+        fprintf(stderr, "%s leaves=%u\n", m ? "" : " none (memory)", N);
     }
 
     /* The reachable cells, each read once: leaves that share a cell (§4.4) share its bits. */
@@ -247,14 +274,19 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
         if (!k || rs[k].a != rs[k - 1].a) { cq[nc] = (uint8_t)cq_cell_read(rs[k].a, &r.cell[8 * nc]); nc++; }
         r.at[rs[k].k] = nc - 1;
     }
-    /* The load rule (cq_rt.h): into a |0> h, the union over the leaves of their 8 cells' notes. */
-    int note = op == CQ_BUS_LOAD && w == 64 && cq_rail_zero((int32_t)hh);
-    cq_note nt = { 0 };
-    for (uint32_t a = 0; note && a < N && nt.n >= 0; a++) {
+    /* The load rule (cq_rt.h): a |0> h that a load or swap fills gets hn, the union over the leaves of
+     * their 8 cells' notes. The cell rule: a store or swap of a noted rail (a |0> one: null) leaves
+     * ln[a] = the leaf's note ∪ the rail's with leaf a. */
+    cq_note rn = op == CQ_BUS_LOAD ? (cq_note){ -1, { { 0, 0 } } } : cq_note_get((int32_t)hh), hn = { 0, { { 0, 0 } } }, hp = hn;   /* hp: the pointer rule */
+    int toh = w == 64 && op != CQ_BUS_STORE && cq_rail_zero((int32_t)hh), note = w == 64 && rn.n >= 0;
+    cq_note *ln = alloc(note ? N : 0, sizeof *ln);
+    for (uint32_t a = 0; (toh || note) && a < N; a++) {
         cq_bit v[64];
         int quantum = 0;
         for (uint32_t i = 0; i < 64; i++) { v[i] = *kappa(&r, a, i); quantum |= cq[r.at[a * S + i / 8]]; }
-        nt = cq_note_union(nt, cq_note_cells(v, quantum));
+        cq_note t = cq_note_cells(la[a], v, quantum);
+        if (toh) { hn = cq_note_union(hn, t); if (quantum || t.n >= 0) hp = cq_note_union(hp, t); }
+        if (note) ln[a] = cq_note_union(t, rn);
     }
     free(cq);
 
@@ -282,12 +314,18 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
             bcast(&r, ts, U);
             for (uint32_t i = 0; i < w; i++) cq_cx(&h[i], &ts[i]);
         }
-        for (size_t k = 0; k < (size_t)N * S; k++)
-            if (!k || rs[k].a != rs[k - 1].a) cq_cell_write(rs[k].a, &r.cell[8 * r.at[rs[k].k]], 1);
+        cq_note acc = { 0 };   /* a cell several leaves share: the union of theirs */
+        for (size_t k = 0; k < (size_t)N * S; k++) {
+            int first = !k || rs[k].a != rs[k - 1].a;
+            if (first) cq_cell_write(rs[k].a, &r.cell[8 * r.at[rs[k].k]], 1);
+            if (!note) continue;
+            acc = first ? ln[rs[k].k / S] : cq_note_union(acc, ln[rs[k].k / S]);
+            if (k + 1 == (size_t)N * S || rs[k + 1].a != rs[k].a) cq_cell_note_set(rs[k].a, &acc);
+        }
     }
     cq_tape_undo(&A);   /* PLANE and DECODE reversed; every ancilla back to the pool */
-    if (note) cq_note_set((int32_t)hh, &nt);
-    free(X); free(n); free(r.G); free(r.cell); free(r.at); free(rs);
+    if (toh) { cq_note_set((int32_t)hh, &hn); cq_note_alt((int32_t)hh, &hp); }
+    free(ln); free(X); free(n); free(r.G); free(r.cell); free(r.at); free(rs);
 }
 
 /* Objects (ABI §1.10 "Objects"): disjoint [start, end) ranges sorted by start, so ends are sorted too.
@@ -296,6 +334,7 @@ void cq_qram_access(int op, const cq_bit *c, uint32_t ah, uint32_t hh, uint32_t 
 typedef struct { uint64_t s, e; } obj;
 static obj *O;
 static size_t nO, capO;
+static uint64_t cells;   /* registered in all, at most 2^Q */
 
 static size_t end_above(uint64_t a) {   /* the first object with end > a */
     size_t lo = 0, hi = nO;
@@ -309,7 +348,17 @@ void cqrt_qram_object(int64_t addr, int64_t size) {
     size_t i = end_above(s), j = i;   /* O[i..j): the overlapping ones; touching ones stay separate */
     while (j < nO && O[j].s < e) j++;
     if (i < j) { if (O[i].s < s) s = O[i].s; if (O[j - 1].e > e) e = O[j - 1].e; }
-    else if (nO == capO) O = realloc(O, (capO = capO ? 2 * capO : 64) * sizeof *O);
+    uint64_t tot = cells + (e - s);
+    for (size_t k = i; k < j; k++) tot -= O[k].e - O[k].s;
+    if (tot > 1ull << cq_qaddr_bits()) {
+        fprintf(stderr, "cq_runtime: bus: registering the object [0x%llx, +%lld) takes the program's memory to %llu cells, "
+                "above 2^Q = 2^%u. Q is the cap on quantum address bits and the memory size (ABI §1.10), the user's "
+                "run-time setting: environment CQ_MAX_QADDR_BITS\n",
+                (unsigned long long)addr, (long long)size, (unsigned long long)tot, cq_qaddr_bits());
+        abort();
+    }
+    cells = tot;
+    if (i == j && nO == capO) O = realloc(O, (capO = capO ? 2 * capO : 64) * sizeof *O);
     if (!O) die("bus: out of memory, objects", nO);
     memmove(&O[i + 1], &O[j], (nO - j) * sizeof *O);
     nO += 1 - (j - i);
@@ -328,4 +377,26 @@ int cq_object_ending_at(uint64_t a, uint64_t *start, uint64_t *size) {
     if (i == nO || O[i].e != a) return 0;
     *start = O[i].s; *size = O[i].e - O[i].s;
     return 1;
+}
+
+/* The memory bound (ABI §1.10 "The memory size"): the registered cells that agree with the classical
+ * address bits, ascending, from whichever of the bit pattern and the memory is smaller to walk.
+ * cq_qram_force_bits: all 2^q, registered or not. */
+static uint32_t memory(uint64_t base, uint64_t qm, const uint32_t *pos, uint32_t q, uint64_t **la) {
+    uint32_t N = 0;
+    uint64_t s, n;
+    if (cq_qram_force_bits && q > cq_qaddr_bits()) die("bus: the forced bit pattern is above the cap CQ_MAX_QADDR_BITS, quantum bits", q);
+    if (cq_qram_force_bits || (q < 64 && 1ull << q <= cells)) {
+        *la = alloc((size_t)1 << q, sizeof **la);
+        for (uint64_t x = 0; x < 1ull << q; x++) {
+            uint64_t a = base;
+            for (uint32_t k = 0; k < q; k++) a |= (x >> k & 1) << pos[k];
+            if (cq_qram_force_bits || cq_object_at(a, &s, &n)) (*la)[N++] = a;
+        }
+        return N;
+    }
+    *la = alloc(cells, sizeof **la);
+    for (size_t i = 0; i < nO; i++)
+        for (uint64_t a = O[i].s; a < O[i].e; a++) if (!((a ^ base) & ~qm)) (*la)[N++] = a;
+    return N;
 }

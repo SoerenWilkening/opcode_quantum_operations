@@ -774,7 +774,7 @@ static void merge_tests(void) {
             model(w, k, m, 8, "10");
             expect(s_pread_off, "INPUT, quantum offset: pread", 0, w);
         }
-    expect_abort(s_pread_cap, "Limits: enumerated rail above the cap", "more quantum bits than CQ_MAX_QADDR_BITS to enumerate, the build-time cap" LIM);
+    expect_abort(s_pread_cap, "Limits: enumerated rail above the cap", "more quantum bits than CQ_MAX_QADDR_BITS to enumerate, the cap" LIM);
     /* getdelim: two candidates (',' and '<', which does not occur) and four (',' '-' '<' '='), input
      * shorter than K2; then the empty input; then K2 + 5 bytes in a file. Model: memchr. */
     const char *gin[] = { "ab-cd,ef=g", "" };

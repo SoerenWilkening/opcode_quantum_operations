@@ -1,5 +1,5 @@
 /* The derivation note beside a 64-bit rail (ABI §1.10 "Objects", Derivation; src/note.c): the value
- * rule, the rules of copy, add, sub, select and the i64 load, the default drop and the end flag, a note
+ * rule, the rules of copy, add, sub, select, the i64 load and the cells, the default drop and the end flag, a note
  * set by a call run at the end of a cq_invert region. Read through cq_note_get. Always asserts. */
 #undef NDEBUG
 #include <assert.h>
@@ -9,7 +9,7 @@
 #include "cq_template.h"
 #include "cq_replay.h"
 
-/* X and Y touch, Z stands alone; P holds pointer tables (HOST cells, not an object). */
+/* X and Y touch, Z stands alone; P holds pointer tables (its own object). */
 static _Alignas(64) uint64_t mem[64], P[16];
 static uint64_t X, Y, Z, ZE;   /* ZE: one past Z's end, in no object */
 static uint32_t M;
@@ -133,12 +133,22 @@ static void loads(void) {
     is(load_table((uint64_t[]){ X, Z, 0, ZE }), 2, X, 0, Z, 0);                 /* Z and its end: plain */
     is(load_table((uint64_t[]){ X, ZE, 0, ZE }), 2, X, 0, Z, 1);
     none(load_table((uint64_t[]){ X, ZE + 1, X + 16, X + 56 }));                 /* an unknown entry */
+    uint32_t p = load_table((uint64_t[]){ X, 0x10, Z, 7 });                      /* a pointer load: integers add nothing */
+    none(p); cqrt_qram_pointer(p); is(p, 2, X, 0, Z, 0);
+    cqrt_qram_pointer(p = noted(X)); one(p, X, 0);                               /* no load: nothing changes */
+    cqrt_qram_pointer(p = qrail(X, 0, 3)); none(p);
+    p = cqrt_qram_load_i64_hl_controlled(qbit(), M, (uint64_t)(uintptr_t)&P[3]); /* classical address too */
+    none(p); cqrt_qram_pointer(p); is(p, 0, 0, 0, 0, 0);
+    p = cqrt_alloc_i64(0);                                                       /* the call before the load runs */
+    cqrt_invert_begin(); cqrt_qram_load_i64_unc(p, M, qrail((uint64_t)(uintptr_t)P, 3, 5)); cqrt_qram_pointer(p); cqrt_invert_end();
+    is(p, 2, X, 0, Z, 0);
     /* one cell made QUANTUM by a prior store */
     for (int i = 0; i < 4; i++) P[i] = X + 8 * (uint64_t)i;
     uint32_t v = cqrt_alloc_i8(0);
     cq_get_qubit(cq_rail_bits((int32_t)v));
     cqrt_qram_store_i8_hl(M, (uint64_t)(uintptr_t)&P[2] + 1, v);
-    none(cqrt_qram_load_i64(M, qrail((uint64_t)(uintptr_t)P, 3, 5)));
+    none(p = cqrt_qram_load_i64(M, qrail((uint64_t)(uintptr_t)P, 3, 5)));
+    cqrt_qram_pointer(p); none(p);                                               /* a QUANTUM cell with no note: still none */
     one(cqrt_qram_load_i64(M, qrail((uint64_t)(uintptr_t)P, 3, 4)), X, 0);    /* leaves 0, 1 only */
     /* classical address: controlled into |0>, and the uncontrolled classical result */
     P[8] = Z + 8;
@@ -151,6 +161,41 @@ static void loads(void) {
     uint32_t h = noted(X);   /* a load _unc into a rail that is not |0> sets nothing */
     cqrt_qram_load_i64_hl_controlled_unc(h, qbit(), M, (uint64_t)(uintptr_t)&P[8]);
     none(h);
+}
+
+/* The cell rule: a store or swap leaves the rail's note with the cells it can reach, a load from QUANTUM
+ * cells takes the union of theirs. */
+static void cells(void) {
+    uint64_t T = (uint64_t)(uintptr_t)&P[12];
+    P[12] = Z + 8; P[13] = Z + 16;
+    cqrt_qram_store_i64(M, qrail(T, 3, 4), cqrt_alloc_i64(X + 8));   /* quantum address: what each slot had, and X */
+    is(cqrt_qram_load_i64_hl(M, T + 8), 2, X, 0, Z, 0);
+    is(cqrt_qram_load_i64(M, qrail(T, 3, 4)), 2, X, 0, Z, 0);
+    is(cqrt_qram_load_i64_hl(M, T + 4), 2, X, 0, Z, 0);              /* the note is per cell: across two slots too */
+    cqrt_qram_store_i64_hl(M, T, noted(X + 8));                      /* classical address, no control: the rail's alone */
+    one(cqrt_qram_load_i64_hl(M, T), X, 0);
+    cqrt_qram_store_i64_hl_controlled(qbit(), M, T, cqrt_alloc_i64(Z));   /* controlled: or what it had */
+    is(cqrt_qram_load_i64_hl(M, T), 2, X, 0, Z, 0);
+    cqrt_qram_swap_i64_hl(M, T, noted(Z + 8));
+    one(cqrt_qram_load_i64_hl(M, T), Z, 0);
+    for (int qa = 0; qa < 2; qa++) {   /* the in-place form: a swap into |0> is a load, the update keeps the note */
+        uint32_t h = cqrt_alloc_i64(0), a = qrail(T, 3, 4);
+        if (qa) cqrt_qram_swap_i64(M, a, h); else cqrt_qram_swap_i64_hl(M, T, h);
+        if (qa) is(h, 2, X, 0, Z, 0); else one(h, Z, 0);   /* the other slot still has X and Z */
+        uint32_t y = cq_template_add_i64_hl(h, 8);
+        if (qa) cqrt_qram_swap_i64(M, a, y); else cqrt_qram_swap_i64_hl(M, T, y);
+        if (qa) is(cqrt_qram_load_i64_hl(M, T), 2, X, 0, Z, 0); else one(cqrt_qram_load_i64_hl(M, T), Z, 0);
+    }
+    cqrt_qram_store_i64_hl(M, T, noted(Z + 8));
+    cqrt_qram_store_i64_controlled(qbit(), M, qrail(T, 3, 4), cqrt_alloc_i64(0));   /* null adds nothing */
+    one(cqrt_qram_load_i64_hl(M, T), Z, 0);
+    uint32_t v = cqrt_alloc_i8(0);
+    cq_get_qubit(cq_rail_bits((int32_t)v));
+    cqrt_qram_store_i8_hl(M, T + 1, v);                              /* a narrower store: the cell has none */
+    none(cqrt_qram_load_i64_hl(M, T));
+    cqrt_qram_store_i64_hl(M, T, noted(X + 8));
+    cqrt_qram_store_i64(M, qrail(T, 3, 4), qrail(X, 0, 3));          /* a rail with no note leaves none */
+    none(cqrt_qram_load_i64_hl(M, T));
 }
 
 static void invert(void) {
@@ -178,8 +223,9 @@ static void unbound(void) {
 int main(void) {
     X = (uint64_t)(uintptr_t)mem; Y = X + 64; Z = X + 256; ZE = Z + 64;
     cqrt_qram_object((int64_t)X, 64); cqrt_qram_object((int64_t)Y, 64); cqrt_qram_object((int64_t)Z, 64);
+    cqrt_qram_object((int64_t)(uintptr_t)P, sizeof P);   /* a quantum address reaches registered memory only */
     M = cqrt_qram_alloc_i8(0);
-    value_rule(); keep(); drops(); end_flag(); loads(); invert(); unbound();
+    value_rule(); keep(); drops(); end_flag(); loads(); cells(); invert(); unbound();
     printf("note ok\n");
     return 0;
 }

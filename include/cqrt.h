@@ -67,7 +67,7 @@ void     cqrt_rz_qangle_controlled(uint32_t c, uint32_t A);
 
 /* Memory bus, §1.10 (src/bus.c). addr: a 64-bit rail in the plain forms, an address in the _hl
  * forms. The load _unc takes h before c (ABI:397, inventory D2). A quantum address rail goes through
- * the fan-out QRAM (src/qram.c), up to CQ_MAX_QADDR_BITS quantum bits. */
+ * the fan-out QRAM (src/qram.c), over at most 2^Q registered cells (cq_bus.h). */
 #define CQRT_DECL_BUS_(n, ...) \
     uint32_t cqrt_qram_load_##n(uint32_t m, uint32_t addr); \
     uint32_t cqrt_qram_load_##n##_hl(uint32_t m, uint64_t addr); \
@@ -91,6 +91,7 @@ uint32_t cqrt_qram_alloc_i8(uint32_t n);
 /* An object [addr, addr + size) for the access bound (src/qram.c): no gate, no qubit; size <= 0 and a
  * range reaching 2^64 register nothing; overlapping registrations merge. */
 void     cqrt_qram_object(int64_t addr, int64_t size);
+void     cqrt_qram_pointer(uint32_t h);   /* §1.10 "A pointer load": h's load ignores the non-address cells of its bound */
 void     cqrt_qram_unbound(uint32_t h);   /* §1.10 "No object": h carries no note from now on */
 
 /* Tape and abort, §1.11 (src/tape.c). name: a host symbol, or NULL for the address in the first

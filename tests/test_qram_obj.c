@@ -282,20 +282,30 @@ static void unions(void) {
     printf("unions of two (touching, byte and 8-byte addresses) and three objects: ok\n");
 }
 
-/* One i8 load both ways: the same leaves (2^q) and gates. */
+/* One i8 load on the memory bound: its leaves are the registered cells of the bit pattern, and where
+ * those are all 2^q, the gates are the forced bit pattern's. */
 static void same_as_bits(uint32_t a) {
-    uint64_t g[2];
-    uint32_t l[2], q = nq(cq_rail_bits((int32_t)a), 64);
-    for (int force = 0; force < 2; force++) {
+    uint64_t g[2], o, on, base = 0;
+    uint32_t l[2], q = 0, want = 0, pos[64];
+    const cq_bit *ab = cq_rail_bits((int32_t)a);
+    for (uint32_t i = 0; i < 64; i++) if (cq_bit_is_q(ab[i])) pos[q++] = i; else base |= (uint64_t)ab[i].kind << i;
+    for (uint64_t x = 0; x < 1ull << q; x++) {
+        uint64_t v = base;
+        for (uint32_t k = 0; k < q; k++) v |= (x >> k & 1) << pos[k];
+        want += (uint32_t)cq_object_at(v, &o, &on);
+    }
+    for (int force = 0; force < 1 + (q <= CQ_MAX_QADDR_BITS); force++) {   /* forced above the cap aborts */
         cq_qram_force_bits = force;
         uint64_t g0 = cq_replay_gates();
         uint32_t h = cqrt_qram_load_i8(M, a);
         g[force] = cq_replay_gates() - g0; l[force] = cq_qram_leaves;
+        assert(peek(h) == (cq_object_at(peek(a), &o, &on) || force ? *(uint8_t *)(uintptr_t)peek(a) : 0));
         cqrt_qram_load_i8_unc(h, M, a);
+        assert(!peek(h));
         cqrt_free(h);
     }
     cq_qram_force_bits = 0;
-    assert(l[0] == 1u << q && l[1] == l[0] && g[0] == g[1]);
+    assert(l[0] == want && (q > CQ_MAX_QADDR_BITS || (l[1] == 1u << q && (l[0] != l[1] || g[0] == g[1]))));
 }
 
 static void cap_abort(uint64_t start) {
@@ -306,9 +316,7 @@ static void cap_abort(uint64_t start) {
     assert(pid >= 0);
     if (pid == 0) {
         dup2(fd[1], 2);
-        uint32_t a = qrail(start, 0, CQ_MAX_QADDR_BITS + 2);
-        cq_note_set((int32_t)a, &(cq_note){ 1, { { start, 0 } } });
-        cqrt_qram_load_i8(M, a);
+        cqrt_qram_object((int64_t)start, 1ll << (CQ_MAX_QADDR_BITS + 2));
         _exit(0);
     }
     close(fd[1]);
@@ -342,10 +350,9 @@ static void fallbacks(void) {
     cqrt_qram_object((int64_t)(X - 0x100), 64);
     cq_note_set((int32_t)a, &(cq_note){ 1, { { X - 0x100, 0 } } });
     same_as_bits(a);
-    /* object leaves above the cap: the bit pattern, which aborts as today */
-    uint64_t big = 0x7a0000000000ull;
-    cqrt_qram_object((int64_t)big, 1ll << (CQ_MAX_QADDR_BITS + 2));
-    cap_abort(big);
+    /* an object above 2^Q cells aborts at its registration; an address of Q + 2 quantum bits does not */
+    cap_abort(0x7a0000000000ull);
+    same_as_bits(qrail(X, 0, CQ_MAX_QADDR_BITS + 2));
     /* and with that note, an address of 7 quantum bits in the 100-byte object: 100 leaves */
     cq_replay_reset();
     a = qrail(X, 0, 7);
@@ -353,7 +360,7 @@ static void fallbacks(void) {
     uint32_t h = cqrt_qram_load_i8(M, a);
     assert(cq_qram_leaves == 100);
     cqrt_qram_load_i8_unc(h, M, a);
-    printf("fallbacks (no note, only an end entry, a classical high bit of d, not smaller, above the cap): ok\n");
+    printf("fallbacks (no note, only an end entry, a classical high bit of d, not smaller, above the cap): the memory bound, ok\n");
 }
 
 /* The measured problem: a table T of N pointers into A (|A| = 512), index quantum, address =
