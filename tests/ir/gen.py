@@ -56,6 +56,14 @@ def run(name, W, ty, retattr, frombits, tobits, wbits):
     meas(d, x^want, 'cqrt_copy value')
     body.append(f'  call void @cqrt_copy_{name}_controlled(i32 {c}, i32 {h}, i32 {d})')  # d = x
     meas(d, x, 'cqrt_copy_controlled value')
+    if frombits:   # §1.15, integer widths: d = x + y, + want, - want
+        D(f'declare void @cqrt_addc_{name}(i32, {ty})'); D(f'declare void @cqrt_add_{name}(i32, i32)'); D(f'declare void @cqrt_sub_{name}(i32, i32)')
+        body.append(f'  call void @cqrt_addc_{name}(i32 {d}, {ty} {vals[2]})')
+        meas(d, (x+y)&mask, 'cqrt_addc value')
+        body.append(f'  call void @cqrt_add_{name}(i32 {h}, i32 {d})')
+        meas(d, (x+y+want)&mask, 'cqrt_add value')
+        body.append(f'  call void @cqrt_sub_{name}(i32 {h}, i32 {d})')
+        meas(d, (x+y)&mask, 'cqrt_sub value')
     if W in ext:   # the extension the ABI promises: call with an i32 return type (allowed with opaque pointers) to read all of EAX
         z=t(); body.append(f'  {z} = call i32 @cqrt_measure_{name}(i32 {h})')
         ok=t(); body.append(f'  {ok} = icmp eq i32 {z}, {(want - (1<<W) if W>1 and want>>(W-1) else want) & 0xffffffff}'); check(f'{name}: cqrt_measure return not extended to 32 bits', ok)

@@ -57,7 +57,7 @@ the ABI guarantees a known basis state, and the library keeps no shadow state to
 Ours:
 
 - **Core (§1).** alloc, free, measure, ry, ry_qangle, rz_i1, rz_qangle, the i1 logic, copy,
-  xorc, their `_controlled` forms, push/pop, invert_begin/end. Core gates accept the fp width
+  xorc, their `_controlled` forms, the in-place add/sub/addc (§1.15, integer widths), push/pop, invert_begin/end. Core gates accept the fp width
   tokens as bit patterns.
 - **Angle ladder (§1.5, §1.7).** Classical angle rail: k computed on the host, one rotation.
   Quantum angle rail: the exact reduction circuit K ^= k(A), N controlled rotations, the

@@ -5,6 +5,7 @@
 #include <string.h>
 #include "cqrt.h"
 #include "cq_rt.h"
+#include "kernels.h"   /* CQ_KOP_ARITH_add/sub, for the note */
 
 static void die(const char *msg, uint32_t h) {
     fprintf(stderr, "cq_runtime: %s (handle %u)\n", msg, h);
@@ -64,6 +65,71 @@ static void xorc_do(uint32_t c, int ctl, uint32_t h, uint32_t w, const uint64_t 
     cq_call_do(&k);
 }
 
+/* ABI §1.15: d += s in place; sub = 1: d -= s, the same gate list reversed. The Cuccaro adder (Cuccaro,
+ * Draper, Kutin, Moulton, quant-ph/0410184) without the carry out, in its depth 2W + O(1) order: the CXs
+ * of every MAJ first, the carry CCXs up, the top sum bit, then the 3-CNOT UMA (b negated around its
+ * CCX) with the CCXs down before the CXs. c_i, the carry into bit i, lives on wire a_(i-1) (c_0: one
+ * ancilla). Wire a_i is s's bit when that is a qubit, else a scratch bit holding its classical value
+ * (addc's literal too). Scratch and the ancilla end as they began and return to the pool; classical
+ * bits fold in the emitter, so an all-classical call emits no gate.
+ * shortcut: depth linear in W; a log-depth in-place adder (Draper et al., quant-ph/0406142 §4) if it matters. */
+typedef struct { const cq_bit *a, *b; cq_bit *t; } gate;   /* b NULL: CX; a NULL too: X */
+static void add(uint32_t s, uint32_t d, uint32_t w, int sub) {
+    if (s == d) die("add/sub: s and d are the same rail", s);
+    cq_bit *sb = rail(s, w), *db = rail(d, w), cin = cq_bit_const(0);
+    cq_bit *a = malloc(w * sizeof *a), **ap = malloc(w * sizeof *ap);
+    gate *g = malloc(9 * (size_t)w * sizeof *g);
+    if (!a || !ap || !g) die("out of memory", d);
+    /* The derivation note and "Data" (ABI §1.10), as the add/sub template leaves them on its result. */
+    int op = sub ? CQ_KOP_ARITH_sub : CQ_KOP_ARITH_add;
+    cq_note nt = w == 64 ? cq_note_tpl(op, (uint32_t[]){ d, s }) : (cq_note){ -1, { { 0, 0 } } };
+    cq_note ct = cq_content_all((uint32_t[]){ d, s }, 2);
+    if (ct.n < 0 && nt.n > 0) ct = nt;
+    size_t n = 0;
+    for (uint32_t i = 0; i < w; i++) { a[i] = sb[i]; ap[i] = cq_bit_is_q(sb[i]) ? &sb[i] : &a[i]; }
+#define C_(i) ((i) ? ap[(i) - 1] : &cin)
+    for (uint32_t i = 0; i < w; i++) g[n++] = (gate){ ap[i], NULL, &db[i] };                 /* d_i ^= a_i */
+    for (uint32_t i = 0; i + 1 < w; i++) g[n++] = (gate){ ap[i], NULL, C_(i) };              /* c_i ^= a_i */
+    for (uint32_t i = 0; i + 1 < w; i++) g[n++] = (gate){ C_(i), &db[i], ap[i] };            /* a_i = c_(i+1) */
+    if (w > 1) g[n++] = (gate){ ap[w - 2], NULL, &db[w - 1] };                               /* the top sum bit */
+    for (uint32_t i = 0; i + 1 < w; i++) { g[n++] = (gate){ NULL, NULL, &db[i] }; g[n++] = (gate){ C_(i), NULL, &db[i] }; }
+    for (uint32_t i = w - 1; i-- > 0;) g[n++] = (gate){ C_(i), &db[i], ap[i] };              /* a_i restored */
+    for (uint32_t i = w - 1; i-- > 0;) {                                                     /* c_i restored, d_i the sum bit */
+        g[n++] = (gate){ NULL, NULL, &db[i] }; g[n++] = (gate){ ap[i], NULL, C_(i) }; g[n++] = (gate){ ap[i], NULL, &db[i] };
+    }
+#undef C_
+    for (size_t k = 0; k < n; k++) {
+        const gate *x = &g[sub ? n - 1 - k : k];
+        if (x->b) cq_ccx(x->a, x->b, x->t); else if (x->a) cq_cx(x->a, x->t); else cq_x(x->t);
+    }
+    for (uint32_t i = 0; i < w; i++)         /* scratch: back to its classical value, flipped to |0>, released */
+        if (ap[i] == &a[i] && cq_bit_is_q(a[i])) { if (sb[i].kind == CQ_BIT_ONE) cq_x(&a[i]); cq_pool_give(a[i].q); }
+    if (cq_bit_is_q(cin)) cq_pool_give(cin.q);
+    free(a); free(ap); free(g);
+    if (w == 64) cq_note_set((int32_t)d, &nt);
+    cq_content_set((int32_t)d, &ct);
+}
+/* Through cq_invert: the inverse of add is sub, that of addc(lit) the reversed list too (= addc(-lit)). */
+static void add_k(const cq_call *k, int inv) { add(k->h[0], k->h[1], k->n[0], (int)k->n[1] ^ inv); }
+static void add_do(uint32_t s, uint32_t d, uint32_t w, int sub) {
+    cq_call_do(&(cq_call){ .run = add_k, .name = sub ? "sub" : "add", .h = { s, d }, .n = { w, (uint32_t)sub } });
+}
+static void addc_k(const cq_call *k, int inv) {
+    int32_t l = cq_rail_alloc(k->n[0], k->v);   /* classical: add never targets it, the free emits nothing */
+    add((uint32_t)l, k->h[0], k->n[0], inv);
+    cq_rail_free(l);
+}
+static void addc_do(uint32_t h, uint32_t w, const uint64_t *v, size_t nv) {
+    cq_call k = { .run = addc_k, .name = "addc", .h = { h }, .n = { w } };
+    memcpy(k.v, v, nv);
+    cq_call_do(&k);
+}
+/* Integer widths only (ABI §1.15). */
+#define ADD_(n, bits, LIT, V) \
+    void cqrt_add_##n(uint32_t s, uint32_t d) { add_do(s, d, bits, 0); } \
+    void cqrt_sub_##n(uint32_t s, uint32_t d) { add_do(s, d, bits, 1); } \
+    void cqrt_addc_##n(uint32_t h, LIT) { V(bits); addc_do(h, bits, v, sizeof v); }
+
 /* Per width. LIT is the literal parameter list, RET the measure type. V(bits) declares the
  * limbs v of the literal; OUT(bits, RET) returns the measured limbs v as RET. */
 #define CORE_(n, bits, LIT, RET, V, OUT) \
@@ -84,14 +150,16 @@ static unsigned __int128 sext(const uint64_t *v, uint32_t w) {
 #define OUT_NARROW_(bits, RET) return (RET)sext(v, bits)
 #define NARROW_(n, bits) \
     _Static_assert(bits <= 128, #n " belongs in CQ_WIDTHS_WIDE"); \
-    CORE_(n, bits, CQRT_UINT(bits) lit, CQRT_INT(bits), V_NARROW_, OUT_NARROW_)
+    CORE_(n, bits, CQRT_UINT(bits) lit, CQRT_INT(bits), V_NARROW_, OUT_NARROW_) \
+    ADD_(n, bits, CQRT_UINT(bits) lit, V_NARROW_)
 CQ_WIDTHS_NARROW(NARROW_)
 
 #define V_WIDE_(bits) const uint64_t v[4] = { l0, l1, l2, l3 }
 #define OUT_WIDE_(bits, RET) RET r; memcpy(r.l, v, sizeof r.l); return r
 #define WIDE_(n, bits) \
     _Static_assert(bits > 192 && bits <= 256, #n ": four limbs carry 193..256 bits"); \
-    CORE_(n, bits, CQRT_LIMBS_, cqrt_u256, V_WIDE_, OUT_WIDE_)
+    CORE_(n, bits, CQRT_LIMBS_, cqrt_u256, V_WIDE_, OUT_WIDE_) \
+    ADD_(n, bits, CQRT_LIMBS_, V_WIDE_)
 CQ_WIDTHS_WIDE(WIDE_)
 
 /* An fp literal is its bit pattern: the low bits/8 bytes of its object (f80: 10 of 16). */

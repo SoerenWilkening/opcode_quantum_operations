@@ -89,6 +89,8 @@ int main(void) {
             for (int s = 0; CORE_W[f].suf[s]; s++)
                 printf("runtime %s cqrt_%s_%s%s\n", CORE_W[f].fam, CORE_W[f].op,
                        w < NI ? INT[w].n : FP[w - NI].n, CORE_W[f].suf[s]);
+    for (int w = 0; w < NI; w++)            /* §1.15: add, sub, addc at the integer widths only */
+        printf("runtime core cqrt_add_%s\nruntime core cqrt_sub_%s\nruntime core cqrt_addc_%s\n", INT[w].n, INT[w].n, INT[w].n);
     for (size_t f = 0; f < sizeof CORE / sizeof *CORE; f++) printf("runtime %s cqrt_%s\n", CORE[f].fam, CORE[f].name);
     for (size_t f = 0; f < sizeof TPL / sizeof *TPL; f++)
         for (int w = 0; w < NI; w++)

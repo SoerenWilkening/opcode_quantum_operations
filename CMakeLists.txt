@@ -86,6 +86,9 @@ target_sources(cq_backend PRIVATE src/core.c)
 add_executable(test_core tests/test_core.c)
 target_link_libraries(test_core cq_test_harness)
 add_test(NAME core COMMAND test_core)
+add_executable(test_add tests/test_add.c)   # ABI §1.15, and §1.9 on a live target
+target_link_libraries(test_add cq_test_harness)
+add_test(NAME add COMMAND test_add)
 
 # Integer templates §2 (kmgy.25 on): public header include/cq_template.h, sources src/templates/,
 # each calling its registry kernel. Nothing outside src/templates/ references a template (templates_layering).

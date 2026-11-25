@@ -1,5 +1,5 @@
 /* Public core entry points of BACKEND_ABI §1 (libcq_backend.a): alloc, free,
- * measure, the i1 logic, copy, xorc and their _controlled forms, push/pop.
+ * measure, the i1 logic, copy, xorc and their _controlled forms, the in-place add (§1.15), push/pop.
  * Generated per width from CQ_WIDTHS and CQ_FP_WIDTHS (cq_widths.h).
  *
  * The ABI gives LLVM types; the C types below are chosen so a caller compiled
@@ -35,8 +35,13 @@ typedef struct { uint64_t l[4]; } cqrt_u256;   /* a measured iN, 128 < N <= 256 
     void cqrt_copy_##n##_controlled(uint32_t c, uint32_t s, uint32_t d); \
     void cqrt_xorc_##n(uint32_t h, LIT); \
     void cqrt_xorc_##n##_controlled(uint32_t c, uint32_t h, LIT);
-#define CQRT_DECL_NARROW_(n, bits) CQRT_DECL_(n, CQRT_UINT(bits) lit, CQRT_INT(bits))
-#define CQRT_DECL_WIDE_(n, bits)   CQRT_DECL_(n, CQRT_LIMBS_, cqrt_u256)
+/* §1.15, integer widths: d += s, d -= s, h += lit in place, mod 2^W; d (h) is any live rail. */
+#define CQRT_DECL_ADD_(n, LIT) \
+    void cqrt_add_##n(uint32_t s, uint32_t d); \
+    void cqrt_sub_##n(uint32_t s, uint32_t d); \
+    void cqrt_addc_##n(uint32_t h, LIT);
+#define CQRT_DECL_NARROW_(n, bits) CQRT_DECL_(n, CQRT_UINT(bits) lit, CQRT_INT(bits)) CQRT_DECL_ADD_(n, CQRT_UINT(bits) lit)
+#define CQRT_DECL_WIDE_(n, bits)   CQRT_DECL_(n, CQRT_LIMBS_, cqrt_u256) CQRT_DECL_ADD_(n, CQRT_LIMBS_)
 #define CQRT_DECL_FP_(n, bits, T)  CQRT_DECL_(n, T lit, T)
 CQ_WIDTHS_NARROW(CQRT_DECL_NARROW_)
 CQ_WIDTHS_WIDE(CQRT_DECL_WIDE_)
